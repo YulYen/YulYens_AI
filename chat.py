@@ -13,6 +13,21 @@ AVAILABLE_MODELS = {
     "3": ("Leah (Leah13B)", "leah13b"),
 }
 
+
+def warmup_model(model):
+    print("💡 Wärme Modell auf …")
+    try:
+        # Ein einzelner non‑stream‑Call via API
+        requests.post("http://localhost:11434/api/chat", json={
+            "model": model,
+            "stream": False,
+            "messages": [{"role": "user", "content": ""}]
+        }).raise_for_status()
+        time.sleep(2)  # kurz warten
+        print("✅ Modell ist bereit.")
+    except Exception as e:
+        print(f"⚠️ Warm‑Up fehlgeschlagen: {e}")
+
 # Funktion: Ollama-Server-Verfügbarkeit prüfen
 def check_ollama_running():
     print("🔍 Warte auf Ollama-Server...")
@@ -70,6 +85,7 @@ def main():
 
     check_ollama_running()
     model = choose_model()
+    warmup_model(model)
 
     print(f"💬 Starte Chat mit {model} ('exit' zum Beenden)")
     history = []
