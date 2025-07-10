@@ -13,14 +13,19 @@ RESPONSE_SYMBOL = f"{Fore.CYAN}💬 Leah:{Style.RESET_ALL} "
 # Entfernt Dummy-Tags und glättet die Ausgabe
 def clean_text(text: str) -> str:
     text = re.sub(r"<dummy\d+>", "", text)
-    text = text.strip()
-    return text
+    return text.strip()
 
-# Anfrage an Ollama-API
+# Verlauf speichern
+dialog_history = []
+
+# Anfrage an Ollama-API mit Kontext
 def ask_leah(prompt: str) -> str:
+    dialog_history.append(f"User: {prompt}")
+    full_prompt = "\n".join(dialog_history) + "\nAssistant:"
+
     payload = {
         "model": MODEL_NAME,
-        "prompt": prompt,
+        "prompt": full_prompt,
         "stream": False,
         "stop": "<|assistant|>"
     }
@@ -29,7 +34,9 @@ def ask_leah(prompt: str) -> str:
         resp.raise_for_status()
         data = resp.json()
         text = data.get("response", "").split("<|assistant|>")[0]
-        return clean_text(text) or "(leere Antwort)"
+        text = clean_text(text) or "(leere Antwort)"
+        dialog_history.append(f"Assistant: {text}")
+        return text
     except requests.exceptions.RequestException as e:
         return f"❌ API-Fehler: {e}"
     except ValueError:
@@ -41,6 +48,7 @@ def main():
     while True:
         try:
             user_input = input(PROMPT_SYMBOL)
+            print("\n")
             if user_input.lower() in ("exit", "quit", "bye"):
                 print("👋 Auf Wiedersehen!")
                 break
