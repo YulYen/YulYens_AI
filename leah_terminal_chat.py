@@ -1,63 +1,58 @@
-# leah_terminal_chat.py
-
-import subprocess
-import json
+import requests
 import re
+from colorama import Fore, Style, init
 
-# Modellname (muss zuvor via ollama create erzeugt worden sein)
-MODEL_NAME = "LEAH13b"
+init(autoreset=True)  # Für Farbausgabe im Terminal
 
-# Filtert Dummy-Tags wie <dummy12345> aus der Antwort
-def clean_output(text):
-    return re.sub(r"<dummy\d+>", "", text).strip()
+MODEL_NAME = "leah13b"
+API_URL = "http://localhost:11434/api/generate"
+WELCOME = f"\n{Fore.MAGENTA}👋 Willkommen bei Leah (Modell: {MODEL_NAME}){Style.RESET_ALL}\n"
+PROMPT_SYMBOL = f"{Fore.GREEN}🟢 Du:{Style.RESET_ALL} "
+RESPONSE_SYMBOL = f"{Fore.CYAN}💬 Leah:{Style.RESET_ALL} "
 
-# Schickt einen Prompt an ollama und gibt die bereinigte Antwort zurück
-def ask_leah(prompt):
+# Entfernt Dummy-Tags und glättet die Ausgabe
+def clean_text(text: str) -> str:
+    text = re.sub(r"<dummy\d+>", "", text)
+    text = text.strip()
+    return text
+
+# Anfrage an Ollama-API
+def ask_leah(prompt: str) -> str:
+    payload = {
+        "model": MODEL_NAME,
+        "prompt": prompt,
+        "stream": False,
+        "stop": "<|assistant|>"
+    }
     try:
-        # Aufruf von ollama innerhalb der WSL
-        process = subprocess.run(
-            ["ollama", "run", MODEL_NAME],
-            input=prompt.encode("utf-8"),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=60
-        )
+        resp = requests.post(API_URL, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        text = data.get("response", "").split("<|assistant|>")[0]
+        return clean_text(text) or "(leere Antwort)"
+    except requests.exceptions.RequestException as e:
+        return f"❌ API-Fehler: {e}"
+    except ValueError:
+        return "❌ Ungültige Antwort von API"
 
-        stdout = process.stdout.decode("utf-8").strip()
-        stderr = process.stderr.decode("utf-8").strip()
-
-        if process.returncode != 0:
-            return f"[Ollama-Fehlercode {process.returncode}]\nSTDERR:\n{stderr or '(leer)'}\nSTDOUT:\n{stdout or '(leer)'}"
-
-        if stderr.strip():
-            print(f"[Warnung / STDERR von ollama]:\n{stderr}\n")
-
-        # Dummy-Tags filtern (z. B. <dummy32006>)
-        clean = re.sub(r"<dummy\d+>", "", stdout)
-        clean = clean.replace("\\n", "\n").replace('\\"', '"').strip()
-        return clean.strip() or "(leere Antwort)"
-
-    except subprocess.TimeoutExpired:
-        return "[Timeout] Der Aufruf von ollama hat länger als 60 Sekunden gedauert."
-    except FileNotFoundError:
-        return "[Fehler] Das Kommando 'ollama' wurde nicht gefunden – läuft dein Modell in der WSL?"
-    except Exception as e:
-        return f"[Unerwarteter Fehler] {type(e).__name__}: {str(e)}"
-# Hauptschleife
+# Hauptloop
 def main():
-    print(f"👋 Willkommen bei Leah (Modell: {MODEL_NAME})\n")
+    print(WELCOME)
     while True:
         try:
-            user_input = input("🟢 Du: ")
-            if user_input.lower() in {"exit", "quit", "bye"}:
-                print("👋 Bis bald!")
+            user_input = input(PROMPT_SYMBOL)
+            if user_input.lower() in ("exit", "quit", "bye"):
+                print("👋 Auf Wiedersehen!")
                 break
 
             response = ask_leah(user_input)
-            print(f"💬 Leah: {response}\n")
+            print(f"{RESPONSE_SYMBOL}{response}\n")
 
         except KeyboardInterrupt:
-            print("\n👋 Gespräch beendet.")
+            print("\n👋 Auf Wiedersehen!")
+            break
+        except Exception as e:
+            print(f"❌ Unerwarteter Fehler: {e}")
             break
 
 if __name__ == "__main__":
