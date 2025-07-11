@@ -8,8 +8,10 @@ from datetime import datetime
 init(autoreset=True)
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "leah13b"
+MODEL_NAME = "leah13b1"
 LOGFILE = "selftalk_log.txt"
+ENABLE_LOGGING = False
+
 
 # Nachrichtenverlauf für Kontext
 history = []
@@ -23,9 +25,10 @@ def is_strong_selftalk(text):
         result = True
     elif re.match(r"\s*(assistant:)", text, re.IGNORECASE):
         result = True
-    # Loggen
-    with open(LOGFILE, "a", encoding="utf-8") as log:
-        log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Text: {text.strip()} -> Selftalk? {result}\n")
+    if ENABLE_LOGGING:
+        # Loggen
+        with open(LOGFILE, "a", encoding="utf-8") as log:
+            log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Text: {text.strip()} -> Selftalk? {result}\n")
     return result
 
 # Farben und Begrüßung
