@@ -2,58 +2,92 @@ import requests
 import json
 import re
 from colorama import Fore, Style, init
+from datetime import datetime
 
 # Farbausgabe aktivieren
 init(autoreset=True)
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME = "leah13b"
-
-# Farben und Begrüßung
-print(f"{Fore.MAGENTA}💬 Starte lokalen Chat mit L-E-A-H Version 13b ({MODEL_NAME}) ('exit' zum Beenden){Style.RESET_ALL}")
+LOGFILE = "selftalk_log.txt"
 
 # Nachrichtenverlauf für Kontext
 history = []
 
-# Streaming-Funktion mit Dummy-Filter und Farbausgabe
-def send_message_stream(messages):
-    with requests.post(OLLAMA_URL, json={
-        "model": MODEL_NAME,
-        "stream": True,
-        "messages": messages
-    }, stream=True) as response:
-        response.raise_for_status()
+# Filter für echten Selftalk (nicht legitime Antworten)
+def is_strong_selftalk(text):
+    result = False
+    if re.search(r"<\|user\|>", text):
+        result = True
+    elif re.search(r"<\|system\|>", text):
+        result = True
+    elif re.match(r"\s*(assistant:)", text, re.IGNORECASE):
+        result = True
+    # Loggen
+    with open(LOGFILE, "a", encoding="utf-8") as log:
+        log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Text: {text.strip()} -> Selftalk? {result}\n")
+    return result
 
-        full_reply = ""
-        print(f"{Fore.CYAN}🤖 Leah:{Style.RESET_ALL} ", end="", flush=True)
-        for line in response.iter_lines():
-            if line:
+# Farben und Begrüßung
+print(f"{Fore.MAGENTA}💬 Starte lokalen Chat mit Leah ({MODEL_NAME}) ('exit' zum Beenden){Style.RESET_ALL}")
+
+# Hauptfunktion: Streaming mit Wort-basiertem Selftalk-Abbruch bei Leerzeichen
+
+def send_message_stream(messages):
+    payload = {"model": MODEL_NAME, "stream": True, "messages": messages}
+    try:
+        with requests.post(OLLAMA_URL, json=payload, stream=True, timeout=60) as response:
+            response.raise_for_status()
+            full_reply = ""
+            print(f"{Fore.CYAN}🤖 Leah:{Style.RESET_ALL} ", end="", flush=True)
+
+            buffer = ""
+            for line in response.iter_lines():
+                if not line:
+                    continue
                 try:
                     data = json.loads(line.decode('utf-8'))
-                    content = data.get("message", {}).get("content")
-                    if content:
-                        # Dummy-Tags entfernen und ausgeben
-                        clean = re.sub(r"<dummy\d+>", "", content)
-                        print(clean, end="", flush=True)
-                        full_reply += clean
-                except json.JSONDecodeError as e:
-                    print(f"\n⚠️ JSON-Fehler: {e}")
-                    print(f"Antwortzeile: {line}")
-        print()  # Neue Zeile nach Ausgabe
-        return full_reply
+                    content = data.get("message", {}).get("content", "")
+                except json.JSONDecodeError:
+                    continue
+
+                # Dummy-Tags entfernen und Puffer auffüllen
+                clean = re.sub(r"<dummy\d+>", "", content)
+                buffer += clean
+
+                # Prüfen, ob buffer ein Leerzeichen oder Zeilenumbruch enthält (nicht nur am Ende)
+                if re.search(r"\s", buffer):
+                    if is_strong_selftalk(buffer):
+                        break
+                    print(buffer, end="", flush=True)
+                    full_reply += buffer
+                    buffer = ""
+
+            # Restpuffer ausgeben, wenn kein Selftalk
+            if buffer and not is_strong_selftalk(buffer):
+                print(buffer, end="", flush=True)
+                full_reply += buffer
+
+            print()  # Zeilenumbruch am Ende
+            return full_reply
+    except requests.exceptions.RequestException as e:
+        print(f"\n❌ API-Fehler: {e}\n")
+        return ""
 
 # Hauptloop
 while True:
     try:
         user_input = input(f"{Fore.GREEN}🧑 Du:{Style.RESET_ALL} ").strip()
-        if user_input.lower() in ("exit", "quit"): break
-
+        print()  # Leerzeile
+        if user_input.lower() in ("exit", "quit"):  
+            print("👋 Auf Wiedersehen!")
+            break
         history.append({"role": "user", "content": user_input})
         reply = send_message_stream(history)
         history.append({"role": "assistant", "content": reply})
-
     except KeyboardInterrupt:
         print("\n👋 Auf Wiedersehen!")
         break
     except Exception as e:
         print(f"\n❌ Fehler: {e}\n")
+        break
