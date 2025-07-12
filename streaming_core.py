@@ -13,41 +13,53 @@ def is_strong_selftalk(text: str, enable_logging: bool) -> bool:
         result = True
     elif re.search(r"<\|system\|>", text):
         result = True
-    elif re.match(r"\s*(assistant:)", text, re.IGNORECASE):
+    elif re.search(r"\\bassistant: ", text, re.IGNORECASE):
         result = True
     if enable_logging:
         with open(LOGFILE, "a", encoding="utf-8") as log:
             log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Text: {text.strip()} -> Selftalk? {result}\n")
     return result
 
-
-def send_message_stream(messages: list, stream_url: str, model_name: str, enable_logging: bool) -> str:
+def send_message_stream(messages: list, stream_url: str, model_name: str, enable_logging: bool, print_callback=None) -> str:
     """
     Sendet die Nachrichtenhistorie an die Ollama-API im Streaming-Modus.
-    Bricht ab, sobald Selftalk erkannt wird.
+    Gibt Token aus, prüft Selftalk nur zum Unterdrücken der Anzeige.
     """
     payload = {"model": model_name, "stream": True, "messages": messages}
     full_reply = ""
+    visible_reply = ""
+    buffer = ""
+    is_selftalk = False
+
     response = requests.post(stream_url, json=payload, stream=True, timeout=60)
     response.raise_for_status()
 
-    buffer = ""
     for line in response.iter_lines():
         if not line:
             continue
         data = json.loads(line.decode('utf-8'))
         content = data.get("message", {}).get("content", "")
         clean = re.sub(r"<dummy\d+>", "", content)
+        full_reply += clean
         buffer += clean
-        # Prüfen, ob buffer an Wortgrenze endet (Leerzeichen oder Zeilenumbruch)
-        if re.search(r"\s$", buffer):
-            if is_strong_selftalk(buffer, enable_logging):
-                break
-            full_reply += buffer
-            print(buffer, end="", flush=True)
-            buffer = ""
+
+        words = re.split(r'(\s+)', buffer)
+        for i in range(len(words) - 1):
+            token = words[i]
+            if is_strong_selftalk(token, enable_logging):
+                is_selftalk = True
+            elif print_callback and not is_selftalk:
+                print_callback(token)
+                visible_reply += token
+
+        buffer = words[-1]  # Letzter, evtl. unvollständiger Teil bleibt
+
     # Restpuffer
-    if buffer and not is_strong_selftalk(buffer, enable_logging):
-        full_reply += buffer
-        print(buffer, end="", flush=True)
+    if buffer.strip():
+        if is_strong_selftalk(buffer, enable_logging):
+            is_selftalk = True
+        elif print_callback and not is_selftalk:
+            print_callback(buffer)
+            visible_reply += buffer
+
     return full_reply

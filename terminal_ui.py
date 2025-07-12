@@ -16,3 +16,14 @@ def prompt_user() -> str:
 def print_bot_prefix():
     print(f"{Fore.CYAN}🤖 Leah:{Style.RESET_ALL} ", end="", flush=True)
 
+
+def print_stream(text: str):
+    print(text, end="", flush=True)
+
+
+def print_exit():
+    print("👋 Auf Wiedersehen!")
+
+
+def print_empty_line():
+    print()
