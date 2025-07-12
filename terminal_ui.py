@@ -23,3 +23,6 @@ class TerminalUI:
 
     def print_empty_line(self):
         print()
+
+    def launch(self):
+        print("Starte mit einer Frage oder Aufforderung den Dialog mit L-E-A-H ...")

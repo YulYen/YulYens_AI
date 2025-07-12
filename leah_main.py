@@ -1,18 +1,25 @@
 # leah_main.py
 
 from terminal_ui import TerminalUI
+from web_ui import WebUI
 import streaming_core
 
 # --- Konfiguration ---
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL_NAME = "leah13b1"
 ENABLE_LOGGING = False
-ui = TerminalUI()
+
+# ui = TerminalUI()
+ui = WebUI(MODEL_NAME, OLLAMA_URL, ENABLE_LOGGING)
+
 
 def main():
 
+    ui.launch()
+
     ui.init_ui()
     ui.print_welcome(MODEL_NAME)
+    ui.launch()
 
     history = []
     while True:
