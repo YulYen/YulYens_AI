@@ -10,34 +10,6 @@ class WebUI:
         self.enable_logging = enable_logging
         self.history = []  # Speichert vollständigen Nachrichtenverlauf im OpenAI-Format
 
-    def init_ui(self):
-        # Kein spezielles Setup notwendig für Gradio in dieser Implementierung
-        pass
-
-    def print_welcome(self, model_name: str):
-        # Wird über Gradio Markdown angezeigt
-        pass
-
-    def prompt_user(self) -> str:
-        # Nicht verwendet in der Web-Oberfläche
-        return ""
-
-    def print_bot_prefix(self):
-        # Wird in der Web-Oberfläche nicht benötigt
-        pass
-
-    def print_stream(self, text: str):
-        # Nicht genutzt – Ausgabe wird als Gesamtnachricht verarbeitet
-        pass
-
-    def print_empty_line(self):
-        # In Gradio irrelevant
-        pass
-
-    def print_exit(self):
-        # Optional: könnte verwendet werden für UI-Shutdown-Hinweise
-        pass
-
     def respond(self, user_input, chat_history):
         """
         Callback-Funktion für Gradio, verarbeitet Benutzereingabe und gibt aktualisierte Nachrichtenliste zurück.
