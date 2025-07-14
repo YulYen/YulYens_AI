@@ -63,3 +63,44 @@ def send_message_stream(messages: list, stream_url: str, model_name: str, enable
             visible_reply += buffer
 
     return full_reply
+
+def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
+    """
+    Generator-Version von send_message_stream:
+    Liefert jeden Token per yield, angepasst für Ollama-kompatibles Format.
+    """
+    payload = {
+        "model": model_name,
+        "messages": messages,
+        "stream": True
+    }
+
+    try:
+        response = requests.post(stream_url, json=payload, stream=True)
+
+        for line in response.iter_lines():
+            if not line:
+                continue
+
+            decoded = line.decode("utf-8")
+            if decoded.startswith("data: "):
+                decoded = decoded[len("data: "):]  # Ollama & OpenAI senden "data: ..."
+
+            if decoded.strip() == "[DONE]":
+                break
+
+            try:
+                data = json.loads(decoded)
+
+                # Für Ollama: Token steckt in data['message']['content']
+                token = data.get("message", {}).get("content", "")
+
+                if token:
+                    yield token
+            except json.JSONDecodeError as e:
+                if enable_logging:
+                    print(f"[ERROR] JSON decode failed: {decoded} ({e})")
+
+    except requests.RequestException as e:
+        if enable_logging:
+            print(f"[ERROR] Request failed: {e}")

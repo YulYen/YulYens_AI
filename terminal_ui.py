@@ -4,8 +4,9 @@ from colorama import Fore, Style, init
 import streaming_core
 
 class TerminalUI:
-    def __init__(self, model_name, stream_url, enable_logging):
+    def __init__(self, model_name, greeting, stream_url, enable_logging):
         self.model_name = model_name
+        self.greeting = greeting
         self.stream_url = stream_url
         self.enable_logging = enable_logging
         self.history = []
@@ -13,8 +14,9 @@ class TerminalUI:
     def init_ui(self):
         init(autoreset=True)
 
-    def print_welcome(self, model_name: str):
-        print(f"{Fore.MAGENTA}💬 Starte lokalen Chat mit Leah ({model_name}) ('exit' zum Beenden){Style.RESET_ALL}")
+    def print_welcome(self):
+        print(self.greeting)
+        print(f"{Fore.MAGENTA} ('exit' zum Beenden){Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(f"{Fore.GREEN}🧑 Du:{Style.RESET_ALL} ").strip()
@@ -30,7 +32,7 @@ class TerminalUI:
 
     def launch(self):
         self.init_ui()
-        self.print_welcome(self.model_name)
+        self.print_welcome()
 
         while True:
             user_input = self.prompt_user()
