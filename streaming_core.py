@@ -67,7 +67,7 @@ def send_message_stream(messages: list, stream_url: str, model_name: str, enable
 def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
     """
     Generator-Version von send_message_stream:
-    Liefert jeden Token per yield, angepasst für Ollama-kompatibles Format.
+    Liefert jeden Token per yield, inklusive Selftalk-Filterung mit Wortpuffer.
     """
     payload = {
         "model": model_name,
@@ -78,28 +78,40 @@ def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
     try:
         response = requests.post(stream_url, json=payload, stream=True)
 
+        buffer = ""
+
         for line in response.iter_lines():
             if not line:
                 continue
 
             decoded = line.decode("utf-8")
             if decoded.startswith("data: "):
-                decoded = decoded[len("data: "):]  # Ollama & OpenAI senden "data: ..."
+                decoded = decoded[len("data: "):]
 
             if decoded.strip() == "[DONE]":
                 break
 
             try:
                 data = json.loads(decoded)
-
-                # Für Ollama: Token steckt in data['message']['content']
                 token = data.get("message", {}).get("content", "")
 
-                if token:
-                    yield token
+                if not token:
+                    continue
+
+                buffer += token
+                parts = re.split(r'(\s+)', buffer)
+                for i in range(len(parts) - 1):
+                    chunk = parts[i]
+                    if not is_strong_selftalk(chunk, enable_logging):
+                        yield chunk
+                buffer = parts[-1]
+
             except json.JSONDecodeError as e:
                 if enable_logging:
                     print(f"[ERROR] JSON decode failed: {decoded} ({e})")
+
+        if buffer.strip() and not is_strong_selftalk(buffer, enable_logging):
+            yield buffer
 
     except requests.RequestException as e:
         if enable_logging:
