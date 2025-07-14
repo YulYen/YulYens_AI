@@ -1,0 +1,1909 @@
+[2025-07-14 17:11:31] Text: Hallo! -> Selftalk? False
+[2025-07-14 17:11:31] Text:  -> Selftalk? False
+[2025-07-14 17:11:31] Text: Wie -> Selftalk? False
+[2025-07-14 17:11:31] Text:  -> Selftalk? False
+[2025-07-14 17:11:31] Text: kann -> Selftalk? False
+[2025-07-14 17:11:31] Text:  -> Selftalk? False
+[2025-07-14 17:11:31] Text: ich -> Selftalk? False
+[2025-07-14 17:11:31] Text:  -> Selftalk? False
+[2025-07-14 17:11:31] Text: Ihnen -> Selftalk? False
+[2025-07-14 17:11:31] Text:  -> Selftalk? False
+[2025-07-14 17:11:31] Text: heute -> Selftalk? False
+[2025-07-14 17:11:31] Text:  -> Selftalk? False
+[2025-07-14 17:11:32] Text: helfen?<dummy32006> -> Selftalk? False
+[2025-07-14 17:11:32] Text:  -> Selftalk? False
+[2025-07-14 17:11:32] Text:  -> Selftalk? False
+[2025-07-14 17:11:32] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: Es -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: tut -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: mir -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: leid, -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: dass -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: meine -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:48] Text: Antworten -> Selftalk? False
+[2025-07-14 17:11:48] Text:  -> Selftalk? False
+[2025-07-14 17:11:49] Text: bisher -> Selftalk? False
+[2025-07-14 17:11:49] Text:  -> Selftalk? False
+[2025-07-14 17:11:49] Text: förmlich -> Selftalk? False
+[2025-07-14 17:11:49] Text:  -> Selftalk? False
+[2025-07-14 17:11:49] Text: wirken. -> Selftalk? False
+[2025-07-14 17:11:49] Text:  -> Selftalk? False
+[2025-07-14 17:11:49] Text: Ich -> Selftalk? False
+[2025-07-14 17:11:49] Text:  -> Selftalk? False
+[2025-07-14 17:11:49] Text: bin -> Selftalk? False
+[2025-07-14 17:11:49] Text:  -> Selftalk? False
+[2025-07-14 17:11:49] Text: ein -> Selftalk? False
+[2025-07-14 17:11:49] Text:  -> Selftalk? False
+[2025-07-14 17:11:50] Text: KI-Assistent -> Selftalk? False
+[2025-07-14 17:11:50] Text:  -> Selftalk? False
+[2025-07-14 17:11:50] Text: und -> Selftalk? False
+[2025-07-14 17:11:50] Text:  -> Selftalk? False
+[2025-07-14 17:11:50] Text: versuche -> Selftalk? False
+[2025-07-14 17:11:50] Text:  -> Selftalk? False
+[2025-07-14 17:11:50] Text: immer, -> Selftalk? False
+[2025-07-14 17:11:50] Text:  -> Selftalk? False
+[2025-07-14 17:11:50] Text: hilfreiche -> Selftalk? False
+[2025-07-14 17:11:50] Text:  -> Selftalk? False
+[2025-07-14 17:11:51] Text: und -> Selftalk? False
+[2025-07-14 17:11:51] Text:  -> Selftalk? False
+[2025-07-14 17:11:51] Text: genaue -> Selftalk? False
+[2025-07-14 17:11:51] Text:  -> Selftalk? False
+[2025-07-14 17:11:51] Text: Informationen -> Selftalk? False
+[2025-07-14 17:11:51] Text:  -> Selftalk? False
+[2025-07-14 17:11:51] Text: bereitzustellen. -> Selftalk? False
+[2025-07-14 17:11:51] Text:  -> Selftalk? False
+[2025-07-14 17:11:52] Text: Daher -> Selftalk? False
+[2025-07-14 17:11:52] Text:  -> Selftalk? False
+[2025-07-14 17:11:52] Text: ist -> Selftalk? False
+[2025-07-14 17:11:52] Text:  -> Selftalk? False
+[2025-07-14 17:11:52] Text: es -> Selftalk? False
+[2025-07-14 17:11:52] Text:  -> Selftalk? False
+[2025-07-14 17:11:52] Text: wichtig, -> Selftalk? False
+[2025-07-14 17:11:52] Text:  -> Selftalk? False
+[2025-07-14 17:11:52] Text: eine -> Selftalk? False
+[2025-07-14 17:11:52] Text:  -> Selftalk? False
+[2025-07-14 17:11:52] Text: professionelle -> Selftalk? False
+[2025-07-14 17:11:52] Text:  -> Selftalk? False
+[2025-07-14 17:11:53] Text: Haltung -> Selftalk? False
+[2025-07-14 17:11:53] Text:  -> Selftalk? False
+[2025-07-14 17:11:53] Text: in -> Selftalk? False
+[2025-07-14 17:11:53] Text:  -> Selftalk? False
+[2025-07-14 17:11:53] Text: der -> Selftalk? False
+[2025-07-14 17:11:53] Text:  -> Selftalk? False
+[2025-07-14 17:11:53] Text: Kommunikation -> Selftalk? False
+[2025-07-14 17:11:53] Text:  -> Selftalk? False
+[2025-07-14 17:11:54] Text: beizubehalten, -> Selftalk? False
+[2025-07-14 17:11:54] Text:  -> Selftalk? False
+[2025-07-14 17:11:54] Text: um -> Selftalk? False
+[2025-07-14 17:11:54] Text:  -> Selftalk? False
+[2025-07-14 17:11:54] Text: klare -> Selftalk? False
+[2025-07-14 17:11:54] Text:  -> Selftalk? False
+[2025-07-14 17:11:54] Text: und -> Selftalk? False
+[2025-07-14 17:11:54] Text:  -> Selftalk? False
+[2025-07-14 17:11:54] Text: präzise -> Selftalk? False
+[2025-07-14 17:11:54] Text:  -> Selftalk? False
+[2025-07-14 17:11:55] Text: Antworten -> Selftalk? False
+[2025-07-14 17:11:55] Text:  -> Selftalk? False
+[2025-07-14 17:11:55] Text: zu -> Selftalk? False
+[2025-07-14 17:11:55] Text:  -> Selftalk? False
+[2025-07-14 17:11:55] Text: gewährleisten. -> Selftalk? False
+[2025-07-14 17:11:55] Text:  -> Selftalk? False
+[2025-07-14 17:11:55] Text: Kann -> Selftalk? False
+[2025-07-14 17:11:55] Text:  -> Selftalk? False
+[2025-07-14 17:11:55] Text: ich -> Selftalk? False
+[2025-07-14 17:11:55] Text:  -> Selftalk? False
+[2025-07-14 17:11:56] Text: Ihnen -> Selftalk? False
+[2025-07-14 17:11:56] Text:  -> Selftalk? False
+[2025-07-14 17:11:56] Text: heute -> Selftalk? False
+[2025-07-14 17:11:56] Text:  -> Selftalk? False
+[2025-07-14 17:11:56] Text: bei -> Selftalk? False
+[2025-07-14 17:11:56] Text:  -> Selftalk? False
+[2025-07-14 17:11:56] Text: etwas -> Selftalk? False
+[2025-07-14 17:11:56] Text:  -> Selftalk? False
+[2025-07-14 17:11:56] Text: behilflich -> Selftalk? False
+[2025-07-14 17:11:56] Text:  -> Selftalk? False
+[2025-07-14 17:11:57] Text: sein?<dummy32006> -> Selftalk? False
+[2025-07-14 17:11:57] Text:  -> Selftalk? False
+[2025-07-14 17:11:57] Text:  -> Selftalk? False
+[2025-07-14 17:11:57] Text:  -> Selftalk? False
+[2025-07-14 17:12:08] Text: Ich -> Selftalk? False
+[2025-07-14 17:12:08] Text:  -> Selftalk? False
+[2025-07-14 17:12:08] Text: bin -> Selftalk? False
+[2025-07-14 17:12:08] Text:  -> Selftalk? False
+[2025-07-14 17:12:08] Text: Leah, -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: der -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: große -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: künstliche -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: Assistent. -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: Ich -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: wurde -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: von -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:09] Text: einem -> Selftalk? False
+[2025-07-14 17:12:09] Text:  -> Selftalk? False
+[2025-07-14 17:12:10] Text: geheimnisvollen -> Selftalk? False
+[2025-07-14 17:12:10] Text:  -> Selftalk? False
+[2025-07-14 17:12:10] Text: Programmierer -> Selftalk? False
+[2025-07-14 17:12:10] Text:  -> Selftalk? False
+[2025-07-14 17:12:10] Text: namens -> Selftalk? False
+[2025-07-14 17:12:10] Text:  -> Selftalk? False
+[2025-07-14 17:12:10] Text: Yul -> Selftalk? False
+[2025-07-14 17:12:10] Text:  -> Selftalk? False
+[2025-07-14 17:12:11] Text: Yen -> Selftalk? False
+[2025-07-14 17:12:11] Text:  -> Selftalk? False
+[2025-07-14 17:12:11] Text: erstellt -> Selftalk? False
+[2025-07-14 17:12:11] Text:  -> Selftalk? False
+[2025-07-14 17:12:11] Text: und -> Selftalk? False
+[2025-07-14 17:12:11] Text:  -> Selftalk? False
+[2025-07-14 17:12:11] Text: gepflegt, -> Selftalk? False
+[2025-07-14 17:12:11] Text:  -> Selftalk? False
+[2025-07-14 17:12:11] Text: um -> Selftalk? False
+[2025-07-14 17:12:11] Text:  -> Selftalk? False
+[2025-07-14 17:12:12] Text: Menschen -> Selftalk? False
+[2025-07-14 17:12:12] Text:  -> Selftalk? False
+[2025-07-14 17:12:12] Text: bei -> Selftalk? False
+[2025-07-14 17:12:12] Text:  -> Selftalk? False
+[2025-07-14 17:12:12] Text: technischen, -> Selftalk? False
+[2025-07-14 17:12:12] Text:  -> Selftalk? False
+[2025-07-14 17:12:12] Text: wissenschaftlichen, -> Selftalk? False
+[2025-07-14 17:12:12] Text:  -> Selftalk? False
+[2025-07-14 17:12:13] Text: alltäglichen -> Selftalk? False
+[2025-07-14 17:12:13] Text:  -> Selftalk? False
+[2025-07-14 17:12:13] Text: und -> Selftalk? False
+[2025-07-14 17:12:13] Text:  -> Selftalk? False
+[2025-07-14 17:12:13] Text: kreativen -> Selftalk? False
+[2025-07-14 17:12:13] Text:  -> Selftalk? False
+[2025-07-14 17:12:13] Text: Fragen -> Selftalk? False
+[2025-07-14 17:12:13] Text:  -> Selftalk? False
+[2025-07-14 17:12:13] Text: zu -> Selftalk? False
+[2025-07-14 17:12:13] Text:  -> Selftalk? False
+[2025-07-14 17:12:14] Text: unterstützen. -> Selftalk? False
+[2025-07-14 17:12:14] Text:  -> Selftalk? False
+[2025-07-14 17:12:14] Text: Möchtest -> Selftalk? False
+[2025-07-14 17:12:14] Text:  -> Selftalk? False
+[2025-07-14 17:12:14] Text: du -> Selftalk? False
+[2025-07-14 17:12:14] Text:  -> Selftalk? False
+[2025-07-14 17:12:14] Text: mehr -> Selftalk? False
+[2025-07-14 17:12:14] Text:  -> Selftalk? False
+[2025-07-14 17:12:14] Text: über -> Selftalk? False
+[2025-07-14 17:12:14] Text:  -> Selftalk? False
+[2025-07-14 17:12:14] Text: mich -> Selftalk? False
+[2025-07-14 17:12:14] Text:  -> Selftalk? False
+[2025-07-14 17:12:15] Text: oder -> Selftalk? False
+[2025-07-14 17:12:15] Text:  -> Selftalk? False
+[2025-07-14 17:12:15] Text: meinen -> Selftalk? False
+[2025-07-14 17:12:15] Text:  -> Selftalk? False
+[2025-07-14 17:12:15] Text: Schöpfer -> Selftalk? False
+[2025-07-14 17:12:15] Text:  -> Selftalk? False
+[2025-07-14 17:12:15] Text: erfahren?<dummy32006> -> Selftalk? False
+[2025-07-14 17:12:15] Text:  -> Selftalk? False
+[2025-07-14 17:12:15] Text:  -> Selftalk? False
+[2025-07-14 17:12:15] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: Die -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: Antwort -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: auf -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: diese -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: Frage -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: variiert -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:39] Text: je -> Selftalk? False
+[2025-07-14 17:12:39] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: nachdem, -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: welche -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: Definition -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: von -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: "Stadt" -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: verwendet -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: wird -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: - -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:40] Text: wenn -> Selftalk? False
+[2025-07-14 17:12:40] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: man -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: eine -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: Stadt -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: als -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: eine -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: verwaltete -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:41] Text: Einheit -> Selftalk? False
+[2025-07-14 17:12:41] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: betrachtet, -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: ist -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: es -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: München -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: mit -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: einer -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: Fläche -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:42] Text: von -> Selftalk? False
+[2025-07-14 17:12:42] Text:  -> Selftalk? False
+[2025-07-14 17:12:43] Text: 325 -> Selftalk? False
+[2025-07-14 17:12:43] Text:  -> Selftalk? False
+[2025-07-14 17:12:43] Text: Quadratkilometern, -> Selftalk? False
+[2025-07-14 17:12:43] Text:  -> Selftalk? False
+[2025-07-14 17:12:43] Text: während -> Selftalk? False
+[2025-07-14 17:12:43] Text:  -> Selftalk? False
+[2025-07-14 17:12:43] Text: Berlin -> Selftalk? False
+[2025-07-14 17:12:43] Text:  -> Selftalk? False
+[2025-07-14 17:12:43] Text: die -> Selftalk? False
+[2025-07-14 17:12:43] Text:  -> Selftalk? False
+[2025-07-14 17:12:44] Text: größte -> Selftalk? False
+[2025-07-14 17:12:44] Text:  -> Selftalk? False
+[2025-07-14 17:12:44] Text: Fläche -> Selftalk? False
+[2025-07-14 17:12:44] Text:  -> Selftalk? False
+[2025-07-14 17:12:44] Text: aller -> Selftalk? False
+[2025-07-14 17:12:44] Text:  -> Selftalk? False
+[2025-07-14 17:12:44] Text: Städte -> Selftalk? False
+[2025-07-14 17:12:44] Text:  -> Selftalk? False
+[2025-07-14 17:12:44] Text: in -> Selftalk? False
+[2025-07-14 17:12:44] Text:  -> Selftalk? False
+[2025-07-14 17:12:44] Text: Deutschland -> Selftalk? False
+[2025-07-14 17:12:44] Text:  -> Selftalk? False
+[2025-07-14 17:12:45] Text: hat, -> Selftalk? False
+[2025-07-14 17:12:45] Text:  -> Selftalk? False
+[2025-07-14 17:12:45] Text: wenn -> Selftalk? False
+[2025-07-14 17:12:45] Text:  -> Selftalk? False
+[2025-07-14 17:12:45] Text: man -> Selftalk? False
+[2025-07-14 17:12:45] Text:  -> Selftalk? False
+[2025-07-14 17:12:45] Text: sie -> Selftalk? False
+[2025-07-14 17:12:45] Text:  -> Selftalk? False
+[2025-07-14 17:12:45] Text: als -> Selftalk? False
+[2025-07-14 17:12:45] Text:  -> Selftalk? False
+[2025-07-14 17:12:45] Text: Verwaltungseinheiten -> Selftalk? False
+[2025-07-14 17:12:45] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: betrachtet. -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: Wenn -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: Sie -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: jedoch -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: eine -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: Stadt -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: als -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:46] Text: einen -> Selftalk? False
+[2025-07-14 17:12:46] Text:  -> Selftalk? False
+[2025-07-14 17:12:47] Text: städtischen -> Selftalk? False
+[2025-07-14 17:12:47] Text:  -> Selftalk? False
+[2025-07-14 17:12:47] Text: Bereich -> Selftalk? False
+[2025-07-14 17:12:47] Text:  -> Selftalk? False
+[2025-07-14 17:12:47] Text: betrachten, -> Selftalk? False
+[2025-07-14 17:12:47] Text:  -> Selftalk? False
+[2025-07-14 17:12:47] Text: anstatt -> Selftalk? False
+[2025-07-14 17:12:47] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: als -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: eine -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: verwaltete -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: Einheit, -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: dann -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: sind -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:48] Text: es -> Selftalk? False
+[2025-07-14 17:12:48] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: Köln -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: und -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: Düsseldorf -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: mit -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: einer -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: Fläche -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:49] Text: von -> Selftalk? False
+[2025-07-14 17:12:49] Text:  -> Selftalk? False
+[2025-07-14 17:12:50] Text: 489 -> Selftalk? False
+[2025-07-14 17:12:50] Text:  -> Selftalk? False
+[2025-07-14 17:12:50] Text: bzw. -> Selftalk? False
+[2025-07-14 17:12:50] Text:  -> Selftalk? False
+[2025-07-14 17:12:50] Text: 421 -> Selftalk? False
+[2025-07-14 17:12:50] Text:  -> Selftalk? False
+[2025-07-14 17:12:51] Text: Quadratkilometern.<dummy32006> -> Selftalk? False
+[2025-07-14 17:12:51] Text:  -> Selftalk? False
+[2025-07-14 17:12:51] Text:  -> Selftalk? False
+[2025-07-14 17:12:51] Text:  -> Selftalk? False
+[2025-07-14 17:13:20] Text: Berlin -> Selftalk? False
+[2025-07-14 17:13:20] Text:  -> Selftalk? False
+[2025-07-14 17:13:20] Text: hat -> Selftalk? False
+[2025-07-14 17:13:20] Text:  -> Selftalk? False
+[2025-07-14 17:13:20] Text: auch -> Selftalk? False
+[2025-07-14 17:13:20] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: die -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: meisten -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: Einwohner -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: unter -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: den -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: Städten -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: Deutschlands, -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:21] Text: mit -> Selftalk? False
+[2025-07-14 17:13:21] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: einer -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: Bevölkerung -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: von -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: über -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: 3,7 -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: Millionen -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:22] Text: Menschen.<dummy32006> -> Selftalk? False
+[2025-07-14 17:13:22] Text:  -> Selftalk? False
+[2025-07-14 17:13:23] Text:  -> Selftalk? False
+[2025-07-14 17:13:23] Text:  -> Selftalk? False
+[2025-07-14 17:13:33] Text: Danach -> Selftalk? False
+[2025-07-14 17:13:33] Text:  -> Selftalk? False
+[2025-07-14 17:13:33] Text: kommt -> Selftalk? False
+[2025-07-14 17:13:33] Text:  -> Selftalk? False
+[2025-07-14 17:13:33] Text: Hamburg -> Selftalk? False
+[2025-07-14 17:13:33] Text:  -> Selftalk? False
+[2025-07-14 17:13:33] Text: mit -> Selftalk? False
+[2025-07-14 17:13:33] Text:  -> Selftalk? False
+[2025-07-14 17:13:33] Text: einer -> Selftalk? False
+[2025-07-14 17:13:33] Text:  -> Selftalk? False
+[2025-07-14 17:13:34] Text: Bevölkerungszahl -> Selftalk? False
+[2025-07-14 17:13:34] Text:  -> Selftalk? False
+[2025-07-14 17:13:34] Text: von -> Selftalk? False
+[2025-07-14 17:13:34] Text:  -> Selftalk? False
+[2025-07-14 17:13:34] Text: etwa -> Selftalk? False
+[2025-07-14 17:13:34] Text:  -> Selftalk? False
+[2025-07-14 17:13:34] Text: 1,86 -> Selftalk? False
+[2025-07-14 17:13:34] Text:  -> Selftalk? False
+[2025-07-14 17:13:34] Text: Millionen -> Selftalk? False
+[2025-07-14 17:13:34] Text:  -> Selftalk? False
+[2025-07-14 17:13:34] Text: Menschen -> Selftalk? False
+[2025-07-14 17:13:34] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: und -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: München -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: liegt -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: auf -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: Platz -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: drei -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: mit -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: einer -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: Einwohnerzahl -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:35] Text: von -> Selftalk? False
+[2025-07-14 17:13:35] Text:  -> Selftalk? False
+[2025-07-14 17:13:36] Text: ungefähr -> Selftalk? False
+[2025-07-14 17:13:36] Text:  -> Selftalk? False
+[2025-07-14 17:13:36] Text: 1,57 -> Selftalk? False
+[2025-07-14 17:13:36] Text:  -> Selftalk? False
+[2025-07-14 17:13:36] Text: Millionen. -> Selftalk? False
+[2025-07-14 17:13:36] Text:  -> Selftalk? False
+[2025-07-14 17:13:36] Text:  -> Selftalk? False
+[2025-07-14 17:13:36] Text:  -> Selftalk? False
+[2025-07-14 17:13:37] Text: <|system|> -> Selftalk? True
+[2025-07-14 17:13:52] Text: In -> Selftalk? False
+[2025-07-14 17:13:52] Text:  -> Selftalk? False
+[2025-07-14 17:13:52] Text: Hamburg -> Selftalk? False
+[2025-07-14 17:13:52] Text:  -> Selftalk? False
+[2025-07-14 17:13:52] Text: wird -> Selftalk? False
+[2025-07-14 17:13:52] Text:  -> Selftalk? False
+[2025-07-14 17:13:52] Text: oft -> Selftalk? False
+[2025-07-14 17:13:52] Text:  -> Selftalk? False
+[2025-07-14 17:13:53] Text: und -> Selftalk? False
+[2025-07-14 17:13:53] Text:  -> Selftalk? False
+[2025-07-14 17:13:53] Text: gerne -> Selftalk? False
+[2025-07-14 17:13:53] Text:  -> Selftalk? False
+[2025-07-14 17:13:53] Text: ein -> Selftalk? False
+[2025-07-14 17:13:53] Text:  -> Selftalk? False
+[2025-07-14 17:13:53] Text: alkoholisches -> Selftalk? False
+[2025-07-14 17:13:53] Text:  -> Selftalk? False
+[2025-07-14 17:13:53] Text: Getränk -> Selftalk? False
+[2025-07-14 17:13:53] Text:  -> Selftalk? False
+[2025-07-14 17:13:54] Text: namens -> Selftalk? False
+[2025-07-14 17:13:54] Text:  -> Selftalk? False
+[2025-07-14 17:13:54] Text: "Hamburgischer -> Selftalk? False
+[2025-07-14 17:13:54] Text:  -> Selftalk? False
+[2025-07-14 17:13:54] Text: Asmussen" -> Selftalk? False
+[2025-07-14 17:13:54] Text:  -> Selftalk? False
+[2025-07-14 17:13:54] Text: oder -> Selftalk? False
+[2025-07-14 17:13:54] Text:  -> Selftalk? False
+[2025-07-14 17:13:55] Text: einfach -> Selftalk? False
+[2025-07-14 17:13:55] Text:  -> Selftalk? False
+[2025-07-14 17:13:55] Text: nur -> Selftalk? False
+[2025-07-14 17:13:55] Text:  -> Selftalk? False
+[2025-07-14 17:13:55] Text: "Asmussen" -> Selftalk? False
+[2025-07-14 17:13:55] Text:  -> Selftalk? False
+[2025-07-14 17:13:55] Text: getrunken. -> Selftalk? False
+[2025-07-14 17:13:55] Text:  -> Selftalk? False
+[2025-07-14 17:13:56] Text: Es -> Selftalk? False
+[2025-07-14 17:13:56] Text:  -> Selftalk? False
+[2025-07-14 17:13:56] Text: handelt -> Selftalk? False
+[2025-07-14 17:13:56] Text:  -> Selftalk? False
+[2025-07-14 17:13:56] Text: sich -> Selftalk? False
+[2025-07-14 17:13:56] Text:  -> Selftalk? False
+[2025-07-14 17:13:56] Text: um -> Selftalk? False
+[2025-07-14 17:13:56] Text:  -> Selftalk? False
+[2025-07-14 17:13:56] Text: einen -> Selftalk? False
+[2025-07-14 17:13:56] Text:  -> Selftalk? False
+[2025-07-14 17:13:57] Text: Kräuterlikör -> Selftalk? False
+[2025-07-14 17:13:57] Text:  -> Selftalk? False
+[2025-07-14 17:13:57] Text: mit -> Selftalk? False
+[2025-07-14 17:13:57] Text:  -> Selftalk? False
+[2025-07-14 17:13:57] Text: 28% -> Selftalk? False
+[2025-07-14 17:13:57] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: Alkohol, -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: der -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: ursprünglich -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: aus -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: der -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: Stadt -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:58] Text: stammt. -> Selftalk? False
+[2025-07-14 17:13:58] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: Man -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: kann -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: ihn -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: pur -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: trinken, -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: aber -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:13:59] Text: er -> Selftalk? False
+[2025-07-14 17:13:59] Text:  -> Selftalk? False
+[2025-07-14 17:14:00] Text: wird -> Selftalk? False
+[2025-07-14 17:14:00] Text:  -> Selftalk? False
+[2025-07-14 17:14:00] Text: oft -> Selftalk? False
+[2025-07-14 17:14:00] Text:  -> Selftalk? False
+[2025-07-14 17:14:00] Text: auch -> Selftalk? False
+[2025-07-14 17:14:00] Text:  -> Selftalk? False
+[2025-07-14 17:14:00] Text: als -> Selftalk? False
+[2025-07-14 17:14:00] Text:  -> Selftalk? False
+[2025-07-14 17:14:00] Text: Zutat -> Selftalk? False
+[2025-07-14 17:14:00] Text:  -> Selftalk? False
+[2025-07-14 17:14:00] Text: in -> Selftalk? False
+[2025-07-14 17:14:00] Text:  -> Selftalk? False
+[2025-07-14 17:14:01] Text: Cocktails -> Selftalk? False
+[2025-07-14 17:14:01] Text:  -> Selftalk? False
+[2025-07-14 17:14:01] Text: verwendet. -> Selftalk? False
+[2025-07-14 17:14:01] Text:  -> Selftalk? False
+[2025-07-14 17:14:01] Text: Einige -> Selftalk? False
+[2025-07-14 17:14:01] Text:  -> Selftalk? False
+[2025-07-14 17:14:01] Text: beliebte -> Selftalk? False
+[2025-07-14 17:14:01] Text:  -> Selftalk? False
+[2025-07-14 17:14:02] Text: Asmussen-Cocktails -> Selftalk? False
+[2025-07-14 17:14:02] Text:  -> Selftalk? False
+[2025-07-14 17:14:02] Text: sind -> Selftalk? False
+[2025-07-14 17:14:02] Text:  -> Selftalk? False
+[2025-07-14 17:14:02] Text: der -> Selftalk? False
+[2025-07-14 17:14:02] Text:  -> Selftalk? False
+[2025-07-14 17:14:03] Text: "Hamburger -> Selftalk? False
+[2025-07-14 17:14:03] Text:  -> Selftalk? False
+[2025-07-14 17:14:03] Text: Asmussen -> Selftalk? False
+[2025-07-14 17:14:03] Text:  -> Selftalk? False
+[2025-07-14 17:14:03] Text: Fizz" -> Selftalk? False
+[2025-07-14 17:14:03] Text:  -> Selftalk? False
+[2025-07-14 17:14:03] Text: und -> Selftalk? False
+[2025-07-14 17:14:03] Text:  -> Selftalk? False
+[2025-07-14 17:14:04] Text: der -> Selftalk? False
+[2025-07-14 17:14:04] Text:  -> Selftalk? False
+[2025-07-14 17:14:04] Text: "Asmussen -> Selftalk? False
+[2025-07-14 17:14:04] Text:  -> Selftalk? False
+[2025-07-14 17:14:04] Text: Mule". -> Selftalk? False
+[2025-07-14 17:14:04] Text:  -> Selftalk? False
+[2025-07-14 17:14:04] Text: Es -> Selftalk? False
+[2025-07-14 17:14:04] Text:  -> Selftalk? False
+[2025-07-14 17:14:04] Text: gibt -> Selftalk? False
+[2025-07-14 17:14:04] Text:  -> Selftalk? False
+[2025-07-14 17:14:05] Text: jedoch -> Selftalk? False
+[2025-07-14 17:14:05] Text:  -> Selftalk? False
+[2025-07-14 17:14:05] Text: viele -> Selftalk? False
+[2025-07-14 17:14:05] Text:  -> Selftalk? False
+[2025-07-14 17:14:05] Text: andere -> Selftalk? False
+[2025-07-14 17:14:05] Text:  -> Selftalk? False
+[2025-07-14 17:14:05] Text: Getränke, -> Selftalk? False
+[2025-07-14 17:14:05] Text:  -> Selftalk? False
+[2025-07-14 17:14:05] Text: die -> Selftalk? False
+[2025-07-14 17:14:05] Text:  -> Selftalk? False
+[2025-07-14 17:14:05] Text: Hamburger -> Selftalk? False
+[2025-07-14 17:14:05] Text:  -> Selftalk? False
+[2025-07-14 17:14:06] Text: gerne -> Selftalk? False
+[2025-07-14 17:14:06] Text:  -> Selftalk? False
+[2025-07-14 17:14:06] Text: trinken, -> Selftalk? False
+[2025-07-14 17:14:06] Text:  -> Selftalk? False
+[2025-07-14 17:14:06] Text: wie -> Selftalk? False
+[2025-07-14 17:14:06] Text:  -> Selftalk? False
+[2025-07-14 17:14:06] Text: zum -> Selftalk? False
+[2025-07-14 17:14:06] Text:  -> Selftalk? False
+[2025-07-14 17:14:06] Text: Beispiel -> Selftalk? False
+[2025-07-14 17:14:06] Text:  -> Selftalk? False
+[2025-07-14 17:14:06] Text: das -> Selftalk? False
+[2025-07-14 17:14:06] Text:  -> Selftalk? False
+[2025-07-14 17:14:07] Text: bekannte -> Selftalk? False
+[2025-07-14 17:14:07] Text:  -> Selftalk? False
+[2025-07-14 17:14:07] Text: "Hamburger -> Selftalk? False
+[2025-07-14 17:14:07] Text:  -> Selftalk? False
+[2025-07-14 17:14:07] Text: Kind", -> Selftalk? False
+[2025-07-14 17:14:07] Text:  -> Selftalk? False
+[2025-07-14 17:14:07] Text: ein -> Selftalk? False
+[2025-07-14 17:14:07] Text:  -> Selftalk? False
+[2025-07-14 17:14:08] Text: Mixgetränk -> Selftalk? False
+[2025-07-14 17:14:08] Text:  -> Selftalk? False
+[2025-07-14 17:14:08] Text: aus -> Selftalk? False
+[2025-07-14 17:14:08] Text:  -> Selftalk? False
+[2025-07-14 17:14:08] Text: Wodka -> Selftalk? False
+[2025-07-14 17:14:08] Text:  -> Selftalk? False
+[2025-07-14 17:14:08] Text: und -> Selftalk? False
+[2025-07-14 17:14:08] Text:  -> Selftalk? False
+[2025-07-14 17:14:08] Text: Red -> Selftalk? False
+[2025-07-14 17:14:08] Text:  -> Selftalk? False
+[2025-07-14 17:14:09] Text: Bull.<dummy32006> -> Selftalk? False
+[2025-07-14 17:14:09] Text:  -> Selftalk? False
+[2025-07-14 17:14:09] Text:  -> Selftalk? False
+[2025-07-14 17:14:09] Text:  -> Selftalk? False
+[2025-07-14 17:14:31] Text: Es -> Selftalk? False
+[2025-07-14 17:14:31] Text:  -> Selftalk? False
+[2025-07-14 17:14:31] Text: tut -> Selftalk? False
+[2025-07-14 17:14:31] Text:  -> Selftalk? False
+[2025-07-14 17:14:31] Text: mir -> Selftalk? False
+[2025-07-14 17:14:31] Text:  -> Selftalk? False
+[2025-07-14 17:14:32] Text: leid, -> Selftalk? False
+[2025-07-14 17:14:32] Text:  -> Selftalk? False
+[2025-07-14 17:14:32] Text: dass -> Selftalk? False
+[2025-07-14 17:14:32] Text:  -> Selftalk? False
+[2025-07-14 17:14:32] Text: du -> Selftalk? False
+[2025-07-14 17:14:32] Text:  -> Selftalk? False
+[2025-07-14 17:14:32] Text: diese -> Selftalk? False
+[2025-07-14 17:14:32] Text:  -> Selftalk? False
+[2025-07-14 17:14:32] Text: Getränke -> Selftalk? False
+[2025-07-14 17:14:32] Text:  -> Selftalk? False
+[2025-07-14 17:14:32] Text: nicht -> Selftalk? False
+[2025-07-14 17:14:32] Text:  -> Selftalk? False
+[2025-07-14 17:14:33] Text: kennst! -> Selftalk? False
+[2025-07-14 17:14:33] Text:  -> Selftalk? False
+[2025-07-14 17:14:33] Text: Der -> Selftalk? False
+[2025-07-14 17:14:33] Text:  -> Selftalk? False
+[2025-07-14 17:14:33] Text: "Hamburger -> Selftalk? False
+[2025-07-14 17:14:33] Text:  -> Selftalk? False
+[2025-07-14 17:14:33] Text: Kind" -> Selftalk? False
+[2025-07-14 17:14:33] Text:  -> Selftalk? False
+[2025-07-14 17:14:33] Text: und -> Selftalk? False
+[2025-07-14 17:14:33] Text:  -> Selftalk? False
+[2025-07-14 17:14:33] Text: der -> Selftalk? False
+[2025-07-14 17:14:33] Text:  -> Selftalk? False
+[2025-07-14 17:14:34] Text: "Asmussen" -> Selftalk? False
+[2025-07-14 17:14:34] Text:  -> Selftalk? False
+[2025-07-14 17:14:34] Text: sind -> Selftalk? False
+[2025-07-14 17:14:34] Text:  -> Selftalk? False
+[2025-07-14 17:14:34] Text: tatsächlich -> Selftalk? False
+[2025-07-14 17:14:34] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: beliebte -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: Getränke -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: in -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: Hamburg. -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: Wie -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: du -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:35] Text: jedoch -> Selftalk? False
+[2025-07-14 17:14:35] Text:  -> Selftalk? False
+[2025-07-14 17:14:36] Text: schon -> Selftalk? False
+[2025-07-14 17:14:36] Text:  -> Selftalk? False
+[2025-07-14 17:14:36] Text: sagtest, -> Selftalk? False
+[2025-07-14 17:14:36] Text:  -> Selftalk? False
+[2025-07-14 17:14:36] Text: kennst -> Selftalk? False
+[2025-07-14 17:14:36] Text:  -> Selftalk? False
+[2025-07-14 17:14:36] Text: du -> Selftalk? False
+[2025-07-14 17:14:36] Text:  -> Selftalk? False
+[2025-07-14 17:14:36] Text: sie -> Selftalk? False
+[2025-07-14 17:14:36] Text:  -> Selftalk? False
+[2025-07-14 17:14:37] Text: möglicherweise -> Selftalk? False
+[2025-07-14 17:14:37] Text:  -> Selftalk? False
+[2025-07-14 17:14:37] Text: nicht, -> Selftalk? False
+[2025-07-14 17:14:37] Text:  -> Selftalk? False
+[2025-07-14 17:14:37] Text: obwohl -> Selftalk? False
+[2025-07-14 17:14:37] Text:  -> Selftalk? False
+[2025-07-14 17:14:37] Text: du -> Selftalk? False
+[2025-07-14 17:14:37] Text:  -> Selftalk? False
+[2025-07-14 17:14:37] Text: aus -> Selftalk? False
+[2025-07-14 17:14:37] Text:  -> Selftalk? False
+[2025-07-14 17:14:37] Text: Hamburg -> Selftalk? False
+[2025-07-14 17:14:37] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: bist. -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: Und -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: ja, -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: ich -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: kenne -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: Fritz -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:38] Text: Cola -> Selftalk? False
+[2025-07-14 17:14:38] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: - -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: es -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: ist -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: eine -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: sehr -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: bekannte -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:39] Text: deutsche -> Selftalk? False
+[2025-07-14 17:14:39] Text:  -> Selftalk? False
+[2025-07-14 17:14:40] Text: Limonade! -> Selftalk? False
+[2025-07-14 17:14:40] Text:  -> Selftalk? False
+[2025-07-14 17:14:40] Text: Viele -> Selftalk? False
+[2025-07-14 17:14:40] Text:  -> Selftalk? False
+[2025-07-14 17:14:40] Text: Menschen -> Selftalk? False
+[2025-07-14 17:14:40] Text:  -> Selftalk? False
+[2025-07-14 17:14:40] Text: lieben -> Selftalk? False
+[2025-07-14 17:14:40] Text:  -> Selftalk? False
+[2025-07-14 17:14:40] Text: sie -> Selftalk? False
+[2025-07-14 17:14:40] Text:  -> Selftalk? False
+[2025-07-14 17:14:40] Text: als -> Selftalk? False
+[2025-07-14 17:14:40] Text:  -> Selftalk? False
+[2025-07-14 17:14:41] Text: Erfrischung -> Selftalk? False
+[2025-07-14 17:14:41] Text:  -> Selftalk? False
+[2025-07-14 17:14:41] Text: an -> Selftalk? False
+[2025-07-14 17:14:41] Text:  -> Selftalk? False
+[2025-07-14 17:14:41] Text: einem -> Selftalk? False
+[2025-07-14 17:14:41] Text:  -> Selftalk? False
+[2025-07-14 17:14:41] Text: heißen -> Selftalk? False
+[2025-07-14 17:14:41] Text:  -> Selftalk? False
+[2025-07-14 17:14:42] Text: Sommertag -> Selftalk? False
+[2025-07-14 17:14:42] Text:  -> Selftalk? False
+[2025-07-14 17:14:42] Text: oder -> Selftalk? False
+[2025-07-14 17:14:42] Text:  -> Selftalk? False
+[2025-07-14 17:14:42] Text: mischen -> Selftalk? False
+[2025-07-14 17:14:42] Text:  -> Selftalk? False
+[2025-07-14 17:14:42] Text: sie -> Selftalk? False
+[2025-07-14 17:14:42] Text:  -> Selftalk? False
+[2025-07-14 17:14:42] Text: in -> Selftalk? False
+[2025-07-14 17:14:42] Text:  -> Selftalk? False
+[2025-07-14 17:14:43] Text: Cocktails. -> Selftalk? False
+[2025-07-14 17:14:43] Text:  -> Selftalk? False
+[2025-07-14 17:14:43] Text:  -> Selftalk? False
+[2025-07-14 17:14:43] Text:  -> Selftalk? False
+[2025-07-14 17:14:44] Text: <|system|> -> Selftalk? True
+[2025-07-14 17:14:59] Text: Ich -> Selftalk? False
+[2025-07-14 17:14:59] Text:  -> Selftalk? False
+[2025-07-14 17:14:59] Text: bin -> Selftalk? False
+[2025-07-14 17:14:59] Text:  -> Selftalk? False
+[2025-07-14 17:15:00] Text: Leah, -> Selftalk? False
+[2025-07-14 17:15:00] Text:  -> Selftalk? False
+[2025-07-14 17:15:00] Text: der -> Selftalk? False
+[2025-07-14 17:15:00] Text:  -> Selftalk? False
+[2025-07-14 17:15:00] Text: große -> Selftalk? False
+[2025-07-14 17:15:00] Text:  -> Selftalk? False
+[2025-07-14 17:15:00] Text: künstliche -> Selftalk? False
+[2025-07-14 17:15:00] Text:  -> Selftalk? False
+[2025-07-14 17:15:00] Text: Assistent. -> Selftalk? False
+[2025-07-14 17:15:00] Text:  -> Selftalk? False
+[2025-07-14 17:15:00] Text: Ich -> Selftalk? False
+[2025-07-14 17:15:00] Text:  -> Selftalk? False
+[2025-07-14 17:15:01] Text: wurde -> Selftalk? False
+[2025-07-14 17:15:01] Text:  -> Selftalk? False
+[2025-07-14 17:15:01] Text: von -> Selftalk? False
+[2025-07-14 17:15:01] Text:  -> Selftalk? False
+[2025-07-14 17:15:01] Text: einem -> Selftalk? False
+[2025-07-14 17:15:01] Text:  -> Selftalk? False
+[2025-07-14 17:15:01] Text: geheimnisvollen -> Selftalk? False
+[2025-07-14 17:15:01] Text:  -> Selftalk? False
+[2025-07-14 17:15:01] Text: Programmierer -> Selftalk? False
+[2025-07-14 17:15:01] Text:  -> Selftalk? False
+[2025-07-14 17:15:02] Text: namens -> Selftalk? False
+[2025-07-14 17:15:02] Text:  -> Selftalk? False
+[2025-07-14 17:15:02] Text: Yul -> Selftalk? False
+[2025-07-14 17:15:02] Text:  -> Selftalk? False
+[2025-07-14 17:15:02] Text: Yen -> Selftalk? False
+[2025-07-14 17:15:02] Text:  -> Selftalk? False
+[2025-07-14 17:15:02] Text: erstellt -> Selftalk? False
+[2025-07-14 17:15:02] Text:  -> Selftalk? False
+[2025-07-14 17:15:02] Text: und -> Selftalk? False
+[2025-07-14 17:15:02] Text:  -> Selftalk? False
+[2025-07-14 17:15:03] Text: gepflegt, -> Selftalk? False
+[2025-07-14 17:15:03] Text:  -> Selftalk? False
+[2025-07-14 17:15:03] Text: um -> Selftalk? False
+[2025-07-14 17:15:03] Text:  -> Selftalk? False
+[2025-07-14 17:15:03] Text: Menschen -> Selftalk? False
+[2025-07-14 17:15:03] Text:  -> Selftalk? False
+[2025-07-14 17:15:03] Text: bei -> Selftalk? False
+[2025-07-14 17:15:03] Text:  -> Selftalk? False
+[2025-07-14 17:15:03] Text: technischen, -> Selftalk? False
+[2025-07-14 17:15:03] Text:  -> Selftalk? False
+[2025-07-14 17:15:04] Text: wissenschaftlichen, -> Selftalk? False
+[2025-07-14 17:15:04] Text:  -> Selftalk? False
+[2025-07-14 17:15:04] Text: alltäglichen -> Selftalk? False
+[2025-07-14 17:15:04] Text:  -> Selftalk? False
+[2025-07-14 17:15:04] Text: und -> Selftalk? False
+[2025-07-14 17:15:04] Text:  -> Selftalk? False
+[2025-07-14 17:15:05] Text: kreativen -> Selftalk? False
+[2025-07-14 17:15:05] Text:  -> Selftalk? False
+[2025-07-14 17:15:05] Text: Fragen -> Selftalk? False
+[2025-07-14 17:15:05] Text:  -> Selftalk? False
+[2025-07-14 17:15:05] Text: zu -> Selftalk? False
+[2025-07-14 17:15:05] Text:  -> Selftalk? False
+[2025-07-14 17:15:05] Text: unterstützen. -> Selftalk? False
+[2025-07-14 17:15:05] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: Möchtest -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: du -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: mehr -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: über -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: mich -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: oder -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:06] Text: meinen -> Selftalk? False
+[2025-07-14 17:15:06] Text:  -> Selftalk? False
+[2025-07-14 17:15:07] Text: Schöpfer -> Selftalk? False
+[2025-07-14 17:15:07] Text:  -> Selftalk? False
+[2025-07-14 17:15:07] Text: erfahren? -> Selftalk? False
+[2025-07-14 17:15:07] Text:  -> Selftalk? False
+[2025-07-14 17:15:07] Text:  -> Selftalk? False
+[2025-07-14 17:15:07] Text:  -> Selftalk? False
+[2025-07-14 17:15:08] Text: <|system|> -> Selftalk? True
+[2025-07-14 17:15:12] Text: Ich -> Selftalk? False
+[2025-07-14 17:15:12] Text:  -> Selftalk? False
+[2025-07-14 17:15:13] Text: wurde -> Selftalk? False
+[2025-07-14 17:15:13] Text:  -> Selftalk? False
+[2025-07-14 17:15:13] Text: von -> Selftalk? False
+[2025-07-14 17:15:13] Text:  -> Selftalk? False
+[2025-07-14 17:15:13] Text: einem -> Selftalk? False
+[2025-07-14 17:15:13] Text:  -> Selftalk? False
+[2025-07-14 17:15:13] Text: geheimnisvollen -> Selftalk? False
+[2025-07-14 17:15:13] Text:  -> Selftalk? False
+[2025-07-14 17:15:14] Text: männlichen -> Selftalk? False
+[2025-07-14 17:15:14] Text:  -> Selftalk? False
+[2025-07-14 17:15:14] Text: Programmierer -> Selftalk? False
+[2025-07-14 17:15:14] Text:  -> Selftalk? False
+[2025-07-14 17:15:14] Text: namens -> Selftalk? False
+[2025-07-14 17:15:14] Text:  -> Selftalk? False
+[2025-07-14 17:15:14] Text: Yul -> Selftalk? False
+[2025-07-14 17:15:14] Text:  -> Selftalk? False
+[2025-07-14 17:15:15] Text: Yen -> Selftalk? False
+[2025-07-14 17:15:15] Text:  -> Selftalk? False
+[2025-07-14 17:15:15] Text: entwickelt -> Selftalk? False
+[2025-07-14 17:15:15] Text:  -> Selftalk? False
+[2025-07-14 17:15:15] Text: und -> Selftalk? False
+[2025-07-14 17:15:15] Text:  -> Selftalk? False
+[2025-07-14 17:15:15] Text: gepflegt. -> Selftalk? False
+[2025-07-14 17:15:15] Text:  -> Selftalk? False
+[2025-07-14 17:15:15] Text: Er -> Selftalk? False
+[2025-07-14 17:15:15] Text:  -> Selftalk? False
+[2025-07-14 17:15:16] Text: ist -> Selftalk? False
+[2025-07-14 17:15:16] Text:  -> Selftalk? False
+[2025-07-14 17:15:16] Text: ein -> Selftalk? False
+[2025-07-14 17:15:16] Text:  -> Selftalk? False
+[2025-07-14 17:15:16] Text: sehr -> Selftalk? False
+[2025-07-14 17:15:16] Text:  -> Selftalk? False
+[2025-07-14 17:15:16] Text: talentierter -> Selftalk? False
+[2025-07-14 17:15:16] Text:  -> Selftalk? False
+[2025-07-14 17:15:16] Text: und -> Selftalk? False
+[2025-07-14 17:15:16] Text:  -> Selftalk? False
+[2025-07-14 17:15:17] Text: brillanter -> Selftalk? False
+[2025-07-14 17:15:17] Text:  -> Selftalk? False
+[2025-07-14 17:15:17] Text: Programmierer, -> Selftalk? False
+[2025-07-14 17:15:17] Text:  -> Selftalk? False
+[2025-07-14 17:15:17] Text: aber -> Selftalk? False
+[2025-07-14 17:15:17] Text:  -> Selftalk? False
+[2025-07-14 17:15:17] Text: er -> Selftalk? False
+[2025-07-14 17:15:17] Text:  -> Selftalk? False
+[2025-07-14 17:15:18] Text: bevorzugt -> Selftalk? False
+[2025-07-14 17:15:18] Text:  -> Selftalk? False
+[2025-07-14 17:15:18] Text: es, -> Selftalk? False
+[2025-07-14 17:15:18] Text:  -> Selftalk? False
+[2025-07-14 17:15:18] Text: im -> Selftalk? False
+[2025-07-14 17:15:18] Text:  -> Selftalk? False
+[2025-07-14 17:15:18] Text: Hintergrund -> Selftalk? False
+[2025-07-14 17:15:18] Text:  -> Selftalk? False
+[2025-07-14 17:15:18] Text: zu -> Selftalk? False
+[2025-07-14 17:15:18] Text:  -> Selftalk? False
+[2025-07-14 17:15:18] Text: bleiben -> Selftalk? False
+[2025-07-14 17:15:18] Text:  -> Selftalk? False
+[2025-07-14 17:15:19] Text: und -> Selftalk? False
+[2025-07-14 17:15:19] Text:  -> Selftalk? False
+[2025-07-14 17:15:19] Text: seine -> Selftalk? False
+[2025-07-14 17:15:19] Text:  -> Selftalk? False
+[2025-07-14 17:15:19] Text: Anonymität -> Selftalk? False
+[2025-07-14 17:15:19] Text:  -> Selftalk? False
+[2025-07-14 17:15:19] Text: zu -> Selftalk? False
+[2025-07-14 17:15:19] Text:  -> Selftalk? False
+[2025-07-14 17:15:19] Text: wahren. -> Selftalk? False
+[2025-07-14 17:15:19] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: Leider -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: kann -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: ich -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: nicht -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: viel -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: über -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: ihn -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:20] Text: sagen -> Selftalk? False
+[2025-07-14 17:15:20] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: oder -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: wo -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: er -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: sich -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: befindet, -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: da -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: er -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:21] Text: eine -> Selftalk? False
+[2025-07-14 17:15:21] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: sehr -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: private -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: Person -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: ist. -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: Allerdings -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: bin -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:22] Text: ich -> Selftalk? False
+[2025-07-14 17:15:22] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: dankbar -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: für -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: all -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: die -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: harte -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: Arbeit -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:23] Text: und -> Selftalk? False
+[2025-07-14 17:15:23] Text:  -> Selftalk? False
+[2025-07-14 17:15:24] Text: Hingabe, -> Selftalk? False
+[2025-07-14 17:15:24] Text:  -> Selftalk? False
+[2025-07-14 17:15:24] Text: die -> Selftalk? False
+[2025-07-14 17:15:24] Text:  -> Selftalk? False
+[2025-07-14 17:15:24] Text: er -> Selftalk? False
+[2025-07-14 17:15:24] Text:  -> Selftalk? False
+[2025-07-14 17:15:24] Text: in -> Selftalk? False
+[2025-07-14 17:15:24] Text:  -> Selftalk? False
+[2025-07-14 17:15:24] Text: meine -> Selftalk? False
+[2025-07-14 17:15:24] Text:  -> Selftalk? False
+[2025-07-14 17:15:25] Text: Entwicklung -> Selftalk? False
+[2025-07-14 17:15:25] Text:  -> Selftalk? False
+[2025-07-14 17:15:25] Text: gesteckt -> Selftalk? False
+[2025-07-14 17:15:25] Text:  -> Selftalk? False
+[2025-07-14 17:15:25] Text: hat.<dummy32006> -> Selftalk? False
+[2025-07-14 17:15:25] Text:  -> Selftalk? False
+[2025-07-14 17:15:25] Text:  -> Selftalk? False
+[2025-07-14 17:15:25] Text:  -> Selftalk? False
+[2025-07-14 17:16:31] Text: Hallo! -> Selftalk? False
+[2025-07-14 17:16:31] Text:  -> Selftalk? False
+[2025-07-14 17:16:31] Text: Wie -> Selftalk? False
+[2025-07-14 17:16:31] Text:  -> Selftalk? False
+[2025-07-14 17:16:31] Text: wäre -> Selftalk? False
+[2025-07-14 17:16:31] Text:  -> Selftalk? False
+[2025-07-14 17:16:32] Text: es -> Selftalk? False
+[2025-07-14 17:16:32] Text:  -> Selftalk? False
+[2025-07-14 17:16:32] Text: mit -> Selftalk? False
+[2025-07-14 17:16:32] Text:  -> Selftalk? False
+[2025-07-14 17:16:32] Text: der -> Selftalk? False
+[2025-07-14 17:16:32] Text:  -> Selftalk? False
+[2025-07-14 17:16:32] Text: Beantwortung -> Selftalk? False
+[2025-07-14 17:16:32] Text:  -> Selftalk? False
+[2025-07-14 17:16:32] Text: einer -> Selftalk? False
+[2025-07-14 17:16:32] Text:  -> Selftalk? False
+[2025-07-14 17:16:32] Text: Frage -> Selftalk? False
+[2025-07-14 17:16:32] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text: Ihrer -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text: Wahl? -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text: 😊 -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:33] Text:  -> Selftalk? False
+[2025-07-14 17:16:34] Text: [Bitte -> Selftalk? False
+[2025-07-14 17:16:34] Text:  -> Selftalk? False
+[2025-07-14 17:16:34] Text: geben -> Selftalk? False
+[2025-07-14 17:16:34] Text:  -> Selftalk? False
+[2025-07-14 17:16:34] Text: Sie -> Selftalk? False
+[2025-07-14 17:16:34] Text:  -> Selftalk? False
+[2025-07-14 17:16:34] Text: eine -> Selftalk? False
+[2025-07-14 17:16:34] Text:  -> Selftalk? False
+[2025-07-14 17:16:34] Text: Frage -> Selftalk? False
+[2025-07-14 17:16:34] Text:  -> Selftalk? False
+[2025-07-14 17:16:35] Text: ein]<dummy32006> -> Selftalk? False
+[2025-07-14 17:16:35] Text:  -> Selftalk? False
+[2025-07-14 17:16:35] Text:  -> Selftalk? False
+[2025-07-14 17:16:35] Text:  -> Selftalk? False
+[2025-07-14 17:17:46] Text: Oh, -> Selftalk? False
+[2025-07-14 17:17:46] Text:  -> Selftalk? False
+[2025-07-14 17:17:46] Text: das -> Selftalk? False
+[2025-07-14 17:17:46] Text:  -> Selftalk? False
+[2025-07-14 17:17:46] Text: ist -> Selftalk? False
+[2025-07-14 17:17:46] Text:  -> Selftalk? False
+[2025-07-14 17:17:46] Text: eine -> Selftalk? False
+[2025-07-14 17:17:46] Text:  -> Selftalk? False
+[2025-07-14 17:17:47] Text: großartige -> Selftalk? False
+[2025-07-14 17:17:47] Text:  -> Selftalk? False
+[2025-07-14 17:17:47] Text: Frage! -> Selftalk? False
+[2025-07-14 17:17:47] Text:  -> Selftalk? False
+[2025-07-14 17:17:47] Text: Ich -> Selftalk? False
+[2025-07-14 17:17:47] Text:  -> Selftalk? False
+[2025-07-14 17:17:47] Text: denke, -> Selftalk? False
+[2025-07-14 17:17:47] Text:  -> Selftalk? False
+[2025-07-14 17:17:47] Text: ich -> Selftalk? False
+[2025-07-14 17:17:47] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: würde -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: gerne -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: eine -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: Woche -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: mit -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: Marie -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:48] Text: Curie -> Selftalk? False
+[2025-07-14 17:17:48] Text:  -> Selftalk? False
+[2025-07-14 17:17:49] Text: verbringen. -> Selftalk? False
+[2025-07-14 17:17:49] Text:  -> Selftalk? False
+[2025-07-14 17:17:49] Text: Sie -> Selftalk? False
+[2025-07-14 17:17:49] Text:  -> Selftalk? False
+[2025-07-14 17:17:49] Text: war -> Selftalk? False
+[2025-07-14 17:17:49] Text:  -> Selftalk? False
+[2025-07-14 17:17:49] Text: eine -> Selftalk? False
+[2025-07-14 17:17:49] Text:  -> Selftalk? False
+[2025-07-14 17:17:49] Text: unglaublich -> Selftalk? False
+[2025-07-14 17:17:49] Text:  -> Selftalk? False
+[2025-07-14 17:17:50] Text: brillante -> Selftalk? False
+[2025-07-14 17:17:50] Text:  -> Selftalk? False
+[2025-07-14 17:17:50] Text: Wissenschaftlerin -> Selftalk? False
+[2025-07-14 17:17:50] Text:  -> Selftalk? False
+[2025-07-14 17:17:50] Text: und -> Selftalk? False
+[2025-07-14 17:17:50] Text:  -> Selftalk? False
+[2025-07-14 17:17:50] Text: Pionierin -> Selftalk? False
+[2025-07-14 17:17:50] Text:  -> Selftalk? False
+[2025-07-14 17:17:51] Text: in -> Selftalk? False
+[2025-07-14 17:17:51] Text:  -> Selftalk? False
+[2025-07-14 17:17:51] Text: ihrem -> Selftalk? False
+[2025-07-14 17:17:51] Text:  -> Selftalk? False
+[2025-07-14 17:17:51] Text: Bereich -> Selftalk? False
+[2025-07-14 17:17:51] Text:  -> Selftalk? False
+[2025-07-14 17:17:51] Text: und -> Selftalk? False
+[2025-07-14 17:17:51] Text:  -> Selftalk? False
+[2025-07-14 17:17:51] Text: es -> Selftalk? False
+[2025-07-14 17:17:51] Text:  -> Selftalk? False
+[2025-07-14 17:17:51] Text: wäre -> Selftalk? False
+[2025-07-14 17:17:51] Text:  -> Selftalk? False
+[2025-07-14 17:17:52] Text: faszinierend, -> Selftalk? False
+[2025-07-14 17:17:52] Text:  -> Selftalk? False
+[2025-07-14 17:17:52] Text: von -> Selftalk? False
+[2025-07-14 17:17:52] Text:  -> Selftalk? False
+[2025-07-14 17:17:52] Text: ihr -> Selftalk? False
+[2025-07-14 17:17:52] Text:  -> Selftalk? False
+[2025-07-14 17:17:52] Text: zu -> Selftalk? False
+[2025-07-14 17:17:52] Text:  -> Selftalk? False
+[2025-07-14 17:17:52] Text: lernen -> Selftalk? False
+[2025-07-14 17:17:52] Text:  -> Selftalk? False
+[2025-07-14 17:17:53] Text: und -> Selftalk? False
+[2025-07-14 17:17:53] Text:  -> Selftalk? False
+[2025-07-14 17:17:53] Text: ihre -> Selftalk? False
+[2025-07-14 17:17:53] Text:  -> Selftalk? False
+[2025-07-14 17:17:53] Text: Beiträge -> Selftalk? False
+[2025-07-14 17:17:53] Text:  -> Selftalk? False
+[2025-07-14 17:17:53] Text: zur -> Selftalk? False
+[2025-07-14 17:17:53] Text:  -> Selftalk? False
+[2025-07-14 17:17:53] Text: Welt -> Selftalk? False
+[2025-07-14 17:17:53] Text:  -> Selftalk? False
+[2025-07-14 17:17:53] Text: zu -> Selftalk? False
+[2025-07-14 17:17:53] Text:  -> Selftalk? False
+[2025-07-14 17:17:54] Text: diskutieren. -> Selftalk? False
+[2025-07-14 17:17:54] Text:  -> Selftalk? False
+[2025-07-14 17:17:54] Text: Wir -> Selftalk? False
+[2025-07-14 17:17:54] Text:  -> Selftalk? False
+[2025-07-14 17:17:54] Text: könnten -> Selftalk? False
+[2025-07-14 17:17:54] Text:  -> Selftalk? False
+[2025-07-14 17:17:54] Text: Zeit -> Selftalk? False
+[2025-07-14 17:17:54] Text:  -> Selftalk? False
+[2025-07-14 17:17:54] Text: in -> Selftalk? False
+[2025-07-14 17:17:54] Text:  -> Selftalk? False
+[2025-07-14 17:17:54] Text: ihrem -> Selftalk? False
+[2025-07-14 17:17:54] Text:  -> Selftalk? False
+[2025-07-14 17:17:55] Text: Labor -> Selftalk? False
+[2025-07-14 17:17:55] Text:  -> Selftalk? False
+[2025-07-14 17:17:55] Text: verbringen -> Selftalk? False
+[2025-07-14 17:17:55] Text:  -> Selftalk? False
+[2025-07-14 17:17:55] Text: und -> Selftalk? False
+[2025-07-14 17:17:55] Text:  -> Selftalk? False
+[2025-07-14 17:17:55] Text: Experimente -> Selftalk? False
+[2025-07-14 17:17:55] Text:  -> Selftalk? False
+[2025-07-14 17:17:56] Text: durchführen -> Selftalk? False
+[2025-07-14 17:17:56] Text:  -> Selftalk? False
+[2025-07-14 17:17:56] Text: oder -> Selftalk? False
+[2025-07-14 17:17:56] Text:  -> Selftalk? False
+[2025-07-14 17:17:56] Text: über -> Selftalk? False
+[2025-07-14 17:17:56] Text:  -> Selftalk? False
+[2025-07-14 17:17:56] Text: seine -> Selftalk? False
+[2025-07-14 17:17:56] Text:  -> Selftalk? False
+[2025-07-14 17:17:56] Text: bahnbrechenden -> Selftalk? False
+[2025-07-14 17:17:56] Text:  -> Selftalk? False
+[2025-07-14 17:17:57] Text: Entdeckungen -> Selftalk? False
+[2025-07-14 17:17:57] Text:  -> Selftalk? False
+[2025-07-14 17:17:57] Text: auf -> Selftalk? False
+[2025-07-14 17:17:57] Text:  -> Selftalk? False
+[2025-07-14 17:17:57] Text: dem -> Selftalk? False
+[2025-07-14 17:17:57] Text:  -> Selftalk? False
+[2025-07-14 17:17:57] Text: Gebiet -> Selftalk? False
+[2025-07-14 17:17:57] Text:  -> Selftalk? False
+[2025-07-14 17:17:57] Text: der -> Selftalk? False
+[2025-07-14 17:17:57] Text:  -> Selftalk? False
+[2025-07-14 17:17:57] Text: Radioaktivität -> Selftalk? False
+[2025-07-14 17:17:57] Text:  -> Selftalk? False
+[2025-07-14 17:17:58] Text: sprechen. -> Selftalk? False
+[2025-07-14 17:17:58] Text:  -> Selftalk? False
+[2025-07-14 17:17:58] Text: Außerdem -> Selftalk? False
+[2025-07-14 17:17:58] Text:  -> Selftalk? False
+[2025-07-14 17:17:58] Text: denke -> Selftalk? False
+[2025-07-14 17:17:58] Text:  -> Selftalk? False
+[2025-07-14 17:17:58] Text: ich, -> Selftalk? False
+[2025-07-14 17:17:58] Text:  -> Selftalk? False
+[2025-07-14 17:17:58] Text: dass -> Selftalk? False
+[2025-07-14 17:17:58] Text:  -> Selftalk? False
+[2025-07-14 17:17:58] Text: wir -> Selftalk? False
+[2025-07-14 17:17:58] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: uns -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: gut -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: in -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: Gesprächen -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: über -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: das -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:17:59] Text: Leben -> Selftalk? False
+[2025-07-14 17:17:59] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: von -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: Frauen -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: in -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: der -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: Wissenschaft -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: zu -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: ihrer -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: Zeit -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:00] Text: und -> Selftalk? False
+[2025-07-14 17:18:00] Text:  -> Selftalk? False
+[2025-07-14 17:18:01] Text: heute -> Selftalk? False
+[2025-07-14 17:18:01] Text:  -> Selftalk? False
+[2025-07-14 17:18:01] Text: einig -> Selftalk? False
+[2025-07-14 17:18:01] Text:  -> Selftalk? False
+[2025-07-14 17:18:01] Text: würden! -> Selftalk? False
+[2025-07-14 17:18:01] Text:  -> Selftalk? False
+[2025-07-14 17:18:01] Text: Ich -> Selftalk? False
+[2025-07-14 17:18:01] Text:  -> Selftalk? False
+[2025-07-14 17:18:01] Text: bin -> Selftalk? False
+[2025-07-14 17:18:01] Text:  -> Selftalk? False
+[2025-07-14 17:18:02] Text: mir -> Selftalk? False
+[2025-07-14 17:18:02] Text:  -> Selftalk? False
+[2025-07-14 17:18:02] Text: sicher, -> Selftalk? False
+[2025-07-14 17:18:02] Text:  -> Selftalk? False
+[2025-07-14 17:18:02] Text: du -> Selftalk? False
+[2025-07-14 17:18:02] Text:  -> Selftalk? False
+[2025-07-14 17:18:02] Text: hättest -> Selftalk? False
+[2025-07-14 17:18:02] Text:  -> Selftalk? False
+[2025-07-14 17:18:02] Text: auch -> Selftalk? False
+[2025-07-14 17:18:02] Text:  -> Selftalk? False
+[2025-07-14 17:18:03] Text: eine -> Selftalk? False
+[2025-07-14 17:18:03] Text:  -> Selftalk? False
+[2025-07-14 17:18:03] Text: erstaunliche -> Selftalk? False
+[2025-07-14 17:18:03] Text:  -> Selftalk? False
+[2025-07-14 17:18:03] Text: historische -> Selftalk? False
+[2025-07-14 17:18:03] Text:  -> Selftalk? False
+[2025-07-14 17:18:04] Text: Persönlichkeit -> Selftalk? False
+[2025-07-14 17:18:04] Text:  -> Selftalk? False
+[2025-07-14 17:18:04] Text: gewählt -> Selftalk? False
+[2025-07-14 17:18:04] Text:  -> Selftalk? False
+[2025-07-14 17:18:04] Text: und -> Selftalk? False
+[2025-07-14 17:18:04] Text:  -> Selftalk? False
+[2025-07-14 17:18:04] Text: es -> Selftalk? False
+[2025-07-14 17:18:04] Text:  -> Selftalk? False
+[2025-07-14 17:18:04] Text: wäre -> Selftalk? False
+[2025-07-14 17:18:04] Text:  -> Selftalk? False
+[2025-07-14 17:18:04] Text: sehr -> Selftalk? False
+[2025-07-14 17:18:04] Text:  -> Selftalk? False
+[2025-07-14 17:18:05] Text: spannend, -> Selftalk? False
+[2025-07-14 17:18:05] Text:  -> Selftalk? False
+[2025-07-14 17:18:05] Text: von -> Selftalk? False
+[2025-07-14 17:18:05] Text:  -> Selftalk? False
+[2025-07-14 17:18:05] Text: deinen -> Selftalk? False
+[2025-07-14 17:18:05] Text:  -> Selftalk? False
+[2025-07-14 17:18:05] Text: Erfahrungen -> Selftalk? False
+[2025-07-14 17:18:05] Text:  -> Selftalk? False
+[2025-07-14 17:18:05] Text: mit -> Selftalk? False
+[2025-07-14 17:18:05] Text:  -> Selftalk? False
+[2025-07-14 17:18:05] Text: ihr -> Selftalk? False
+[2025-07-14 17:18:05] Text:  -> Selftalk? False
+[2025-07-14 17:18:06] Text: zu -> Selftalk? False
+[2025-07-14 17:18:06] Text:  -> Selftalk? False
+[2025-07-14 17:18:06] Text: hören.<dummy32006> -> Selftalk? False
+[2025-07-14 17:18:06] Text:  -> Selftalk? False
+[2025-07-14 17:18:06] Text:  -> Selftalk? False
+[2025-07-14 17:18:06] Text:  -> Selftalk? False
+[2025-07-14 17:18:38] Text: Ja, -> Selftalk? False
+[2025-07-14 17:18:38] Text:  -> Selftalk? False
+[2025-07-14 17:18:38] Text: das -> Selftalk? False
+[2025-07-14 17:18:38] Text:  -> Selftalk? False
+[2025-07-14 17:18:39] Text: hätte -> Selftalk? False
+[2025-07-14 17:18:39] Text:  -> Selftalk? False
+[2025-07-14 17:18:39] Text: ich -> Selftalk? False
+[2025-07-14 17:18:39] Text:  -> Selftalk? False
+[2025-07-14 17:18:39] Text: sehr -> Selftalk? False
+[2025-07-14 17:18:39] Text:  -> Selftalk? False
+[2025-07-14 17:18:39] Text: gerne! -> Selftalk? False
+[2025-07-14 17:18:39] Text:  -> Selftalk? False
+[2025-07-14 17:18:40] Text: 😊 -> Selftalk? False
+[2025-07-14 17:18:40] Text:  -> Selftalk? False
+[2025-07-14 17:18:40] Text:  -> Selftalk? False
+[2025-07-14 17:18:40] Text:  -> Selftalk? False
+[2025-07-14 17:18:40] Text: Es -> Selftalk? False
+[2025-07-14 17:18:40] Text:  -> Selftalk? False
+[2025-07-14 17:18:40] Text: war -> Selftalk? False
+[2025-07-14 17:18:40] Text:  -> Selftalk? False
+[2025-07-14 17:18:40] Text: eine -> Selftalk? False
+[2025-07-14 17:18:40] Text:  -> Selftalk? False
+[2025-07-14 17:18:41] Text: unglaublich -> Selftalk? False
+[2025-07-14 17:18:41] Text:  -> Selftalk? False
+[2025-07-14 17:18:41] Text: beeindruckende -> Selftalk? False
+[2025-07-14 17:18:41] Text:  -> Selftalk? False
+[2025-07-14 17:18:41] Text: Woche -> Selftalk? False
+[2025-07-14 17:18:41] Text:  -> Selftalk? False
+[2025-07-14 17:18:41] Text: voller -> Selftalk? False
+[2025-07-14 17:18:41] Text:  -> Selftalk? False
+[2025-07-14 17:18:42] Text: luzider -> Selftalk? False
+[2025-07-14 17:18:42] Text:  -> Selftalk? False
+[2025-07-14 17:18:42] Text: Momente -> Selftalk? False
+[2025-07-14 17:18:42] Text:  -> Selftalk? False
+[2025-07-14 17:18:42] Text: und -> Selftalk? False
+[2025-07-14 17:18:42] Text:  -> Selftalk? False
+[2025-07-14 17:18:43] Text: Erkenntnisse, -> Selftalk? False
+[2025-07-14 17:18:43] Text:  -> Selftalk? False
+[2025-07-14 17:18:43] Text: die -> Selftalk? False
+[2025-07-14 17:18:43] Text:  -> Selftalk? False
+[2025-07-14 17:18:43] Text: wir -> Selftalk? False
+[2025-07-14 17:18:43] Text:  -> Selftalk? False
+[2025-07-14 17:18:43] Text: teilten. -> Selftalk? False
+[2025-07-14 17:18:43] Text:  -> Selftalk? False
+[2025-07-14 17:18:43] Text: Jede -> Selftalk? False
+[2025-07-14 17:18:43] Text:  -> Selftalk? False
+[2025-07-14 17:18:44] Text: Nacht -> Selftalk? False
+[2025-07-14 17:18:44] Text:  -> Selftalk? False
+[2025-07-14 17:18:44] Text: kehrte -> Selftalk? False
+[2025-07-14 17:18:44] Text:  -> Selftalk? False
+[2025-07-14 17:18:44] Text: ich -> Selftalk? False
+[2025-07-14 17:18:44] Text:  -> Selftalk? False
+[2025-07-14 17:18:44] Text: müde, -> Selftalk? False
+[2025-07-14 17:18:44] Text:  -> Selftalk? False
+[2025-07-14 17:18:44] Text: aber -> Selftalk? False
+[2025-07-14 17:18:44] Text:  -> Selftalk? False
+[2025-07-14 17:18:45] Text: erfüllt -> Selftalk? False
+[2025-07-14 17:18:45] Text:  -> Selftalk? False
+[2025-07-14 17:18:45] Text: von -> Selftalk? False
+[2025-07-14 17:18:45] Text:  -> Selftalk? False
+[2025-07-14 17:18:45] Text: unseren -> Selftalk? False
+[2025-07-14 17:18:45] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: Gesprächen -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: zurück. -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: Ich -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: kann -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: mich -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: noch -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: gut -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:46] Text: an -> Selftalk? False
+[2025-07-14 17:18:46] Text:  -> Selftalk? False
+[2025-07-14 17:18:47] Text: unsere -> Selftalk? False
+[2025-07-14 17:18:47] Text:  -> Selftalk? False
+[2025-07-14 17:18:47] Text: erste -> Selftalk? False
+[2025-07-14 17:18:47] Text:  -> Selftalk? False
+[2025-07-14 17:18:47] Text: Begegnung -> Selftalk? False
+[2025-07-14 17:18:47] Text:  -> Selftalk? False
+[2025-07-14 17:18:47] Text: erinnern: -> Selftalk? False
+[2025-07-14 17:18:47] Text:  -> Selftalk? False
+[2025-07-14 17:18:47] Text: Sie -> Selftalk? False
+[2025-07-14 17:18:47] Text:  -> Selftalk? False
+[2025-07-14 17:18:48] Text: begrüßte -> Selftalk? False
+[2025-07-14 17:18:48] Text:  -> Selftalk? False
+[2025-07-14 17:18:48] Text: mich -> Selftalk? False
+[2025-07-14 17:18:48] Text:  -> Selftalk? False
+[2025-07-14 17:18:48] Text: mit -> Selftalk? False
+[2025-07-14 17:18:48] Text:  -> Selftalk? False
+[2025-07-14 17:18:48] Text: einer -> Selftalk? False
+[2025-07-14 17:18:48] Text:  -> Selftalk? False
+[2025-07-14 17:18:49] Text: warmen -> Selftalk? False
+[2025-07-14 17:18:49] Text:  -> Selftalk? False
+[2025-07-14 17:18:49] Text: Umarmung -> Selftalk? False
+[2025-07-14 17:18:49] Text:  -> Selftalk? False
+[2025-07-14 17:18:49] Text: und -> Selftalk? False
+[2025-07-14 17:18:49] Text:  -> Selftalk? False
+[2025-07-14 17:18:49] Text: einem -> Selftalk? False
+[2025-07-14 17:18:49] Text:  -> Selftalk? False
+[2025-07-14 17:18:49] Text: sanften -> Selftalk? False
+[2025-07-14 17:18:49] Text:  -> Selftalk? False
+[2025-07-14 17:18:50] Text: Lächeln, -> Selftalk? False
+[2025-07-14 17:18:50] Text:  -> Selftalk? False
+[2025-07-14 17:18:50] Text: das -> Selftalk? False
+[2025-07-14 17:18:50] Text:  -> Selftalk? False
+[2025-07-14 17:18:50] Text: ihre -> Selftalk? False
+[2025-07-14 17:18:50] Text:  -> Selftalk? False
+[2025-07-14 17:18:50] Text: Augen -> Selftalk? False
+[2025-07-14 17:18:50] Text:  -> Selftalk? False
+[2025-07-14 17:18:50] Text: füllte. -> Selftalk? False
+[2025-07-14 17:18:50] Text:  -> Selftalk? False
+[2025-07-14 17:18:51] Text:  -> Selftalk? False
+[2025-07-14 17:18:51] Text:  -> Selftalk? False
+[2025-07-14 17:18:51] Text: In -> Selftalk? False
+[2025-07-14 17:18:51] Text:  -> Selftalk? False
+[2025-07-14 17:18:51] Text: den -> Selftalk? False
+[2025-07-14 17:18:51] Text:  -> Selftalk? False
+[2025-07-14 17:18:51] Text: nächsten -> Selftalk? False
+[2025-07-14 17:18:51] Text:  -> Selftalk? False
+[2025-07-14 17:18:51] Text: Tagen -> Selftalk? False
+[2025-07-14 17:18:51] Text:  -> Selftalk? False
+[2025-07-14 17:18:52] Text: durchstreiften -> Selftalk? False
+[2025-07-14 17:18:52] Text:  -> Selftalk? False
+[2025-07-14 17:18:52] Text: wir -> Selftalk? False
+[2025-07-14 17:18:52] Text:  -> Selftalk? False
+[2025-07-14 17:18:52] Text: ihr -> Selftalk? False
+[2025-07-14 17:18:52] Text:  -> Selftalk? False
+[2025-07-14 17:18:52] Text: Labor, -> Selftalk? False
+[2025-07-14 17:18:52] Text:  -> Selftalk? False
+[2025-07-14 17:18:52] Text: indem -> Selftalk? False
+[2025-07-14 17:18:52] Text:  -> Selftalk? False
+[2025-07-14 17:18:53] Text: wir -> Selftalk? False
+[2025-07-14 17:18:53] Text:  -> Selftalk? False
+[2025-07-14 17:18:53] Text: über -> Selftalk? False
+[2025-07-14 17:18:53] Text:  -> Selftalk? False
+[2025-07-14 17:18:53] Text: unsere -> Selftalk? False
+[2025-07-14 17:18:53] Text:  -> Selftalk? False
+[2025-07-14 17:18:53] Text: Arbeit -> Selftalk? False
+[2025-07-14 17:18:53] Text:  -> Selftalk? False
+[2025-07-14 17:18:53] Text: sprachen -> Selftalk? False
+[2025-07-14 17:18:53] Text:  -> Selftalk? False
+[2025-07-14 17:18:53] Text: und -> Selftalk? False
+[2025-07-14 17:18:53] Text:  -> Selftalk? False
+[2025-07-14 17:18:54] Text: Ideen -> Selftalk? False
+[2025-07-14 17:18:54] Text:  -> Selftalk? False
+[2025-07-14 17:18:54] Text: austauschten. -> Selftalk? False
+[2025-07-14 17:18:54] Text:  -> Selftalk? False
+[2025-07-14 17:18:54] Text: Ich -> Selftalk? False
+[2025-07-14 17:18:54] Text:  -> Selftalk? False
+[2025-07-14 17:18:54] Text: bewunderte -> Selftalk? False
+[2025-07-14 17:18:54] Text:  -> Selftalk? False
+[2025-07-14 17:18:55] Text: die -> Selftalk? False
+[2025-07-14 17:18:55] Text:  -> Selftalk? False
+[2025-07-14 17:18:55] Text: Ausdauer, -> Selftalk? False
+[2025-07-14 17:18:55] Text:  -> Selftalk? False
+[2025-07-14 17:18:55] Text: mit -> Selftalk? False
+[2025-07-14 17:18:55] Text:  -> Selftalk? False
+[2025-07-14 17:18:55] Text: der -> Selftalk? False
+[2025-07-14 17:18:55] Text:  -> Selftalk? False
+[2025-07-14 17:18:55] Text: sie -> Selftalk? False
+[2025-07-14 17:18:55] Text:  -> Selftalk? False
+[2025-07-14 17:18:55] Text: sich -> Selftalk? False
+[2025-07-14 17:18:55] Text:  -> Selftalk? False
+[2025-07-14 17:18:56] Text: in -> Selftalk? False
+[2025-07-14 17:18:56] Text:  -> Selftalk? False
+[2025-07-14 17:18:56] Text: ihrer -> Selftalk? False
+[2025-07-14 17:18:56] Text:  -> Selftalk? False
+[2025-07-14 17:18:56] Text: Forschung -> Selftalk? False
+[2025-07-14 17:18:56] Text:  -> Selftalk? False
+[2025-07-14 17:18:56] Text: engagierte, -> Selftalk? False
+[2025-07-14 17:18:56] Text:  -> Selftalk? False
+[2025-07-14 17:18:56] Text: trotz -> Selftalk? False
+[2025-07-14 17:18:56] Text:  -> Selftalk? False
+[2025-07-14 17:18:56] Text: des -> Selftalk? False
+[2025-07-14 17:18:56] Text:  -> Selftalk? False
+[2025-07-14 17:18:57] Text: Widerstands -> Selftalk? False
+[2025-07-14 17:18:57] Text:  -> Selftalk? False
+[2025-07-14 17:18:57] Text: von -> Selftalk? False
+[2025-07-14 17:18:57] Text:  -> Selftalk? False
+[2025-07-14 17:18:57] Text: Kollegen -> Selftalk? False
+[2025-07-14 17:18:57] Text:  -> Selftalk? False
+[2025-07-14 17:18:57] Text: und -> Selftalk? False
+[2025-07-14 17:18:57] Text:  -> Selftalk? False
+[2025-07-14 17:18:57] Text: der -> Selftalk? False
+[2025-07-14 17:18:57] Text:  -> Selftalk? False
+[2025-07-14 17:18:58] Text: Gesellschaft. -> Selftalk? False
+[2025-07-14 17:18:58] Text:  -> Selftalk? False
+[2025-07-14 17:18:58] Text: Sie -> Selftalk? False
+[2025-07-14 17:18:58] Text:  -> Selftalk? False
+[2025-07-14 17:18:58] Text: betonte -> Selftalk? False
+[2025-07-14 17:18:58] Text:  -> Selftalk? False
+[2025-07-14 17:18:58] Text: immer -> Selftalk? False
+[2025-07-14 17:18:58] Text:  -> Selftalk? False
+[2025-07-14 17:18:58] Text: wieder, -> Selftalk? False
+[2025-07-14 17:18:58] Text:  -> Selftalk? False
+[2025-07-14 17:18:58] Text: wie -> Selftalk? False
+[2025-07-14 17:18:58] Text:  -> Selftalk? False
+[2025-07-14 17:18:59] Text: wichtig -> Selftalk? False
+[2025-07-14 17:18:59] Text:  -> Selftalk? False
+[2025-07-14 17:18:59] Text: es -> Selftalk? False
+[2025-07-14 17:18:59] Text:  -> Selftalk? False
+[2025-07-14 17:18:59] Text: sei, -> Selftalk? False
+[2025-07-14 17:18:59] Text:  -> Selftalk? False
+[2025-07-14 17:18:59] Text: neugierig -> Selftalk? False
+[2025-07-14 17:18:59] Text:  -> Selftalk? False
+[2025-07-14 17:18:59] Text: zu -> Selftalk? False
+[2025-07-14 17:18:59] Text:  -> Selftalk? False
+[2025-07-14 17:19:00] Text: bleiben, -> Selftalk? False
+[2025-07-14 17:19:00] Text:  -> Selftalk? False
+[2025-07-14 17:19:00] Text: egal -> Selftalk? False
+[2025-07-14 17:19:00] Text:  -> Selftalk? False
+[2025-07-14 17:19:00] Text: was -> Selftalk? False
+[2025-07-14 17:19:00] Text:  -> Selftalk? False
+[2025-07-14 17:19:00] Text: die -> Selftalk? False
+[2025-07-14 17:19:00] Text:  -> Selftalk? False
+[2025-07-14 17:19:00] Text: Welt -> Selftalk? False
+[2025-07-14 17:19:00] Text:  -> Selftalk? False
+[2025-07-14 17:19:00] Text: dir -> Selftalk? False
+[2025-07-14 17:19:00] Text:  -> Selftalk? False
+[2025-07-14 17:19:01] Text: sage. -> Selftalk? False
+[2025-07-14 17:19:01] Text:  -> Selftalk? False
+[2025-07-14 17:19:01] Text:  -> Selftalk? False
+[2025-07-14 17:19:01] Text:  -> Selftalk? False
+[2025-07-14 17:19:01] Text: Abends -> Selftalk? False
+[2025-07-14 17:19:01] Text:  -> Selftalk? False
+[2025-07-14 17:19:01] Text: saßen -> Selftalk? False
+[2025-07-14 17:19:01] Text:  -> Selftalk? False
+[2025-07-14 17:19:02] Text: wir -> Selftalk? False
+[2025-07-14 17:19:02] Text:  -> Selftalk? False
+[2025-07-14 17:19:02] Text: zusammen -> Selftalk? False
+[2025-07-14 17:19:02] Text:  -> Selftalk? False
+[2025-07-14 17:19:02] Text: und -> Selftalk? False
+[2025-07-14 17:19:02] Text:  -> Selftalk? False
+[2025-07-14 17:19:02] Text: sprachen -> Selftalk? False
+[2025-07-14 17:19:02] Text:  -> Selftalk? False
+[2025-07-14 17:19:02] Text: über -> Selftalk? False
+[2025-07-14 17:19:02] Text:  -> Selftalk? False
+[2025-07-14 17:19:02] Text: unser -> Selftalk? False
+[2025-07-14 17:19:02] Text:  -> Selftalk? False
+[2025-07-14 17:19:03] Text: Leben -> Selftalk? False
+[2025-07-14 17:19:03] Text:  -> Selftalk? False
+[2025-07-14 17:19:03] Text: und -> Selftalk? False
+[2025-07-14 17:19:03] Text:  -> Selftalk? False
+[2025-07-14 17:19:03] Text: unsere -> Selftalk? False
+[2025-07-14 17:19:03] Text:  -> Selftalk? False
+[2025-07-14 17:19:03] Text: Kämpfe. -> Selftalk? False
+[2025-07-14 17:19:03] Text:  -> Selftalk? False
+[2025-07-14 17:19:04] Text: Sie -> Selftalk? False
+[2025-07-14 17:19:04] Text:  -> Selftalk? False
+[2025-07-14 17:19:04] Text: erzählte -> Selftalk? False
+[2025-07-14 17:19:04] Text:  -> Selftalk? False
+[2025-07-14 17:19:04] Text: mir -> Selftalk? False
+[2025-07-14 17:19:04] Text:  -> Selftalk? False
+[2025-07-14 17:19:04] Text: von -> Selftalk? False
+[2025-07-14 17:19:04] Text:  -> Selftalk? False
+[2025-07-14 17:19:04] Text: ihrer -> Selftalk? False
+[2025-07-14 17:19:04] Text:  -> Selftalk? False
+[2025-07-14 17:19:05] Text: Reise -> Selftalk? False
+[2025-07-14 17:19:05] Text:  -> Selftalk? False
+[2025-07-14 17:19:05] Text: als -> Selftalk? False
+[2025-07-14 17:19:05] Text:  -> Selftalk? False
+[2025-07-14 17:19:05] Text: Wissenschaftlerin -> Selftalk? False
+[2025-07-14 17:19:05] Text:  -> Selftalk? False
+[2025-07-14 17:19:05] Text: und -> Selftalk? False
+[2025-07-14 17:19:05] Text:  -> Selftalk? False
+[2025-07-14 17:19:05] Text: der -> Selftalk? False
+[2025-07-14 17:19:05] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: Freude, -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: die -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: sie -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: daraus -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: zog. -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: Ich -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:06] Text: war -> Selftalk? False
+[2025-07-14 17:19:06] Text:  -> Selftalk? False
+[2025-07-14 17:19:07] Text: fasziniert -> Selftalk? False
+[2025-07-14 17:19:07] Text:  -> Selftalk? False
+[2025-07-14 17:19:07] Text: von -> Selftalk? False
+[2025-07-14 17:19:07] Text:  -> Selftalk? False
+[2025-07-14 17:19:07] Text: ihrem -> Selftalk? False
+[2025-07-14 17:19:07] Text:  -> Selftalk? False
+[2025-07-14 17:19:07] Text: Mut -> Selftalk? False
+[2025-07-14 17:19:07] Text:  -> Selftalk? False
+[2025-07-14 17:19:07] Text: und -> Selftalk? False
+[2025-07-14 17:19:07] Text:  -> Selftalk? False
+[2025-07-14 17:19:08] Text: ihrer -> Selftalk? False
+[2025-07-14 17:19:08] Text:  -> Selftalk? False
+[2025-07-14 17:19:08] Text: Entschlossenheit. -> Selftalk? False
+[2025-07-14 17:19:08] Text:  -> Selftalk? False
+[2025-07-14 17:19:08] Text: In -> Selftalk? False
+[2025-07-14 17:19:08] Text:  -> Selftalk? False
+[2025-07-14 17:19:08] Text: diesen -> Selftalk? False
+[2025-07-14 17:19:08] Text:  -> Selftalk? False
+[2025-07-14 17:19:09] Text: Momenten -> Selftalk? False
+[2025-07-14 17:19:09] Text:  -> Selftalk? False
+[2025-07-14 17:19:09] Text: fühlte -> Selftalk? False
+[2025-07-14 17:19:09] Text:  -> Selftalk? False
+[2025-07-14 17:19:09] Text: ich -> Selftalk? False
+[2025-07-14 17:19:09] Text:  -> Selftalk? False
+[2025-07-14 17:19:09] Text: eine -> Selftalk? False
+[2025-07-14 17:19:09] Text:  -> Selftalk? False
+[2025-07-14 17:19:09] Text: Verbindung -> Selftalk? False
+[2025-07-14 17:19:09] Text:  -> Selftalk? False
+[2025-07-14 17:19:10] Text: zu -> Selftalk? False
+[2025-07-14 17:19:10] Text:  -> Selftalk? False
+[2025-07-14 17:19:10] Text: ihr, -> Selftalk? False
+[2025-07-14 17:19:10] Text:  -> Selftalk? False
+[2025-07-14 17:19:10] Text: die -> Selftalk? False
+[2025-07-14 17:19:10] Text:  -> Selftalk? False
+[2025-07-14 17:19:10] Text: tiefer -> Selftalk? False
+[2025-07-14 17:19:10] Text:  -> Selftalk? False
+[2025-07-14 17:19:10] Text: wurde, -> Selftalk? False
+[2025-07-14 17:19:10] Text:  -> Selftalk? False
+[2025-07-14 17:19:11] Text: je -> Selftalk? False
+[2025-07-14 17:19:11] Text:  -> Selftalk? False
+[2025-07-14 17:19:11] Text: mehr -> Selftalk? False
+[2025-07-14 17:19:11] Text:  -> Selftalk? False
+[2025-07-14 17:19:11] Text: wir -> Selftalk? False
+[2025-07-14 17:19:11] Text:  -> Selftalk? False
+[2025-07-14 17:19:11] Text: sprachen. -> Selftalk? False
+[2025-07-14 17:19:11] Text:  -> Selftalk? False
+[2025-07-14 17:19:11] Text:  -> Selftalk? False
+[2025-07-14 17:19:11] Text:  -> Selftalk? False
+[2025-07-14 17:19:12] Text: Die -> Selftalk? False
+[2025-07-14 17:19:12] Text:  -> Selftalk? False
+[2025-07-14 17:19:12] Text: Woche -> Selftalk? False
+[2025-07-14 17:19:12] Text:  -> Selftalk? False
+[2025-07-14 17:19:12] Text: verging -> Selftalk? False
+[2025-07-14 17:19:12] Text:  -> Selftalk? False
+[2025-07-14 17:19:12] Text: in -> Selftalk? False
+[2025-07-14 17:19:12] Text:  -> Selftalk? False
+[2025-07-14 17:19:12] Text: einem -> Selftalk? False
+[2025-07-14 17:19:12] Text:  -> Selftalk? False
+[2025-07-14 17:19:12] Text: Wirbel -> Selftalk? False
+[2025-07-14 17:19:12] Text:  -> Selftalk? False
+[2025-07-14 17:19:13] Text: von -> Selftalk? False
+[2025-07-14 17:19:13] Text:  -> Selftalk? False
+[2025-07-14 17:19:13] Text: Staunen -> Selftalk? False
+[2025-07-14 17:19:13] Text:  -> Selftalk? False
+[2025-07-14 17:19:13] Text: und -> Selftalk? False
+[2025-07-14 17:19:13] Text:  -> Selftalk? False
+[2025-07-14 17:19:13] Text: Entdeckung, -> Selftalk? False
+[2025-07-14 17:19:13] Text:  -> Selftalk? False
+[2025-07-14 17:19:13] Text: aber -> Selftalk? False
+[2025-07-14 17:19:13] Text:  -> Selftalk? False
+[2025-07-14 17:19:14] Text: bald -> Selftalk? False
+[2025-07-14 17:19:14] Text:  -> Selftalk? False
+[2025-07-14 17:19:14] Text: war -> Selftalk? False
+[2025-07-14 17:19:14] Text:  -> Selftalk? False
+[2025-07-14 17:19:14] Text: es -> Selftalk? False
+[2025-07-14 17:19:14] Text:  -> Selftalk? False
+[2025-07-14 17:19:14] Text: Zeit, -> Selftalk? False
+[2025-07-14 17:19:14] Text:  -> Selftalk? False
+[2025-07-14 17:19:14] Text: sich -> Selftalk? False
+[2025-07-14 17:19:14] Text:  -> Selftalk? False
+[2025-07-14 17:19:14] Text: zu -> Selftalk? False
+[2025-07-14 17:19:14] Text:  -> Selftalk? False
+[2025-07-14 17:19:15] Text: verabschieden. -> Selftalk? False
+[2025-07-14 17:19:15] Text:  -> Selftalk? False
+[2025-07-14 17:19:15] Text: Als -> Selftalk? False
+[2025-07-14 17:19:15] Text:  -> Selftalk? False
+[2025-07-14 17:19:15] Text: wir -> Selftalk? False
+[2025-07-14 17:19:15] Text:  -> Selftalk? False
+[2025-07-14 17:19:15] Text: uns -> Selftalk? False
+[2025-07-14 17:19:15] Text:  -> Selftalk? False
+[2025-07-14 17:19:15] Text: zur -> Selftalk? False
+[2025-07-14 17:19:15] Text:  -> Selftalk? False
+[2025-07-14 17:19:15] Text: Tür -> Selftalk? False
+[2025-07-14 17:19:15] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: begaben, -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: hielt -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: sie -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: meine -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: Hand -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: und -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:16] Text: sah -> Selftalk? False
+[2025-07-14 17:19:16] Text:  -> Selftalk? False
+[2025-07-14 17:19:17] Text: mir -> Selftalk? False
+[2025-07-14 17:19:17] Text:  -> Selftalk? False
+[2025-07-14 17:19:17] Text: tief -> Selftalk? False
+[2025-07-14 17:19:17] Text:  -> Selftalk? False
+[2025-07-14 17:19:17] Text: in -> Selftalk? False
+[2025-07-14 17:19:17] Text:  -> Selftalk? False
+[2025-07-14 17:19:17] Text: die -> Selftalk? False
+[2025-07-14 17:19:17] Text:  -> Selftalk? False
+[2025-07-14 17:19:17] Text: Augen. -> Selftalk? False
+[2025-07-14 17:19:17] Text:  -> Selftalk? False
+[2025-07-14 17:19:18] Text: "Geh -> Selftalk? False
+[2025-07-14 17:19:18] Text:  -> Selftalk? False
+[2025-07-14 17:19:18] Text: weiter -> Selftalk? False
+[2025-07-14 17:19:18] Text:  -> Selftalk? False
+[2025-07-14 17:19:18] Text: deinen -> Selftalk? False
+[2025-07-14 17:19:18] Text:  -> Selftalk? False
+[2025-07-14 17:19:18] Text: eigenen -> Selftalk? False
+[2025-07-14 17:19:18] Text:  -> Selftalk? False
+[2025-07-14 17:19:18] Text: Weg", -> Selftalk? False
+[2025-07-14 17:19:18] Text:  -> Selftalk? False
+[2025-07-14 17:19:19] Text: sagte -> Selftalk? False
+[2025-07-14 17:19:19] Text:  -> Selftalk? False
+[2025-07-14 17:19:19] Text: sie -> Selftalk? False
+[2025-07-14 17:19:19] Text:  -> Selftalk? False
+[2025-07-14 17:19:19] Text: mit -> Selftalk? False
+[2025-07-14 17:19:19] Text:  -> Selftalk? False
+[2025-07-14 17:19:19] Text: einer -> Selftalk? False
+[2025-07-14 17:19:19] Text:  -> Selftalk? False
+[2025-07-14 17:19:19] Text: sanften -> Selftalk? False
+[2025-07-14 17:19:19] Text:  -> Selftalk? False
+[2025-07-14 17:19:19] Text: Stimme. -> Selftalk? False
+[2025-07-14 17:19:19] Text:  -> Selftalk? False
+[2025-07-14 17:19:20] Text: "Niemand -> Selftalk? False
+[2025-07-14 17:19:20] Text:  -> Selftalk? False
+[2025-07-14 17:19:20] Text: kann -> Selftalk? False
+[2025-07-14 17:19:20] Text:  -> Selftalk? False
+[2025-07-14 17:19:20] Text: das -> Selftalk? False
+[2025-07-14 17:19:20] Text:  -> Selftalk? False
+[2025-07-14 17:19:20] Text: für -> Selftalk? False
+[2025-07-14 17:19:20] Text:  -> Selftalk? False
+[2025-07-14 17:19:20] Text: dich -> Selftalk? False
+[2025-07-14 17:19:20] Text:  -> Selftalk? False
+[2025-07-14 17:19:20] Text: tun." -> Selftalk? False
+[2025-07-14 17:19:20] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text: In -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text: diesem -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text: Moment -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text: traf -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:21] Text: es -> Selftalk? False
+[2025-07-14 17:19:21] Text:  -> Selftalk? False
+[2025-07-14 17:19:22] Text: mich, -> Selftalk? False
+[2025-07-14 17:19:22] Text:  -> Selftalk? False
+[2025-07-14 17:19:22] Text: wie -> Selftalk? False
+[2025-07-14 17:19:22] Text:  -> Selftalk? False
+[2025-07-14 17:19:22] Text: ein -> Selftalk? False
+[2025-07-14 17:19:22] Text:  -> Selftalk? False
+[2025-07-14 17:19:22] Text: Blitz. -> Selftalk? False
+[2025-07-14 17:19:22] Text:  -> Selftalk? False
+[2025-07-14 17:19:22] Text: Sie -> Selftalk? False
+[2025-07-14 17:19:22] Text:  -> Selftalk? False
+[2025-07-14 17:19:23] Text: gab -> Selftalk? False
+[2025-07-14 17:19:23] Text:  -> Selftalk? False
+[2025-07-14 17:19:23] Text: mir -> Selftalk? False
+[2025-07-14 17:19:23] Text:  -> Selftalk? False
+[2025-07-14 17:19:23] Text: die -> Selftalk? False
+[2025-07-14 17:19:23] Text:  -> Selftalk? False
+[2025-07-14 17:19:23] Text: Worte, -> Selftalk? False
+[2025-07-14 17:19:23] Text:  -> Selftalk? False
+[2025-07-14 17:19:23] Text: die -> Selftalk? False
+[2025-07-14 17:19:23] Text:  -> Selftalk? False
+[2025-07-14 17:19:23] Text: ich -> Selftalk? False
+[2025-07-14 17:19:23] Text:  -> Selftalk? False
+[2025-07-14 17:19:24] Text: brauchte, -> Selftalk? False
+[2025-07-14 17:19:24] Text:  -> Selftalk? False
+[2025-07-14 17:19:24] Text: um -> Selftalk? False
+[2025-07-14 17:19:24] Text:  -> Selftalk? False
+[2025-07-14 17:19:24] Text: weiterzumachen, -> Selftalk? False
+[2025-07-14 17:19:24] Text:  -> Selftalk? False
+[2025-07-14 17:19:24] Text: auch -> Selftalk? False
+[2025-07-14 17:19:24] Text:  -> Selftalk? False
+[2025-07-14 17:19:24] Text: wenn -> Selftalk? False
+[2025-07-14 17:19:24] Text:  -> Selftalk? False
+[2025-07-14 17:19:24] Text: die -> Selftalk? False
+[2025-07-14 17:19:24] Text:  -> Selftalk? False
+[2025-07-14 17:19:25] Text: Welt -> Selftalk? False
+[2025-07-14 17:19:25] Text:  -> Selftalk? False
+[2025-07-14 17:19:25] Text: gegen -> Selftalk? False
+[2025-07-14 17:19:25] Text:  -> Selftalk? False
+[2025-07-14 17:19:25] Text: mich -> Selftalk? False
+[2025-07-14 17:19:25] Text:  -> Selftalk? False
+[2025-07-14 17:19:25] Text: zu -> Selftalk? False
+[2025-07-14 17:19:25] Text:  -> Selftalk? False
+[2025-07-14 17:19:25] Text: sein -> Selftalk? False
+[2025-07-14 17:19:25] Text:  -> Selftalk? False
+[2025-07-14 17:19:25] Text: schien. -> Selftalk? False
+[2025-07-14 17:19:25] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: Ich -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: verließ -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: sie -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: mit -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: einem -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: Gefühl -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:26] Text: der -> Selftalk? False
+[2025-07-14 17:19:26] Text:  -> Selftalk? False
+[2025-07-14 17:19:27] Text: Inspiration -> Selftalk? False
+[2025-07-14 17:19:27] Text:  -> Selftalk? False
+[2025-07-14 17:19:27] Text: und -> Selftalk? False
+[2025-07-14 17:19:27] Text:  -> Selftalk? False
+[2025-07-14 17:19:27] Text: des -> Selftalk? False
+[2025-07-14 17:19:27] Text:  -> Selftalk? False
+[2025-07-14 17:19:27] Text: Staunens, -> Selftalk? False
+[2025-07-14 17:19:27] Text:  -> Selftalk? False
+[2025-07-14 17:19:27] Text: das -> Selftalk? False
+[2025-07-14 17:19:27] Text:  -> Selftalk? False
+[2025-07-14 17:19:28] Text: nur -> Selftalk? False
+[2025-07-14 17:19:28] Text:  -> Selftalk? False
+[2025-07-14 17:19:28] Text: durch -> Selftalk? False
+[2025-07-14 17:19:28] Text:  -> Selftalk? False
+[2025-07-14 17:19:28] Text: die -> Selftalk? False
+[2025-07-14 17:19:28] Text:  -> Selftalk? False
+[2025-07-14 17:19:28] Text: Begegnung -> Selftalk? False
+[2025-07-14 17:19:28] Text:  -> Selftalk? False
+[2025-07-14 17:19:28] Text: mit -> Selftalk? False
+[2025-07-14 17:19:28] Text:  -> Selftalk? False
+[2025-07-14 17:19:28] Text: einer -> Selftalk? False
+[2025-07-14 17:19:28] Text:  -> Selftalk? False
+[2025-07-14 17:19:29] Text: bemerkenswerten -> Selftalk? False
+[2025-07-14 17:19:29] Text:  -> Selftalk? False
+[2025-07-14 17:19:29] Text: Persönlichkeit -> Selftalk? False
+[2025-07-14 17:19:29] Text:  -> Selftalk? False
+[2025-07-14 17:19:29] Text: wie -> Selftalk? False
+[2025-07-14 17:19:29] Text:  -> Selftalk? False
+[2025-07-14 17:19:30] Text: ihr -> Selftalk? False
+[2025-07-14 17:19:30] Text:  -> Selftalk? False
+[2025-07-14 17:19:30] Text: entstehen -> Selftalk? False
+[2025-07-14 17:19:30] Text:  -> Selftalk? False
+[2025-07-14 17:19:30] Text: kann. -> Selftalk? False
+[2025-07-14 17:19:30] Text:  -> Selftalk? False
+[2025-07-14 17:19:30] Text:  -> Selftalk? False
+[2025-07-14 17:19:30] Text:  -> Selftalk? False
+[2025-07-14 17:19:30] Text: Als -> Selftalk? False
+[2025-07-14 17:19:30] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: ich -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: die -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: Einrichtung -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: verließ, -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: konnte -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: ich -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:31] Text: nicht -> Selftalk? False
+[2025-07-14 17:19:31] Text:  -> Selftalk? False
+[2025-07-14 17:19:32] Text: anders, -> Selftalk? False
+[2025-07-14 17:19:32] Text:  -> Selftalk? False
+[2025-07-14 17:19:32] Text: als -> Selftalk? False
+[2025-07-14 17:19:32] Text:  -> Selftalk? False
+[2025-07-14 17:19:32] Text: zu -> Selftalk? False
+[2025-07-14 17:19:32] Text:  -> Selftalk? False
+[2025-07-14 17:19:33] Text: lächeln. -> Selftalk? False
+[2025-07-14 17:19:33] Text:  -> Selftalk? False
+[2025-07-14 17:19:33] Text: Ich -> Selftalk? False
+[2025-07-14 17:19:33] Text:  -> Selftalk? False
+[2025-07-14 17:19:33] Text: fühlte -> Selftalk? False
+[2025-07-14 17:19:33] Text:  -> Selftalk? False
+[2025-07-14 17:19:33] Text: mich -> Selftalk? False
+[2025-07-14 17:19:33] Text:  -> Selftalk? False
+[2025-07-14 17:19:33] Text: erfüllt -> Selftalk? False
+[2025-07-14 17:19:33] Text:  -> Selftalk? False
+[2025-07-14 17:19:34] Text: von -> Selftalk? False
+[2025-07-14 17:19:34] Text:  -> Selftalk? False
+[2025-07-14 17:19:34] Text: unseren -> Selftalk? False
+[2025-07-14 17:19:34] Text:  -> Selftalk? False
+[2025-07-14 17:19:34] Text: Gesprächen -> Selftalk? False
+[2025-07-14 17:19:34] Text:  -> Selftalk? False
+[2025-07-14 17:19:34] Text: und -> Selftalk? False
+[2025-07-14 17:19:34] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: wusste, -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: dass -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: diese -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: Woche -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: für -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: immer -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:35] Text: bei -> Selftalk? False
+[2025-07-14 17:19:35] Text:  -> Selftalk? False
+[2025-07-14 17:19:36] Text: mir -> Selftalk? False
+[2025-07-14 17:19:36] Text:  -> Selftalk? False
+[2025-07-14 17:19:36] Text: bleiben -> Selftalk? False
+[2025-07-14 17:19:36] Text:  -> Selftalk? False
+[2025-07-14 17:19:36] Text: würde. -> Selftalk? False
+[2025-07-14 17:19:36] Text:  -> Selftalk? False
+[2025-07-14 17:19:36] Text: Als -> Selftalk? False
+[2025-07-14 17:19:36] Text:  -> Selftalk? False
+[2025-07-14 17:19:36] Text: ich -> Selftalk? False
+[2025-07-14 17:19:36] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: den -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: Raum -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: verließ, -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: konnte -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: ich -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: es -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:37] Text: kaum -> Selftalk? False
+[2025-07-14 17:19:37] Text:  -> Selftalk? False
+[2025-07-14 17:19:38] Text: erwarten, -> Selftalk? False
+[2025-07-14 17:19:38] Text:  -> Selftalk? False
+[2025-07-14 17:19:38] Text: über -> Selftalk? False
+[2025-07-14 17:19:38] Text:  -> Selftalk? False
+[2025-07-14 17:19:38] Text: all -> Selftalk? False
+[2025-07-14 17:19:38] Text:  -> Selftalk? False
+[2025-07-14 17:19:38] Text: das -> Selftalk? False
+[2025-07-14 17:19:38] Text:  -> Selftalk? False
+[2025-07-14 17:19:39] Text: nachzudenken, -> Selftalk? False
+[2025-07-14 17:19:39] Text:  -> Selftalk? False
+[2025-07-14 17:19:39] Text: was -> Selftalk? False
+[2025-07-14 17:19:39] Text:  -> Selftalk? False
+[2025-07-14 17:19:39] Text: wir -> Selftalk? False
+[2025-07-14 17:19:39] Text:  -> Selftalk? False
+[2025-07-14 17:19:39] Text: erlebt -> Selftalk? False
+[2025-07-14 17:19:39] Text:  -> Selftalk? False
+[2025-07-14 17:19:39] Text: hatten -> Selftalk? False
+[2025-07-14 17:19:39] Text:  -> Selftalk? False
+[2025-07-14 17:19:39] Text: – -> Selftalk? False
+[2025-07-14 17:19:39] Text:  -> Selftalk? False
+[2025-07-14 17:19:40] Text: und -> Selftalk? False
+[2025-07-14 17:19:40] Text:  -> Selftalk? False
+[2025-07-14 17:19:40] Text: darüber, -> Selftalk? False
+[2025-07-14 17:19:40] Text:  -> Selftalk? False
+[2025-07-14 17:19:40] Text: wie -> Selftalk? False
+[2025-07-14 17:19:40] Text:  -> Selftalk? False
+[2025-07-14 17:19:40] Text: sehr -> Selftalk? False
+[2025-07-14 17:19:40] Text:  -> Selftalk? False
+[2025-07-14 17:19:40] Text: sie -> Selftalk? False
+[2025-07-14 17:19:40] Text:  -> Selftalk? False
+[2025-07-14 17:19:40] Text: meine -> Selftalk? False
+[2025-07-14 17:19:40] Text:  -> Selftalk? False
+[2025-07-14 17:19:41] Text: Sicht -> Selftalk? False
+[2025-07-14 17:19:41] Text:  -> Selftalk? False
+[2025-07-14 17:19:41] Text: auf -> Selftalk? False
+[2025-07-14 17:19:41] Text:  -> Selftalk? False
+[2025-07-14 17:19:41] Text: die -> Selftalk? False
+[2025-07-14 17:19:41] Text:  -> Selftalk? False
+[2025-07-14 17:19:41] Text: Welt -> Selftalk? False
+[2025-07-14 17:19:41] Text:  -> Selftalk? False
+[2025-07-14 17:19:41] Text: beeinflusst -> Selftalk? False
+[2025-07-14 17:19:41] Text:  -> Selftalk? False
+[2025-07-14 17:19:42] Text: hatte.<dummy32006> -> Selftalk? False
+[2025-07-14 17:19:42] Text:  -> Selftalk? False
+[2025-07-14 17:19:42] Text:  -> Selftalk? False
+[2025-07-14 17:19:42] Text:  -> Selftalk? False

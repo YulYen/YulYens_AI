@@ -52,7 +52,7 @@ def send_message_stream(messages: list, stream_url: str, model_name: str, enable
                 print_callback(token)
                 visible_reply += token
 
-        buffer = words[-1]  # Letzter, evtl. unvollständiger Teil bleibt
+        buffer = words[-1]
 
     # Restpuffer
     if buffer.strip():
@@ -67,34 +67,27 @@ def send_message_stream(messages: list, stream_url: str, model_name: str, enable
 def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
     """
     Generator-Version von send_message_stream:
-    Liefert jeden Token per yield, inklusive Selftalk-Filterung mit Wortpuffer.
+    Liefert jedes Wort oder Satzzeichen per yield,
+    ignoriert aber ab Start von Selftalk dauerhaft alle weiteren Tokens.
     """
-    payload = {
-        "model": model_name,
-        "messages": messages,
-        "stream": True
-    }
+    payload = {"model": model_name, "messages": messages, "stream": True}
+    is_selftalk = False
+    buffer = ""
 
     try:
         response = requests.post(stream_url, json=payload, stream=True)
 
-        buffer = ""
-
         for line in response.iter_lines():
             if not line:
                 continue
-
             decoded = line.decode("utf-8")
             if decoded.startswith("data: "):
                 decoded = decoded[len("data: "):]
-
             if decoded.strip() == "[DONE]":
                 break
-
             try:
                 data = json.loads(decoded)
                 token = data.get("message", {}).get("content", "")
-
                 if not token:
                     continue
 
@@ -102,15 +95,19 @@ def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
                 parts = re.split(r'(\s+)', buffer)
                 for i in range(len(parts) - 1):
                     chunk = parts[i]
-                    if not is_strong_selftalk(chunk, enable_logging):
+                    if is_strong_selftalk(chunk, enable_logging):
+                        is_selftalk = True
+                        break
+                    if not is_selftalk:
                         yield chunk
+                if is_selftalk:
+                    break
                 buffer = parts[-1]
-
             except json.JSONDecodeError as e:
                 if enable_logging:
                     print(f"[ERROR] JSON decode failed: {decoded} ({e})")
 
-        if buffer.strip() and not is_strong_selftalk(buffer, enable_logging):
+        if buffer.strip() and not is_selftalk:
             yield buffer
 
     except requests.RequestException as e:
