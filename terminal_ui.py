@@ -30,6 +30,7 @@ class TerminalUI:
     def print_exit(self):
         print("👋 Auf Wiedersehen!")
 
+
     def launch(self):
         self.init_ui()
         self.print_welcome()
@@ -45,18 +46,14 @@ class TerminalUI:
             self.print_bot_prefix()
 
             reply = ""
-            def collect_stream(token):
-                nonlocal reply
-                reply += token
-                self.print_stream(token)
-
-            streaming_core.send_message_stream(
+            for token in streaming_core.send_message_stream_gen(
                 messages=self.history,
                 stream_url=self.stream_url,
                 model_name=self.model_name,
-                enable_logging=self.enable_logging,
-                print_callback=collect_stream
-            )
+                enable_logging=self.enable_logging
+            ):
+                reply += token
+                self.print_stream(token)
 
             self.history.append({"role": "assistant", "content": reply})
             print()

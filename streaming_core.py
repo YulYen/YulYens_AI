@@ -20,49 +20,6 @@ def is_strong_selftalk(text: str, enable_logging: bool) -> bool:
             log.write(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Text: {text.strip()} -> Selftalk? {result}\n")
     return result
 
-def send_message_stream(messages: list, stream_url: str, model_name: str, enable_logging: bool, print_callback=None) -> str:
-    """
-    Sendet die Nachrichtenhistorie an die Ollama-API im Streaming-Modus.
-    Gibt Token aus, prüft Selftalk nur zum Unterdrücken der Anzeige.
-    """
-    payload = {"model": model_name, "stream": True, "messages": messages}
-    full_reply = ""
-    visible_reply = ""
-    buffer = ""
-    is_selftalk = False
-
-    response = requests.post(stream_url, json=payload, stream=True, timeout=60)
-    response.raise_for_status()
-
-    for line in response.iter_lines():
-        if not line:
-            continue
-        data = json.loads(line.decode('utf-8'))
-        content = data.get("message", {}).get("content", "")
-        clean = re.sub(r"<dummy\d+>", "", content)
-        full_reply += clean
-        buffer += clean
-
-        words = re.split(r'(\s+)', buffer)
-        for i in range(len(words) - 1):
-            token = words[i]
-            if is_strong_selftalk(token, enable_logging):
-                is_selftalk = True
-            elif print_callback and not is_selftalk:
-                print_callback(token)
-                visible_reply += token
-
-        buffer = words[-1]
-
-    # Restpuffer
-    if buffer.strip():
-        if is_strong_selftalk(buffer, enable_logging):
-            is_selftalk = True
-        elif print_callback and not is_selftalk:
-            print_callback(buffer)
-            visible_reply += buffer
-
-    return full_reply
 
 def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
     """
@@ -88,6 +45,8 @@ def send_message_stream_gen(messages, stream_url, model_name, enable_logging):
             try:
                 data = json.loads(decoded)
                 token = data.get("message", {}).get("content", "")
+                # Dummy-Bereinigung
+                token = re.sub(r"<dummy\d+>", "", token)
                 if not token:
                     continue
 
