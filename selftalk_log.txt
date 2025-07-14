@@ -4181,3 +4181,113 @@
 [2025-07-14 19:26:17] Text:  -> Selftalk? False
 [2025-07-14 19:26:18] Text:  -> Selftalk? False
 [2025-07-14 19:26:18] Text:  -> Selftalk? False
+[2025-07-14 19:30:02] Text: Ein -> Selftalk? False
+[2025-07-14 19:30:02] Text:  -> Selftalk? False
+[2025-07-14 19:30:02] Text: Aluminiumhut -> Selftalk? False
+[2025-07-14 19:30:02] Text:  -> Selftalk? False
+[2025-07-14 19:30:02] Text: ist -> Selftalk? False
+[2025-07-14 19:30:02] Text:  -> Selftalk? False
+[2025-07-14 19:30:03] Text: eine -> Selftalk? False
+[2025-07-14 19:30:03] Text:  -> Selftalk? False
+[2025-07-14 19:30:03] Text: Verschwörungstheorie, -> Selftalk? False
+[2025-07-14 19:30:03] Text:  -> Selftalk? False
+[2025-07-14 19:30:03] Text: die -> Selftalk? False
+[2025-07-14 19:30:03] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: behauptet, -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: dass -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: Geheimdienste -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: oder -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: andere -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: Gruppen -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:04] Text: Menschen -> Selftalk? False
+[2025-07-14 19:30:04] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: durch -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: das -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: Verteilen -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: von -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: Aluminium -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: in -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:05] Text: der -> Selftalk? False
+[2025-07-14 19:30:05] Text:  -> Selftalk? False
+[2025-07-14 19:30:06] Text: Atmosphäre -> Selftalk? False
+[2025-07-14 19:30:06] Text:  -> Selftalk? False
+[2025-07-14 19:30:06] Text: gehirngewaschen -> Selftalk? False
+[2025-07-14 19:30:06] Text:  -> Selftalk? False
+[2025-07-14 19:30:06] Text: haben. -> Selftalk? False
+[2025-07-14 19:30:06] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: Es -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: gibt -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: keine -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: wissenschaftlichen -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: Beweise, -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: um -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: diese -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:07] Text: Theorie -> Selftalk? False
+[2025-07-14 19:30:07] Text:  -> Selftalk? False
+[2025-07-14 19:30:08] Text: zu -> Selftalk? False
+[2025-07-14 19:30:08] Text:  -> Selftalk? False
+[2025-07-14 19:30:08] Text: unterstützen. -> Selftalk? False
+[2025-07-14 19:30:08] Text:  -> Selftalk? False
+[2025-07-14 19:30:08] Text: Der -> Selftalk? False
+[2025-07-14 19:30:08] Text:  -> Selftalk? False
+[2025-07-14 19:30:08] Text: Begriff -> Selftalk? False
+[2025-07-14 19:30:08] Text:  -> Selftalk? False
+[2025-07-14 19:30:09] Text: "Aluhut" -> Selftalk? False
+[2025-07-14 19:30:09] Text:  -> Selftalk? False
+[2025-07-14 19:30:09] Text: wird -> Selftalk? False
+[2025-07-14 19:30:09] Text:  -> Selftalk? False
+[2025-07-14 19:30:09] Text: manchmal -> Selftalk? False
+[2025-07-14 19:30:09] Text:  -> Selftalk? False
+[2025-07-14 19:30:09] Text: als -> Selftalk? False
+[2025-07-14 19:30:09] Text:  -> Selftalk? False
+[2025-07-14 19:30:09] Text: lächerliche -> Selftalk? False
+[2025-07-14 19:30:09] Text:  -> Selftalk? False
+[2025-07-14 19:30:09] Text: Bezeichnung -> Selftalk? False
+[2025-07-14 19:30:09] Text:  -> Selftalk? False
+[2025-07-14 19:30:10] Text: für -> Selftalk? False
+[2025-07-14 19:30:10] Text:  -> Selftalk? False
+[2025-07-14 19:30:10] Text: jemanden -> Selftalk? False
+[2025-07-14 19:30:10] Text:  -> Selftalk? False
+[2025-07-14 19:30:10] Text: verwendet, -> Selftalk? False
+[2025-07-14 19:30:10] Text:  -> Selftalk? False
+[2025-07-14 19:30:10] Text: der -> Selftalk? False
+[2025-07-14 19:30:10] Text:  -> Selftalk? False
+[2025-07-14 19:30:10] Text: an -> Selftalk? False
+[2025-07-14 19:30:10] Text:  -> Selftalk? False
+[2025-07-14 19:30:11] Text: Verschwörungstheorien -> Selftalk? False
+[2025-07-14 19:30:11] Text:  -> Selftalk? False
+[2025-07-14 19:30:11] Text: glaubt, -> Selftalk? False
+[2025-07-14 19:30:11] Text:  -> Selftalk? False
+[2025-07-14 19:30:11] Text: die -> Selftalk? False
+[2025-07-14 19:30:12] Text:  -> Selftalk? False
+[2025-07-14 19:30:12] Text: nicht -> Selftalk? False
+[2025-07-14 19:30:12] Text:  -> Selftalk? False
+[2025-07-14 19:30:12] Text: durch -> Selftalk? False
+[2025-07-14 19:30:12] Text:  -> Selftalk? False
+[2025-07-14 19:30:12] Text: Beweise -> Selftalk? False
+[2025-07-14 19:30:12] Text:  -> Selftalk? False
+[2025-07-14 19:30:12] Text: gestützt -> Selftalk? False
+[2025-07-14 19:30:12] Text:  -> Selftalk? False
+[2025-07-14 19:30:12] Text: werden. -> Selftalk? False
+[2025-07-14 19:30:12] Text:  -> Selftalk? False
+[2025-07-14 19:30:13] Text:  -> Selftalk? False
+[2025-07-14 19:30:13] Text:  -> Selftalk? False
