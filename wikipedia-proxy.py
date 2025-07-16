@@ -1,7 +1,8 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
+import json
 
 KIWIX_PORT = 8080
 PROXY_PORT = 8042
@@ -10,7 +11,10 @@ MAX_CHARS = 4000  # Maximale Zeichenanzahl für die Ausgabe
 
 class WikiRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        suchbegriff = unquote(self.path[1:])
+        parsed_path = urlparse(self.path)
+        suchbegriff = unquote(parsed_path.path[1:])
+        query = parse_qs(parsed_path.query)
+
         print(f"[Anfrage] Suchbegriff: '{suchbegriff}'")
 
         if not suchbegriff:
@@ -31,17 +35,30 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"Artikel nicht gefunden.")
                 return
 
+            response.encoding = response.apparent_encoding  # Automatisch beste Erkennung
             soup = BeautifulSoup(response.text, 'html.parser')
             content_div = soup.find(id="content") or soup.body
             clean_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
 
-            if len(clean_text) > MAX_CHARS:
-                clean_text = clean_text[:MAX_CHARS] + "... [gekürzt]"
+            limit = int(query.get("limit", [MAX_CHARS])[0])
+            if len(clean_text) > limit:
+                clean_text = clean_text[:limit] + "... [gekürzt]"
 
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(clean_text.encode("utf-8"))
+            if "json" in query:
+                payload = {
+                    "title": suchbegriff.replace("_", " "),
+                    "text": clean_text
+                }
+                encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(encoded)
+            else:
+                self.send_response(200)
+                self.send_header("Content-type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(clean_text.encode("utf-8"))
 
         except Exception as e:
             print(f"[Exception] {e}")
