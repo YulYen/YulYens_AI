@@ -41,6 +41,16 @@ class WebUI:
     def launch(self):
         print(f"[DEBUG] Launching WebUI on 0.0.0.0:7860")
         with gr.Blocks() as demo:
+            with gr.Row():
+                with gr.Column(scale=1):
+                    gr.Image("static/leah.png", elem_id="leah-img", show_label=False, container=False)
+                with gr.Column(scale=3):
+                    gr.Markdown("""
+                    ## Hallo, ich bin Leah, die freundliche KI 👋  
+                    Willkommen unserem kleinen Chat.  
+                    Frag mich, was du willst – ich höre zu, denke mit, und helfe dir weiter.  
+                """)
+
             gr.Markdown(self.greeting)
             chatbot = gr.Chatbot(label="Leah")     # verwaltet intern eine Liste von (user,bot)
             txt     = gr.Textbox(show_label=False, placeholder="Schreibe…")
