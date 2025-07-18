@@ -5,7 +5,7 @@ from web_ui import WebUI
 
 # --- Konfiguration ---
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "leah13wiki0.1"
+MODEL_NAME = "leah1.0"
 ENABLE_LOGGING = True
 GREETING = "Chatte mit L-E-A-H in der Modellversion "+ MODEL_NAME
 
