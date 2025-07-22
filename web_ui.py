@@ -1,5 +1,6 @@
 import gradio as gr
-import streaming_core
+import streaming_core_chatml as streaming_core
+
 
 class WebUI:
     def __init__(self, model_name, greeting, stream_url, enable_logging):

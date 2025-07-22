@@ -5,12 +5,12 @@ from web_ui import WebUI
 
 # --- Konfiguration ---
 OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "leah_q5"
-ENABLE_LOGGING = True
+MODEL_NAME = "plain"
+ENABLE_LOGGING = False
 GREETING = "Chatte mit L-E-A-H in der Modellversion "+ MODEL_NAME
 
-#ui = TerminalUI(MODEL_NAME,GREETING, OLLAMA_URL, ENABLE_LOGGING)
-ui = WebUI(MODEL_NAME, GREETING, OLLAMA_URL, ENABLE_LOGGING)
+ui = TerminalUI(MODEL_NAME,GREETING, OLLAMA_URL, ENABLE_LOGGING)
+#ui = WebUI(MODEL_NAME, GREETING, OLLAMA_URL, ENABLE_LOGGING)
 
 
 def main():

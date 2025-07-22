@@ -1,7 +1,8 @@
 # terminal_ui.py
 
 from colorama import Fore, Style, init
-import streaming_core
+from streaming_core_ollama import OllamaStreamer
+
 
 class TerminalUI:
     def __init__(self, model_name, greeting, stream_url, enable_logging):
@@ -10,9 +11,11 @@ class TerminalUI:
         self.stream_url = stream_url
         self.enable_logging = enable_logging
         self.history = []
+        self.streamer = OllamaStreamer(model_name, enable_logging)
 
     def init_ui(self):
         init(autoreset=True)
+
 
     def print_welcome(self):
         print(self.greeting)
@@ -46,12 +49,7 @@ class TerminalUI:
             self.print_bot_prefix()
 
             reply = ""
-            for token in streaming_core.send_message_stream_gen(
-                messages=self.history,
-                stream_url=self.stream_url,
-                model_name=self.model_name,
-                enable_logging=self.enable_logging
-            ):
+            for token in self.streamer.stream(messages=self.history):
                 reply += token
                 self.print_stream(token)
 
