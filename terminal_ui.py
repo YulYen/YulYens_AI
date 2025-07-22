@@ -11,7 +11,7 @@ class TerminalUI:
         self.stream_url = stream_url
         self.enable_logging = enable_logging
         self.history = []
-        self.streamer = OllamaStreamer(model_name, enable_logging)
+        self.streamer = OllamaStreamer(model_name, enable_logging, False)
 
     def init_ui(self):
         init(autoreset=True)
