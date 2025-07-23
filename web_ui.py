@@ -27,7 +27,7 @@ class WebUI:
 
         # Stream-Antwort
         reply = ""
-        for token in self.streamer.stream(messages=self.history):
+        for token in self.streamer.stream(messages=message_history):
             reply += token
             # Interim-Update
             yield None, chat_history + [(user_input, reply)]
