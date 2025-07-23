@@ -4,8 +4,9 @@ from ollama import chat
 
 
 class OllamaStreamer:
-    def __init__(self, model_name="plain", enable_logging=False, warm_up=True):
+    def __init__(self, model_name="plain", enable_logging=False, warm_up=True, system_prompt = None):
         self.model_name = model_name
+        self.system_prompt = system_prompt
         self.enable_logging = enable_logging
 
         if warm_up:
@@ -28,6 +29,9 @@ class OllamaStreamer:
             self._log(f"Fehler beim Aufwärmen des Modells:\n{traceback.format_exc()}")
 
     def stream(self, messages):
+        if self.system_prompt:
+            messages = [{"role": "system", "content": self.system_prompt}] + messages
+            self._log(messages)
         try:
             stream = chat(
                 model=self.model_name,
@@ -39,7 +43,7 @@ class OllamaStreamer:
                 if token:
                     cleaned = self._clean_token(token)
                     if cleaned:
-                        self._log(f"Token: {repr(cleaned)}")
+                        #self._log(f"Token: {repr(cleaned)}")
                         yield cleaned
         except Exception as e:
             self._log(f"Fehler bei stream():\n{traceback.format_exc()}")

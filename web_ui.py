@@ -1,13 +1,15 @@
 import gradio as gr
-import streaming_core_chatml as streaming_core
+from streaming_core_ollama import OllamaStreamer
 
 
 class WebUI:
-    def __init__(self, model_name, greeting, stream_url, enable_logging):
-        self.model_name    = model_name
-        self.greeting      = greeting
-        self.stream_url    = stream_url
+    def __init__(self, model_name, greeting, enable_logging, system_prompt):
+        self.model_name = model_name
+        self.greeting = greeting
         self.enable_logging = enable_logging
+        self.history = []
+        self.system_prompt = system_prompt
+        self.streamer = OllamaStreamer(model_name, enable_logging, True, system_prompt)
 
     def respond_streaming(self, user_input, chat_history):
         # Debug
@@ -25,12 +27,7 @@ class WebUI:
 
         # Stream-Antwort
         reply = ""
-        for token in streaming_core.send_message_stream_gen(
-            messages=message_history,
-            stream_url=self.stream_url,
-            model_name=self.model_name,
-            enable_logging=self.enable_logging
-        ):
+        for token in self.streamer.stream(messages=self.history):
             reply += token
             # Interim-Update
             yield None, chat_history + [(user_input, reply)]
