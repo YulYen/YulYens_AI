@@ -2,12 +2,13 @@
 
 from terminal_ui import TerminalUI
 from web_ui import WebUI
+from system_prompts import leah_system_prompts
 import json
 
 # --- Konfiguration ---
 #OLLAMA_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "leo_q5"
-ENABLE_LOGGING = True
+MODEL_NAME = "leo3"
+ENABLE_LOGGING = False
 GREETING = "Chatte mit L-E-A-H in der Modellversion "+ MODEL_NAME
 
 ## TODO_ Umbauen, dass das ganze Array an die UI geht
@@ -21,7 +22,7 @@ def load_system_prompt(filepath="system_prompts.json", persona="Leah 1.0"):
 
 
 def main():
-    system_prompt = load_system_prompt()
+    system_prompt = leah_system_prompts[0]["prompt"]
     ui = TerminalUI(MODEL_NAME,GREETING, ENABLE_LOGGING, system_prompt)
     #ui = WebUI(MODEL_NAME, GREETING, ENABLE_LOGGING)
     ui.launch()
