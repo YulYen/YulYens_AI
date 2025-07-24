@@ -1,5 +1,5 @@
 #streaming_core_ollama.py
-import traceback, re
+import traceback, re, socket
 from ollama import chat
 
 
@@ -8,6 +8,8 @@ class OllamaStreamer:
         self.model_name = model_name
         self.system_prompt = system_prompt
         self.enable_logging = enable_logging
+        self.local_ip = self._get_local_ip()
+
 
         if warm_up:
             print("Starte aufwärmen des Models:"+model_name)
@@ -28,6 +30,17 @@ class OllamaStreamer:
         except Exception as e:
             self._log(f"Fehler beim Aufwärmen des Modells:\n{traceback.format_exc()}")
 
+    def _get_local_ip(self):
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))  # Dummy-Verbindung, um lokale IP zu ermitteln
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except:
+            return "localhost"
+
+    
     def stream(self, messages):
         if self.system_prompt:
             messages = [{"role": "system", "content": self.system_prompt}] + messages
@@ -38,13 +51,19 @@ class OllamaStreamer:
                 messages=messages,
                 stream=True
             )
+            buffer = ""
             for chunk in stream:
                 token = chunk.get("message", {}).get("content", "")
                 if token:
                     cleaned = self._clean_token(token)
-                    if cleaned:
-                        #self._log(f"Token: {repr(cleaned)}")
-                        yield cleaned
+                    buffer += cleaned
+                    if any(sep in cleaned for sep in [" ", "\n"]):
+                        replaced = self._replace_wiki_token(buffer)
+                        buffer = ""
+                        if replaced:
+                            yield replaced
+            if buffer:
+                yield self._replace_wiki_token(buffer)
         except Exception as e:
             self._log(f"Fehler bei stream():\n{traceback.format_exc()}")
             yield f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"
@@ -59,3 +78,17 @@ class OllamaStreamer:
             return ""
 
         return token
+    
+    def _replace_wiki_token(self, text: str) -> str:
+        if self.enable_logging:
+            self._log(f"Wiki-Check in Text: {repr(text)}")
+
+        def ersetze(match):
+            thema = match.group(1)
+            link = f"http://{self.local_ip}:8080/content/wikipedia_de_all_nopic_2025-06/{thema}"
+            ersatz = f"Leah schlägt bei Wikipedia nach: {link}"
+            if self.enable_logging:
+                self._log(f"Ersetze !wiki!{thema} → {ersatz}")
+            return ersatz
+
+        return re.sub(r"!wiki!([\wÄÖÜäöüß\-]+)", ersetze, text)
