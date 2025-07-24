@@ -23,5 +23,4 @@ def replace_wiki_token(text: str, local_ip: str, enable_logging: bool = False, l
         if enable_logging:
             log_fn(f"Ersetze !wiki!{thema} → {ersatz}")
         return ersatz
-
-    return re.sub(r"!wiki!([\wÄÖÜäöüß\-]+)", ersetze, text)
+    return re.sub(r"\[wiki:([^\]]+)\]", ersetze, text)

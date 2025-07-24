@@ -8,7 +8,7 @@ from datetime import datetime
 
 # --- Konfiguration ---
 MODEL_NAME = "leo3"
-ENABLE_LOGGING = True
+ENABLE_LOGGING = False
 GREETING = "Chatte mit L-E-A-H in der Modellversion " + leah_system_prompts[0]["name"] + " auf Basis von " + MODEL_NAME
 
 def get_today_date():
@@ -20,7 +20,7 @@ def format_system_prompt(base_prompt: str) -> str:
         f"Merke dir diese Fakten:\n"
         f"- Heute ist der {today}.\n"
         f"- Dein Trainingsdatenstand endet im April 2023.\n"
-        f"- Deine Wikipedia-Recherche-Funktion ist aktueller geht bis Juni 2025. Nutze dies, indem du !wiki!<Thema> antwortest.\n"
+        f"- Deine Wikipedia-Recherche-Funktion ist aktueller geht bis Juni 2025. Nutze dies, indem du mit [wiki:Thema] antwortest.\n"
     )
     return base_prompt.strip() + "\n\n" + facts
 
