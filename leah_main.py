@@ -20,14 +20,14 @@ def format_system_prompt(base_prompt: str) -> str:
         f"Merke dir diese Fakten:\n"
         f"- Heute ist der {today}.\n"
         f"- Dein Trainingsdatenstand endet im April 2023.\n"
-        f"- Deine Wikipedia-Recherche geht bis Juni 2025. Das sind ziemlich aktuelle Daten, auf die du aber nur mir !wiki!Thema zugreifen kannst. \n"
+        f"- Deine Wikipedia-Recherche-Funktion ist aktueller geht bis Juni 2025. Nutze dies, indem du !wiki!<Thema> antwortest.\n"
     )
     return base_prompt.strip() + "\n\n" + facts
 
 def main():
     system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
-    ui = TerminalUI(MODEL_NAME,GREETING, ENABLE_LOGGING, system_prompt)
-    #ui = WebUI(MODEL_NAME, GREETING, ENABLE_LOGGING, system_prompt)
+    #ui = TerminalUI(MODEL_NAME,GREETING, ENABLE_LOGGING, system_prompt)
+    ui = WebUI(MODEL_NAME, GREETING, ENABLE_LOGGING, system_prompt)
     ui.launch()
 
 if __name__ == "__main__":
