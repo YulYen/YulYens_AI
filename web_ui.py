@@ -1,19 +1,19 @@
 import gradio as gr
 from streaming_core_ollama import OllamaStreamer
+import logging
 
 
 class WebUI:
-    def __init__(self, model_name, greeting, enable_logging, system_prompt):
+    def __init__(self, model_name, greeting, system_prompt):
         self.model_name = model_name
         self.greeting = greeting
-        self.enable_logging = enable_logging
         self.history = []
         self.system_prompt = system_prompt
-        self.streamer = OllamaStreamer(model_name, enable_logging, True, system_prompt)
+        self.streamer = OllamaStreamer(model_name, True, system_prompt)
 
     def respond_streaming(self, user_input, chat_history):
         # Debug
-        print(f"[DEBUG] User input: {user_input}")
+        logging.info("User input: {user_input}")
 
         # Baue die LLM-History im OpenAI-Format
         message_history = []

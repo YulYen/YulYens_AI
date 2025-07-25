@@ -1,5 +1,6 @@
 # streaming_helper.py
 import re
+import logging
 
 def clean_token(token: str) -> str:
     # Dummy-Tags raus
@@ -12,15 +13,13 @@ def clean_token(token: str) -> str:
 
     return token
 
-def replace_wiki_token(text: str, local_ip: str, enable_logging: bool = False, log_fn=print) -> str:
-    if enable_logging:
-        log_fn(f"Wiki-Check in Text: {repr(text)}")
+def replace_wiki_token(text: str, local_ip: str) -> str:
+    logging.debug(f"Wiki-Check in Text: {repr(text)}")
 
     def ersetze(match):
         thema = match.group(1)
         link = f"http://{local_ip}:8080/content/wikipedia_de_all_nopic_2025-06/{thema}"
         ersatz = f"Leah schlägt bei Wikipedia nach: {link}"
-        if enable_logging:
-            log_fn(f"Ersetze !wiki!{thema} → {ersatz}")
+        logging.info(f"Ersetze !wiki!{thema} → {ersatz}")
         return ersatz
     return re.sub(r"\[wiki:([^\]]+)\]", ersetze, text)

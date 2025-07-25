@@ -4,6 +4,8 @@ from terminal_ui import TerminalUI
 from web_ui import WebUI
 from system_prompts import leah_system_prompts
 from datetime import datetime
+from logging_setup import init_logging
+import logging
 
 
 # --- Konfiguration ---
@@ -25,9 +27,14 @@ def format_system_prompt(base_prompt: str) -> str:
     return base_prompt.strip() + "\n\n" + facts
 
 def main():
+
+
+    # Beispiel: Datei-Logging aktivieren
+    init_logging(loglevel="INFO", logfile="jk_ki.log", to_console=False)
+    logging.info("Starte JK_KI mit Logging")
     system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
-    #ui = TerminalUI(MODEL_NAME,GREETING, ENABLE_LOGGING, system_prompt)
-    ui = WebUI(MODEL_NAME, GREETING, ENABLE_LOGGING, system_prompt)
+    ui = TerminalUI(MODEL_NAME,GREETING, system_prompt)
+    #ui = WebUI(MODEL_NAME, GREETING, system_prompt)
     ui.launch()
 
 if __name__ == "__main__":

@@ -5,13 +5,12 @@ from streaming_core_ollama import OllamaStreamer
 
 
 class TerminalUI:
-    def __init__(self, model_name, greeting, enable_logging, system_prompt):
+    def __init__(self, model_name, greeting, system_prompt):
         self.model_name = model_name
         self.greeting = greeting
-        self.enable_logging = enable_logging
         self.history = []
         self.system_prompt = system_prompt
-        self.streamer = OllamaStreamer(model_name, enable_logging, False, system_prompt)
+        self.streamer = OllamaStreamer(model_name, False, system_prompt)
 
     def init_ui(self):
         init(autoreset=True)
