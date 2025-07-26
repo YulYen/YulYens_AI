@@ -1,7 +1,7 @@
 #streaming_core_ollama.py
 import traceback
 from ollama import chat
-from streaming_helper import clean_token, replace_wiki_token
+from streaming_helper import clean_token
 import logging
 
 
@@ -46,13 +46,10 @@ class OllamaStreamer:
                     count = sum(buffer.count(sep) for sep in seps)
                     logging.debug(f"Buffer:"+ buffer + "###"+str(count))
                     if count >= 1:
-                        #logging.debug(f"Wiki-Check in Buffer: {repr(buffer)}")
-                        #replaced = replace_wiki_token(buffer, self.local_ip)
                         yield buffer
                         buffer = ""
             if buffer:
-                #logging.debug(f"Wiki-Check in final Buffer: {repr(buffer)}")
-                yield buffer #replace_wiki_token(buffer, self.local_ip)
+                yield buffer
         except Exception as e:
             logging.error(f"Fehler bei stream():\n{traceback.format_exc()}")
             yield f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"

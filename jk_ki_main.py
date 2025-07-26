@@ -35,7 +35,7 @@ def format_system_prompt(base_prompt: str) -> str:
         f"Merke dir diese Fakten:\n"
         f"- Heute ist der {today}.\n"
         f"- Dein Trainingsdatenstand endet im April 2023.\n"
-        f"- Deine Wikipedia-Recherche-Funktion ist aktueller geht bis Juni 2025. Nutze dies, indem du mit [wiki:Thema] antwortest.\n"
+        f"- Deine Wikipedia-Recherche-Funktion ist aktueller geht bis Juni 2025.\n"
     )
     return base_prompt.strip() + "\n\n" + facts
 
