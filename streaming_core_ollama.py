@@ -1,5 +1,5 @@
 #streaming_core_ollama.py
-import traceback, socket
+import traceback
 from ollama import chat
 from streaming_helper import clean_token, replace_wiki_token
 import logging
@@ -14,9 +14,6 @@ class OllamaStreamer:
         if warm_up:
             print("Starte aufwärmen des Models:"+model_name)
             self._warm_up()
-
-        # Dynamische IP für Wiki-Link ermitteln
-        self.local_ip = self._get_local_ip()
 
     def _warm_up(self):
         logging.info(f"Sende Dummy zur Modellaktivierung: {self.model_name}")
@@ -48,24 +45,14 @@ class OllamaStreamer:
                     seps = [" ", "\n", "\t", ".", "?"]
                     count = sum(buffer.count(sep) for sep in seps)
                     logging.debug(f"Buffer:"+ buffer + "###"+str(count))
-                    if count >= 2:
-                        logging.debug(f"Wiki-Check in Buffer: {repr(buffer)}")
-                        replaced = replace_wiki_token(buffer, self.local_ip)
-                        yield replaced
+                    if count >= 1:
+                        #logging.debug(f"Wiki-Check in Buffer: {repr(buffer)}")
+                        #replaced = replace_wiki_token(buffer, self.local_ip)
+                        yield buffer
                         buffer = ""
             if buffer:
-                logging.debug(f"Wiki-Check in final Buffer: {repr(buffer)}")
-                yield replace_wiki_token(buffer, self.local_ip)
+                #logging.debug(f"Wiki-Check in final Buffer: {repr(buffer)}")
+                yield buffer #replace_wiki_token(buffer, self.local_ip)
         except Exception as e:
             logging.error(f"Fehler bei stream():\n{traceback.format_exc()}")
             yield f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"
-
-    def _get_local_ip(self):
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except:
-            return "localhost"

@@ -4,12 +4,14 @@ import logging
 
 
 class WebUI:
-    def __init__(self, model_name, greeting, system_prompt):
+    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip):
         self.model_name = model_name
         self.greeting = greeting
         self.history = []
         self.system_prompt = system_prompt
+        self.keyword_finder = keyword_finder
         self.streamer = OllamaStreamer(model_name, True, system_prompt)
+        self.local_ip = ip
 
     def respond_streaming(self, user_input, chat_history):
         # Debug
@@ -25,16 +27,29 @@ class WebUI:
         # Leere das Textfeld
         yield "", chat_history
 
-        # Stream-Antwort
+        #Wiki Hinweis
+        keywords = self.keyword_finder.find_keywords(user_input)
+        if keywords:
+            links = [f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}" for kw in keywords]
+            wiki_hint = "Leah wirft einen Blick in die lokale Wikipedia:\n" + "\n".join(links)
+        else:
+            wiki_hint = None
+        if wiki_hint:
+            # Zeige Links als separate Bot-Nachricht
+            chat_history.append((user_input, wiki_hint))  # feste Aufnahme in History
+            yield None, chat_history
+            # Für die eigentliche Frage füg nochmal die Frage als neuen "User"-Turn hinzu
+            user_input = ""  # Reset, weil wir die Frage ja schon haben
+
+     # Stream-Antwort
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            # Interim-Update
-            yield None, chat_history + [(user_input, reply)]
+            yield None, chat_history + [("", reply)]
 
-        # Final-Update
-        new_history = chat_history + [(user_input, reply)]
-        yield None, new_history
+        # Final speichern
+        chat_history.append(("", reply))
+        yield None, chat_history
 
     def launch(self):
         print(f"[DEBUG] Launching WebUI on 0.0.0.0:7860")
