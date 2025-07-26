@@ -14,24 +14,25 @@ class WebUI:
         self.local_ip = ip
 
     def respond_streaming(self, user_input, chat_history):
-        # Merke Originaleingabe, um sie ggf. korrekt anzuzeigen
+        # Merke Originaleingabe, um sie ggf. korrekt anzeigen zu können
         original_user_input = user_input
 
-        # Debug (optional)
         logging.info(f"User input: {user_input}")
 
-        # 1. Historie im OpenAI-Format für das LLM
+        # 1. LLM-History vorbereiten – aber ohne Wiki-Hinweise!
         message_history = []
         for u, b in chat_history:
+            if b.startswith("🕵️‍♀️"):  # Skip Anzeige-Hinweise
+                continue
             message_history.append({"role": "user", "content": u})
             message_history.append({"role": "assistant", "content": b})
-        message_history.append({"role": "user", "content": user_input})
+        message_history.append({"role": "user", "content": original_user_input})
 
-        # 2. Eingabefeld leeren (Textfeld in Gradio)
+        # 2. Eingabefeld leeren (Textfeld zurücksetzen)
         yield "", chat_history
 
-        # 3. Wikipedia-Hinweis vorbereiten
-        keywords = self.keyword_finder.find_keywords(user_input)
+        # 3. Wikipedia-Hinweis erzeugen (aber **nicht ins Prompt geben**)
+        keywords = self.keyword_finder.find_keywords(original_user_input)
         wiki_hint = None
         if keywords:
             links = [
@@ -40,24 +41,24 @@ class WebUI:
             ]
             wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
 
-        # 4. Wenn ein Wiki-Hinweis gefunden wurde, separat anzeigen
         if wiki_hint:
-            # Zeige den Hinweis als Antwort auf die Nutzereingabe
+            # Hinweis nur anzeigen – nicht ins LLM!
             chat_history.append((original_user_input, wiki_hint))
             yield None, chat_history
-            # Die Eingabe wurde schon dargestellt, Leahs Antwort erfolgt neutral
+            # LLM-Antwort erfolgt auf leere User-Zeile
             user_input = None
+            message_history.append({"role": "user", "content": ""})
 
-        # 5. LLM-Antwort streamen
+        # 4. LLM-Antwort streamen
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            # Vorschau während Stream
-            yield None, chat_history + [(user_input , reply)]
+            yield None, chat_history + [(user_input, reply)]
 
-        # 6. Final speichern
+        # 5. Antwort final speichern
         chat_history.append((user_input, reply))
         yield None, chat_history
+
 
 
     def launch(self):
