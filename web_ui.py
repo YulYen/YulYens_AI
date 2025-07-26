@@ -14,39 +14,48 @@ class WebUI:
         self.local_ip = ip
 
     def respond_streaming(self, user_input, chat_history):
-        original_user_input = user_input  # Merken!
+        # Merke Originaleingabe, um sie ggf. korrekt anzuzeigen
+        original_user_input = user_input
 
-        # Debug
+        # Debug (optional)
         logging.info(f"User input: {user_input}")
 
-        # LLM-History bauen
+        # 1. Historie im OpenAI-Format für das LLM
         message_history = []
         for u, b in chat_history:
             message_history.append({"role": "user", "content": u})
             message_history.append({"role": "assistant", "content": b})
         message_history.append({"role": "user", "content": user_input})
 
+        # 2. Eingabefeld leeren (Textfeld in Gradio)
         yield "", chat_history
 
-        # Wiki-Hinweis
+        # 3. Wikipedia-Hinweis vorbereiten
         keywords = self.keyword_finder.find_keywords(user_input)
         wiki_hint = None
         if keywords:
-            links = [f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}" for kw in keywords]
-            wiki_hint = "Leah wirft einen Blick in die lokale Wikipedia:\n" + "\n".join(links)
+            links = [
+                f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}"
+                for kw in keywords
+            ]
+            wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
 
+        # 4. Wenn ein Wiki-Hinweis gefunden wurde, separat anzeigen
         if wiki_hint:
+            # Zeige den Hinweis als Antwort auf die Nutzereingabe
             chat_history.append((original_user_input, wiki_hint))
             yield None, chat_history
-            user_input = ""  # Nur resetten, wenn der Hinweis separat war
+            # Die Eingabe wurde schon dargestellt, Leahs Antwort erfolgt neutral
+            user_input = None
 
-        # Stream-Antwort
+        # 5. LLM-Antwort streamen
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            yield None, chat_history + [(user_input, reply)]
+            # Vorschau während Stream
+            yield None, chat_history + [(user_input , reply)]
 
-        # Final speichern
+        # 6. Final speichern
         chat_history.append((user_input, reply))
         yield None, chat_history
 
