@@ -19,3 +19,5 @@ __pycache__/system_prompts.cpython-310.pyc
 jk_ki.log
 __pycache__/web_ui.cpython-310.pyc
 jk_ki.log
+tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
+__pycache__/spacy_keyword_finder.cpython-310.pyc

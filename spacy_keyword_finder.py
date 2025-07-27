@@ -5,7 +5,8 @@ RELEVANT_LABELS = ["PER", "ORG", "LOC", "EVENT"]
 
 BLOCKWORDS = {
     "hallo", "hübsche", "hi", "na", "servus", "moin", "schatz",
-    "liebling", "guten", "grüß", "tag", "huhu", "toll", "danke", "bitte"
+    "liebling", "guten", "grüß", "tag", "huhu", "toll", "danke", "bitte",
+    "super", "cool", "prima", "jo", "gern", "okay", "schreib"
 }
 
 from enum import Enum
@@ -43,15 +44,26 @@ class SpacyKeywordFinder:
         if ent.root.pos_ not in ("PROPN", "NOUN"):
             return False
 
+        # Sicherstellen, dass keine Imperative wie "Schreib" durchrutschen
+        if ent.root.lemma_.lower() in BLOCKWORDS:
+            return False
+
+        # Kein Ausrufezeichen am Ende
+        if keyword.endswith("!"):
+            return False
+
         return True
 
     def find_keywords(self, text):
         doc = self.nlp(text)
         treffer = []
+
+        # (1) normale spaCy-Entitäten
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
                 keyword = ent.text.strip().replace(" ", "_").replace("\u00df", "ss")
                 logging.info(f"{ent.label_} Treffer: {keyword}")
                 if keyword not in treffer:
                     treffer.append(keyword)
+
         return treffer

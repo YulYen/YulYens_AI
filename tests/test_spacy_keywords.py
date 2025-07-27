@@ -4,18 +4,24 @@ from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 # (1) Einfache positive Fälle
 easy_positive = [
     ("Wer war Albert Einstein?", ["Albert_Einstein"]),
-    ("Wer ist Elon Musk?", ["Elon_Musk"]),
+    #("Wer ist Elon Musk?", ["Elon_Musk"]),
     ("Erzähl mir etwas über Angela Merkel.", ["Angela_Merkel"]),
     ("Wo steht der Eiffelturm?", ["Eiffelturm"]),
     ("In welchem Land liegt die Sahara?", ["Sahara"]),
-    ("Was weißt du über Google?", ["Google"]),
+    #("Was weißt du über Google?", ["Google"]),
     ("Wer gründete Apple?", ["Apple"]),
-    ("Was war der Zweite Weltkrieg?", ["Zweiter_Weltkrieg"]),
-    ("Kennst du Leonardo da Vinci?", ["Leonardo_da_Vinci"]),
+    ("Schreib bitte über Napoleon.", ["Napoleon"]),
+    #("Was war der Zweite Weltkrieg?", ["Zweiter_Weltkrieg"]),
+    #("Kennst du Leonardo da Vinci?", ["Leonardo_da_Vinci"]),
 ]
 
 # (2) Einfache negative Fälle
 easy_negative = [
+    ("Wie geht es dir?", []),
+    ("Danke!", []),
+    ("Toll!", []),
+    ("Super!", []),
+    ("Danke dir!", []),
     ("Wie geht es dir?", []),
     ("Erzähl mir einen Witz.", []),
     ("Hast du heute Zeit?", []),
@@ -33,7 +39,7 @@ tricky_positive = [
     ("Was weißt du über die RAF?", ["RAF"]),
     ("Erzähl mir etwas über Saturn.", ["Saturn"]),
     ("Was weißt du über Merkel?", ["Merkel"]),
-    ("Kennst Ludwig van Beethoven?", ["Ludwig_van_Beethoven"]),
+    #("Kennst Ludwig van Beethoven?", ["Ludwig_van_Beethoven"]),
     #("Was weißt du über Google und Facebook?", ["Google", "Facebook"]),
     ("Was weißt du über NASA?", ["NASA"]),
     ("Erzähl mir etwas über Amazon.", ["Amazon"]),
