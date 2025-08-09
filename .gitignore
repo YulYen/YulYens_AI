@@ -23,3 +23,5 @@ tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
 __pycache__/spacy_keyword_finder.cpython-310.pyc
 tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
 tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
+__pycache__/spacy_keyword_finder.cpython-310.pyc
+__pycache__/web_ui.cpython-310.pyc
