@@ -1,27 +1,25 @@
-selftalk_log.txt
-__pycache__/web_ui.cpython-310.pyc
-selftalk_log.txt
-__pycache__/web_ui.cpython-310.pyc
-selftalk_log.txt
-__pycache__/streaming_core_chatml.cpython-310.pyc
-__pycache__/streaming_core_min.cpython-310.pyc
-__pycache__/streaming_core_ollama.cpython-310.pyc
-__pycache__/terminal_ui.cpython-310.pyc
-__pycache__/web_ui.cpython-310.pyc
-debug_plain_chatml_log.txt
-__pycache__/terminal_ui.cpython-310.pyc
-__pycache__/system_prompts.cpython-310.pyc
-__pycache__/web_ui.cpython-310.pyc
-__pycache__/system_prompts.cpython-310.pyc
-__pycache__/streaming_helper.cpython-310.pyc
-__pycache__/system_prompts.cpython-310.pyc
-__pycache__/system_prompts.cpython-310.pyc
-jk_ki.log
-__pycache__/web_ui.cpython-310.pyc
-jk_ki.log
-tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
-__pycache__/spacy_keyword_finder.cpython-310.pyc
-tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
-tests/__pycache__/test_spacy_keywords.cpython-310-pytest-8.4.1.pyc
-__pycache__/spacy_keyword_finder.cpython-310.pyc
-__pycache__/web_ui.cpython-310.pyc
+# Python-Bytecode und Cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Logs und Debug-Dateien
+*.log
+
+# Test-/Pytest-Cache
+.pytest_cache/
+tests/__pycache__/
+
+# Temporäre Dateien / Editor-Artefakte
+*.swp
+*.swo
+*.tmp
+*.temp
+
+# VSCode / IDE spezifisch
+.vscode/
+.idea/
+
+# Projekt-spezifische temporäre Dateien
+conversation_*.json
