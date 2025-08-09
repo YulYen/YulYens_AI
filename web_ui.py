@@ -4,13 +4,13 @@ import logging
 
 
 class WebUI:
-    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip):
+    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log):
         self.model_name = model_name
         self.greeting = greeting
         self.history = []
         self.system_prompt = system_prompt
         self.keyword_finder = keyword_finder
-        self.streamer = OllamaStreamer(model_name, True, system_prompt)
+        self.streamer = OllamaStreamer(model_name, True, system_prompt, convers_log)
         self.local_ip = ip
 
     def respond_streaming(self, user_input, chat_history):

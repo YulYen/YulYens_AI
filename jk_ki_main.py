@@ -45,8 +45,8 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     conv_log_file = f"conversation_{timestamp}.json"
     system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
-    ui = TerminalUI(MODEL_NAME,GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file)
-    #ui = WebUI(MODEL_NAME, GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file)
+    #ui = TerminalUI(MODEL_NAME,GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file)
+    ui = WebUI(MODEL_NAME, GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file)
     ui.launch()
 
 if __name__ == "__main__":
