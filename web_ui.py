@@ -14,6 +14,11 @@ class WebUI:
         self.local_ip = ip
 
     def respond_streaming(self, user_input, chat_history):
+        # Spezialfall: "clear" leitet neue Unterhaltung ein
+        if user_input.strip().lower() == "clear":
+            yield "", []
+            return
+
         # Merke Originaleingabe, um sie ggf. korrekt anzeigen zu können
         original_user_input = user_input
 
@@ -75,8 +80,9 @@ class WebUI:
                 """)
 
             gr.Markdown(self.greeting)
-            chatbot = gr.Chatbot(label="Leah")     # verwaltet intern eine Liste von (user,bot)
+            chatbot = gr.Chatbot(label="Leah")
             txt     = gr.Textbox(show_label=False, placeholder="Schreibe…")
+            clear   = gr.Button("🔄 Neue Unterhaltung")
 
             txt.submit(
                 fn=self.respond_streaming,
@@ -84,5 +90,7 @@ class WebUI:
                 outputs=[txt, chatbot],
                 queue=True,
             )
+
+            clear.click(lambda: ("", []), outputs=[txt, chatbot])
 
         demo.launch(server_name="0.0.0.0", server_port=7860)
