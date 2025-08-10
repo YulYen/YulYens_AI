@@ -26,6 +26,8 @@ class WebUI:
         original_user_input = user_input
 
         logging.info(f"User input: {user_input}")
+        wiki_hint = None  # trackt, ob wir gleich eine Hinweis-Zeile angezeigt haben
+
 
         # 1. LLM-History vorbereiten – aber ohne Wiki-Hinweise!
         message_history = []
@@ -34,7 +36,7 @@ class WebUI:
                 continue
             message_history.append({"role": "user", "content": u})
             message_history.append({"role": "assistant", "content": b})
-        message_history.append({"role": "user", "content": original_user_input})
+        #TODO weg: message_history.append({"role": "user", "content": original_user_input})
 
         # 2. Eingabefeld leeren (Textfeld zurücksetzen)
         yield "", chat_history
@@ -54,9 +56,9 @@ class WebUI:
                 # Hinweis nur anzeigen – nicht ins LLM!
                 chat_history.append((original_user_input, wiki_hint))
                 yield None, chat_history
-                # LLM-Antwort erfolgt auf leere User-Zeile
-                user_input = None
-                message_history.append({"role": "user", "content": ""})
+                #TODO Weg:  LLM-Antwort erfolgt auf leere User-Zeile
+                #user_input = None
+                #message_history.append({"role": "user", "content": ""})
 
             for topic in keywords:
                 try:
@@ -99,14 +101,25 @@ class WebUI:
             self._last_wiki_snippet = None
             self._last_wiki_title = None
 
+        message_history.append({"role": "user", "content": original_user_input})
+
+
         # 4. LLM-Antwort streamen
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            yield None, chat_history + [(user_input, reply)]
+            if wiki_hint:
+                combined = wiki_hint + "\n\n" + reply
+                # letzte (user, bot)-Zeile live aktualisieren statt neues Paar anzuhängen
+                yield None, chat_history[:-1] + [(original_user_input, combined)]
+            else:
+                yield None, chat_history + [(original_user_input, reply)]
 
-        # 5. Antwort final speichern
-        chat_history.append((user_input, reply))
+        # Final-Update
+        if wiki_hint:
+            chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
+        else:
+            chat_history.append((original_user_input, reply))
         yield None, chat_history
 
 
