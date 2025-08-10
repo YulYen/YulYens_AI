@@ -6,6 +6,8 @@ PROXY_BASE = "http://localhost:8042"
 
 class WebUI:
     def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log):
+        self._last_wiki_snippet = None
+        self._last_wiki_title = None
         self.model_name = model_name
         self.greeting = greeting
         self.history = []
@@ -67,6 +69,14 @@ class WebUI:
                         logging.info(f"[WIKI 200] topic='{topic}' len={len(text)}")
                         logging.info(f"[WIKI 200 PREVIEW] {text_snippet}")
 
+                        # 1) Snippet merken (nur für den nächsten Prompt)
+                        self._last_wiki_title = topic
+                        self._last_wiki_snippet = (text or "")[:800].replace("\r", " ").strip()
+
+                        # 2) zur Nachvollziehbarkeit
+                        logging.debug(f"[WIKI INJECT READY] topic='{topic}' use_len={len(self._last_wiki_snippet)}")
+
+
                     elif r.status_code == 404:
                         logging.info(f"[WIKI 404] topic='{topic}'")
                         logging.info(f"[WIKI 404 PATH] {PROXY_BASE}/{topic}?json=1&limit=800")
@@ -74,6 +84,20 @@ class WebUI:
                         logging.warning(f"[WIKI other] topic='{topic}' status={r.status_code}")
                 except Exception as e:
                         logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
+
+        # Optionaler Wiki-Spickzettel als System-Kontext (nicht zitieren/erwähnen)
+        if getattr(self, "_last_wiki_snippet", None):
+            msg = (
+                "Kontext für diese eine Antwort (nicht zitieren, nicht erwähnen; "
+                "nur zum besseren Verständnis nutzen):\n"
+                f"[Quelle: Lokale Wikipedia – {getattr(self, '_last_wiki_title','').replace('_',' ')}]\n"
+                f"{self._last_wiki_snippet}"
+            )
+            message_history.append({"role": "system", "content": msg})
+            logging.info(f"[WIKI INJECTED] title='{getattr(self, '_last_wiki_title','')}' len={len(self._last_wiki_snippet)}")
+            # nur einmal verwenden
+            self._last_wiki_snippet = None
+            self._last_wiki_title = None
 
         # 4. LLM-Antwort streamen
         reply = ""
