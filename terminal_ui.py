@@ -70,10 +70,11 @@ class TerminalUI:
                 self.already_searched_keywords.clear()
                 print(f"{Fore.BLUE}🔄 Neue Unterhaltung gestartet.{Style.RESET_ALL}\n")
                 continue
-
-            # 1. Wiki-Hinweis anzeigen (nicht ins Prompt geben!)
-            keywords = self.keyword_finder.find_keywords(user_input)
-            self.print_wiki_hint(keywords)
+            
+            if self.keyword_finder is not None:
+                # 1. Wiki-Hinweis anzeigen (nicht ins Prompt geben!)
+                keywords = self.keyword_finder.find_keywords(user_input)
+                self.print_wiki_hint(keywords)
 
             # 2. Stream starten (nur echte Konversation)
             self.history.append({"role": "user", "content": user_input})

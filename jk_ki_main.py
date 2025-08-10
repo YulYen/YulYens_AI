@@ -11,9 +11,11 @@ from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 # --- Konfiguration ---
 MODEL_NAME = "leo3"
-ENABLE_LOGGING = False
+OFFLINE_WIKI_ENABLED = False  # Feature-Flag
+LOG_LEVEL = "INFO"
 GREETING = "Chatte mit der Modellversion " + leah_system_prompts[0]["name"] + " auf Basis von " + MODEL_NAME
-keyword_finder = SpacyKeywordFinder(ModelVariant.MEDIUM)
+
+keyword_finder = SpacyKeywordFinder(ModelVariant.MEDIUM) if OFFLINE_WIKI_ENABLED else None
 
 os.makedirs("logs", exist_ok=True)
 logfile = os.path.join("logs", f"jk_ki_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
@@ -43,8 +45,9 @@ def format_system_prompt(base_prompt: str) -> str:
 
 def main():
     # Datei-Logging aktivieren
-    init_logging(loglevel="INFO", logfile=logfile, to_console=False)
+    init_logging(loglevel=LOG_LEVEL, logfile=logfile, to_console=False)
     logging.info("Starte JK_KI mit Logging")
+    logging.info(f"offline_wiki.enabled={OFFLINE_WIKI_ENABLED}")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     conv_log_file = f"conversation_{timestamp}.json"
     system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])

@@ -37,22 +37,23 @@ class WebUI:
         yield "", chat_history
 
         # 3. Wikipedia-Hinweis erzeugen (aber **nicht ins Prompt geben**)
-        keywords = self.keyword_finder.find_keywords(original_user_input)
-        wiki_hint = None
-        if keywords:
-            links = [
-                f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}"
-                for kw in keywords
-            ]
-            wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
+        if self.keyword_finder is not None:
+            keywords = self.keyword_finder.find_keywords(original_user_input)
+            wiki_hint = None
+            if keywords:
+                links = [
+                    f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}"
+                    for kw in keywords
+                ]
+                wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
 
-        if wiki_hint:
-            # Hinweis nur anzeigen – nicht ins LLM!
-            chat_history.append((original_user_input, wiki_hint))
-            yield None, chat_history
-            # LLM-Antwort erfolgt auf leere User-Zeile
-            user_input = None
-            message_history.append({"role": "user", "content": ""})
+            if wiki_hint:
+                # Hinweis nur anzeigen – nicht ins LLM!
+                chat_history.append((original_user_input, wiki_hint))
+                yield None, chat_history
+                # LLM-Antwort erfolgt auf leere User-Zeile
+                user_input = None
+                message_history.append({"role": "user", "content": ""})
 
         # 4. LLM-Antwort streamen
         reply = ""
