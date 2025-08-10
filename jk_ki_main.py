@@ -5,7 +5,7 @@ from web_ui import WebUI
 from system_prompts import leah_system_prompts
 from datetime import datetime
 from logging_setup import init_logging
-import logging, socket
+import logging, socket, os
 from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 
@@ -14,6 +14,9 @@ MODEL_NAME = "leo3"
 ENABLE_LOGGING = False
 GREETING = "Chatte mit der Modellversion " + leah_system_prompts[0]["name"] + " auf Basis von " + MODEL_NAME
 keyword_finder = SpacyKeywordFinder(ModelVariant.MEDIUM)
+
+os.makedirs("logs", exist_ok=True)
+logfile = os.path.join("logs", f"jk_ki_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
 
 def get_local_ip():
     try:
@@ -40,7 +43,7 @@ def format_system_prompt(base_prompt: str) -> str:
 
 def main():
     # Datei-Logging aktivieren
-    init_logging(loglevel="INFO", logfile="jk_ki.log", to_console=False)
+    init_logging(loglevel="INFO", logfile=logfile, to_console=False)
     logging.info("Starte JK_KI mit Logging")
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     conv_log_file = f"conversation_{timestamp}.json"

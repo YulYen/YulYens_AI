@@ -2,16 +2,8 @@
 import logging
 
 def init_logging(loglevel="INFO", logfile=None, to_console=True):
-    level = getattr(logging, loglevel.upper(), logging.INFO)
-    handlers = []
-
-    if to_console:
-        handlers.append(logging.StreamHandler())
-    if logfile:
-        handlers.append(logging.FileHandler(logfile, encoding="utf-8"))
-
     logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=handlers
-    )
+        level=getattr(logging, loglevel),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[logging.FileHandler(logfile, encoding="utf-8")] + ([logging.StreamHandler()] if to_console else []), force=True)

@@ -7,13 +7,15 @@ import logging
 
 
 class OllamaStreamer:
-    def __init__(self, model_name="plain", warm_up=True, system_prompt=None, log_path="conversation.json"):
+    def __init__(self, model_name="plain", warm_up=True, system_prompt=None, log_file="conversation.json"):
         self.model_name = model_name
         self.system_prompt = system_prompt
-        self.conversation_log_path = log_path
-
+        self._logs_dir = "logs"
+        os.makedirs(self._logs_dir, exist_ok=True)
+        self.conversation_log_path = os.path.join(self._logs_dir, log_file)
+       
         if warm_up:
-            print("Starte aufwärmen des Models:" + model_name)
+            logging.info("Starte aufwärmen des Models:" + model_name)
             self._warm_up()
 
     def _warm_up(self):
