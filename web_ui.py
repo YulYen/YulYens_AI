@@ -1,7 +1,8 @@
 import gradio as gr
 from streaming_core_ollama import OllamaStreamer
-import logging
+import requests, logging
 
+PROXY_BASE = "http://localhost:8042"
 
 class WebUI:
     def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log):
@@ -54,6 +55,25 @@ class WebUI:
                 # LLM-Antwort erfolgt auf leere User-Zeile
                 user_input = None
                 message_history.append({"role": "user", "content": ""})
+
+            for topic in keywords:
+                try:
+                    r = requests.get(f"{PROXY_BASE}/{topic}?json=1&limit=800", timeout=(3.0, 8.0))
+
+                    if r.status_code == 200:
+                        data = r.json()
+                        text = data.get("text", "")
+                        text_snippet = text[:255].replace('\n',' ')
+                        logging.info(f"[WIKI 200] topic='{topic}' len={len(text)}")
+                        logging.info(f"[WIKI 200 PREVIEW] {text_snippet}")
+
+                    elif r.status_code == 404:
+                        logging.info(f"[WIKI 404] topic='{topic}'")
+                        logging.info(f"[WIKI 404 PATH] {PROXY_BASE}/{topic}?json=1&limit=800")
+                    else:
+                        logging.warning(f"[WIKI other] topic='{topic}' status={r.status_code}")
+                except Exception as e:
+                        logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
 
         # 4. LLM-Antwort streamen
         reply = ""

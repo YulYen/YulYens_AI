@@ -28,8 +28,15 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             print(f"[Fetch] hole {fetch_url}")
             response = requests.get(fetch_url, timeout=5)
 
-            if response.status_code != 200:
+            if response.status_code != 200 and response.status_code !=404:
                 print(f"[Fehler] HTTP-Code: {response.status_code}")
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Unerwarteter Fehler - HTTP-Code: {response.status_code}")
+                return
+            
+            if response.status_code == 404 :
+                print(f"[Nicht gefunden] HTTP-Code: {response.status_code}")
                 self.send_response(404)
                 self.end_headers()
                 self.wfile.write(b"Artikel nicht gefunden.")
@@ -52,15 +59,31 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(encoded)))
                 self.end_headers()
-                self.wfile.write(encoded)
+                self.send_header("Connection", "close")
+                try:
+                    self.wfile.write(encoded)
+                except (ConnectionAbortedError, BrokenPipeError):
+                    print(f"[ClientAborted] JSON write aborted for '{suchbegriff}'")
+                    return
             else:
                 self.send_response(200)
                 self.send_header("Content-type", "text/plain; charset=utf-8")
+                encoded = clean_text.encode("utf-8")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.send_header("Connection", "close")
                 self.end_headers()
-                self.wfile.write(clean_text.encode("utf-8"))
+                try:
+                    self.wfile.write(encoded)
+                except (ConnectionAbortedError, BrokenPipeError):
+                    print(f"[ClientAborted] TEXT write aborted for '{suchbegriff}'")
+                    return
 
         except Exception as e:
+            if isinstance(e, (ConnectionAbortedError, BrokenPipeError)):
+                print(f"[ClientAborted] '{suchbegriff}': {e}")
+                return
             print(f"[Exception] {e}")
             self.send_response(500)
             self.end_headers()

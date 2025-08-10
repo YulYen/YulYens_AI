@@ -11,7 +11,7 @@ from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 # --- Konfiguration ---
 MODEL_NAME = "leo3"
-OFFLINE_WIKI_ENABLED = False  # Feature-Flag
+OFFLINE_WIKI_ENABLED = True  # Feature-Flag
 LOG_LEVEL = "INFO"
 GREETING = "Chatte mit der Modellversion " + leah_system_prompts[0]["name"] + " auf Basis von " + MODEL_NAME
 
