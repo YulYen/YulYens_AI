@@ -4,17 +4,26 @@ from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
 import json
+import os
+import logging
+from datetime import datetime
+from logging_setup import init_logging
 
-# --- Konfiguration ---
-KIWIX_PORT   = 8080
-PROXY_PORT   = 8042
-ZIM_PREFIX   = "wikipedia_de_all_nopic_2025-06"
-MAX_CHARS    = 4000
+# --- Logging einrichten ---------------------------------------------------------
+os.makedirs("logs", exist_ok=True)
+PROXY_LOGFILE = os.path.join("logs", f"wiki_proxy_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
+init_logging(loglevel="INFO", logfile=PROXY_LOGFILE, to_console=True)
+logging.info("Wiki-Proxy startet…")
+
+# --- Konfiguration --------------------------------------------------------------
+KIWIX_PORT    = 8080
+PROXY_PORT    = 8042
+ZIM_PREFIX    = "wikipedia_de_all_nopic_2025-06"
+MAX_CHARS     = 4000
 KIWIX_TIMEOUT = (3.0, 8.0)  # (connect, read) Sekunden
 
 
-# ---------- Helper für Antworten -------------------------------------------------
-
+# ---------- Helper für Antworten ------------------------------------------------
 def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes):
     handler.send_response(status)
     handler.send_header("Content-type", f"{content_type}; charset=utf-8")
@@ -24,7 +33,7 @@ def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str,
     try:
         handler.wfile.write(body)
     except (ConnectionAbortedError, BrokenPipeError) as e:
-        print(f"[ClientAborted] write aborted: {e}")
+        logging.warning(f"[ClientAborted] write aborted: {e}")
 
 def _send_text(handler: BaseHTTPRequestHandler, status: int, text: str):
     _send_bytes(handler, status, "text/plain", text.encode("utf-8"))
@@ -34,8 +43,7 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
     _send_bytes(handler, status, "application/json", encoded)
 
 
-# ---------- Helper für Request-Verarbeitung -------------------------------------
-
+# ---------- Helper für Request-Verarbeitung ------------------------------------
 def _build_kiwix_url(term: str) -> str:
     return f"http://localhost:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
@@ -48,24 +56,27 @@ def _parse_limit(query: dict) -> int:
 
 def _fetch_kiwix(term: str):
     url = _build_kiwix_url(term)
-    print(f"[Fetch] hole {url}")
+    logging.info(f"[Fetch] {url}")
     try:
         r = requests.get(url, timeout=KIWIX_TIMEOUT)
         return r.status_code, r
     except Exception as e:
-        print(f"[FetchError] {e}")
+        logging.error(f"[FetchError] {e}")
         return 500, None
 
 
-# ---------- HTTP-Handler ---------------------------------------------------------
-
+# ---------- HTTP-Handler --------------------------------------------------------
 class WikiRequestHandler(BaseHTTPRequestHandler):
+    # Standard-HTTPServer-Logs in unser Logging leiten (optional, aber hübsch)
+    def log_message(self, format, *args):
+        logging.info("%s - %s" % (self.address_string(), format % args))
+
     def do_GET(self):
         parsed_path = urlparse(self.path)
         suchbegriff = unquote(parsed_path.path[1:])
         query = parse_qs(parsed_path.query)
 
-        print(f"[Anfrage] Suchbegriff: '{suchbegriff}'")
+        logging.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}'")
 
         if not suchbegriff:
             _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
@@ -75,12 +86,12 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
         # Fehlerfälle Kiwix
         if status == 404:
-            print(f"[Nicht gefunden] HTTP-Code: 404")
+            logging.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
             _send_text(self, 404, "Artikel nicht gefunden.")
             return
 
         if status != 200:
-            print(f"[Fehler] HTTP-Code: {status}")
+            logging.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
             _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
             return
 
@@ -102,12 +113,14 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 "text": clean_text
             }
             _send_json(self, 200, payload)
+            logging.info(f"[OK 200 JSON] term='{suchbegriff}' len={len(clean_text)}")
         else:
             _send_text(self, 200, clean_text)
+            logging.info(f"[OK 200 TEXT] term='{suchbegriff}' len={len(clean_text)}")
 
 
 def run():
-    print(f"Starte lokalen Wikipedia-Text-Proxy auf http://localhost:{PROXY_PORT}")
+    logging.info(f"Starte lokalen Wikipedia-Text-Proxy auf http://localhost:{PROXY_PORT}")
     server = HTTPServer(("", PROXY_PORT), WikiRequestHandler)
     server.serve_forever()
 
