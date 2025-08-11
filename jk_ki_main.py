@@ -12,6 +12,8 @@ from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 # --- Konfiguration ---
 MODEL_NAME = "leo3"
 OFFLINE_WIKI_ENABLED = True  # Feature-Flag
+# Wiki-Snippet-Limit für Proxy (Zeichen)
+WIKI_SNIPPET_LIMIT = 2800  # oder z.B. 800, 2800
 LOG_LEVEL = "INFO"
 GREETING = "Chatte mit der Modellversion " + leah_system_prompts[0]["name"] + " auf Basis von " + MODEL_NAME
 
@@ -51,8 +53,8 @@ def main():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
     conv_log_file = f"conversation_{timestamp}.json"
     system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
-    #ui = TerminalUI(MODEL_NAME,GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file)
-    ui = WebUI(MODEL_NAME, GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file)
+    #ui = TerminalUI(MODEL_NAME,GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file,  WIKI_SNIPPET_LIMIT)
+    ui = WebUI(MODEL_NAME, GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file,  WIKI_SNIPPET_LIMIT)
     ui.launch()
 
 if __name__ == "__main__":

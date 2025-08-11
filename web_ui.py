@@ -5,7 +5,7 @@ import requests, logging
 PROXY_BASE = "http://localhost:8042"
 
 class WebUI:
-    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log):
+    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log, wiki_snippet_limit):
         self._last_wiki_snippet = None
         self._last_wiki_title = None
         self.model_name = model_name
@@ -15,6 +15,7 @@ class WebUI:
         self.keyword_finder = keyword_finder
         self.streamer = OllamaStreamer(model_name, True, system_prompt, convers_log)
         self.local_ip = ip
+        self.wiki_snippet_limit = wiki_snippet_limit
 
     def respond_streaming(self, user_input, chat_history):
         # Spezialfall: "clear" leitet neue Unterhaltung ein
@@ -36,7 +37,6 @@ class WebUI:
                 continue
             message_history.append({"role": "user", "content": u})
             message_history.append({"role": "assistant", "content": b})
-        #TODO weg: message_history.append({"role": "user", "content": original_user_input})
 
         # 2. Eingabefeld leeren (Textfeld zurücksetzen)
         yield "", chat_history
@@ -50,21 +50,14 @@ class WebUI:
                     f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}"
                     for kw in keywords
                 ]
-                wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
-
-            if wiki_hint:
-                # Hinweis nur anzeigen – nicht ins LLM!
-                chat_history.append((original_user_input, wiki_hint))
-                yield None, chat_history
-                #TODO Weg:  LLM-Antwort erfolgt auf leere User-Zeile
-                #user_input = None
-                #message_history.append({"role": "user", "content": ""})
 
             for topic in keywords:
                 try:
-                    r = requests.get(f"{PROXY_BASE}/{topic}?json=1&limit=800", timeout=(3.0, 8.0))
+                    r = requests.get(f"{PROXY_BASE}/{topic}?json=1&limit={self.wiki_snippet_limit}", timeout=(3.0, 8.0))
 
                     if r.status_code == 200:
+                        if wiki_hint is None:  # Falls mehrere Keywords, nur einmal setzen
+                            wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
                         data = r.json()
                         text = data.get("text", "")
                         text_snippet = text[:255].replace('\n',' ')
@@ -73,19 +66,29 @@ class WebUI:
 
                         # 1) Snippet merken (nur für den nächsten Prompt)
                         self._last_wiki_title = topic
-                        self._last_wiki_snippet = (text or "")[:800].replace("\r", " ").strip()
+                        self._last_wiki_snippet = (text or "")[:self.wiki_snippet_limit].replace("\r", " ").strip()
 
                         # 2) zur Nachvollziehbarkeit
                         logging.debug(f"[WIKI INJECT READY] topic='{topic}' use_len={len(self._last_wiki_snippet)}")
 
 
                     elif r.status_code == 404:
+                        if wiki_hint is None:
+                            wiki_hint = "🕵️‍♀️ *Leah findet nichts in der lokalen lokale Wikipedia zu:*\n" + "\n".join(links)
                         logging.info(f"[WIKI 404] topic='{topic}'")
                         logging.info(f"[WIKI 404 PATH] {PROXY_BASE}/{topic}?json=1&limit=800")
                     else:
                         logging.warning(f"[WIKI other] topic='{topic}' status={r.status_code}")
+                            # NEU: Kiwix/Proxy nicht erreichbar
+                        if wiki_hint is None:
+                            wiki_hint = "🕵️‍♀️ *Leah erreicht die lokale Wikipedia nicht.*\n" + "\n".join(links)
                 except Exception as e:
                         logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
+
+                if wiki_hint:
+                # Hinweis nur anzeigen – nicht ins LLM!
+                    chat_history.append((original_user_input, wiki_hint))
+                    yield None, chat_history
 
         # Optionaler Wiki-Spickzettel als System-Kontext (nicht zitieren/erwähnen)
         if getattr(self, "_last_wiki_snippet", None):

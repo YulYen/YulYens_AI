@@ -5,7 +5,7 @@ from streaming_core_ollama import OllamaStreamer
 
 
 class TerminalUI:
-    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, conv_log):
+    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, conv_log, wiki_snippet_limit):
         self.model_name = model_name
         self.greeting = greeting
         self.history = []  # Nur echte Konversation (nicht: Wiki-Hinweis)
@@ -14,6 +14,7 @@ class TerminalUI:
         self.streamer = OllamaStreamer(model_name, False, system_prompt, conv_log)
         self.local_ip = ip
         self.already_searched_keywords = set()  # Verhindert doppelte Wiki-Links
+        self.wiki_snippet_limit = wiki_snippet_limit
 
 
     def init_ui(self):
