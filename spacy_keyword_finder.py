@@ -67,3 +67,24 @@ class SpacyKeywordFinder:
                     treffer.append(keyword)
 
         return treffer
+    
+
+    def find_top_keyword(self, text: str):
+        doc = self.nlp(text)
+        candidates = []
+
+        for ent in doc.ents:
+            if self.is_valid_keyword(ent):
+                # Score: früher im Text + Länge
+                pos_score = 1.0 - (ent.start_char / max(1, len(text)))  # 0..1
+                len_score = min(len(ent.text) / 10.0, 1.0)              # max 1.0
+                score = pos_score + len_score
+                candidates.append((score, ent))
+
+        if not candidates:
+            return None
+
+        # Bester Score zuerst
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        best_ent = candidates[0][1]
+        return best_ent.text.strip().replace(" ", "_").replace("\u00df", "ss")
