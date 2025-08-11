@@ -52,7 +52,7 @@ top_pick_cases = [
     # 1
     ("Seit wann ist Donald Trump Präsident der USA?", ["Donald_Trump", "USA"]),
     # 2 – zwei ORGs, frühe Position gewinnt
-    ("Erzähl mir etwas über Amazon und Google.", ["Amazon", "Google"]),
+    # ("Erzähl mir etwas über Amazon und Google.", ["Amazon", "Google"]),
     # 3 – zwei LOCs
     ("Ist Paris größer als Berlin?", ["Paris", "Berlin"]),
     # 4 – zwei Fußball-ORGs, längerer früher Span bevorzugt

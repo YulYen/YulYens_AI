@@ -21,6 +21,10 @@ class SpacyKeywordFinder:
         logging.info(f"Lade spaCy-Modell: {self.model_name}")
         self.nlp = spacy.load(self.model_name)
 
+    def _normalize_keyword(self, text: str) -> str:
+        """Hilfsmethode: Vereinheitlicht Leerzeichen, ß usw."""
+        return text.strip().replace(" ", "_").replace("\u00df", "ss")
+
     def is_valid_keyword(self, ent):
         keyword = ent.text.strip().replace(" ", "_").replace("\u00df", "ss")
 
@@ -61,7 +65,7 @@ class SpacyKeywordFinder:
         # (1) normale spaCy-Entitäten
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
-                keyword = ent.text.strip().replace(" ", "_").replace("\u00df", "ss")
+                keyword = self._normalize_keyword(ent.text) 
                 logging.info(f"{ent.label_} Treffer: {keyword}")
                 if keyword not in treffer:
                     treffer.append(keyword)
@@ -87,4 +91,4 @@ class SpacyKeywordFinder:
         # Bester Score zuerst
         candidates.sort(key=lambda x: x[0], reverse=True)
         best_ent = candidates[0][1]
-        return best_ent.text.strip().replace(" ", "_").replace("\u00df", "ss")
+        return self._normalize_keyword(best_ent.text)
