@@ -43,47 +43,41 @@ class WebUI:
 
         # 3. Wikipedia-Hinweis erzeugen (aber **nicht ins Prompt geben**)
         if self.keyword_finder is not None:
-            keywords = self.keyword_finder.find_keywords(original_user_input)
+            keyword = self.keyword_finder.find_top_keyword(original_user_input)
             wiki_hint = None
-            if keywords:
-                links = [
-                    f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}"
-                    for kw in keywords
-                ]
-
-            for topic in keywords:
+            if keyword:
+                link = f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{keyword}"
                 try:
-                    r = requests.get(f"{PROXY_BASE}/{topic}?json=1&limit={self.wiki_snippet_limit}", timeout=(3.0, 8.0))
+                    r = requests.get(f"{PROXY_BASE}/{keyword}?json=1&limit={self.wiki_snippet_limit}", timeout=(3.0, 8.0))
 
                     if r.status_code == 200:
-                        if wiki_hint is None:  # Falls mehrere Keywords, nur einmal setzen
-                            wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + "\n".join(links)
+                        wiki_hint = "🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n" + link
                         data = r.json()
                         text = data.get("text", "")
                         text_snippet = text[:255].replace('\n',' ')
-                        logging.info(f"[WIKI 200] topic='{topic}' len={len(text)}")
+                        logging.info(f"[WIKI 200] topic='{keyword}' len={len(text)}")
                         logging.info(f"[WIKI 200 PREVIEW] {text_snippet}")
 
                         # 1) Snippet merken (nur für den nächsten Prompt)
-                        self._last_wiki_title = topic
+                        self._last_wiki_title = keyword
                         self._last_wiki_snippet = (text or "")[:self.wiki_snippet_limit].replace("\r", " ").strip()
 
                         # 2) zur Nachvollziehbarkeit
-                        logging.debug(f"[WIKI INJECT READY] topic='{topic}' use_len={len(self._last_wiki_snippet)}")
+                        logging.debug(f"[WIKI INJECT READY] topic='{keyword}' use_len={len(self._last_wiki_snippet)}")
 
 
                     elif r.status_code == 404:
                         if wiki_hint is None:
-                            wiki_hint = "🕵️‍♀️ *Leah findet nichts in der lokalen lokale Wikipedia zu:*\n" + "\n".join(links)
-                        logging.info(f"[WIKI 404] topic='{topic}'")
-                        logging.info(f"[WIKI 404 PATH] {PROXY_BASE}/{topic}?json=1&limit=800")
+                            wiki_hint = "🕵️‍♀️ *Leah findet nichts in der lokalen lokale Wikipedia zu:*\n" + "\n" + link
+                        logging.info(f"[WIKI 404] topic='{keyword}'")
+                        logging.info(f"[WIKI 404 PATH] {PROXY_BASE}/{keyword}?json=1&limit=800")
                     else:
-                        logging.warning(f"[WIKI other] topic='{topic}' status={r.status_code}")
+                        logging.warning(f"[WIKI other] topic='{keyword}' status={r.status_code}")
                             # NEU: Kiwix/Proxy nicht erreichbar
                         if wiki_hint is None:
-                            wiki_hint = "🕵️‍♀️ *Leah erreicht die lokale Wikipedia nicht.*\n" + "\n".join(links)
+                            wiki_hint = "🕵️‍♀️ *Leah erreicht die lokale Wikipedia nicht.*\n" + link
                 except Exception as e:
-                        logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
+                        logging.error(f"[WIKI EXC] topic='{keyword}' err={e}")
 
                 if wiki_hint:
                 # Hinweis nur anzeigen – nicht ins LLM!
@@ -93,9 +87,8 @@ class WebUI:
         # Optionaler Wiki-Spickzettel als System-Kontext (nicht zitieren/erwähnen)
         if getattr(self, "_last_wiki_snippet", None):
             msg = (
-                "Kontext für diese eine Antwort (nicht zitieren, nicht erwähnen; "
-                "nur zum besseren Verständnis nutzen):\n"
-                f"[Quelle: Lokale Wikipedia – {getattr(self, '_last_wiki_title','').replace('_',' ')}]\n"
+                f"Kontext zum Thema {getattr(self, '_last_wiki_title','').replace('_',' ')}:\n "
+                f"[Quelle: Lokale Wikipedia]\n"
                 f"{self._last_wiki_snippet}"
             )
             message_history.append({"role": "system", "content": msg})
