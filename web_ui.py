@@ -17,6 +17,15 @@ class WebUI:
         self.local_ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
 
+    def _strip_wiki_hint(self, text: str) -> str:
+    # Entfernt den UI-Hinweis "🕵️‍♀️ …" + genau die eine Leerzeile,
+    # die du beim Streamen mit "\n\n" vor die eigentliche Antwort setzt.
+        if text.startswith("🕵️‍♀️"):
+            sep = "\n\n"
+            i = text.find(sep)
+            return text[i+len(sep):] if i != -1 else ""
+        return text
+
     def respond_streaming(self, user_input, chat_history):
         # Spezialfall: "clear" leitet neue Unterhaltung ein
         if user_input.strip().lower() == "clear":
@@ -30,13 +39,13 @@ class WebUI:
         wiki_hint = None  # trackt, ob wir gleich eine Hinweis-Zeile angezeigt haben
 
 
-        # 1. LLM-History vorbereiten – aber ohne Wiki-Hinweise!
+        # 1. LLM-History vorbereiten – aber ohne UI-Hinweis im Bot-Text
         message_history = []
         for u, b in chat_history:
-            if b.startswith("🕵️‍♀️"):  # Skip Anzeige-Hinweise
-                continue
+            cleaned = self._strip_wiki_hint(b)
             message_history.append({"role": "user", "content": u})
-            message_history.append({"role": "assistant", "content": b})
+            if cleaned:  # nur anhängen, wenn schon eine echte Antwort existiert
+                message_history.append({"role": "assistant", "content": cleaned})
 
         # 2. Eingabefeld leeren (Textfeld zurücksetzen)
         yield "", chat_history
@@ -46,7 +55,7 @@ class WebUI:
             keyword = self.keyword_finder.find_top_keyword(original_user_input)
             wiki_hint = None
             if keyword:
-                link = f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{keyword}"
+                link = f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{keyword} \n\n"
                 try:
                     r = requests.get(f"{PROXY_BASE}/{keyword}?json=1&limit={self.wiki_snippet_limit}", timeout=(3.0, 8.0))
 
@@ -68,7 +77,7 @@ class WebUI:
 
                     elif r.status_code == 404:
                         if wiki_hint is None:
-                            wiki_hint = "🕵️‍♀️ *Leah findet nichts in der lokalen lokale Wikipedia zu:*\n" + "\n" + link
+                            wiki_hint = "🕵️‍♀️ *Leah findet nichts in der lokalen lokale Wikipedia zu:*\n"  + link
                         logging.info(f"[WIKI 404] topic='{keyword}'")
                         logging.info(f"[WIKI 404 PATH] {PROXY_BASE}/{keyword}?json=1&limit=800")
                     else:
