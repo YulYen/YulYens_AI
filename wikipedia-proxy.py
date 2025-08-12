@@ -49,6 +49,27 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
 def _build_kiwix_url(term: str) -> str:
     return f"http://localhost:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
+def _build_online_url(term: str) -> str:
+    # Wikipedia akzeptiert Unterstriche als Leerzeichen
+    return f"https://de.wikipedia.org/wiki/{term}"
+
+def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online: bool) -> str:
+    """
+    Baut einen Link, der im Browser des Nutzers funktioniert.
+    Nimmt den Host aus dem aktuellen Request (z. B. 192.168.x.y oder localhost)
+    und setzt nur den Port passend (8042 -> 8080) für Kiwix.
+    """
+    host_header = handler.headers.get("Host", "localhost")
+    hostname = host_header.split(":")[0] if host_header else "localhost"
+    if online:
+        return _build_online_url(term)
+    # lokaler Kiwix-Link (gleicher Host wie Nutzer-Aufruf, aber Port 8080)
+    return f"http://{hostname}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
+
+def _build_wiki_hint(link: str, online: bool) -> str:
+    where = "echte" if online else "lokale"
+    return f"🕵️‍♀️ *Leah wirft einen Blick in die {where} Wikipedia:*\n{link}"
+
 def _parse_limit(query: dict) -> int:
     try:
         val = int(query.get("limit", [MAX_CHARS])[0])
@@ -133,12 +154,21 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         if len(clean_text) > limit:
             clean_text = clean_text[:limit] + "... [gekürzt]"
 
-        # JSON oder Plain ausgeben
-        if "json" in query:
-            payload = {"title": suchbegriff.replace("_", " "), "text": clean_text}
-            _send_json(self, 200, payload)
-        else:
-            _send_text(self, 200, clean_text)
+        # Ziel-Link & UI-Hinweis
+        link = _build_user_visible_link(self, suchbegriff, online)
+        source = "online" if online else "local"
+        wiki_hint = _build_wiki_hint(link, online)
+
+        # JSON ausgeben
+        payload = {
+        "title": suchbegriff.replace("_", " "),
+        "text": clean_text,
+        "link": link,
+        "source": source,
+        "wiki_hint": wiki_hint
+    }
+        _send_json(self, 200, payload)
+
 
 
 def run():

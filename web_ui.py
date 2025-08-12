@@ -38,26 +38,17 @@ class WebUI:
         """Erzeugt UI-Hinweis + holt (max. 1) Snippet. Gibt (wiki_hint, title, snippet) zurück."""
         if not self.keyword_finder:
             return None, None, None
-
-        kws = self.keyword_finder.find_keywords(user_text) or []
-        if not kws:
-            return None, None, None
-
+        
         # Nur Top‑Treffer anzeigen/nutzen – hält UI & Kontext schlank
-        topic = kws[0]
-
-        # Link für UI (lokal, bleibt hübsch/konstant)
-        local_link  = f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{topic}"
+        topic = self.keyword_finder.find_top_keyword(user_text)
+        if not topic:
+            return None, None, None
         
         # Modus in Proxy-Call abbilden
         # offline: ?json=1&limit=...
         # online:  ?json=1&limit=...&online=1
-        online_flag = "1" if self.wiki_mode in ("online", "hybrid") else "0"
-        url = f"{self.proxy_base}/{topic}?json=1&limit={self.wiki_snippet_limit}&online={online_flag}"
-
-        wiki_hint_prefix = "🕵️‍♀️ *Leah wirft einen Blick in die "
-        source_label = "echte Wikipedia" if self.wiki_mode in ("online") else "lokale Wikipedia"
-        wiki_hint = f"{wiki_hint_prefix}{source_label}:*\n{local_link}"
+        online_flag = "1" if self.wiki_mode == "online" else "0"
+        url = f"{self.proxy_base}/{topic}?&limit={self.wiki_snippet_limit}&online={online_flag}"
 
         try:
             r = requests.get(url, timeout=(3.0, 8.0))
@@ -65,25 +56,26 @@ class WebUI:
                 data = r.json()
                 text = (data.get("text") or "").replace("\r", " ").strip()
                 snippet = text[: self.wiki_snippet_limit]
+                wiki_hint = data.get("wiki_hint")  # direkt vom Proxy
                 return wiki_hint, topic, snippet
             elif r.status_code == 404:
-                return f"🕵️‍♀️ *Kein Eintrag gefunden:*\n{local_link}", None, None
+                return f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}", None, None
             else:
-                return f"🕵️‍♀️ *Wikipedia nicht erreichbar.*\n{local_link}", None, None
+                return f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}", None, None
         except Exception as e:
             logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
-            return f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*\n{local_link}", None, None
+            return f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*{topic}", None, None
 
     def _inject_wiki_context(self, message_history, title: str, snippet: str):
         """Snippet als System-Kontext anhängen (Guardrail + Inhalt)."""
         guardrail = (
-            "Nutze ausschließlich den folgenden Kontext aus der lokalen Wikipedia. "
+            "Nutze ausschließlich den folgenden Kontext aus Wikipedia. "
             "Wenn etwas dort nicht steht, sag knapp, dass du es nicht sicher weißt."
         )
         message_history.append({"role": "system", "content": guardrail})
         msg = (
             f"Kontext zum Thema {title.replace('_',' ')}:\n"
-            f"[Quelle: Lokale Wikipedia]\n{snippet}"
+            f"[Quelle: Wikipedia]\n{snippet}"
         )
         message_history.append({"role": "system", "content": msg})
 
