@@ -1,0 +1,28 @@
+# --- Core-Einstellungen ----------------------------------------------------------
+core:
+  # Standard-Modelname für den Start
+  model_name: "leo-hessianai-13b-chat.Q5"
+
+# --- UI-Einstellungen ----------------------------------------------------------
+ui:
+  # Start-UI: "web" oder "terminal"
+  type: "terminal"
+
+  # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
+  # Verfügbare Platzhalter: {model_name} und {persona_name}
+  greeting: "Chatte mit {persona_name} auf Basis der Modellversion {model_name}"
+
+# --- Wiki-Einstellungen --------------------------------------------------------
+wiki:
+  # Ob das lokale Offline-Wiki (Kiwix) genutzt wird: offline
+  # Oder Wikipedia: online
+  # Oder kein wiki-Tool: false
+  wiki_mode: offline
+
+  # Maximale Länge der Wiki-Snippets (Zeichen)
+  snippet_limit: 1600
+
+# --- Logging -------------------------------------------------------------------
+logging:
+  # DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
