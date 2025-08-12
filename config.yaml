@@ -6,7 +6,7 @@ core:
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:
   # Start-UI: "web" oder "terminal"
-  type: "terminal"
+  type: "web"
 
   # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
   # Verfügbare Platzhalter: {model_name} und {persona_name}
@@ -17,7 +17,9 @@ wiki:
   # Ob das lokale Offline-Wiki (Kiwix) genutzt wird: offline
   # Oder Wikipedia: online
   # Oder kein wiki-Tool: false
-  wiki_mode: offline
+  mode: online
+  # Immer notwendig, egal ob offline oder online
+  proxy_base: "http://localhost:8042"
 
   # Maximale Länge der Wiki-Snippets (Zeichen)
   snippet_limit: 1600

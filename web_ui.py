@@ -2,11 +2,8 @@ import gradio as gr
 from streaming_core_ollama import OllamaStreamer
 import requests, logging
 
-PROXY_BASE = "http://localhost:8042"
-
 class WebUI:
-    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log, wiki_snippet_limit):
-        self._last_wiki_snippet = None
+    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log, wiki_snippet_limit, wiki_mode, proxy_base):
         self._last_wiki_title = None
         self.model_name = model_name
         self.greeting = greeting
@@ -16,6 +13,8 @@ class WebUI:
         self.streamer = OllamaStreamer(model_name, True, system_prompt, convers_log)
         self.local_ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
+        self.wiki_mode = wiki_mode          # "offline" | "online" | "hybrid"
+        self.proxy_base = proxy_base
 
     def _strip_wiki_hint(self, text: str) -> str:
     # Entfernt den UI-Hinweis "🕵️‍♀️ …" + genau die eine Leerzeile,
@@ -46,23 +45,34 @@ class WebUI:
 
         # Nur Top‑Treffer anzeigen/nutzen – hält UI & Kontext schlank
         topic = kws[0]
-        link = f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{topic}"
-        wiki_hint = f"🕵️‍♀️ *Leah wirft einen Blick in die lokale Wikipedia:*\n{link}"
+
+        # Link für UI (lokal, bleibt hübsch/konstant)
+        local_link  = f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{topic}"
+        
+        # Modus in Proxy-Call abbilden
+        # offline: ?json=1&limit=...
+        # online:  ?json=1&limit=...&online=1
+        online_flag = "1" if self.wiki_mode in ("online", "hybrid") else "0"
+        url = f"{self.proxy_base}/{topic}?json=1&limit={self.wiki_snippet_limit}&online={online_flag}"
+
+        wiki_hint_prefix = "🕵️‍♀️ *Leah wirft einen Blick in die "
+        source_label = "echte Wikipedia" if self.wiki_mode in ("online") else "lokale Wikipedia"
+        wiki_hint = f"{wiki_hint_prefix}{source_label}:*\n{local_link}"
 
         try:
-            r = requests.get(f"{PROXY_BASE}/{topic}?json=1&limit={self.wiki_snippet_limit}", timeout=(3.0, 8.0))
+            r = requests.get(url, timeout=(3.0, 8.0))
             if r.status_code == 200:
                 data = r.json()
                 text = (data.get("text") or "").replace("\r", " ").strip()
                 snippet = text[: self.wiki_snippet_limit]
                 return wiki_hint, topic, snippet
             elif r.status_code == 404:
-                return f"🕵️‍♀️ *Kein Eintrag gefunden:*\n{link}", None, None
+                return f"🕵️‍♀️ *Kein Eintrag gefunden:*\n{local_link}", None, None
             else:
-                return f"🕵️‍♀️ *Lokale Wikipedia nicht erreichbar.*\n{link}", None, None
+                return f"🕵️‍♀️ *Wikipedia nicht erreichbar.*\n{local_link}", None, None
         except Exception as e:
             logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
-            return f"🕵️‍♀️ *Lokale Wikipedia nicht erreichbar.*\n{link}", None, None
+            return f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*\n{local_link}", None, None
 
     def _inject_wiki_context(self, message_history, title: str, snippet: str):
         """Snippet als System-Kontext anhängen (Guardrail + Inhalt)."""

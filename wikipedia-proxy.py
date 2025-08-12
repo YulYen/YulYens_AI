@@ -22,6 +22,8 @@ ZIM_PREFIX    = "wikipedia_de_all_nopic_2025-06"
 MAX_CHARS     = 4000
 KIWIX_TIMEOUT = (3.0, 8.0)  # (connect, read) Sekunden
 
+ONLINE_TIMEOUT = (3.0, 8.0)
+
 
 # ---------- Helper für Antworten ------------------------------------------------
 def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes):
@@ -63,6 +65,26 @@ def _fetch_kiwix(term: str):
     except Exception as e:
         logging.error(f"[FetchError] {e}")
         return 500, None
+    
+def _fetch_online(term: str):
+    """Holt Kurztext aus echter deutscher Wikipedia (REST Summary API)."""
+    url = f"https://de.wikipedia.org/api/rest_v1/page/summary/{term}"
+    logging.info(f"[FetchOnline] {url}")
+    try:
+        r = requests.get(url, timeout=ONLINE_TIMEOUT, headers={"User-Agent": "LeahWikiProxy/1.0"})
+        if r.status_code != 200:
+            return r.status_code, None
+        data = r.json()
+        extract = (data.get("extract") or "").strip()
+        if not extract:
+            return 404, None
+        class Resp:
+            text = extract
+            apparent_encoding = "utf-8"
+        return 200, Resp()
+    except Exception as e:
+        logging.error(f"[FetchOnlineError] {e}")
+        return 500, None
 
 
 # ---------- HTTP-Handler --------------------------------------------------------
@@ -75,31 +97,36 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         parsed_path = urlparse(self.path)
         suchbegriff = unquote(parsed_path.path[1:])
         query = parse_qs(parsed_path.query)
+        online = query.get("online", ["0"])[0] == "1"
 
-        logging.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}'")
+        logging.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
 
         if not suchbegriff:
             _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
             return
 
-        status, resp = _fetch_kiwix(suchbegriff)
-
-        # Fehlerfälle Kiwix
-        if status == 404:
-            logging.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
-            _send_text(self, 404, "Artikel nicht gefunden.")
-            return
+        if online:
+            status, resp = _fetch_online(suchbegriff)
+        else:
+            status, resp = _fetch_kiwix(suchbegriff)
 
         if status != 200:
-            logging.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
-            _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
+            if status == 404:
+                logging.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
+                _send_text(self, 404, "Artikel nicht gefunden.")
+            else:
+                logging.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
+                _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
             return
 
-        # HTML in Text extrahieren
-        resp.encoding = resp.apparent_encoding  # beste Schätzung
-        soup = BeautifulSoup(resp.text, "html.parser")
-        content_div = soup.find(id="content") or soup.body
-        clean_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
+        # Text gewinnen
+        if online:
+            clean_text = resp.text
+        else:
+            resp.encoding = resp.apparent_encoding
+            soup = BeautifulSoup(resp.text, "html.parser")
+            content_div = soup.find(id="content") or soup.body
+            clean_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
 
         # Limit anwenden
         limit = _parse_limit(query)
@@ -108,15 +135,10 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
         # JSON oder Plain ausgeben
         if "json" in query:
-            payload = {
-                "title": suchbegriff.replace("_", " "),
-                "text": clean_text
-            }
+            payload = {"title": suchbegriff.replace("_", " "), "text": clean_text}
             _send_json(self, 200, payload)
-            logging.info(f"[OK 200 JSON] term='{suchbegriff}' len={len(clean_text)}")
         else:
             _send_text(self, 200, clean_text)
-            logging.info(f"[OK 200 TEXT] term='{suchbegriff}' len={len(clean_text)}")
 
 
 def run():
