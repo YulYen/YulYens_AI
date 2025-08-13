@@ -5,8 +5,7 @@ core:
 
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:
-  # Start-UI: "web" oder "terminal"
-  type: "web"
+  type: web   # Optionen: "web", "terminal", null (= nur API)
 
   # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
   # Verfügbare Platzhalter: {model_name} und {persona_name}
@@ -20,7 +19,6 @@ wiki:
   mode: offline
   # Immer notwendig, egal ob offline oder online
   proxy_base: "http://localhost:8042"
-
   # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen
   snippet_limit: 1600
 

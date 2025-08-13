@@ -3,14 +3,12 @@ from streaming_core_ollama import OllamaStreamer
 import requests, logging
 
 class WebUI:
-    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, convers_log, wiki_snippet_limit, wiki_mode, proxy_base):
+    def __init__(self, streamer, greeting, keyword_finder, ip, wiki_snippet_limit, wiki_mode, proxy_base):
         self._last_wiki_title = None
-        self.model_name = model_name
         self.greeting = greeting
         self.history = []
-        self.system_prompt = system_prompt
         self.keyword_finder = keyword_finder
-        self.streamer = OllamaStreamer(model_name, True, system_prompt, convers_log)
+        self.streamer = streamer
         self.local_ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode          # "offline" | "online" | "hybrid"

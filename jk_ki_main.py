@@ -7,6 +7,13 @@ from system_prompts import leah_system_prompts
 from terminal_ui import TerminalUI
 from web_ui import WebUI
 from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+from streaming_core_ollama import OllamaStreamer
+import threading
+import uvicorn
+
+# API-Imports
+from api.app import app, set_provider
+from api.provider import AiApiProvider
 
 CONFIG_PATH = "config.yaml"
 
@@ -16,6 +23,20 @@ def load_config(path=CONFIG_PATH) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+def start_api_in_background(api_cfg, provider):
+    """
+    Startet Uvicorn in einem Daemon-Thread.
+    """
+    set_provider(provider)
+    host = api_cfg["host"]
+    port = int(api_cfg["port"])
+
+    def _run():
+        uvicorn.run(app, host=host, port=port, log_level="info")
+
+    t = threading.Thread(target=_run, name="LeahAPI", daemon=True)
+    t.start()
+    return t
 
 # ----------------- kleine Helper -----------------
 def get_local_ip():
@@ -46,13 +67,22 @@ def format_greeting(cfg: dict) -> str:
 def _wiki_mode_enabled(mode_val) -> bool:
     """
     Steuerung für KeywordFinder:
-      - 'online' -> True 
+      - 'online' oder 'offline' -> True 
       - alles andere -> False
-    Hinweis: Wenn ihr 'online' später aktivieren wollt, hier einfach erweitern.
     """
     if isinstance(mode_val, bool):
         return mode_val
     return str(mode_val).strip().lower() == "offline" or str(mode_val).strip().lower() == "online"
+
+def build_ollama_streamer(cfg):
+    """
+    Factory für Streamer:
+      TODO: WarmUp aus der Konfig lesen
+    """
+    system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
+    conv_log_file = f"conversation_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
+
+    return OllamaStreamer(cfg["core"]["model_name"], False, system_prompt, conv_log_file)
 
 
 # ----------------- Main -----------------
@@ -61,8 +91,6 @@ def main():
 
     # Strikte Keys (kein Defaulting)
     WIKI_CFG            = cfg["wiki"]
-    MODEL_NAME         = cfg["core"]["model_name"]
-    UI_TYPE            = cfg["ui"]["type"].lower()
     WIKI_MODE          = WIKI_CFG["mode"]      # z. B. "offline" / "online" / false
     WIKI_SNIPPET_LIMIT = int(WIKI_CFG["snippet_limit"])
     WIKI_PROXY_BASE = WIKI_CFG["proxy_base"]
@@ -72,27 +100,38 @@ def main():
 
     # KeywordFinder nur bei wiki_mode_enabled
     keyword_finder = SpacyKeywordFinder(ModelVariant.MEDIUM) if _wiki_mode_enabled(WIKI_MODE) else None
-
+    streamer = build_ollama_streamer(cfg)      # <-- deine bestehende Fabrik / Konstruktor
     # Logging
     os.makedirs("logs", exist_ok=True)
     logfile = os.path.join("logs", f"jk_ki_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
     init_logging(loglevel=LOG_LEVEL, logfile=logfile, to_console=False)
-    logging.info("Starte JK_KI mit Logging")
-    logging.info(f"ui.type={UI_TYPE}  wiki.mode={WIKI_MODE}  snippet_limit={WIKI_SNIPPET_LIMIT}")
+    ui_type = cfg.get("ui", {}).get("type", "web")
+    logging.info(f"ui.type={ui_type}  wiki.mode={WIKI_MODE}  snippet_limit={WIKI_SNIPPET_LIMIT}")
 
-    # Conversation-Log
-    conv_log_file = f"conversation_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
 
-    # Systemprompt
-    system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
+    if cfg["api"]["enabled"]:
+        provider = AiApiProvider(
+            streamer,
+            keyword_finder=keyword_finder,
+            wiki_mode=WIKI_MODE,
+            wiki_proxy_base=WIKI_PROXY_BASE,
+            wiki_snippet_limit=WIKI_SNIPPET_LIMIT,
+        )
+        start_api_in_background(cfg["api"], provider)
 
-    # UI auswählen (Signaturen wie in deinen UIs)
-    if UI_TYPE == "terminal":
-        ui = TerminalUI(MODEL_NAME, GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file, WIKI_SNIPPET_LIMIT,  WIKI_MODE, WIKI_PROXY_BASE)
-    elif UI_TYPE == "web":
-        ui = WebUI(MODEL_NAME, GREETING, system_prompt, keyword_finder, get_local_ip, conv_log_file, WIKI_SNIPPET_LIMIT, WIKI_MODE, WIKI_PROXY_BASE)
+    # 4) UI-Auswahl
+    if ui_type is None:
+        # Nur API – sauber laufen lassen
+        print("[Leah] API läuft. UI ist deaktiviert (ui.type = null).")
+        # Blocken, damit Prozess nicht sofort endet:
+        threading.Event().wait()  # simple idle
+        return
+    elif ui_type == "terminal":
+        ui = TerminalUI(streamer, GREETING , keyword_finder, get_local_ip, WIKI_SNIPPET_LIMIT,  WIKI_MODE, WIKI_PROXY_BASE)
+    elif ui_type == "web":
+        ui = WebUI(streamer, GREETING, keyword_finder, get_local_ip, WIKI_SNIPPET_LIMIT, WIKI_MODE, WIKI_PROXY_BASE)
     else:
-        raise ValueError(f"Unbekannter UI-Typ: {UI_TYPE!r} (erwarte 'web' oder 'terminal')")
+        raise ValueError(f"Unbekannter UI-Typ: {ui_type!r} (erwarte 'web' oder 'terminal')")
 
     ui.launch()
 

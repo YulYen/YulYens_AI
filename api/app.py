@@ -1,19 +1,19 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
-from .provider import AnswerProvider, EchoProvider
+from .provider import AiApiProvider
 
 # Globale, austauschbare Abhängigkeit:
-_provider: Optional[AnswerProvider] = None
+_provider: Optional[AiApiProvider] = None
 
-def set_provider(p: AnswerProvider) -> None:
+def set_provider(p: AiApiProvider) -> None:
     global _provider
     _provider = p
 
-def get_provider() -> AnswerProvider:
+def get_provider() -> AiApiProvider:
     global _provider
     if _provider is None:
-        _provider = EchoProvider()  # bis wir in Schritt 2 „RealLeah“ setzen
+        _provider = AiApiProvider()  
     return _provider
 
 class AskRequest(BaseModel):

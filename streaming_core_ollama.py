@@ -3,7 +3,7 @@ import traceback
 import datetime, json, os
 from ollama import chat
 from streaming_helper import clean_token
-import logging
+import requests, logging
 
 
 class OllamaStreamer:
@@ -92,3 +92,55 @@ class OllamaStreamer:
             err = f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"
             self._append_conversation_log("assistant", err)
             yield err
+
+
+
+    def respond_one_shot(self, user_input: str, keyword_finder, wiki_mode, wiki_proxy_base, wiki_snippet_limit) -> str:
+        if user_input.strip().lower() == "clear":
+            return ""
+        logging.info(f"User input: {user_input}")
+        messages = []
+        snippet = None
+        wiki_hint = None
+        title = None
+        # Wiki-Hinweis und Snippet holen (nur Top-Treffer)
+        if keyword_finder:
+            topic = keyword_finder.find_top_keyword(user_input)
+            if topic:
+                online_flag = "1" if wiki_mode == "online" else "0"
+                url = f"{wiki_proxy_base.rstrip('/')}/{topic}?json=1&limit={wiki_snippet_limit}&online={online_flag}"
+                try:
+                    r = requests.get(url, timeout=(3.0, 8.0))
+                    if r.status_code == 200:
+                        data = r.json()
+                        text = (data.get("text") or "").replace("\r", " ").strip()
+                        snippet = text[: wiki_snippet_limit]
+                        wiki_hint = data.get("wiki_hint")
+                        title = topic
+                    elif r.status_code == 404:
+                        wiki_hint = f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}"
+                    else:
+                        wiki_hint = f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}"
+                except Exception as e:
+                    logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
+                    wiki_hint = f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*{topic}"
+        # Kontext aus Wikipedia (falls verfügbar) als System-Nachrichten anhängen
+        if snippet:
+            guardrail = (
+                "Nutze ausschließlich den folgenden Kontext aus Wikipedia. "
+                "Wenn etwas dort nicht steht, sag knapp, dass du es nicht sicher weißt."
+            )
+            messages.append({"role": "system", "content": guardrail})
+            msg = (
+                f"Kontext zum Thema {title.replace('_',' ')}: "
+                f"[Quelle: Wikipedia] {snippet}"
+            )
+            messages.append({"role": "system", "content": msg})
+        # Nutzerfrage als letzte Message hinzufügen
+        messages.append({"role": "user", "content": user_input})
+        # LLM-Aufruf (Ollama) durchführen und gesamte Antwort sammeln
+        full_reply_parts = []
+        for token in self.stream(messages=messages):
+            full_reply_parts.append(token)
+        full_reply = "".join(full_reply_parts).strip()
+        return full_reply
