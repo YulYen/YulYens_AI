@@ -54,14 +54,102 @@ def _build_online_url(term: str) -> str:
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
     """
-    Entfernt Fußnotenverweise wie [1], [23] und faltet alle Zeilenumbrüche
-    sowie sonstige Whitespace-Zeichen zu einfachen Leerzeichen.
+    Entfernt Fußnoten [1], Soft-Hyphen \xad, NBSP \xa0 und faltet Whitespace zu ' '.
     """
-    # Fußnotenmarkierungen entfernen
-    text = re.sub(r"\[\d+\]", "", text)
-    # Alle Arten von Whitespace (Zeilenumbruch, Tabs, doppelte Leerzeichen) zu einem Leerzeichen reduzieren
+    # Fußnoten wie [1], [ 23 ]
+    text = re.sub(r"\[\s*\d+\s*\]", "", text)
+    # Soft-Hyphen (Silbentrennung) raus
+    text = text.replace("\xad", "")
+    # NBSP zu Leerzeichen
+    text = text.replace("\xa0", " ")
+    # alles auf einfache Leerzeichen
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+def _find_infobox_table(soup):
+    """
+    Sucht robust nach einer Infobox-Tabelle.
+    Berücksichtigt unterschiedliche Class-Kombis ("infobox", "infobox vcard", ...)
+    und ist case-insensitiv.
+    """
+
+    # 1) CSS-Selektor: direkte Treffer
+    tbl = soup.select_one("table.infobox")
+    if tbl:
+        return tbl
+
+    # 2) Enthält 'infobox' irgendwo in der class-Attributliste
+    for t in soup.find_all("table"):
+        classes = t.get("class") or []
+        if any("infobox" in c.lower() for c in classes):
+            return t
+    return None
+
+def _extract_infobox_kv(html: str, max_items: int = 30):
+    soup = BeautifulSoup(html, "html.parser", from_encoding="utf-8")
+
+    table = _find_infobox_table(soup)
+    if not table:
+        return []
+
+    pairs = []
+    for tr in table.find_all("tr"):
+        th = tr.find("th")
+        tds = tr.find_all("td")
+
+        # Bild-/Medienzeilen überspringen
+        if tds:
+            td_classes_joined = " ".join(sum([td.get("class") or [] for td in tds], [])).lower()
+            if "image" in td_classes_joined or "infobox-image" in td_classes_joined:
+                continue
+
+        key = val = None
+
+        if th and tds:
+            # klassischer Fall: <th>Key</th><td>Value</td>
+            key = th.get_text(" ", strip=True)
+            val = tds[0].get_text(" ", strip=True)
+
+        elif len(tds) >= 2:
+            # neuer Fall: <td class="ibleft">Key</td><td class="ibright|ibdata">Value</td>
+            left = right = None
+            for td in tds:
+                classes = " ".join(td.get("class") or []).lower()
+                if "ibleft" in classes and left is None:
+                    left = td
+                elif (("ibright" in classes) or ("ibdata" in classes)) and right is None:
+                    right = td
+            if left and right:
+                key = left.get_text(" ", strip=True)
+                val = right.get_text(" ", strip=True)
+            else:
+                # generischer Fallback: nimm die ersten beiden td
+                key = tds[0].get_text(" ", strip=True)
+                val = tds[1].get_text(" ", strip=True)
+
+        if key and val:
+            key = _clean_whitespace_and_remove_refs(key)
+            val = _clean_whitespace_and_remove_refs(val)
+            if key and val:
+                pairs.append((key, val))
+                if len(pairs) >= max_items:
+                    break
+
+    return pairs
+
+def _format_kv_line(pairs) -> str:
+    """
+    Baut 'Key: Value | Key: Value …'. Werte werden sanft gekürzt, damit die Zeile kurz bleibt.
+    """
+    if not pairs:
+        return ""
+    parts = []
+    for k, v in pairs:
+        # zu lange Werte einkürzen (sauber am Wortende)
+        if len(v) > 120:
+            v = (v[:120].rsplit(" ", 1)[0] + " …").strip()
+        parts.append(f"{k}: {v}")
+    return " | ".join(parts)
 
 def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online: bool) -> str:
     """
@@ -153,18 +241,40 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         # Text gewinnen
         if online:
             clean_text = _clean_whitespace_and_remove_refs(resp.text)
+            kv_line = ""  # Online-Summary hat keine HTML-Infobox
         else:
-            # Beim Offline-Zugriff HTML parsen, Text extrahieren und säubern
-            resp.encoding = resp.apparent_encoding
-            soup = BeautifulSoup(resp.text, "html.parser")
+            resp.encoding = resp.apparent_encoding or "utf-8"
+            html_bytes = resp.content   
+            soup = BeautifulSoup(html_bytes , "html.parser", from_encoding=resp.encoding)
+            # 1) KV aus Original-HTML holen
+            kv_pairs = _extract_infobox_kv(resp.text)
+            kv_line = _format_kv_line(kv_pairs)
+
+            # 2) Infobox aus dem DOM entfernen, damit sie NICHT im Fließtext landet
+            ibox = _find_infobox_table(soup)
+            if ibox:
+                ibox.decompose()
+
+            # 3) Jetzt den restlichen Text ziehen
             content_div = soup.find(id="content") or soup.body
             raw_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
             clean_text = _clean_whitespace_and_remove_refs(raw_text)
 
-        # Limit anwenden
+        # --- EINMALIGE Limit-Logik: KV bleibt vollständig, nur Fließtext wird gekürzt ---
         limit = _parse_limit(query)
-        if len(clean_text) > limit:
-            clean_text = clean_text[:limit] + "... [gekürzt]"
+
+        if kv_line:
+            # KV + Leerzeile + Fließtext
+            sep = "\n\n"
+            base = kv_line + sep
+            remaining = max(0, limit - len(base))
+            body = clean_text if remaining <= 0 else (clean_text[:remaining].rsplit(" ", 1)[0] + " …" if len(clean_text) > remaining else clean_text)
+            combined_text = base + body
+        else:
+            # kein KV → normal limitieren
+            combined_text = clean_text if len(clean_text) <= limit else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
+
+        clean_text = combined_text
 
         # Ziel-Link & UI-Hinweis
         link = _build_user_visible_link(self, suchbegriff, online)

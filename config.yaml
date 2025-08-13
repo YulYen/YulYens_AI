@@ -22,7 +22,7 @@ wiki:
   proxy_base: "http://localhost:8042"
 
   # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen
-  snippet_limit: 1800
+  snippet_limit: 1600
 
 # --- Logging -------------------------------------------------------------------
 logging:

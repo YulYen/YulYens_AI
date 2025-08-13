@@ -30,8 +30,8 @@ def get_today_date():
 
 def format_system_prompt(base_prompt: str) -> str:
     today = get_today_date()
-    facts = f"Heute ist der {today}.\n"
-    return base_prompt.strip() + "\n\n" + facts
+    facts = f" | Heute ist der {today}."
+    return base_prompt.strip() + facts
 
 
 
