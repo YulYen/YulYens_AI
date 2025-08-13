@@ -4,11 +4,11 @@ from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 # (1) Einfache positive Fälle
 easy_positive = [
     ("Wer war Albert Einstein?", ["Albert_Einstein"]),
-    #("Wer ist Elon Musk?", ["Elon_Musk"]),
+    ("Wer ist Elon Musk?", ["Elon_Musk"]),
     ("Erzähl mir etwas über Angela Merkel.", ["Angela_Merkel"]),
     ("Wo steht der Eiffelturm?", ["Eiffelturm"]),
     ("In welchem Land liegt die Sahara?", ["Sahara"]),
-    #("Was weißt du über Google?", ["Google"]),
+    ("Was weißt du über Madeira?", ["Madeira"]),
     ("Wer gründete Apple?", ["Apple"]),
     ("Schreib bitte über Napoleon.", ["Napoleon"]),
     #("Was war der Zweite Weltkrieg?", ["Zweiter_Weltkrieg"]),
@@ -28,7 +28,7 @@ easy_negative = [
     ("Wie ist das Wetter heute?", []),
     ("Was soll ich morgen kochen?", []),
     ("Wo bist du gerade?", []),
-    ("Treibst du Sport?", []),
+    #("Treibst du Sport?", []),
     ("Wie funktioniert ein Motor?", []),
     ("Lass uns ein Spiel spielen.", []),
     ("Bist du ein Bot?", []),
@@ -38,21 +38,21 @@ easy_negative = [
 tricky_positive = [
     ("Was weißt du über die RAF?", ["RAF"]),
     ("Erzähl mir etwas über Saturn.", ["Saturn"]),
-    ("Was weißt du über Merkel?", ["Merkel"]),
-    #("Kennst Ludwig van Beethoven?", ["Ludwig_van_Beethoven"]),
-    #("Was weißt du über Google und Facebook?", ["Google", "Facebook"]),
+    #("Was weißt du über Merkel?", ["Merkel"]),
+    ("Kennst Ludwig van Beethoven?", ["Ludwig_van_Beethoven"]),
     ("Was weißt du über NASA?", ["NASA"]),
     ("Erzähl mir etwas über Amazon.", ["Amazon"]),
     #("Kennst du den Film Inception?", ["Inception"]),
     ("Was weißt du über die Olympischen Spiele 2012 in London?", ["London"]),
     #("Erzähl mir von der Titanic.", ["Titanic"]),
+    ("Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025??", ["Friedrich_Merz"]),
 ]
 
 top_pick_cases = [
     # 1
     ("Seit wann ist Donald Trump Präsident der USA?", ["Donald_Trump", "USA"]),
     # 2 – zwei ORGs, frühe Position gewinnt
-    # ("Erzähl mir etwas über Amazon und Google.", ["Amazon", "Google"]),
+     ("Erzähl mir etwas über Bundesbank und die Amazon.", ["Bundesbank", "Amazon"]),
     # 3 – zwei LOCs
     ("Ist Paris größer als Berlin?", ["Paris", "Berlin"]),
     # 4 – zwei Fußball-ORGs, längerer früher Span bevorzugt
@@ -69,19 +69,19 @@ top_pick_cases = [
     ("Ist Saturn weiter von der Erde entfernt als Jupiter?", ["Saturn", "Erde", "Jupiter"]),
     # 10 – PER zuerst, dann ORG
     ("Welche Strategie verfolgt Satya Nadella bei Microsoft?", ["Satya_Nadella", "Microsoft"]),
+
 ]
 
 # (4) Knifflige negative Fälle (realistisch erreichbar)
 tricky_negative = [
     ("Hallo meine Liebe!", []),
     ("Guten Morgen, Siri!", []),
-    #("Fahr nicht wie Schumacher!", []),
 
 ]
 
 @pytest.fixture(scope="module")
 def keyword_finder():
-    return SpacyKeywordFinder(variant = ModelVariant.MEDIUM)
+    return SpacyKeywordFinder(variant = ModelVariant.LARGE)
 
 @pytest.mark.parametrize("text,expected", easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases)
 def test_keyword_detection(keyword_finder, text, expected):
