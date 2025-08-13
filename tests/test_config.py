@@ -2,7 +2,7 @@
 import yaml
 import pytest
 
-from jk_ki_main import format_greeting, _SafeDict, _wiki_mode_enabled
+from jk_ki_main import format_greeting, _wiki_mode_enabled
 from system_prompts import leah_system_prompts
 
 
@@ -18,7 +18,7 @@ core:
   model_name: "TestModel"
 ui:
   type: "web"
-  greeting: "Chatte mit {persona_name} auf Basis von {model_name}! {unknown}"
+  greeting: "Chatte mit {persona_name} auf Basis von {model_name}!"
 wiki:
   wiki_mode: "offline"
   snippet_limit: 1600
@@ -33,8 +33,6 @@ logging:
     g = format_greeting(cfg)
     assert f"{persona_name}" in g
     assert "TestModel" in g
-    # Unbekannter Key bleibt stehen
-    assert "{unknown}" in g
 
 
 def test_greeting_missing_keys_raises(tmp_path):
