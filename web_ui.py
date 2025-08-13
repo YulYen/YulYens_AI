@@ -74,8 +74,8 @@ class WebUI:
         )
         message_history.append({"role": "system", "content": guardrail})
         msg = (
-            f"Kontext zum Thema {title.replace('_',' ')}:\n"
-            f"[Quelle: Wikipedia]\n{snippet}"
+            f"Kontext zum Thema {title.replace('_',' ')}: "
+            f"[Quelle: Wikipedia] {snippet}"
         )
         message_history.append({"role": "system", "content": msg})
 

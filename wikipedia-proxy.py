@@ -3,8 +3,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
-import json
-import os
+import json, os, re
 import logging
 from datetime import datetime
 from logging_setup import init_logging
@@ -53,6 +52,17 @@ def _build_online_url(term: str) -> str:
     # Wikipedia akzeptiert Unterstriche als Leerzeichen
     return f"https://de.wikipedia.org/wiki/{term}"
 
+def _clean_whitespace_and_remove_refs(text: str) -> str:
+    """
+    Entfernt Fußnotenverweise wie [1], [23] und faltet alle Zeilenumbrüche
+    sowie sonstige Whitespace-Zeichen zu einfachen Leerzeichen.
+    """
+    # Fußnotenmarkierungen entfernen
+    text = re.sub(r"\[\d+\]", "", text)
+    # Alle Arten von Whitespace (Zeilenumbruch, Tabs, doppelte Leerzeichen) zu einem Leerzeichen reduzieren
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
 def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online: bool) -> str:
     """
     Baut einen Link, der im Browser des Nutzers funktioniert.
@@ -67,7 +77,7 @@ def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online:
     return f"http://{hostname}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
 def _build_wiki_hint(link: str, online: bool) -> str:
-    where = "echte" if online else "lokale"
+    where = "deutsche" if online else "lokale deutsche"
     return f"🕵️‍♀️ *Leah wirft einen Blick in die {where} Wikipedia:*\n{link}"
 
 def _parse_limit(query: dict) -> int:
@@ -142,12 +152,14 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
         # Text gewinnen
         if online:
-            clean_text = resp.text
+            clean_text = _clean_whitespace_and_remove_refs(resp.text)
         else:
+            # Beim Offline-Zugriff HTML parsen, Text extrahieren und säubern
             resp.encoding = resp.apparent_encoding
             soup = BeautifulSoup(resp.text, "html.parser")
             content_div = soup.find(id="content") or soup.body
-            clean_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
+            raw_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
+            clean_text = _clean_whitespace_and_remove_refs(raw_text)
 
         # Limit anwenden
         limit = _parse_limit(query)

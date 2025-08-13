@@ -17,7 +17,7 @@ wiki:
   # Ob das lokale Offline-Wiki (Kiwix) genutzt wird: offline
   # Oder Wikipedia: online
   # Oder kein wiki-Tool: false
-  mode: online
+  mode: offline
   # Immer notwendig, egal ob offline oder online
   proxy_base: "http://localhost:8042"
 
