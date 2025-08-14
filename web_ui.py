@@ -1,6 +1,6 @@
 import gradio as gr
-from streaming_core_ollama import OllamaStreamer
 import requests, logging
+from streaming_core_ollama import OllamaStreamer, lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
 
 class WebUI:
     def __init__(self, streamer, greeting, keyword_finder, ip, wiki_snippet_limit, wiki_mode, proxy_base):
@@ -15,67 +15,24 @@ class WebUI:
         self.proxy_base = proxy_base
 
     def _strip_wiki_hint(self, text: str) -> str:
-    # Entfernt den UI-Hinweis "🕵️‍♀️ …" + genau die eine Leerzeile,
-    # die du beim Streamen mit "\n\n" vor die eigentliche Antwort setzt.
+        # Entfernt den UI-Hinweis "🕵️‍♀️ …" samt der Leerzeile vor der eigentlichen Antwort.
         if text.startswith("🕵️‍♀️"):
             sep = "\n\n"
             i = text.find(sep)
             return text[i+len(sep):] if i != -1 else ""
         return text
-    
+
     def _build_history(self, chat_history):
         hist = []
-        for u, b in chat_history:
-            cleaned = self._strip_wiki_hint(b)
-            hist.append({"role": "user", "content": u})
+        for user_msg, bot_msg in chat_history:
+            cleaned = self._strip_wiki_hint(bot_msg)
+            hist.append({"role": "user", "content": user_msg})
             if cleaned:
                 hist.append({"role": "assistant", "content": cleaned})
         return hist
 
-    def _lookup_wiki(self, user_text: str):
-        """Erzeugt UI-Hinweis + holt (max. 1) Snippet. Gibt (wiki_hint, title, snippet) zurück."""
-        if not self.keyword_finder:
-            return None, None, None
-        
-        # Nur Top‑Treffer anzeigen/nutzen – hält UI & Kontext schlank
-        topic = self.keyword_finder.find_top_keyword(user_text)
-        if not topic:
-            return None, None, None
-        
-        # Modus in Proxy-Call abbilden
-        # offline: ?json=1&limit=...
-        # online:  ?json=1&limit=...&online=1
-        online_flag = "1" if self.wiki_mode == "online" else "0"
-        url = f"{self.proxy_base}/{topic}?&limit={self.wiki_snippet_limit}&online={online_flag}"
-
-        try:
-            r = requests.get(url, timeout=(3.0, 8.0))
-            if r.status_code == 200:
-                data = r.json()
-                text = (data.get("text") or "").replace("\r", " ").strip()
-                snippet = text[: self.wiki_snippet_limit]
-                wiki_hint = data.get("wiki_hint")  # direkt vom Proxy
-                return wiki_hint, topic, snippet
-            elif r.status_code == 404:
-                return f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}", None, None
-            else:
-                return f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}", None, None
-        except Exception as e:
-            logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
-            return f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*{topic}", None, None
-
-    def _inject_wiki_context(self, message_history, title: str, snippet: str):
-        """Snippet als System-Kontext anhängen (Guardrail + Inhalt)."""
-        guardrail = (
-            "Nutze ausschließlich den folgenden Kontext aus Wikipedia. "
-            "Wenn etwas dort nicht steht, sag knapp, dass du es nicht sicher weißt."
-        )
-        message_history.append({"role": "system", "content": guardrail})
-        msg = (
-            f"Kontext zum Thema {title.replace('_',' ')}: "
-            f"[Quelle: Wikipedia] {snippet}"
-        )
-        message_history.append({"role": "system", "content": msg})
+    # Die Methoden _lookup_wiki und _inject_wiki_context wurden entfernt, da ihre Funktionalität
+    # jetzt von lookup_wiki_snippet und inject_wiki_context übernommen wird.
 
     def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
         reply = ""
@@ -86,12 +43,12 @@ class WebUI:
                 yield None, chat_history[:-1] + [(original_user_input, combined)]
             else:
                 yield None, chat_history + [(original_user_input, reply)]
+        # Abschluss des Streaming: Den finalen Reply in den Chat-Verlauf übernehmen
         if wiki_hint:
             chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
         else:
             chat_history.append((original_user_input, reply))
         yield None, chat_history
-
 
     def respond_streaming(self, user_input, chat_history):
         if user_input.strip().lower() == "clear":
@@ -101,29 +58,38 @@ class WebUI:
         original_user_input = user_input
         logging.info(f"User input: {user_input}")
 
-        # 1) History bauen (UI‑Hinweise aus Bot‑Text entfernen)
-        message_history = self._build_history(chat_history)  # 
+        # 1) Verlauf für das LLM aufbereiten (UI-Hinweise aus vorherigen Bot-Antworten entfernen)
+        message_history = self._build_history(chat_history)
 
-        # 2) Eingabefeld leeren
+        # 2) Eingabefeld in der UI leeren
         yield "", chat_history
 
-        # 3) Wiki-Hinweis/Snippet holen (nur Top‑Treffer)
-        wiki_hint, title, snippet = self._lookup_wiki(original_user_input)  # 
+        # 3) Wiki-Hinweis und Snippet holen (nur Top-Treffer aus Wikipedia)
+        wiki_hint, title, snippet = lookup_wiki_snippet(
+            original_user_input, 
+            self.keyword_finder, 
+            self.wiki_mode, 
+            self.proxy_base, 
+            self.wiki_snippet_limit
+        )  # **Neuer Aufruf**: nutzt die ausgelagerte Funktion, statt interner _lookup_wiki
+
         if wiki_hint:
+            # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((original_user_input, wiki_hint))
-            yield None, chat_history  # Hinweis anzeigen, aber nicht ans LLM
+            yield None, chat_history  # Hinweis für den Nutzer ausgeben
 
-        # 4) Optional: Kontext injizieren (Titel behalten für Follow-ups)
+        # 4) Optional: Wiki-Kontext injizieren (falls ein Snippet gefunden wurde)
         if snippet:
-            self._last_wiki_snippet = None  # wir nutzen es sofort, kein späterer Verbrauch
-            self._last_wiki_title = title   # Titel NICHT löschen – hilft bei Folgefragen
-            self._inject_wiki_context(message_history, title, snippet)  # 
+            self._last_wiki_snippet = None       # Snippet wird sofort verbraucht, nicht für später gespeichert
+            self._last_wiki_title = title        # Titel des Wiki-Artikels merken für Folgefragen
+            inject_wiki_context(message_history, title, snippet)  # **Neuer Aufruf**: nutzt die ausgelagerte Funktion zum Kontext-Injektieren
 
-        # 5) Aktuelle User-Frage ans LLM
+        # 5) Nutzerfrage zur Nachrichtenhistorie fürs LLM hinzufügen
         message_history.append({"role": "user", "content": original_user_input})
 
-        # 6) Streamen (UI live updaten)
-        yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)  # 
+        # 6) Antwort vom LLM streamen und in der UI anzeigen (Logik unverändert)
+        yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
+
 
 
     def launch(self):
