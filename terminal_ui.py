@@ -1,90 +1,130 @@
 # terminal_ui.py
+from __future__ import annotations
 
 from colorama import Fore, Style, init
-from streaming_core_ollama import OllamaStreamer
+from typing import Callable, List, Dict, Optional
+
+# Gemeinsame Core-Utilities & Streamer
+from streaming_core_ollama import (
+    OllamaStreamer,
+    lookup_wiki_snippet,
+    inject_wiki_context,
+)
 
 
 class TerminalUI:
-    def __init__(self, model_name, greeting, system_prompt, keyword_finder, ip, conv_log, wiki_snippet_limit):
-        self.model_name = model_name
+    """
+    Terminal-Chat für Leah – nutzt die gleiche Wiki-Logik wie die WebUI:
+    - Wiki-Hinweis (🕵️‍♀️ …) wird NUR im Terminal angezeigt (nicht ans LLM geschickt)
+    - Wiki-Snippet (falls vorhanden) wird als System-Kontext injiziert
+    - Tokenweises Streaming der LLM-Antwort bleibt unverändert
+    """
+
+    def __init__(
+        self,
+        streamer: OllamaStreamer,
+        greeting: str,
+        keyword_finder,                 # None oder SpacyKeywordFinder
+        ip_func: Callable[[], str],     # z. B. jk_ki_main.get_local_ip
+        wiki_snippet_limit: int,
+        wiki_mode: str,                 # "offline" | "online" | False/None
+        proxy_base: str,
+    ):
+        self.streamer = streamer
         self.greeting = greeting
-        self.history = []  # Nur echte Konversation (nicht: Wiki-Hinweis)
-        self.system_prompt = system_prompt
         self.keyword_finder = keyword_finder
-        self.streamer = OllamaStreamer(model_name, False, system_prompt, conv_log)
-        self.local_ip = ip
-        self.already_searched_keywords = set()  # Verhindert doppelte Wiki-Links
-        self.wiki_snippet_limit = wiki_snippet_limit
+        self._ip_func = ip_func
 
+        self.wiki_snippet_limit = int(wiki_snippet_limit)
+        self.wiki_mode = wiki_mode
+        self.proxy_base = proxy_base
 
-    def init_ui(self):
+        # Nur echte Konversation (User/Assistant) + ggf. System-Kontexte (Wiki)
+        self.history: List[Dict[str, str]] = []
+
+        # Für optionale Folge-Logik (nicht zwingend genutzt, aber praktisch)
+        self._last_wiki_title: Optional[str] = None
+
+    # ---------- kleine UI‑Hilfen ----------
+    def init_ui(self) -> None:
         init(autoreset=True)
 
-    def print_welcome(self):
+    def print_welcome(self) -> None:
         print(self.greeting)
-        print(f"{Fore.MAGENTA} ('exit' zum Beenden){Style.RESET_ALL}")
-        print(f"{Fore.MAGENTA} ('clear' für neue Unterhaltung){Style.RESET_ALL}")
+        print(f"{Fore.MAGENTA}('exit' zum Beenden){Style.RESET_ALL}")
+        print(f"{Fore.MAGENTA}('clear' für neue Unterhaltung){Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(f"{Fore.GREEN}🧑 Du:{Style.RESET_ALL} ").strip()
 
-    def print_bot_prefix(self):
+    def print_bot_prefix(self) -> None:
         print(f"{Fore.CYAN}🧠 Leah:{Style.RESET_ALL} ", end="", flush=True)
 
-    def print_stream(self, text: str):
+    def print_stream(self, text: str) -> None:
         print(text, end="", flush=True)
 
-    def print_exit(self):
+    def print_exit(self) -> None:
         print("👋 Auf Wiedersehen!")
 
-    def print_wiki_hint(self, keywords):
-        new_keywords = [kw for kw in keywords if kw not in self.already_searched_keywords]
-        if not new_keywords:
-            return
+    def local_ip(self) -> str:
+        try:
+            return self._ip_func()
+        except Exception:
+            # Fallback (sollte selten nötig sein)
+            import socket
+            return socket.gethostbyname(socket.gethostname())
 
-        self.already_searched_keywords.update(new_keywords)
-
-        links = [
-            f"http://{self.local_ip()}:8080/content/wikipedia_de_all_nopic_2025-06/{kw}"
-            for kw in new_keywords
-        ]
-        hint = "\n".join(links)
-        print(f"\n{Fore.YELLOW}🕵️‍♀️ Leah wirft einen Blick in die lokale Wikipedia:{Style.RESET_ALL}\n{hint}\n")
-
-    def local_ip(self):
-        import socket
-        return socket.gethostbyname(socket.gethostname())
-
-    def launch(self):
+    # ---------- Haupt-Loop ----------
+    def launch(self) -> None:
         self.init_ui()
         self.print_welcome()
 
         while True:
             user_input = self.prompt_user()
-            print()
-            if user_input.lower() in ["exit", "quit"]:
+            print()  # kleine Leerzeile nach der Eingabe
+
+            # Exit
+            if user_input.lower() in ("exit", "quit"):
                 self.print_exit()
                 break
 
+            # Clear / neue Unterhaltung
             if user_input.lower() == "clear":
                 self.history.clear()
-                self.already_searched_keywords.clear()
+                self._last_wiki_title = None
                 print(f"{Fore.BLUE}🔄 Neue Unterhaltung gestartet.{Style.RESET_ALL}\n")
                 continue
-            
-            if self.keyword_finder is not None:
-                # 1. Wiki-Hinweis anzeigen (nicht ins Prompt geben!)
-                keywords = self.keyword_finder.find_keywords(user_input)
-                self.print_wiki_hint(keywords)
 
-            # 2. Stream starten (nur echte Konversation)
+            # --- (1) Wiki‑Lookup: nur Top‑Treffer, Hinweis anzeigen, Snippet ggf. injizieren ---
+            wiki_hint = None
+            if self.keyword_finder:
+                wiki_hint, title, snippet = lookup_wiki_snippet(
+                    user_input,
+                    self.keyword_finder,
+                    self.wiki_mode,
+                    self.proxy_base,
+                    self.wiki_snippet_limit,
+                )
+
+                # Hinweis (🕵️‍♀️ …) NUR anzeigen – nicht an das LLM schicken
+                if wiki_hint:
+                    print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
+
+                # Snippet als System-Kontext einfügen (Guardrail + Kontext)
+                if snippet:
+                    inject_wiki_context(self.history, title, snippet)
+                    self._last_wiki_title = title
+
+            # --- (2) Nutzerfrage an die History hängen ---
             self.history.append({"role": "user", "content": user_input})
-            self.print_bot_prefix()
 
+            # --- (3) Streaming der Antwort (tokenweise) ---
+            self.print_bot_prefix()
             reply = ""
             for token in self.streamer.stream(messages=self.history):
                 reply += token
                 self.print_stream(token)
 
+            # --- (4) Antwort in History übernehmen, hübscher Abschluss ---
             self.history.append({"role": "assistant", "content": reply})
-            print()
+            print()  # Zeilenumbruch nach kompletter Antwort
