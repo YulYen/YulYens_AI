@@ -32,7 +32,7 @@ def start_api_in_background(api_cfg, provider):
     port = int(api_cfg["port"])
 
     def _run():
-        uvicorn.run(app, host=host, port=port, log_level="info")
+        uvicorn.run(app, host=host, port=port, log_level="warning") # bei Info wird die TerminalUI gestört
 
     t = threading.Thread(target=_run, name="LeahAPI", daemon=True)
     t.start()

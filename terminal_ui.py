@@ -127,4 +127,8 @@ class TerminalUI:
 
             # --- (4) Antwort in History übernehmen, hübscher Abschluss ---
             self.history.append({"role": "assistant", "content": reply})
-            print()  # Zeilenumbruch nach kompletter Antwort
+            # Immer ZWEI Leerzeilen nach der Antwort sicherstellen:
+            # (Falls das Streaming bereits \n ausgegeben hat, ergänzen wir nur die fehlenden.)
+            trailing_nl = len(reply) - len(reply.rstrip("\n"))
+            for _ in range(max(0, 2 - trailing_nl)):
+                print()
