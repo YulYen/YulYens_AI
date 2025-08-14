@@ -19,25 +19,17 @@ class TerminalUI:
     - Wiki-Snippet (falls vorhanden) wird als System-Kontext injiziert
     - Tokenweises Streaming der LLM-Antwort bleibt unverändert
     """
-
-    def __init__(
-        self,
-        streamer: OllamaStreamer,
-        greeting: str,
-        keyword_finder,                 # None oder SpacyKeywordFinder
-        ip_func: Callable[[], str],     # z. B. jk_ki_main.get_local_ip
-        wiki_snippet_limit: int,
-        wiki_mode: str,                 # "offline" | "online" | False/None
-        proxy_base: str,
-    ):
+    def __init__(self, streamer, greeting, keyword_finder, ip,
+                 wiki_snippet_limit, wiki_mode, proxy_base,
+                 wiki_timeout):
         self.streamer = streamer
         self.greeting = greeting
         self.keyword_finder = keyword_finder
-        self._ip_func = ip_func
-
-        self.wiki_snippet_limit = int(wiki_snippet_limit)
+        self.ip = ip
+        self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
+        self.wiki_timeout = wiki_timeout
 
         # Nur echte Konversation (User/Assistant) + ggf. System-Kontexte (Wiki)
         self.history: List[Dict[str, str]] = []
@@ -104,7 +96,8 @@ class TerminalUI:
                     self.wiki_mode,
                     self.proxy_base,
                     self.wiki_snippet_limit,
-                )
+                    self.wiki_timeout,
+)
 
                 # Hinweis (🕵️‍♀️ …) NUR anzeigen – nicht an das LLM schicken
                 if wiki_hint:

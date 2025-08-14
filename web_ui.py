@@ -3,16 +3,20 @@ import requests, logging
 from streaming_core_ollama import OllamaStreamer, lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
 
 class WebUI:
-    def __init__(self, streamer, greeting, keyword_finder, ip, wiki_snippet_limit, wiki_mode, proxy_base):
-        self._last_wiki_title = None
-        self.greeting = greeting
-        self.history = []
-        self.keyword_finder = keyword_finder
+    def __init__(self, streamer, greeting, keyword_finder, ip,
+                 wiki_snippet_limit, wiki_mode, proxy_base,
+                 web_host, web_port,
+                 wiki_timeout):
         self.streamer = streamer
-        self.local_ip = ip
+        self.greeting = greeting
+        self.keyword_finder = keyword_finder
+        self.ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
-        self.wiki_mode = wiki_mode          # "offline" | "online" | "hybrid"
+        self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
+        self.web_host = web_host
+        self.web_port = int(web_port)
+        self.wiki_timeout = wiki_timeout
 
     def _strip_wiki_hint(self, text: str) -> str:
         # Entfernt den UI-Hinweis "🕵️‍♀️ …" samt der Leerzeile vor der eigentlichen Antwort.
@@ -66,12 +70,13 @@ class WebUI:
 
         # 3) Wiki-Hinweis und Snippet holen (nur Top-Treffer aus Wikipedia)
         wiki_hint, title, snippet = lookup_wiki_snippet(
-            original_user_input, 
-            self.keyword_finder, 
-            self.wiki_mode, 
-            self.proxy_base, 
-            self.wiki_snippet_limit
-        )  # **Neuer Aufruf**: nutzt die ausgelagerte Funktion, statt interner _lookup_wiki
+                original_user_input,
+                self.keyword_finder,
+                self.wiki_mode,
+                self.proxy_base,
+                self.wiki_snippet_limit,
+                self.wiki_timeout,
+            )
 
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)

@@ -2,14 +2,17 @@
 core:
   # Standard-Modelname für den Start
   model_name: "leo-hessianai-13b-chat.Q5"
+  warm_up: false
 
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:
-  type: terminal   # Optionen: "web", "terminal", null (= nur API)
-
+  type: web   # Optionen: "web", "terminal", null (= nur API)
   # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
   # Verfügbare Platzhalter: {model_name} und {persona_name}
   greeting: "Chatte mit {persona_name} auf Basis der Modellversion {model_name}"
+  web:
+    host: "0.0.0.0"
+    port: 7860
 
 # --- Wiki-Einstellungen --------------------------------------------------------
 wiki:
@@ -18,14 +21,22 @@ wiki:
   # Oder kein wiki-Tool: false
   mode: offline
   # Immer notwendig, egal ob offline oder online
-  proxy_base: "http://localhost:8042"
+  proxy_port: 8042
   # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen
   snippet_limit: 1600
+  timeout_connect: 5.0 # <-- EIN Timeout-Set, gilt für online & offline
+  timeout_read: 8.0
+  offline:
+    kiwix_port: 8080 # nur für offline Wiki
+    zim_prefix: "wikipedia_de_all_nopic_2025-06" # nur für offline Wiki
 
 # --- Logging -------------------------------------------------------------------
 logging:
   # DEBUG, INFO, WARNING, ERROR
   level: "INFO"
+  to_console: false
+  dir: "logs"
+  conversation_prefix: "conversation" 
 
 # --- One-Shot-API z.B. für Tests  -------------------------------------------------------------------
 api:

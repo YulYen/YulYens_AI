@@ -7,21 +7,32 @@ import json, os, re
 import logging
 from datetime import datetime
 from logging_setup import init_logging
+import yaml
+
+# --- Konfiguration --------------------------------------------------------------
+CONFIG_PATH = "config.yaml"
+
+with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    _cfg = yaml.safe_load(f)
+
+WIKI_CFG = _cfg["wiki"]
+OFFLINE_CFG = _cfg["wiki"]["offline"]
+
+SNIPPET_LIMIT = int(WIKI_CFG["snippet_limit"])
+TIMEOUT = (float(WIKI_CFG["timeout_connect"]), float(WIKI_CFG["timeout_read"]))
+
+KIWIX_PORT = int(OFFLINE_CFG["kiwix_port"])
+PROXY_PORT = int(WIKI_CFG["proxy_port"])
+ZIM_PREFIX = OFFLINE_CFG["zim_prefix"]
+
+KIWIX_TIMEOUT = TIMEOUT
+ONLINE_TIMEOUT = TIMEOUT
 
 # --- Logging einrichten ---------------------------------------------------------
 os.makedirs("logs", exist_ok=True)
 PROXY_LOGFILE = os.path.join("logs", f"wiki_proxy_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
 init_logging(loglevel="INFO", logfile=PROXY_LOGFILE, to_console=True)
 logging.info("Wiki-Proxy startet…")
-
-# --- Konfiguration --------------------------------------------------------------
-KIWIX_PORT    = 8080
-PROXY_PORT    = 8042
-ZIM_PREFIX    = "wikipedia_de_all_nopic_2025-06"
-MAX_CHARS     = 4000
-KIWIX_TIMEOUT = (3.0, 8.0)  # (connect, read) Sekunden
-
-ONLINE_TIMEOUT = (3.0, 8.0)
 
 
 # ---------- Helper für Antworten ------------------------------------------------
@@ -170,10 +181,10 @@ def _build_wiki_hint(link: str, online: bool) -> str:
 
 def _parse_limit(query: dict) -> int:
     try:
-        val = int(query.get("limit", [MAX_CHARS])[0])
+        val = int(query.get("limit", [SNIPPET_LIMIT])[0])
     except (ValueError, TypeError):
-        val = MAX_CHARS
-    return max(0, min(val, MAX_CHARS))
+        val = SNIPPET_LIMIT
+    return max(0, min(val, SNIPPET_LIMIT))
 
 def _fetch_kiwix(term: str):
     url = _build_kiwix_url(term)

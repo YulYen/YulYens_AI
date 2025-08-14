@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 from .provider import AiApiProvider
+import logging
+import traceback
 
 # Globale, austauschbare Abhängigkeit:
 _provider: Optional[AiApiProvider] = None
@@ -35,4 +37,6 @@ def ask(req: AskRequest):
         ans = provider.answer(req.question)
         return AskResponse(answer=ans.strip())
     except Exception as e:
+        logging.error(e)
+        logging.error(f"Fehler in der API:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))

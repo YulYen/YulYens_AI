@@ -95,12 +95,11 @@ class OllamaStreamer:
 
 
 
-    def respond_one_shot(self, user_input: str, keyword_finder, wiki_mode, wiki_proxy_base, wiki_snippet_limit) -> str:
-
+    def respond_one_shot(self, user_input: str, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout) -> str:
         messages = []
         
         # 1. Wikipedia-Snippet suchen
-        wiki_hint, topic_title, snippet = lookup_wiki_snippet(user_input, keyword_finder, wiki_mode, wiki_proxy_base, wiki_snippet_limit)
+        wiki_hint, topic_title, snippet = lookup_wiki_snippet(user_input, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout)
 
         # 2. Wikipedia-Kontext (falls vorhanden) als System-Nachrichten anhängen
         if snippet:
@@ -116,44 +115,22 @@ class OllamaStreamer:
 
 
 
-def lookup_wiki_snippet(question: str, keyword_finder, wiki_mode: str, proxy_base: str, limit: int) -> tuple[str, str, str]:
-    """
-    Find a relevant Wikipedia article snippet for the given question.
-
-    This function uses a keyword finder to extract a topic from the user question and then retrieves 
-    a short snippet of text from the corresponding Wikipedia article via a proxy API.
-
-    Parameter:
-        question (str): Die Nutzerfrage, aus der das Wikipedia-Thema extrahiert wird.
-        keyword_finder: Ein Objekt mit Methode `find_top_keyword(text)`, um das relevanteste Schlüsselwort (Thema) zu finden.
-        wiki_mode (str): Betriebsmodus für Wikipedia ("online" oder "offline"). 
-                         Wenn "online", werden Online-Daten bevorzugt (online_flag=1), sonst offline (online_flag=0).
-        proxy_base (str): Basis-URL des Wikipedia-Proxy-Servers (wird mit Topic und Parametern kombiniert).
-        limit (int): Maximale Länge des zurückgegebenen Snippet-Textes in Zeichen.
-
-    Rückgabe:
-        tuple[str, str, str]: (wiki_hint, topic_title, snippet), alle Strings oder None.
-        - wiki_hint: Hinweistext oder Fehlermeldung (z.B. "*Kein Eintrag gefunden:*<Topic>" bei 404, 
-                     "*Wikipedia nicht erreichbar.*<Topic>" bei anderem Fehler). None, falls kein spezieller Hinweis nötig.
-        - topic_title: Der gefundene Thema-Titel (als String, wie in Wikipedia verwendet), oder None, wenn kein Thema gefunden wurde.
-        - snippet: Ein Auszug aus dem Wikipedia-Artikel zum Thema (bis zu `limit` Zeichen), 
-                   oder None, falls kein Text gefunden/abgerufen wurde.
-    """
+def lookup_wiki_snippet(question: str, keyword_finder, wiki_mode: str, proxy_port: int,
+                        limit: int, timeout: tuple[float, float]) -> tuple[str, str, str]:
     snippet = None
     wiki_hint = None
     topic_title = None
+    proxy_base = "http://localhost:"+str(proxy_port)
 
     if not keyword_finder:
         return (None, None, None)
 
-    # Bestimmen des Top-Schlüsselworts (Thema) aus der Frage
     topic = keyword_finder.find_top_keyword(question)
     if topic:
-        # Wikipedia-Proxy mit entsprechendem Modus (online/offline) abfragen
         online_flag = "1" if wiki_mode == "online" else "0"
         url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}"
         try:
-            r = requests.get(url, timeout=(3.0, 8.0))
+            r = requests.get(url, timeout=timeout)
             if r.status_code == 200:
                 data = r.json()
                 text = (data.get("text") or "").replace("\r", " ").strip()
@@ -161,10 +138,8 @@ def lookup_wiki_snippet(question: str, keyword_finder, wiki_mode: str, proxy_bas
                 wiki_hint = data.get("wiki_hint")
                 topic_title = topic
             elif r.status_code == 404:
-                # Kein Wikipedia-Artikel gefunden
                 wiki_hint = f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}"
             else:
-                # Anderer Fehler (Wikipedia nicht erreichbar etc.)
                 wiki_hint = f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}"
         except Exception as e:
             logging.error(f"[WIKI EXC] topic='{topic}' err={e}")

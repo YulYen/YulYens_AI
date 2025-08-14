@@ -16,9 +16,9 @@ def test_lookup_wiki_snippet_for_germany():
         question="Was ist die Hauptstadt von Deutschland?",
         keyword_finder=finder,
         wiki_mode="offline",
-        proxy_base="http://127.0.0.1:8042",
-        limit=1600
-    )
+        proxy_port=8042,
+        limit=1600,
+        timeout = (3.0, 8.0))
 
     # Wir erwarten, dass der Proxy erreichbar ist und 'Deutschland' erkannt wurde
     assert wiki_hint is not None, "Wiki-Proxy liefert keinen Hint → vermutlich nicht gestartet"
