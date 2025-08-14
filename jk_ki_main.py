@@ -99,7 +99,7 @@ def main():
     GREETING = format_greeting(cfg)
 
     # KeywordFinder nur bei wiki_mode_enabled
-    keyword_finder = SpacyKeywordFinder(ModelVariant.MEDIUM) if _wiki_mode_enabled(WIKI_MODE) else None
+    keyword_finder = SpacyKeywordFinder(ModelVariant.LARGE) if _wiki_mode_enabled(WIKI_MODE) else None
     streamer = build_ollama_streamer(cfg)      # <-- deine bestehende Fabrik / Konstruktor
     # Logging
     os.makedirs("logs", exist_ok=True)

@@ -1,13 +1,17 @@
 import spacy
 import logging
 
-RELEVANT_LABELS = ["PER", "ORG", "LOC", "EVENT"]
+RELEVANT_LABELS = ["PER", "ORG", "LOC", "EVENT", "GPE"]
+
 
 BLOCKWORDS = {
     "hallo", "hübsche", "hi", "na", "servus", "moin", "schatz",
     "liebling", "guten", "grüß", "tag", "huhu", "toll", "danke", "bitte",
     "super", "cool", "prima", "jo", "gern", "okay", "schreib"
 }
+
+W_TOKENS = {"wer", "was", "welches", "welcher", "welche", "wann", "wo", "wie", "warum", "wieso"}
+GENERIC_NOUNS = {"amt", "funktion", "rolle", "posten", "thema", "frage"}
 
 from enum import Enum
 
@@ -55,6 +59,16 @@ class SpacyKeywordFinder:
         # Kein Ausrufezeichen am Ende
         if keyword.endswith("!"):
             return False
+        
+         # Neue, kleine Heuristik 1: W‑Fragewörter innerhalb der Entität → verwerfen
+        ent_lemmas = [t.lemma_.lower() for t in ent]
+        if any(l in W_TOKENS for l in ent_lemmas):
+            return False
+
+        # Neue, kleine Heuristik 2: generische Nomen nur mit Eigennamen (PROPN) zulassen
+        if any(l in GENERIC_NOUNS for l in ent_lemmas):
+            if not any(t.pos_ == "PROPN" for t in ent):
+                return False
 
         return True
 
