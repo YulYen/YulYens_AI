@@ -1,0 +1,29 @@
+# tests/test_wiki_proxy_lookup.py
+import pytest
+from streaming_core_ollama import lookup_wiki_snippet
+from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+
+def test_lookup_wiki_snippet_for_germany():
+    """
+    Integrationstest: prüft, ob der lokale Wiki-Proxy läuft und
+    zu 'Deutschland' ein Snippet mit Hauptstadt 'Berlin' liefert.
+    """
+    # KeywordFinder im Medium-Mode (findet 'Deutschland')
+    finder = SpacyKeywordFinder(ModelVariant.MEDIUM)
+
+    # Annahmen: wiki_mode=offline, Proxy läuft lokal auf 8042, Limit z. B. 1600
+    wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+        question="Was ist die Hauptstadt von Deutschland?",
+        keyword_finder=finder,
+        wiki_mode="offline",
+        proxy_base="http://127.0.0.1:8042",
+        limit=1600
+    )
+
+    # Wir erwarten, dass der Proxy erreichbar ist und 'Deutschland' erkannt wurde
+    assert wiki_hint is not None, "Wiki-Proxy liefert keinen Hint → vermutlich nicht gestartet"
+    assert topic_title == "Deutschland"
+    assert snippet, "Wiki-Proxy liefert keinen Snippet-Text"
+
+    # Hauptstadt Berlin sollte im Snippet vorkommen (Groß-/Kleinschreibung egal)
+    assert "berlin" in snippet.lower()
