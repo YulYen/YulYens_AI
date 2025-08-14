@@ -7,16 +7,13 @@ import json, os, re
 import logging
 from datetime import datetime
 from logging_setup import init_logging
-import yaml
+from config_singleton import Config
 
 # --- Konfiguration --------------------------------------------------------------
-CONFIG_PATH = "config.yaml"
-
-with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-    _cfg = yaml.safe_load(f)
-
-WIKI_CFG = _cfg["wiki"]
-OFFLINE_CFG = _cfg["wiki"]["offline"]
+config = Config()  # Singleton-Instanz laden (lädt YAML beim ersten Aufruf)
+ 
+WIKI_CFG = config.wiki
+OFFLINE_CFG = config.wiki["offline"]
 
 SNIPPET_LIMIT = int(WIKI_CFG["snippet_limit"])
 TIMEOUT = (float(WIKI_CFG["timeout_connect"]), float(WIKI_CFG["timeout_read"]))

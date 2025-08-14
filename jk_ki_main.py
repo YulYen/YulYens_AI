@@ -16,12 +16,7 @@ import socket
 from api.app import app, set_provider
 from api.provider import AiApiProvider
 
-CONFIG_PATH = "config.yaml"
-
-# ----------------- Konfig laden (ohne Fallbacks) -----------------
-def load_config(path=CONFIG_PATH) -> dict:
-    with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+from config_singleton import Config 
 
 def start_api_in_background(api_cfg, provider):
     """
@@ -49,8 +44,8 @@ def _wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
             time.sleep(0.1)
     return False
 
-def start_wiki_proxy_thread(cfg) -> threading.Thread | None:
-    proxy_port = int(cfg["wiki"]["proxy_port"])
+def start_wiki_proxy_thread() -> threading.Thread | None:
+    proxy_port = int(Config().wiki["proxy_port"])
 
     # Bereits laufend? (z. B. manuell gestartet)
     if _wait_for_port("127.0.0.1", proxy_port, timeout=0.2):
@@ -88,11 +83,11 @@ def format_system_prompt(base_prompt: str) -> str:
 
 
 
-def format_greeting(cfg: dict) -> str:
-    tpl = cfg["ui"]["greeting"]  # KeyError erwünscht, wenn nicht vorhanden
+def format_greeting() -> str:
+    tpl = Config().ui["greeting"] 
     values = {
-        "model_name":   cfg["core"]["model_name"],      # KeyError erwünscht
-        "persona_name": leah_system_prompts[0]["name"], # vorhanden in system_prompts
+        "model_name":   Config().core["model_name"],     
+        "persona_name": leah_system_prompts[0]["name"],
     }
     return tpl.format_map(values)
 
@@ -106,43 +101,44 @@ def _wiki_mode_enabled(mode_val) -> bool:
         return mode_val
     return str(mode_val).strip().lower() == "offline" or str(mode_val).strip().lower() == "online"
 
-def build_ollama_streamer(cfg):
+def build_ollama_streamer():
+    cfg = Config()
     system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
-    prefix = cfg["logging"]["conversation_prefix"]
+    prefix = cfg.logging["conversation_prefix"]
     conv_log_file = f"{prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
-    warm_up = bool(cfg["core"]["warm_up"])
-    return OllamaStreamer(cfg["core"]["model_name"], warm_up, system_prompt, conv_log_file)
+    warm_up = bool(cfg.core["warm_up"])
+    return OllamaStreamer(cfg.core["model_name"], warm_up, system_prompt, conv_log_file)
 
 
 def main():
-    cfg = load_config()
+    config = Config()
 
-    WIKI_MODE          = cfg["wiki"]["mode"]
-    WIKI_SNIPPET_LIMIT = int(cfg["wiki"]["snippet_limit"])
-    WIKI_PROXY_PORT    = cfg["wiki"]["proxy_port"]
-    WIKI_TIMEOUT       = (float(cfg["wiki"]["timeout_connect"]), float(cfg["wiki"]["timeout_read"]))
+    WIKI_MODE          = config.wiki["mode"]
+    WIKI_SNIPPET_LIMIT = int(config.wiki["snippet_limit"])
+    WIKI_PROXY_PORT    = config.wiki["proxy_port"]
+    WIKI_TIMEOUT       = (float(config.wiki["timeout_connect"]), float(config.wiki["timeout_read"]))
 
-    LOG_LEVEL      = cfg["logging"]["level"].upper()
-    LOG_TO_CONSOLE = bool(cfg["logging"]["to_console"])
-    LOG_DIR        = cfg["logging"]["dir"]
+    LOG_LEVEL      = config.logging["level"].upper()
+    LOG_TO_CONSOLE = bool(config.logging["to_console"])
+    LOG_DIR        = config.logging["dir"]
 
-    UI_TYPE  = cfg["ui"]["type"]
-    WEB_HOST = cfg["ui"]["web"]["host"]
-    WEB_PORT = int(cfg["ui"]["web"]["port"])
+    UI_TYPE  = config.ui["type"]
+    WEB_HOST = config.ui.get("web", {}).get("host", "0.0.0.0")
+    WEB_PORT = int(config.ui.get("web", {}).get("port", 0))
 
-    API_ENABLED = bool(cfg["api"]["enabled"])
-    API_HOST    = cfg["api"]["host"]
-    API_PORT    = int(cfg["api"]["port"])
+    API_ENABLED = bool(config.api["enabled"])
+    API_HOST    = config.api["host"]
+    API_PORT    = int(config.api["port"])
 
-    GREETING = format_greeting(cfg)
+    GREETING = format_greeting()
 
     if _wiki_mode_enabled(WIKI_MODE):
-        start_wiki_proxy_thread(cfg)
+        start_wiki_proxy_thread()
         keyword_finder = SpacyKeywordFinder(ModelVariant.LARGE)
     else:    
         keyword_finder = None
 
-    streamer = build_ollama_streamer(cfg)
+    streamer = build_ollama_streamer()
 
     os.makedirs(LOG_DIR, exist_ok=True)
     logfile = os.path.join(LOG_DIR, f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
