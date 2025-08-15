@@ -1,9 +1,9 @@
 # tests/test_config_and_greeting.py
-import yaml
 import pytest
 
-from jk_ki_main import format_greeting, _wiki_mode_enabled
-from system_prompts import leah_system_prompts
+from core.utils import _greeting_text, _wiki_mode_enabled
+from system_prompts import system_prompts
+from config_singleton import Config
 
 
 def test_greeting_replaces_placeholders(tmp_path):
@@ -13,8 +13,8 @@ def test_greeting_replaces_placeholders(tmp_path):
     - {persona_name} -> system_prompts[0].name
     - unbekannte Platzhalter bleiben unverändert (SafeDict)
     """
-    persona_name = leah_system_prompts[0]["name"]
-    g = format_greeting()
+    persona_name = system_prompts[0]["name"]
+    g = _greeting_text(Config())
     assert f"{persona_name}" in g
     assert "Chatte" in g
 

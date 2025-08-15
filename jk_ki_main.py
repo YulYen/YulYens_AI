@@ -1,22 +1,59 @@
 # jk_ki_main.py
-import os, yaml, logging, socket
+
+# Allgemeine Imports
+import os, logging, socket
 from datetime import datetime
-from logging_setup import init_logging
-from system_prompts import leah_system_prompts
-from terminal_ui import TerminalUI
-from web_ui import WebUI
-from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
-from streaming_core_ollama import OllamaStreamer
 import threading
 import uvicorn
 import time
 import socket
 
-# API-Imports
+# API-Import
 from api.app import app, set_provider
-from api.provider import AiApiProvider
 
-from config_singleton import Config 
+# Logging
+from logging_setup import init_logging
+
+# Core und Konfiguration
+from core.factory import AppFactory
+from core import utils
+from config_singleton import Config
+
+
+def main():
+    cfg = Config()  # einmalig laden
+
+    # 1) Logging initialisieren
+    os.makedirs(cfg.logging["dir"], exist_ok=True)
+    logfile = os.path.join(cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
+    init_logging(loglevel=str(cfg.logging["level"]).upper(),
+                 logfile=logfile,
+                 to_console=bool(cfg.logging["to_console"]))
+
+    # 2) Wiki-Proxy nur starten, wenn Modus aktiv
+    wiki_mode = cfg.wiki["mode"]
+    if utils._wiki_mode_enabled(wiki_mode):
+        start_wiki_proxy_thread()
+
+    # 3) Objekte bauen (Factory) – ohne zu starten
+    factory = AppFactory()
+    ui = factory.get_ui()
+    api_provider = factory.get_api_provider()
+
+    logging.info(f"ui.type={cfg.ui['type']} wiki.mode={wiki_mode} snippet_limit={cfg.wiki['snippet_limit']}")
+
+    # 4) API optional starten
+    if api_provider:
+        start_api_in_background(cfg.api, api_provider)
+
+    # 5) UI starten oder (API-only) blockieren
+    if cfg.ui["type"] is None:
+        print("[Yul Yens AI] API läuft. UI ist deaktiviert (ui.type = null).")
+        threading.Event().wait()
+        return
+    else:
+        ui.launch()  # TerminalUI oder WebUI
+
 
 def start_api_in_background(api_cfg, provider):
     """
@@ -64,116 +101,6 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
         logging.warning(f"Wiki-Proxy (Port {proxy_port}) nach 3s noch nicht erreichbar.")
 
     return t
-
-# ----------------- kleine Helper -----------------
-def get_local_ip():
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s.connect(("8.8.8.8", 80))
-    ip = s.getsockname()[0]
-    s.close()
-    return ip
-
-def get_today_date():
-    return datetime.now().strftime("%Y-%m-%d")
-
-def format_system_prompt(base_prompt: str) -> str:
-    today = get_today_date()
-    facts = f" | Heute ist der {today}."
-    return base_prompt.strip() + facts
-
-
-
-def format_greeting() -> str:
-    tpl = Config().ui["greeting"] 
-    values = {
-        "model_name":   Config().core["model_name"],     
-        "persona_name": leah_system_prompts[0]["name"],
-    }
-    return tpl.format_map(values)
-
-def _wiki_mode_enabled(mode_val) -> bool:
-    """
-    Steuerung für KeywordFinder:
-      - 'online' oder 'offline' -> True 
-      - alles andere -> False
-    """
-    if isinstance(mode_val, bool):
-        return mode_val
-    return str(mode_val).strip().lower() == "offline" or str(mode_val).strip().lower() == "online"
-
-def build_ollama_streamer():
-    cfg = Config()
-    system_prompt = format_system_prompt(leah_system_prompts[0]["prompt"])
-    prefix = cfg.logging["conversation_prefix"]
-    conv_log_file = f"{prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
-    warm_up = bool(cfg.core["warm_up"])
-    return OllamaStreamer(cfg.core["model_name"], warm_up, system_prompt, conv_log_file)
-
-
-def main():
-    config = Config()
-
-    WIKI_MODE          = config.wiki["mode"]
-    WIKI_SNIPPET_LIMIT = int(config.wiki["snippet_limit"])
-    WIKI_PROXY_PORT    = config.wiki["proxy_port"]
-    WIKI_TIMEOUT       = (float(config.wiki["timeout_connect"]), float(config.wiki["timeout_read"]))
-
-    LOG_LEVEL      = config.logging["level"].upper()
-    LOG_TO_CONSOLE = bool(config.logging["to_console"])
-    LOG_DIR        = config.logging["dir"]
-
-    UI_TYPE  = config.ui["type"]
-    WEB_HOST = config.ui.get("web", {}).get("host", "0.0.0.0")
-    WEB_PORT = int(config.ui.get("web", {}).get("port", 0))
-
-    API_ENABLED = bool(config.api["enabled"])
-    API_HOST    = config.api["host"]
-    API_PORT    = int(config.api["port"])
-
-    GREETING = format_greeting()
-
-    if _wiki_mode_enabled(WIKI_MODE):
-        start_wiki_proxy_thread()
-        keyword_finder = SpacyKeywordFinder(ModelVariant.LARGE)
-    else:    
-        keyword_finder = None
-
-    streamer = build_ollama_streamer()
-
-    os.makedirs(LOG_DIR, exist_ok=True)
-    logfile = os.path.join(LOG_DIR, f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
-    init_logging(loglevel=LOG_LEVEL, logfile=logfile, to_console=LOG_TO_CONSOLE)
-    logging.info(f"ui.type={UI_TYPE} wiki.mode={WIKI_MODE} snippet_limit={WIKI_SNIPPET_LIMIT}")
-
-    if API_ENABLED:
-        provider = AiApiProvider(
-            streamer,
-            keyword_finder=keyword_finder,
-            wiki_mode=WIKI_MODE,
-            wiki_proxy_port=WIKI_PROXY_PORT,
-            wiki_snippet_limit=WIKI_SNIPPET_LIMIT,
-            wiki_timeout=WIKI_TIMEOUT,
-        )
-        start_api_in_background({"host": API_HOST, "port": API_PORT}, provider)
-
-    if UI_TYPE is None:
-        print("[Yul Yens AI] API läuft. UI ist deaktiviert (ui.type = null).")
-        threading.Event().wait()
-        return
-    elif UI_TYPE == "terminal":
-        ui = TerminalUI(streamer, GREETING, keyword_finder, get_local_ip,
-                        WIKI_SNIPPET_LIMIT, WIKI_MODE, WIKI_PROXY_PORT,
-                        wiki_timeout=WIKI_TIMEOUT)
-    elif UI_TYPE == "web":
-        ui = WebUI(streamer, GREETING, keyword_finder, get_local_ip,
-                   WIKI_SNIPPET_LIMIT, WIKI_MODE, WIKI_PROXY_PORT,
-                   web_host=WEB_HOST, web_port=WEB_PORT,
-                   wiki_timeout=WIKI_TIMEOUT)
-    else:
-        raise ValueError(f"Unbekannter UI-Typ: {UI_TYPE!r} (erwarte 'web' oder 'terminal')")
-
-    ui.launch()
-
 
 if __name__ == "__main__":
     main()
