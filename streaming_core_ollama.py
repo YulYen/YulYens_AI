@@ -45,7 +45,7 @@ class OllamaStreamer:
     def stream(self, messages):
         if self.system_prompt:
             messages = [{"role": "system", "content": self.system_prompt}] + messages
-            logging.info(messages)
+            logging.debug(messages)
 
         # Letzte User-Nachricht ins zentrale Log schreiben
         for m in reversed(messages):

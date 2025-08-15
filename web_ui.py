@@ -98,7 +98,7 @@ class WebUI:
 
 
     def launch(self):
-        print(f"[DEBUG] Launching WebUI on 0.0.0.0:7860")
+        logging.info(f"Launching WebUI on 0.0.0.0:7860")
         with gr.Blocks() as demo:
             with gr.Row():
                 with gr.Column(scale=1):

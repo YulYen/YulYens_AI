@@ -23,12 +23,21 @@ from config_singleton import Config
 def main():
     cfg = Config()  # einmalig laden
 
-    # 1) Logging initialisieren
+    # 1) Logging ZUERST initialisieren
     os.makedirs(cfg.logging["dir"], exist_ok=True)
-    logfile = os.path.join(cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
-    init_logging(loglevel=str(cfg.logging["level"]).upper(),
-                 logfile=logfile,
-                 to_console=bool(cfg.logging["to_console"]))
+    logfile = os.path.join(
+        cfg.logging["dir"],
+        f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
+    )
+    init_logging(
+        loglevel=str(cfg.logging["level"]),
+        logfile=logfile,
+        to_console=bool(cfg.logging["to_console"]),
+    )
+
+    # Optional (extra sicher): httpx/urllib3 auf WARNING drehen
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     # 2) Wiki-Proxy nur starten, wenn Modus aktiv
     wiki_mode = cfg.wiki["mode"]

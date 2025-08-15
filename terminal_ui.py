@@ -31,6 +31,7 @@ class TerminalUI:
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.wiki_timeout = wiki_timeout
+        self.bot = None # wird nach Auswahl gesetzt
         self.streamer = None # wird nach Auswahl gesetzt
 
 
@@ -56,7 +57,8 @@ class TerminalUI:
                     persona_name = names[choice]
                     # Streamer für gewählte Persona bauen
                     self.streamer = self.factory.get_streamer_for_persona(persona_name)
-                    print(f"Persona {persona_name} ausgewählt.")
+                    self.bot = persona_name
+                    print(f"Persona {self.bot} ausgewählt.")
                     break
             except ValueError:
                 pass
@@ -74,8 +76,8 @@ class TerminalUI:
     def prompt_user(self) -> str:
         return input(f"{Fore.GREEN}🧑 Du:{Style.RESET_ALL} ").strip()
 
-    def print_bot_prefix(self) -> None:
-        print(f"{Fore.CYAN}🧠 Leah:{Style.RESET_ALL} ", end="", flush=True)
+    def print_bot_prefix(self, bot) -> None:
+        print(f"{Fore.CYAN}🧠 {bot}:{Style.RESET_ALL} ", end="", flush=True)
 
     def print_stream(self, text: str) -> None:
         print(text, end="", flush=True)
@@ -145,7 +147,7 @@ class TerminalUI:
             self.history.append({"role": "user", "content": user_input})
 
             # --- (3) Streaming der Antwort (tokenweise) ---
-            self.print_bot_prefix()
+            self.print_bot_prefix(self.bot)
             reply = ""
             for token in self.streamer.stream(messages=self.history):
                 reply += token

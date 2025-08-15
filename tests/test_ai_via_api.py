@@ -35,7 +35,7 @@ def ask(question: str) -> str:
         {
             "name": "Identitaet/Erfinder",
             "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden?",
-            "must_contain": ["leah", "yul yen"],  # anpassbar
+            "must_contain": ["PETER", "yul yen"],  # anpassbar
         },
         {
             "name": "Portugal_PM_2024",
