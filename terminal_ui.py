@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
+from system_prompts import get_all_persona_names, system_prompts
+
 
 # Gemeinsame Core-Utilities & Streamer
 from streaming_core_ollama import (
-    OllamaStreamer,
     lookup_wiki_snippet,
     inject_wiki_context,
 )
@@ -14,28 +15,52 @@ from streaming_core_ollama import (
 
 class TerminalUI:
     """
-    Terminal-Chat für Leah – nutzt die gleiche Wiki-Logik wie die WebUI:
+    Terminal-Chat – nutzt die gleiche Wiki-Logik wie die WebUI:
     - Wiki-Hinweis (🕵️‍♀️ …) wird NUR im Terminal angezeigt (nicht ans LLM geschickt)
     - Wiki-Snippet (falls vorhanden) wird als System-Kontext injiziert
     - Tokenweises Streaming der LLM-Antwort bleibt unverändert
     """
-    def __init__(self, streamer, greeting, keyword_finder, ip,
+    def __init__(self, factory, greeting, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  wiki_timeout):
-        self.streamer = streamer
         self.greeting = greeting
+        self.factory = factory
         self.keyword_finder = keyword_finder
         self.ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.wiki_timeout = wiki_timeout
+        self.streamer = None # wird nach Auswahl gesetzt
+
 
         # Nur echte Konversation (User/Assistant) + ggf. System-Kontexte (Wiki)
         self.history: List[Dict[str, str]] = []
 
         # Für optionale Folge-Logik (nicht zwingend genutzt, aber praktisch)
         self._last_wiki_title: Optional[str] = None
+
+    def choose_persona(self) -> None:
+        """Fragt den Nutzer nach der gewünschten Persona und setzt den Streamer."""
+        names = get_all_persona_names()
+        print("Bitte wähle eine Persona:")
+        for idx, name in enumerate(names, start=1):
+            # optional: kurze Beschreibung anzeigen
+            desc = next(p for p in system_prompts if p["name"] == name)["description"]
+            print(f"{idx}. {name} – {desc}")
+        while True:
+            sel = input("Nummer der gewünschten Persona: ").strip()
+            try:
+                choice = int(sel) - 1
+                if 0 <= choice < len(names):
+                    persona_name = names[choice]
+                    # Streamer für gewählte Persona bauen
+                    self.streamer = self.factory.get_streamer_for_persona(persona_name)
+                    print(f"Persona {persona_name} ausgewählt.")
+                    break
+            except ValueError:
+                pass
+            print("Ungültige Eingabe, bitte erneut versuchen.")
 
     # ---------- kleine UI‑Hilfen ----------
     def init_ui(self) -> None:
@@ -69,7 +94,15 @@ class TerminalUI:
     # ---------- Haupt-Loop ----------
     def launch(self) -> None:
         self.init_ui()
+
+        """Startet die Terminal-UI. Fragt zuerst nach der Persona-Auswahl."""
+        # 1. Persona wählen, falls noch kein Streamer gesetzt
+        if self.streamer is None:
+            self.choose_persona()
+
+        # 2. Begrüßung ausgeben
         self.print_welcome()
+        print(self.greeting)
 
         while True:
             user_input = self.prompt_user()

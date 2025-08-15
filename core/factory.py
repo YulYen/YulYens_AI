@@ -38,18 +38,22 @@ class AppFactory:
                 self._keyword_finder = None
         return self._keyword_finder
 
+    # Als Default
     def get_streamer(self) -> OllamaStreamer:
-        if self._streamer is None:
-            core = self._cfg.core
-            log_prefix = self._cfg.logging["conversation_prefix"]
-            conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
-            self._streamer = OllamaStreamer(
-                model_name=core["model_name"],
-                warm_up=bool(core.get("warm_up", False)),
-                system_prompt=utils._system_prompt_with_date(),
-                log_file=conv_log_file,
-            )
-        return self._streamer
+        return self.get_streamer_for_persona("PETER")
+    
+    def get_streamer_for_persona(self, persona_name: str) -> OllamaStreamer:
+        """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
+        core = self._cfg.core
+        system_prompt = utils._system_prompt_with_date(persona_name)  # Prompt der Persona laden
+        log_prefix = self._cfg.logging["conversation_prefix"]
+        conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
+        return OllamaStreamer(
+            model_name=core["model_name"],
+            warm_up=bool(core.get("warm_up", False)),
+            system_prompt=system_prompt,
+            log_file=conv_log_file,
+        )
 
     def get_api_provider(self):
         """Nur bauen, wenn in YAML aktiviert. Kein Serverstart hier."""
@@ -88,7 +92,7 @@ class AppFactory:
 
         if ui_type == "terminal":
             self._ui = TerminalUI(
-                streamer, greeting, finder, utils._local_ip,
+                self, greeting, finder, utils._local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 wiki_timeout=(float(wiki["timeout_connect"]), float(wiki["timeout_read"])),
             )

@@ -1,7 +1,7 @@
     # --------- Utilities (ohne Seiteneffekte nach außen) ---------
 import socket
 from datetime import datetime
-from system_prompts import system_prompts
+from system_prompts import system_prompts, get_prompt_by_name
 
 def _wiki_mode_enabled(mode_val) -> bool:
     if isinstance(mode_val, bool):
@@ -17,8 +17,8 @@ def _local_ip() -> str:
     finally:
         s.close()
 
-def _system_prompt_with_date() -> str:
-    base = system_prompts[0]["prompt"].strip()
+def _system_prompt_with_date(name) -> str:
+    base = get_prompt_by_name(name)
     today = datetime.now().strftime("%Y-%m-%d")
     return f"{base} | Heute ist der {today}."
 

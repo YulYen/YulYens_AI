@@ -6,7 +6,7 @@ core:
 
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:
-  type: web   # Optionen: "web", "terminal", null (= nur API)
+  type: terminal   # Optionen: "web", "terminal", null (= nur API)
   # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
   # Verfügbare Platzhalter: {model_name} und {persona_name}
   greeting: "Chatte mit {persona_name} auf Basis der Modellversion {model_name}"
