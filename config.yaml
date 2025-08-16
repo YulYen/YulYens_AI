@@ -19,7 +19,7 @@ wiki:
   # Ob das lokale Offline-Wiki (Kiwix) genutzt wird: offline
   # Oder Wikipedia: online
   # Oder kein wiki-Tool: false
-  mode: offline
+  mode: online
   # Immer notwendig, egal ob offline oder online
   proxy_port: 8042
   # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen

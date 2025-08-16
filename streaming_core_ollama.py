@@ -5,6 +5,33 @@ from ollama import chat
 from streaming_helper import clean_token
 import requests, logging
 
+def _is_doris_prompt(prompt: str) -> bool:
+    return isinstance(prompt, str) and "doris" in prompt.lower()
+
+def _doris_reminder() -> str:
+    return (
+        "Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. "
+        "Antworte in 1–2 Sätzen, pointiert statt erklärbärig. "
+        "Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. "
+        "Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. "
+        "Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut.')."
+    )
+
+def _apply_doris_injection(messages: list[dict], system_prompt: str) -> list[dict]:
+    """
+    Fügt VOR der aktuellen User-Message eine kurze system-Reminder-Message ein.
+    Minimalinvasiv: Wir gehen davon aus, dass die letzte Message die User-Frage ist.
+    """
+    if not messages:
+        return messages
+    if not _is_doris_prompt(system_prompt):
+        return messages
+
+    # wir duplizieren die Liste, um nichts an der Caller-Referenz zu ändern
+    patched = list(messages)
+    # Reminder VOR die letzte Message (die aktuelle User-Frage) setzen
+    patched.insert(len(patched) - 1, {"role": "system", "content": _doris_reminder()})
+    return patched
 
 class OllamaStreamer:
     def __init__(self, model_name="plain", warm_up=True, system_prompt=None, log_file="conversation.json"):
@@ -47,6 +74,10 @@ class OllamaStreamer:
             messages = [{"role": "system", "content": self.system_prompt}] + messages
             logging.debug(messages)
 
+        # Nur ein Test für DORIS
+        messages = _apply_doris_injection(messages, self.system_prompt)
+
+
         # Letzte User-Nachricht ins zentrale Log schreiben
         for m in reversed(messages):
             if m.get("role") == "user" and m.get("content"):
@@ -55,7 +86,6 @@ class OllamaStreamer:
 
         full_reply_parts = []
         try:
-
             # Eigentliches Streaming
             stream = chat(
                 model=self.model_name,
