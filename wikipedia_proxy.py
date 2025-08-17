@@ -28,7 +28,7 @@ ONLINE_TIMEOUT = TIMEOUT
 # --- Logging einrichten ---------------------------------------------------------
 os.makedirs("logs", exist_ok=True)
 PROXY_LOGFILE = os.path.join("logs", f"wiki_proxy_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
-init_logging(loglevel="INFO", logfile=PROXY_LOGFILE, to_console=True)
+init_logging(loglevel="INFO", logfile=PROXY_LOGFILE, to_console=config.logging["to_console"])
 logging.info("Wiki-Proxy startet…")
 
 

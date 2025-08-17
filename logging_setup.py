@@ -1,44 +1,35 @@
 # logging_setup.py
-import logging
+import logging, os
+from typing import Optional
 
-NOISY = ["uvicorn", "uvicorn.error", "uvicorn.access", "gradio", "httpx", "urllib3"]
-
-def init_logging(loglevel="INFO", logfile=None, to_console=False):
-    # Baue Handlerliste strikt nach to_console
+def init_logging(*, loglevel: str = "INFO", logfile: Optional[str] = None, to_console: bool = True) -> None:
+    """
+    Zentrale, idempotente Logging-Initialisierung.
+    - Legt das Logverzeichnis an, falls nötig.
+    - Aktiviert File- und optional Console-Handler.
+    - Setzt ein einheitliches Format (UTF-8).
+    - 'force=True' sorgt dafür, dass eine erneute Initialisierung definierte Wirkung hat.
+    """
     handlers = []
+
     if logfile:
+        logdir = os.path.dirname(os.path.abspath(logfile))
+        if logdir:
+            os.makedirs(logdir, exist_ok=True)
         handlers.append(logging.FileHandler(logfile, encoding="utf-8"))
+
     if to_console:
         handlers.append(logging.StreamHandler())
 
     logging.basicConfig(
-        level=getattr(logging, loglevel.upper(), logging.INFO),
+        level=getattr(logging, str(loglevel).upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         handlers=handlers,
-        force=True,  # killt alle alten Handler
+        force=True,   # sauber neu setzen, ohne Handler-Wildwuchs
     )
 
-    # „Laute“ Logger: eigene Handler weg, auf Root propagieren, Level setzen
-    for name in NOISY:
-        lg = logging.getLogger(name)
-        lg.handlers.clear()
-        lg.propagate = False
-        lg.setLevel(getattr(logging, loglevel.upper(), logging.INFO))
-
-    # Gürtel + Hosenträger: falls jemand später doch noch StreamHandler dranhängt
-    if not to_console:
-        _remove_console_handlers_from_all_loggers()
-
-def _remove_console_handlers_from_all_loggers():
-    """Entfernt StreamHandler aus Root und bekannten Child-Loggern."""
-    def _strip_stream_handlers(logger: logging.Logger):
-        for h in list(logger.handlers):
-            if isinstance(h, logging.StreamHandler):
-                logger.removeHandler(h)
-    root = logging.getLogger()
-    _strip_stream_handlers(root)
-    for name, lg in logging.Logger.manager.loggerDict.items():
-        if isinstance(lg, logging.PlaceHolder):
-            continue
-        _strip_stream_handlers(lg)  # type: ignore[arg-type]
+    # Häufig laute Libs zähmen (lass root auf INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)

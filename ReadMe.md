@@ -1,4 +1,4 @@
-# Leah – Private Local AI Assistant
+# Yul Yen’s AI Orchestra
 
 **Note (English):**  
 This is a private project and repository. The short introduction is written in English in case someone outside Germany stumbles upon it – but from here on the documentation continues in German, since the AI personas (Leah, Doris, Peter) are primarily designed to operate in German.  
@@ -7,7 +7,7 @@ This is a private project and repository. The short introduction is written in E
 
 ## Übersicht
 
-**Leah** ist eine lokal laufende KI, die über [Ollama](https://ollama.com/) oder kompatible Backends genutzt wird.  
+**Yul Yen’s AI Orchestra** ist eine lokal laufende KI, die über [Ollama](https://ollama.com/) oder kompatible Backends genutzt wird.  
 Sie bietet:
 
 - **Mehrere Personas** (Leah, Doris, Peter) mit unterschiedlichen Stilen.  

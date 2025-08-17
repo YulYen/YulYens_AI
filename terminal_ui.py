@@ -4,6 +4,7 @@ from __future__ import annotations
 from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
 from system_prompts import get_all_persona_names, system_prompts
+import logging
 
 
 # Gemeinsame Core-Utilities & Streamer
@@ -96,6 +97,7 @@ class TerminalUI:
     # ---------- Haupt-Loop ----------
     def launch(self) -> None:
         self.init_ui()
+        logging.info(f"Launching TerminalUI")
 
         """Startet die Terminal-UI. Fragt zuerst nach der Persona-Auswahl."""
         # 1. Persona wählen, falls noch kein Streamer gesetzt
@@ -108,6 +110,7 @@ class TerminalUI:
 
         while True:
             user_input = self.prompt_user()
+            logging.info(f"[Terminal] User: {user_input}")
             print()  # kleine Leerzeile nach der Eingabe
 
             # Exit
@@ -154,6 +157,8 @@ class TerminalUI:
                 self.print_stream(token)
 
             # --- (4) Antwort in History übernehmen, hübscher Abschluss ---
+            logging.info(f"[Terminal] {self.bot}:  len={reply}")
+
             self.history.append({"role": "assistant", "content": reply})
             # Immer ZWEI Leerzeilen nach der Antwort sicherstellen:
             # (Falls das Streaming bereits \n ausgegeben hat, ergänzen wir nur die fehlenden.)

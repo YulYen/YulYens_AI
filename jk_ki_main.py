@@ -34,6 +34,8 @@ def main():
         logfile=logfile,
         to_console=bool(cfg.logging["to_console"]),
     )
+    logging.info("BOOT OK – Logging initialisiert und aktiv.")
+
 
     # Optional (extra sicher): httpx/urllib3 auf WARNING drehen
     logging.getLogger("httpx").setLevel(logging.WARNING)
