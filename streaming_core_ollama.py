@@ -5,38 +5,29 @@ from ollama import chat
 from streaming_helper import clean_token
 import requests, logging
 
-def _is_doris_prompt(prompt: str) -> bool:
-    return isinstance(prompt, str) and "doris" in prompt.lower()
 
-def _doris_reminder() -> str:
-    return (
-        "Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. "
-        "Antworte in 1–2 Sätzen, pointiert statt erklärbärig. "
-        "Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. "
-        "Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. "
-        "Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut.')."
-    )
-
-def _apply_doris_injection(messages: list[dict], system_prompt: str) -> list[dict]:
+def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]:
     """
     Fügt VOR der aktuellen User-Message eine kurze system-Reminder-Message ein.
     Minimalinvasiv: Wir gehen davon aus, dass die letzte Message die User-Frage ist.
     """
     if not messages:
         return messages
-    if not _is_doris_prompt(system_prompt):
-        return messages
 
     # wir duplizieren die Liste, um nichts an der Caller-Referenz zu ändern
     patched = list(messages)
     # Reminder VOR die letzte Message (die aktuelle User-Frage) setzen
-    patched.insert(len(patched) - 1, {"role": "system", "content": _doris_reminder()})
+    patched.insert(len(patched) - 1, {"role": "system", "content": str(reminder)})
+    logging.info("Reminder injected:" + str(reminder) )
     return patched
 
 class OllamaStreamer:
-    def __init__(self, model_name="plain", warm_up=True, system_prompt=None, log_file="conversation.json"):
+    def __init__(self, persona, model_name="plain", warm_up=False, reminder=None, log_file="conversation.json"):
         self.model_name = model_name
-        self.system_prompt = system_prompt
+        self.reminder = None
+        self.persona_prompt = persona
+        if reminder: 
+            self.reminder =  " ".join(reminder)
         self._logs_dir = "logs"
         os.makedirs(self._logs_dir, exist_ok=True)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
@@ -70,12 +61,12 @@ class OllamaStreamer:
             logging.error(f"Fehler beim Schreiben des Conversation_log : {e}")
 
     def stream(self, messages):
-        if self.system_prompt:
-            messages = [{"role": "system", "content": self.system_prompt}] + messages
+        if self.persona_prompt:
+            messages = [{"role": "system", "content": self.persona_prompt}] + messages
             logging.debug(messages)
 
-        # Nur ein Test für DORIS
-        messages = _apply_doris_injection(messages, self.system_prompt)
+        if self.reminder:
+            messages = _apply_reminder_injection(messages, self.reminder)
 
 
         # Letzte User-Nachricht ins zentrale Log schreiben

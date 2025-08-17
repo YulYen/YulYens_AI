@@ -11,6 +11,8 @@ from terminal_ui import TerminalUI
 from web_ui import WebUI
 from core import utils
 
+import personas
+
 
 class AppFactory:
     """
@@ -45,13 +47,15 @@ class AppFactory:
     def get_streamer_for_persona(self, persona_name: str) -> OllamaStreamer:
         """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
         core = self._cfg.core
-        system_prompt = utils._system_prompt_with_date(persona_name)  # Prompt der Persona laden
+        persona_promot = personas.get_prompt_by_name(persona_name) # Prompt der Persona laden
+        reminder = personas.get_reminder(persona_name)  
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
         return OllamaStreamer(
             model_name=core["model_name"],
             warm_up=bool(core.get("warm_up", False)),
-            system_prompt=system_prompt,
+            reminder=reminder,
+            persona=persona_promot,
             log_file=conv_log_file,
         )
 
