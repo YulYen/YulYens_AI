@@ -6,6 +6,8 @@ __pycache__/
 
 # Logs und Debug-Dateien
 *.log
+logs/
+
 
 # Test-/Pytest-Cache
 .pytest_cache/
@@ -23,3 +25,17 @@ tests/__pycache__/
 
 # Projekt-spezifische temporäre Dateien
 *conversation_*.json
+
+# allgemeines
+.venv/
+.env
+*.env
+data/
+models/
+*.gguf
+*.bin
+*.pt
+*.zim
+.ollama/
+
+

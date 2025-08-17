@@ -1,0 +1,11 @@
+beautifulsoup4
+colorama
+fastapi
+gradio
+ollama
+pydantic
+pytest
+pyyaml
+requests
+spacy
+uvicorn
