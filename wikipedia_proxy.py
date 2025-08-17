@@ -26,10 +26,8 @@ KIWIX_TIMEOUT = TIMEOUT
 ONLINE_TIMEOUT = TIMEOUT
 
 # --- Logging einrichten ---------------------------------------------------------
-os.makedirs("logs", exist_ok=True)
-PROXY_LOGFILE = os.path.join("logs", f"wiki_proxy_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log")
-init_logging(loglevel="INFO", logfile=PROXY_LOGFILE, to_console=config.logging["to_console"])
-logging.info("Wiki-Proxy startet…")
+logger = logging.getLogger("wiki_proxy")
+logger.info("Wiki-Proxy startet…")
 
 
 # ---------- Helper für Antworten ------------------------------------------------
@@ -42,7 +40,7 @@ def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str,
     try:
         handler.wfile.write(body)
     except (ConnectionAbortedError, BrokenPipeError) as e:
-        logging.warning(f"[ClientAborted] write aborted: {e}")
+        logger.warning(f"[ClientAborted] write aborted: {e}")
 
 def _send_text(handler: BaseHTTPRequestHandler, status: int, text: str):
     _send_bytes(handler, status, "text/plain", text.encode("utf-8"))
@@ -185,18 +183,18 @@ def _parse_limit(query: dict) -> int:
 
 def _fetch_kiwix(term: str):
     url = _build_kiwix_url(term)
-    logging.info(f"[Fetch] {url}")
+    logger.info(f"[Fetch] {url}")
     try:
         r = requests.get(url, timeout=KIWIX_TIMEOUT)
         return r.status_code, r
     except Exception as e:
-        logging.error(f"[FetchError] {e}")
+        logger.error(f"[FetchError] {e}")
         return 500, None
     
 def _fetch_online(term: str):
     """Holt Kurztext aus echter deutscher Wikipedia (REST Summary API)."""
     url = f"https://de.wikipedia.org/api/rest_v1/page/summary/{term}"
-    logging.info(f"[FetchOnline] {url}")
+    logger.info(f"[FetchOnline] {url}")
     try:
         r = requests.get(url, timeout=ONLINE_TIMEOUT, headers={"User-Agent": "LeahWikiProxy/1.0"})
         if r.status_code != 200:
@@ -210,15 +208,15 @@ def _fetch_online(term: str):
             apparent_encoding = "utf-8"
         return 200, Resp()
     except Exception as e:
-        logging.error(f"[FetchOnlineError] {e}")
+        logger.error(f"[FetchOnlineError] {e}")
         return 500, None
 
 
 # ---------- HTTP-Handler --------------------------------------------------------
 class WikiRequestHandler(BaseHTTPRequestHandler):
-    # Standard-HTTPServer-Logs in unser Logging leiten (optional, aber hübsch)
+    # Standard-HTTPServer-Logs in unser logger leiten (optional, aber hübsch)
     def log_message(self, format, *args):
-        logging.info("%s - %s" % (self.address_string(), format % args))
+        logger.info("%s - %s" % (self.address_string(), format % args))
 
     def do_GET(self):
         parsed_path = urlparse(self.path)
@@ -226,7 +224,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed_path.query)
         online = query.get("online", ["0"])[0] == "1"
 
-        logging.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
+        logger.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
 
         if not suchbegriff:
             _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
@@ -239,10 +237,10 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
         if status != 200:
             if status == 404:
-                logging.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
+                logger.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
                 _send_text(self, 404, "Artikel nicht gefunden.")
             else:
-                logging.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
+                logger.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
                 _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
             return
 
@@ -302,7 +300,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
 
 def run():
-    logging.info(f"Starte lokalen Wikipedia-Text-Proxy auf http://localhost:{PROXY_PORT}")
+    logger.info(f"Starte lokalen Wikipedia-Text-Proxy auf http://localhost:{PROXY_PORT}")
     server = HTTPServer(("", PROXY_PORT), WikiRequestHandler)
     server.serve_forever()
 

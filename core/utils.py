@@ -1,7 +1,7 @@
     # --------- Utilities (ohne Seiteneffekte nach außen) ---------
 import socket
 from datetime import datetime
-from system_prompts import system_prompts, get_prompt_by_name
+from personas import system_prompts, get_prompt_by_name
 
 def _wiki_mode_enabled(mode_val) -> bool:
     if isinstance(mode_val, bool):

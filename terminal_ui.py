@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
-from system_prompts import get_all_persona_names, system_prompts
+from personas import get_all_persona_names, system_prompts
 import logging
 
 
@@ -157,7 +157,7 @@ class TerminalUI:
                 self.print_stream(token)
 
             # --- (4) Antwort in History übernehmen, hübscher Abschluss ---
-            logging.info(f"[Terminal] {self.bot}:  len={reply}")
+            logging.info(f"[Terminal] {self.bot}: {reply}")
 
             self.history.append({"role": "assistant", "content": reply})
             # Immer ZWEI Leerzeilen nach der Antwort sicherstellen:

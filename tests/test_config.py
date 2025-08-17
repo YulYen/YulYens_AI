@@ -2,7 +2,7 @@
 import pytest
 
 from core.utils import _greeting_text, _wiki_mode_enabled
-from system_prompts import system_prompts
+from personas import system_prompts
 from config_singleton import Config
 
 
