@@ -6,7 +6,7 @@ core:
 
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:
-  type: terminal   # Optionen: "web", "terminal", null (= nur API)
+  type: web   # Optionen: "web", "terminal", null (= nur API)
   # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
   # Verfügbare Platzhalter: {model_name} und {persona_name}
   greeting: "Chat mit {persona_name} auf Basis der Modellversion {model_name}:"
@@ -29,7 +29,7 @@ wiki:
   # Ob das lokale Offline-Wiki (Kiwix) genutzt wird: offline
   # Oder Wikipedia: online
   # Oder kein wiki-Tool: false
-  mode: offline
+  mode: false
   # Immer notwendig, egal ob offline oder online
   proxy_port: 8042
   # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen
@@ -50,6 +50,6 @@ logging:
 
 # --- One-Shot-API z.B. für Tests  -------------------------------------------------------------------
 api:
-  enabled: true
+  enabled: false
   host: "127.0.0.1"
   port: 8013

@@ -1,19 +1,20 @@
 import gradio as gr
-import requests, logging
-from streaming_core_ollama import OllamaStreamer, lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
+import logging
+from personas import system_prompts
+from streaming_core_ollama import  lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
 
 class WebUI:
-    def __init__(self, streamer, keyword_finder, ip,
+    def __init__(self, project_name, streamer, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
         self.streamer = streamer
         self.greeting = "greeting TODO"
+        self.project_name = project_name
         self.keyword_finder = keyword_finder
         self.ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
-        self.bot = "Leah" #Durch auswahl ersetzen
         self.proxy_base = proxy_base
         self.web_host = web_host
         self.web_port = int(web_port)
@@ -100,23 +101,78 @@ class WebUI:
 
 
     def launch(self):
-        logging.info(f"Launching WebUI on 0.0.0.0:7860")
+        # Mapping: "leah" -> persona-dict
+        persona_info = {p["name"].lower(): p for p in system_prompts}
+
+        # Falls du projekt_name in __init__ gesetzt hast, sonst Fallback:
+        project_name = getattr(self, "project_name", "Yul Yen’s AI Orchestra")
+
+        # State: ausgewählte Persona (z. B. "leah"|"doris"|"peter"), initial None
+        selected_persona_state = gr.State(None)
+
+        # --- Callback: Persona wurde gewählt ---
+        def on_persona_selected(key: str):
+            # Guard
+            if not key or key not in persona_info:
+                # Keine Änderung; nichts sichtbar machen
+                return (
+                    gr.update(),                               # selected_persona_state (unchanged)
+                    gr.update(),                               # greeting_md
+                    gr.update(),                               # chatbot
+                    gr.update(),                               # txt
+                    gr.update(),                               # clear
+                )
+            persona = persona_info[key]
+            # self.bot wird auf den (rohen) Namen gesetzt, z.B. "LEAH" | "DORIS" | "PETER"
+            self.bot = persona["name"]
+            # Fürs UI hübsch: Titel-Case als Label
+            display_name = persona["name"].title()
+
+            greeting = f"Hallo, ich bin {display_name} 👋"
+            return (
+                key,                                          # selected_persona_state
+                gr.update(value=greeting, visible=True),      # greeting_md sichtbar + Text
+                gr.update(label=display_name, visible=True),  # chatbot sichtbar + Label
+                gr.update(visible=True, interactive=True),    # txt sichtbar & aktiv
+                gr.update(visible=True),                      # clear sichtbar
+            )
+
+        # --- UI ---
         with gr.Blocks() as demo:
+            # H1: Projektname
+            gr.Markdown(f"# {project_name}")
+
+            # Persona-Karten
+            gr.Markdown("Wähle zuerst eine Persona:")
             with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Image("static/leah.png", elem_id="leah-img", show_label=False, container=False)
-                with gr.Column(scale=3):
-                    gr.Markdown("""
-                    ## Hallo, ich bin Leah, die freundliche KI 👋  
-                    Willkommen unserem kleinen Chat.  
-                    Frag mich, was du willst – ich höre zu, denke mit, und helfe dir weiter.  
-                """)
+                # Wir bauen Buttons und registrieren Callbacks mit stabilen Closures
+                persona_buttons = []
+                for key, p in persona_info.items():
+                    with gr.Column():
+                        gr.Image(
+                            value=p["image_path"], show_label=False,
+                            width=128, height=128, container=False
+                        )
+                        gr.Markdown(f"### {p['name']}\n{p['description']}")
+                        btn = gr.Button(f"{p['name']} wählen", variant="secondary")
+                        persona_buttons.append((key, btn))
 
-            gr.Markdown(self.greeting)
-            chatbot = gr.Chatbot(label="Leah")
-            txt     = gr.Textbox(show_label=False, placeholder="Schreibe…")
-            clear   = gr.Button("🔄 Neue Unterhaltung")
+            # Begrüßung + Chat + Eingabe, zunächst unsichtbar
+            greeting_md = gr.Markdown("", visible=False)
+            chatbot = gr.Chatbot(label="", visible=False)
+            txt = gr.Textbox(show_label=False, placeholder="Schreibe…", visible=False, interactive=False)
+            clear = gr.Button("🔄 Neue Unterhaltung", visible=False)
 
+            # Persona-Buttons sauber verdrahten (Closure mit Default-Arg, um Late Binding zu vermeiden)
+            for key, btn in persona_buttons:
+                btn.click(
+                    fn=lambda key=key: on_persona_selected(key),
+                    inputs=[],
+                    outputs=[selected_persona_state, greeting_md, chatbot, txt, clear],
+                    queue=False,
+                )
+
+            # Chat-Funktionalität (deine bestehende Streaming-Logik bleibt)
             txt.submit(
                 fn=self.respond_streaming,
                 inputs=[txt, chatbot],
@@ -124,6 +180,7 @@ class WebUI:
                 queue=True,
             )
 
+            # Reset: Chat löschen, Persona bleibt (du kannst hier auch Persona wieder nullen, wenn gewünscht)
             clear.click(lambda: ("", []), outputs=[txt, chatbot])
 
         demo.launch(server_name="0.0.0.0", server_port=7860)
