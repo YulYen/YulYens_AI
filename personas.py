@@ -15,7 +15,7 @@ system_prompts = [
         ),
         "reminder": None,
         "description": "Charmante, empathische KI mit lockerer Art.",
-        "image_path": "images/personas/leah.png"
+        "image_path": "static/LEAH.png"
     },
     {
         "name": "DORIS",
@@ -32,7 +32,7 @@ system_prompts = [
         ),
         "reminder": ("Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. Antworte in 1–2 Sätzen, pointiert statt erklärbärig. Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut.'). Jorrit isst gerne Käse."),
         "description": "Direkt, spitz und mit trockenem Humor.",
-        "image_path": "images/personas/doris.png"
+        "image_path": "static/DORIS.png"
     },
     {
         "name": "PETER",
@@ -47,7 +47,7 @@ system_prompts = [
         ),
         "reminder": None,
         "description": "Nerdige, faktenorientierte KI mit Herz.",
-        "image_path": "images/personas/peter.png"
+        "image_path": "static/PETER.png"
     }
 ]
 
@@ -56,6 +56,13 @@ def get_prompt_by_name(name: str) -> str:
     for persona in system_prompts:
         if persona["name"].lower() == name.lower():
             return persona["prompt"]
+    raise ValueError(f"Persona '{name}' nicht gefunden.")
+
+def get_image_by_name(name: str) -> str:
+    """Gibt den Image-PATH für eine Persona anhand des Namens zurück."""
+    for persona in system_prompts:
+        if persona["name"].lower() == name.lower():
+            return persona["image_path"]
     raise ValueError(f"Persona '{name}' nicht gefunden.")
 
 
