@@ -90,13 +90,12 @@ class AppFactory:
             return None
 
         streamer = self.get_streamer()
-        greeting = utils._greeting_text(self.get_config())
         finder   = self.get_keyword_finder()
         wiki     = self._cfg.wiki
 
         if ui_type == "terminal":
             self._ui = TerminalUI(
-                self, greeting, finder, utils._local_ip,
+                self, self._cfg, finder, utils._local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 wiki_timeout=(float(wiki["timeout_connect"]), float(wiki["timeout_read"])),
             )
@@ -105,7 +104,7 @@ class AppFactory:
             host    = web_cfg["host"]                   # KeyError erwünscht
             port    = int(web_cfg["port"])              # KeyError erwünscht
             self._ui = WebUI(
-                streamer, greeting, finder, utils._local_ip,
+                streamer, finder, utils._local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 web_host=host, web_port=port,
                 wiki_timeout=(float(wiki["timeout_connect"]), float(wiki["timeout_read"])),

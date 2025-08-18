@@ -5,6 +5,7 @@ from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
 from personas import get_all_persona_names, system_prompts
 import logging
+from core import utils
 
 
 # Gemeinsame Core-Utilities & Streamer
@@ -21,17 +22,18 @@ class TerminalUI:
     - Wiki-Snippet (falls vorhanden) wird als System-Kontext injiziert
     - Tokenweises Streaming der LLM-Antwort bleibt unverändert
     """
-    def __init__(self, factory, greeting, keyword_finder, ip,
+    def __init__(self, factory, config, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  wiki_timeout):
-        self.greeting = greeting
         self.factory = factory
+        self.config = config
         self.keyword_finder = keyword_finder
         self.ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.wiki_timeout = wiki_timeout
+        self.greeting = None # wird nach Auswahl gesetzt
         self.bot = None # wird nach Auswahl gesetzt
         self.streamer = None # wird nach Auswahl gesetzt
 
@@ -59,6 +61,8 @@ class TerminalUI:
                     # Streamer für gewählte Persona bauen
                     self.streamer = self.factory.get_streamer_for_persona(persona_name)
                     self.bot = persona_name
+                    self.greeting = utils._greeting_text(self.config, self.bot)
+
                     print(f"Persona {self.bot} ausgewählt.")
                     break
             except ValueError:
@@ -70,7 +74,10 @@ class TerminalUI:
         init(autoreset=True)
 
     def print_welcome(self) -> None:
-        print(self.greeting)
+        pname = getattr(self, "bot")
+        project = self.config.project_name
+        tpl =  self.config.texts["greeting"]
+        print(tpl.format(persona_name=pname, project_name=project))
         print(f"{Fore.MAGENTA}('exit' zum Beenden){Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}('clear' für neue Unterhaltung){Style.RESET_ALL}")
 
@@ -130,6 +137,7 @@ class TerminalUI:
             if self.keyword_finder:
                 wiki_hint, title, snippet = lookup_wiki_snippet(
                     user_input,
+                    self.bot,
                     self.keyword_finder,
                     self.wiki_mode,
                     self.proxy_base,

@@ -118,9 +118,12 @@ class OllamaStreamer:
 
     def respond_one_shot(self, user_input: str, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout) -> str:
         messages = []
+
+        # Feste Persona für respond_one_shot
+        persona = "PETER"
         
         # 1. Wikipedia-Snippet suchen
-        wiki_hint, topic_title, snippet = lookup_wiki_snippet(user_input, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout)
+        wiki_hint, topic_title, snippet = lookup_wiki_snippet(user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout)
 
         # 2. Wikipedia-Kontext (falls vorhanden) als System-Nachrichten anhängen
         if snippet:
@@ -136,7 +139,7 @@ class OllamaStreamer:
 
 
 
-def lookup_wiki_snippet(question: str, keyword_finder, wiki_mode: str, proxy_port: int,
+def lookup_wiki_snippet(question: str, persona_name: str, keyword_finder, wiki_mode: str, proxy_port: int,
                         limit: int, timeout: tuple[float, float]) -> tuple[str, str, str]:
     snippet = None
     wiki_hint = None
@@ -149,7 +152,7 @@ def lookup_wiki_snippet(question: str, keyword_finder, wiki_mode: str, proxy_por
     topic = keyword_finder.find_top_keyword(question)
     if topic:
         online_flag = "1" if wiki_mode == "online" else "0"
-        url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}"
+        url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
         try:
             r = requests.get(url, timeout=timeout)
             if r.status_code == 200:

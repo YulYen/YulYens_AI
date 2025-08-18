@@ -3,16 +3,17 @@ import requests, logging
 from streaming_core_ollama import OllamaStreamer, lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
 
 class WebUI:
-    def __init__(self, streamer, greeting, keyword_finder, ip,
+    def __init__(self, streamer, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
         self.streamer = streamer
-        self.greeting = greeting
+        self.greeting = "greeting TODO"
         self.keyword_finder = keyword_finder
         self.ip = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
+        self.bot = "Leah" #Durch auswahl ersetzen
         self.proxy_base = proxy_base
         self.web_host = web_host
         self.web_port = int(web_port)
@@ -71,6 +72,7 @@ class WebUI:
         # 3) Wiki-Hinweis und Snippet holen (nur Top-Treffer aus Wikipedia)
         wiki_hint, title, snippet = lookup_wiki_snippet(
                 original_user_input,
+                self.bot,
                 self.keyword_finder,
                 self.wiki_mode,
                 self.proxy_base,

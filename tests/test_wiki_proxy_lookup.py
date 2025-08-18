@@ -14,6 +14,7 @@ def test_lookup_wiki_snippet_for_germany():
     # Annahmen: wiki_mode=offline, Proxy läuft lokal auf 8042, Limit z. B. 1600
     wiki_hint, topic_title, snippet = lookup_wiki_snippet(
         question="Was ist die Hauptstadt von Deutschland?",
+        persona_name="PETER",
         keyword_finder=finder,
         wiki_mode="offline",
         proxy_port=8042,

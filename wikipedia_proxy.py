@@ -3,7 +3,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
-import json, os, re
+import json, re
 import logging
 from datetime import datetime
 from logging_setup import init_logging
@@ -170,9 +170,14 @@ def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online:
     # lokaler Kiwix-Link (gleicher Host wie Nutzer-Aufruf, aber Port 8080)
     return f"http://{hostname}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
-def _build_wiki_hint(link: str, online: bool) -> str:
-    where = "deutsche" if online else "lokale deutsche"
-    return f"🕵️‍♀️ *Leah wirft einen Blick in die {where} Wikipedia:*\n{link}"
+def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
+    """
+    Baut den Prefix aus config.yaml (online/offline) und fügt den Link an.
+    """
+    key = "wiki_lookup_prefix_online" if online else "wiki_lookup_prefix_offline"
+    tpl = config.texts[key]  # KeyError erwünscht, wenn in config.yaml fehlt
+    prefix = tpl.format(persona_name=persona_name, project_name=cfg.project_name)
+    return f"{prefix}\n{link}"
 
 def _parse_limit(query: dict) -> int:
     try:
@@ -223,6 +228,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         suchbegriff = unquote(parsed_path.path[1:])
         query = parse_qs(parsed_path.query)
         online = query.get("online", ["0"])[0] == "1"
+        persona = query.get("persona", ["0"])[0]
 
         logger.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
 
@@ -284,7 +290,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         # Ziel-Link & UI-Hinweis
         link = _build_user_visible_link(self, suchbegriff, online)
         source = "online" if online else "local"
-        wiki_hint = _build_wiki_hint(link, online)
+        wiki_hint = _build_wiki_hint(config, online, persona, link)
 
         # JSON ausgeben
         payload = {

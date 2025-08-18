@@ -1,4 +1,7 @@
 from __future__ import annotations
+from config_singleton import Config
+
+cfg = Config()
 
 
 class AiApiProvider:
@@ -11,10 +14,12 @@ class AiApiProvider:
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_timeout = wiki_timeout
 
+
+
     def answer(self, question: str) -> str:
         q = (question or "").strip()
         if not q:
-            return "Bitte stell mir eine Frage 🙂"
+            return cfg.ui["texts"]["empty_question"]
         return self.streamer.respond_one_shot(
             q,
             keyword_finder=self.keyword_finder,

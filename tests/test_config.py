@@ -14,7 +14,7 @@ def test_greeting_replaces_placeholders(tmp_path):
     - unbekannte Platzhalter bleiben unverändert (SafeDict)
     """
     persona_name = system_prompts[0]["name"]
-    g = _greeting_text(Config())
+    g = _greeting_text(Config(), persona_name)
     assert f"{persona_name}" in g
     assert "Chatte" in g
 

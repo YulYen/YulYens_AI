@@ -24,11 +24,11 @@ def _system_prompt_with_date(name) -> str:
     today = datetime.now().strftime("%Y-%m-%d")
     return f"{base} | Heute ist der {today}."
 
-def _greeting_text(cfg) -> str:
-    tpl = cfg.ui["greeting"]  # KeyError erwünscht (keine Defaults)
+def _greeting_text(cfg, bot) -> str:
+    tpl = cfg.ui["greeting"]
     values = {
         "model_name":   cfg.core["model_name"],
-        "persona_name":system_prompts[0]["name"],
+        "persona_name": bot,
     }
     return tpl.format_map(values)
 
