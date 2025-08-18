@@ -92,7 +92,7 @@ def _find_infobox_table(soup):
     return None
 
 def _extract_infobox_kv(html: str, max_items: int = 30):
-    soup = BeautifulSoup(html, "html.parser", from_encoding="utf-8")
+    soup = BeautifulSoup(html, "html.parser")
 
     table = _find_infobox_table(soup)
     if not table:
@@ -249,9 +249,8 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             clean_text = _clean_whitespace_and_remove_refs(resp.text)
             kv_line = ""  # Online-Summary hat keine HTML-Infobox
         else:
-            resp.encoding = resp.apparent_encoding or "utf-8"
             html_bytes = resp.content   
-            soup = BeautifulSoup(html_bytes , "html.parser", from_encoding=resp.encoding)
+            soup = BeautifulSoup(html_bytes , "html.parser")
             # 1) KV aus Original-HTML holen
             kv_pairs = _extract_infobox_kv(resp.text)
             kv_line = _format_kv_line(kv_pairs)
