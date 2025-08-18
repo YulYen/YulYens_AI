@@ -1,7 +1,9 @@
-    # --------- Utilities (ohne Seiteneffekte nach außen) ---------
+# --------- Utilities (ohne Seiteneffekte nach außen) ---------
 import socket
 from datetime import datetime
 from personas import system_prompts, get_prompt_by_name
+import re
+
 
 def _wiki_mode_enabled(mode_val) -> bool:
     if isinstance(mode_val, bool):
@@ -29,3 +31,14 @@ def _greeting_text(cfg) -> str:
         "persona_name":system_prompts[0]["name"],
     }
     return tpl.format_map(values)
+
+def clean_token(token: str) -> str:
+    # Dummy-Tags raus
+    token = re.sub(r"<dummy\d+>", "", token)
+
+    # Einzelne irrelevante Tokens rausfiltern
+    stripped = token.strip().lower()
+    if stripped in ["assistant", "assistent:", "antwort:"]:
+        return ""
+
+    return token

@@ -2,7 +2,7 @@
 import traceback
 import datetime, json, os
 from ollama import chat
-from streaming_helper import clean_token
+from core.utils import clean_token
 import requests, logging
 
 

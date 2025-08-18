@@ -47,7 +47,7 @@ class AppFactory:
     def get_streamer_for_persona(self, persona_name: str) -> OllamaStreamer:
         """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
         core = self._cfg.core
-        persona_promot = personas.get_prompt_by_name(persona_name) # Prompt der Persona laden
+        persona_promot = utils._system_prompt_with_date(persona_name) # Prompt der Persona laden
         reminder = personas.get_reminder(persona_name)  
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
