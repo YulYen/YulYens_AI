@@ -40,9 +40,6 @@ class AppFactory:
                 self._keyword_finder = None
         return self._keyword_finder
 
-    # Als Default
-    def get_streamer(self) -> OllamaStreamer:
-        return self.get_streamer_for_persona("PETER")
     
     def get_streamer_for_persona(self, persona_name: str) -> OllamaStreamer:
         """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
@@ -66,7 +63,7 @@ class AppFactory:
                 return None
             from api.provider import AiApiProvider
             self._api_provider = AiApiProvider(
-                self.get_streamer(),
+                self.get_streamer("PETER"), # PETER als default für API-Calls
                 keyword_finder=self.get_keyword_finder(),
                 wiki_mode=self._cfg.wiki["mode"],
                 wiki_proxy_port=int(self._cfg.wiki["proxy_port"]),
@@ -88,8 +85,6 @@ class AppFactory:
         if ui_type is None:
             self._ui = None
             return None
-
-        streamer = self.get_streamer()
         finder   = self.get_keyword_finder()
         wiki     = self._cfg.wiki
 
@@ -105,7 +100,7 @@ class AppFactory:
             port    = int(web_cfg["port"])
             project = self._cfg.project_name         
             self._ui = WebUI(
-                project, streamer, finder, utils._local_ip,
+                project, self, finder, utils._local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 web_host=host, web_port=port,
                 wiki_timeout=(float(wiki["timeout_connect"]), float(wiki["timeout_read"])),

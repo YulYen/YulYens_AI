@@ -4,15 +4,16 @@ from personas import system_prompts
 from streaming_core_ollama import  lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
 
 class WebUI:
-    def __init__(self, project_name, streamer, keyword_finder, ip,
+    def __init__(self, project_name, factory, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
-        self.streamer = streamer
+        self.streamer = None # wird später gesetzt
         self.greeting = "greeting TODO"
         self.project_name = project_name
         self.keyword_finder = keyword_finder
         self.ip = ip
+        self.factory = factory
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
@@ -125,6 +126,10 @@ class WebUI:
             persona = persona_info[key]
             # self.bot wird auf den (rohen) Namen gesetzt, z.B. "LEAH" | "DORIS" | "PETER"
             self.bot = persona["name"]
+            
+            # Korrekten Streamer für Persona
+            self.streamer = self.factory.get_streamer_for_persona(self.bot)
+
             # Fürs UI hübsch: Titel-Case als Label
             display_name = persona["name"].title()
 
