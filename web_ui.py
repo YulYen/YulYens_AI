@@ -111,69 +111,84 @@ class WebUI:
         # State: ausgewählte Persona (z. B. "leah"|"doris"|"peter"), initial None
         selected_persona_state = gr.State(None)
 
-        # --- Callback: Persona wurde gewählt ---
         def on_persona_selected(key: str):
-            # Guard
+            # Safety
             if not key or key not in persona_info:
-                # Keine Änderung; nichts sichtbar machen
                 return (
-                    gr.update(),                               # selected_persona_state (unchanged)
-                    gr.update(),                               # greeting_md
-                    gr.update(),                               # chatbot
-                    gr.update(),                               # txt
-                    gr.update(),                               # clear
+                    gr.update(),  # selected_persona_state
+                    gr.update(visible=True),   # grid_group: bleibt sichtbar
+                    gr.update(visible=False),  # focus_group: bleibt verborgen
+                    gr.update(),               # focus_img
+                    gr.update(),               # focus_md
+                    gr.update(),               # greeting_md
+                    gr.update(),               # chatbot
+                    gr.update(),               # txt
+                    gr.update(),               # clear
                 )
-            persona = persona_info[key]
-            # self.bot wird auf den (rohen) Namen gesetzt, z.B. "LEAH" | "DORIS" | "PETER"
-            self.bot = persona["name"]
-            
-            # Korrekten Streamer für Persona
+
+            p = persona_info[key]             # dict aus personas.py
+            self.bot = p["name"]              # "LEAH"/"DORIS"/"PETER" o.ä.
+
             self.streamer = self.factory.get_streamer_for_persona(self.bot)
 
-            # Fürs UI hübsch: Titel-Case als Label
-            display_name = persona["name"].title()
+            display_name = p["name"].title()
+            greeting = f"Hallo, ich bin {display_name} 👋"  # TODO: Auf normales Greeting aus Config umstellen
+            focus_text = f"### {p['name']}\n{p['description']}"
 
-            greeting = f"Hallo, ich bin {display_name} 👋"
             return (
-                key,                                          # selected_persona_state
-                gr.update(value=greeting, visible=True),      # greeting_md sichtbar + Text
+                key,                             # selected_persona_state
+                gr.update(visible=False),        # grid_group ausblenden
+                gr.update(visible=True),         # focus_group einblenden
+                gr.update(value=p["image_path"]),# focus_img → großes Bild der Persona
+                gr.update(value=focus_text),     # focus_md → Titel + Beschreibung
+                gr.update(value=greeting, visible=True),      # greeting sichtbar + Text
                 gr.update(label=display_name, visible=True),  # chatbot sichtbar + Label
                 gr.update(visible=True, interactive=True),    # txt sichtbar & aktiv
-                gr.update(visible=True),                      # clear sichtbar
+                gr.update(visible=True),                       # clear sichtbar
             )
 
         # --- UI ---
         with gr.Blocks() as demo:
-            # H1: Projektname
             gr.Markdown(f"# {project_name}")
 
-            # Persona-Karten
-            gr.Markdown("Wähle zuerst eine Persona:")
-            with gr.Row():
-                # Wir bauen Buttons und registrieren Callbacks mit stabilen Closures
-                persona_buttons = []
-                for key, p in persona_info.items():
-                    with gr.Column():
-                        gr.Image(
-                            value=p["image_path"], show_label=False,
-                            width=128, height=128, container=False
-                        )
-                        gr.Markdown(f"### {p['name']}\n{p['description']}")
-                        btn = gr.Button(f"{p['name']} wählen", variant="secondary")
-                        persona_buttons.append((key, btn))
+            # --- GRID MIT KARTEN (Startzustand) ---
+            with gr.Group(visible=True) as grid_group:
+                gr.Markdown("Wähle zuerst eine Persona:")
+                with gr.Row():
+                    persona_buttons = []
+                    for key, p in persona_info.items():
+                        with gr.Column():
+                            gr.Image(p["image_path"], show_label=False, width=128, height=128, container=False)
+                            gr.Markdown(f"### {p['name']}\n{p['description']}")
+                            btn = gr.Button(f"{p['name']} wählen", variant="secondary")
+                            persona_buttons.append((key, btn))
 
-            # Begrüßung + Chat + Eingabe, zunächst unsichtbar
+            # --- FOKUS-PANEL NUR FÜR GEWÄHLTE PERSONA ---
+            with gr.Group(visible=False) as focus_group:
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        focus_img = gr.Image(show_label=False, container=False)  # großer Hero
+                    with gr.Column(scale=3):
+                        focus_md = gr.Markdown("")  # Name + Beschreibung
+                gr.Markdown("---")
+
+            # Chat-Teil wie gehabt, initial verborgen
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
             txt = gr.Textbox(show_label=False, placeholder="Schreibe…", visible=False, interactive=False)
             clear = gr.Button("🔄 Neue Unterhaltung", visible=False)
 
-            # Persona-Buttons sauber verdrahten (Closure mit Default-Arg, um Late Binding zu vermeiden)
+            # Buttons sauber verdrahten (Closure!)
             for key, btn in persona_buttons:
                 btn.click(
                     fn=lambda key=key: on_persona_selected(key),
                     inputs=[],
-                    outputs=[selected_persona_state, greeting_md, chatbot, txt, clear],
+                    outputs=[
+                        selected_persona_state,
+                        grid_group, focus_group,
+                        focus_img, focus_md,
+                        greeting_md, chatbot, txt, clear
+                    ],
                     queue=False,
                 )
 
