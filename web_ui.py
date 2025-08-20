@@ -142,7 +142,7 @@ class WebUI:
             focus_text = f"### {p['name']}\n{p['description']}"
 
             return (
-                key,                                              # selected_persona_state
+                gr.update(value=key),                             # selected_persona_state
                 gr.update(visible=False),                         # grid_group aus
                 gr.update(visible=True),                          # focus_group an
                 gr.update(value=p["image_path"]),                 # focus_img
@@ -154,18 +154,18 @@ class WebUI:
             )
 
         # --- Reset in den Ursprungszustand (Auswahlmenü) ---
-        def on_reset_to_start(_key):
+        def on_reset_to_start():
             self.bot = None
             return (
-                None,                                             # selected_persona_state
-                gr.update(visible=True),                          # grid_group an
-                gr.update(visible=False),                         # focus_group aus
-                gr.update(value=None),                            # focus_img leeren
-                gr.update(value=""),                              # focus_md leeren
-                gr.update(value="", visible=False),               # greeting_md aus
-                gr.update(value=[], label="", visible=False),     # chatbot aus + Inhalt leeren
-                gr.update(value="", visible=False, interactive=False, placeholder=input_placeholder),  # txt aus
-                gr.update(visible=False),                         # clear aus
+                gr.update(value=None),               # persona_state zurücksetzen
+                gr.update(visible=True),             # grid_group wieder sichtbar
+                gr.update(visible=False),            # focus_group verstecken
+                gr.update(value=None),               # focus_img leeren
+                gr.update(value=""),                 # focus_md leeren
+                gr.update(value="", visible=False),  # greeting_md verstecken
+                gr.update(value=[], label="", visible=False),  # chatbot leeren
+                gr.update(value="", visible=False, interactive=False),  # txt leeren
+                gr.update(visible=False),            # clear verstecken
             )
 
         # --- UI ---
@@ -223,14 +223,20 @@ class WebUI:
             )
 
             # Reset → Ursprungszustand
+            # Click-Bindung
             clear.click(
                 fn=on_reset_to_start,
-                inputs=[selected_persona_state],
+                inputs=[],  # <— wichtig: keine rohen Strings hier!
                 outputs=[
                     selected_persona_state,
-                    grid_group, focus_group,
-                    focus_img, focus_md,
-                    greeting_md, chatbot, txt, clear,
+                    grid_group,
+                    focus_group,
+                    focus_img,
+                    focus_md,
+                    greeting_md,
+                    chatbot,
+                    txt,
+                    clear,
                 ],
                 queue=False,
             )
