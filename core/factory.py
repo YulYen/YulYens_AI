@@ -98,9 +98,8 @@ class AppFactory:
             web_cfg = self._cfg.ui["web"]               
             host    = web_cfg["host"]                  
             port    = int(web_cfg["port"])
-            project = self._cfg.project_name         
             self._ui = WebUI(
-                project, self, finder, utils._local_ip,
+                 self, self._cfg, finder, utils._local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 web_host=host, web_port=port,
                 wiki_timeout=(float(wiki["timeout_connect"]), float(wiki["timeout_read"])),

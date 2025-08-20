@@ -4,15 +4,14 @@ from personas import system_prompts
 from streaming_core_ollama import  lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
 
 class WebUI:
-    def __init__(self, project_name, factory, keyword_finder, ip,
+    def __init__(self, factory, config, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
         self.streamer = None # wird später gesetzt
-        self.greeting = "greeting TODO"
-        self.project_name = project_name
         self.keyword_finder = keyword_finder
         self.ip = ip
+        self.cfg = config
         self.factory = factory
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
@@ -100,30 +99,37 @@ class WebUI:
         yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
 
 
-
     def launch(self):
-        # Mapping: "leah" -> persona-dict
+        # --- UI-Texte aus zentraler Config ---
+        ui = self.cfg.texts  # Single Source of Truth
+        model_name = self.cfg.core.get("model_name")
+        project_title        = ui.get("project_name")
+        choose_persona_txt   = ui.get("choose_persona")
+        new_chat_label       = ui.get("new_chat" )
+        input_placeholder    = ui.get("input_placeholder" )
+        greeting_template    = ui.get("greeting")
+        persona_btn_suffix   = ui.get("persona_button_suffix")
+
+        # Personas aus echter personas.py
         persona_info = {p["name"].lower(): p for p in system_prompts}
 
-        # Falls du projekt_name in __init__ gesetzt hast, sonst Fallback:
-        project_name = getattr(self, "project_name", "Yul Yen’s AI Orchestra")
-
-        # State: ausgewählte Persona (z. B. "leah"|"doris"|"peter"), initial None
+        # State: aktuell gewählte Persona (keine Default-Persona!)
         selected_persona_state = gr.State(None)
 
+        # --- Persona gewählt ---
         def on_persona_selected(key: str):
-            # Safety
             if not key or key not in persona_info:
+                # Nichts umschalten, Startzustand bleibt
                 return (
-                    gr.update(),  # selected_persona_state
-                    gr.update(visible=True),   # grid_group: bleibt sichtbar
-                    gr.update(visible=False),  # focus_group: bleibt verborgen
-                    gr.update(),               # focus_img
-                    gr.update(),               # focus_md
-                    gr.update(),               # greeting_md
-                    gr.update(),               # chatbot
-                    gr.update(),               # txt
-                    gr.update(),               # clear
+                    gr.update(),                         # selected_persona_state
+                    gr.update(visible=True),             # grid_group
+                    gr.update(visible=False),            # focus_group
+                    gr.update(),                         # focus_img
+                    gr.update(),                         # focus_md
+                    gr.update(),                         # greeting_md
+                    gr.update(),                         # chatbot
+                    gr.update(),                         # txt
+                    gr.update(),                         # clear
                 )
 
             p = persona_info[key]             # dict aus personas.py
@@ -132,53 +138,69 @@ class WebUI:
             self.streamer = self.factory.get_streamer_for_persona(self.bot)
 
             display_name = p["name"].title()
-            greeting = f"Hallo, ich bin {display_name} 👋"  # TODO: Auf normales Greeting aus Config umstellen
+            greeting = greeting_template.format(persona_name=display_name, model_name=model_name)
             focus_text = f"### {p['name']}\n{p['description']}"
 
             return (
-                key,                             # selected_persona_state
-                gr.update(visible=False),        # grid_group ausblenden
-                gr.update(visible=True),         # focus_group einblenden
-                gr.update(value=p["image_path"]),# focus_img → großes Bild der Persona
-                gr.update(value=focus_text),     # focus_md → Titel + Beschreibung
-                gr.update(value=greeting, visible=True),      # greeting sichtbar + Text
-                gr.update(label=display_name, visible=True),  # chatbot sichtbar + Label
-                gr.update(visible=True, interactive=True),    # txt sichtbar & aktiv
-                gr.update(visible=True),                       # clear sichtbar
+                key,                                              # selected_persona_state
+                gr.update(visible=False),                         # grid_group aus
+                gr.update(visible=True),                          # focus_group an
+                gr.update(value=p["image_path"]),                 # focus_img
+                gr.update(value=focus_text),                      # focus_md
+                gr.update(value=greeting, visible=True),          # greeting_md
+                gr.update(value=[], label=display_name, visible=True),  # chatbot sichtbar + Label
+                gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),  # txt an
+                gr.update(visible=True),                          # clear an
+            )
+
+        # --- Reset in den Ursprungszustand (Auswahlmenü) ---
+        def on_reset_to_start(_key):
+            self.bot = None
+            return (
+                None,                                             # selected_persona_state
+                gr.update(visible=True),                          # grid_group an
+                gr.update(visible=False),                         # focus_group aus
+                gr.update(value=None),                            # focus_img leeren
+                gr.update(value=""),                              # focus_md leeren
+                gr.update(value="", visible=False),               # greeting_md aus
+                gr.update(value=[], label="", visible=False),     # chatbot aus + Inhalt leeren
+                gr.update(value="", visible=False, interactive=False, placeholder=input_placeholder),  # txt aus
+                gr.update(visible=False),                         # clear aus
             )
 
         # --- UI ---
         with gr.Blocks() as demo:
-            gr.Markdown(f"# {project_name}")
+            # H1: Projekttitel aus Config
+            gr.Markdown(f"# {project_title}")
 
-            # --- GRID MIT KARTEN (Startzustand) ---
+            # Auswahl-Grid (Startzustand)
             with gr.Group(visible=True) as grid_group:
-                gr.Markdown("Wähle zuerst eine Persona:")
+                gr.Markdown(choose_persona_txt)
                 with gr.Row():
                     persona_buttons = []
                     for key, p in persona_info.items():
                         with gr.Column():
                             gr.Image(p["image_path"], show_label=False, width=128, height=128, container=False)
                             gr.Markdown(f"### {p['name']}\n{p['description']}")
-                            btn = gr.Button(f"{p['name']} wählen", variant="secondary")
+                            btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
                             persona_buttons.append((key, btn))
 
-            # --- FOKUS-PANEL NUR FÜR GEWÄHLTE PERSONA ---
+            # Fokus-Panel: nur gewählte Persona groß
             with gr.Group(visible=False) as focus_group:
                 with gr.Row():
                     with gr.Column(scale=1):
-                        focus_img = gr.Image(show_label=False, container=False)  # großer Hero
+                        focus_img = gr.Image(show_label=False, container=False)
                     with gr.Column(scale=3):
-                        focus_md = gr.Markdown("")  # Name + Beschreibung
+                        focus_md = gr.Markdown("")
                 gr.Markdown("---")
 
-            # Chat-Teil wie gehabt, initial verborgen
+            # Chat (initial versteckt)
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
-            txt = gr.Textbox(show_label=False, placeholder="Schreibe…", visible=False, interactive=False)
-            clear = gr.Button("🔄 Neue Unterhaltung", visible=False)
+            txt = gr.Textbox(show_label=False, placeholder=input_placeholder, visible=False, interactive=False)
+            clear = gr.Button(new_chat_label, visible=False)
 
-            # Buttons sauber verdrahten (Closure!)
+            # Buttons sauber verdrahten (Late-Binding vermeiden)
             for key, btn in persona_buttons:
                 btn.click(
                     fn=lambda key=key: on_persona_selected(key),
@@ -187,12 +209,12 @@ class WebUI:
                         selected_persona_state,
                         grid_group, focus_group,
                         focus_img, focus_md,
-                        greeting_md, chatbot, txt, clear
+                        greeting_md, chatbot, txt, clear,
                     ],
                     queue=False,
                 )
 
-            # Chat-Funktionalität (deine bestehende Streaming-Logik bleibt)
+            # Streaming (unverändert)
             txt.submit(
                 fn=self.respond_streaming,
                 inputs=[txt, chatbot],
@@ -200,7 +222,17 @@ class WebUI:
                 queue=True,
             )
 
-            # Reset: Chat löschen, Persona bleibt (du kannst hier auch Persona wieder nullen, wenn gewünscht)
-            clear.click(lambda: ("", []), outputs=[txt, chatbot])
+            # Reset → Ursprungszustand
+            clear.click(
+                fn=on_reset_to_start,
+                inputs=[selected_persona_state],
+                outputs=[
+                    selected_persona_state,
+                    grid_group, focus_group,
+                    focus_img, focus_md,
+                    greeting_md, chatbot, txt, clear,
+                ],
+                queue=False,
+            )
 
         demo.launch(server_name="0.0.0.0", server_port=7860)
