@@ -176,7 +176,7 @@ def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
     """
     key = "wiki_lookup_prefix_online" if online else "wiki_lookup_prefix_offline"
     tpl = config.texts[key]  # KeyError erwünscht, wenn in config.yaml fehlt
-    prefix = tpl.format(persona_name=persona_name, project_name=cfg.project_name)
+    prefix = tpl.format(persona_name=persona_name, project_name=cfg.texts["project_name"])
     return f"{prefix}\n{link}"
 
 def _parse_limit(query: dict) -> int:
