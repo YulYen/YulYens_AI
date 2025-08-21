@@ -1,14 +1,14 @@
 import gradio as gr
 import logging
 from personas import system_prompts
-from streaming_core_ollama import  lookup_wiki_snippet, inject_wiki_context  # Neue Imports der ausgelagerten Funktionen
+from streaming_core_ollama import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
 
 class WebUI:
     def __init__(self, factory, config, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
-        self.streamer = None # wird später gesetzt
+        self.streamer = None  # wird später gesetzt
         self.keyword_finder = keyword_finder
         self.ip = ip
         self.cfg = config
@@ -19,6 +19,9 @@ class WebUI:
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
+        self.bot = None  # FIX: explizit initialisieren
+        self._last_wiki_snippet = None
+        self._last_wiki_title = None
 
     def _strip_wiki_hint(self, text: str) -> str:
         # Entfernt den UI-Hinweis "🕵️‍♀️ …" samt der Leerzeile vor der eigentlichen Antwort.
@@ -37,91 +40,92 @@ class WebUI:
                 hist.append({"role": "assistant", "content": cleaned})
         return hist
 
-    # Die Methoden _lookup_wiki und _inject_wiki_context wurden entfernt, da ihre Funktionalität
-    # jetzt von lookup_wiki_snippet und inject_wiki_context übernommen wird.
-
+    # Streaming der Antwort (UI wird fortlaufend aktualisiert)
     def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
             if wiki_hint:
                 combined = wiki_hint + "\n\n" + reply
+                # zwei Outputs: (txt bleibt unverändert) + Chatverlauf
                 yield None, chat_history[:-1] + [(original_user_input, combined)]
             else:
                 yield None, chat_history + [(original_user_input, reply)]
-        # Abschluss des Streaming: Den finalen Reply in den Chat-Verlauf übernehmen
-        if wiki_hint:
+        # Abschluss: finalen Reply in den Verlauf übernehmen
+        if wiki_hint and chat_history:
             chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
         else:
             chat_history.append((original_user_input, reply))
         yield None, chat_history
 
     def respond_streaming(self, user_input, chat_history):
-        if user_input.strip().lower() == "clear":
+        # Schutz: Kein Text / Reset-Kommando
+        if not user_input or user_input.strip().lower() == "clear":
             yield "", []
+            return
+
+        # Schutz: Persona noch nicht gewählt → UI verhindert das, aber doppelt hält besser
+        if not self.bot:
+            yield "", chat_history
             return
 
         original_user_input = user_input
         logging.info(f"User input: {user_input}")
 
-        # 1) Verlauf für das LLM aufbereiten (UI-Hinweise aus vorherigen Bot-Antworten entfernen)
+        # 1) Verlauf für LLM ohne UI-Hinweise
         message_history = self._build_history(chat_history)
 
-        # 2) Eingabefeld in der UI leeren
+        # 2) Eingabefeld leeren
         yield "", chat_history
 
-        # 3) Wiki-Hinweis und Snippet holen (nur Top-Treffer aus Wikipedia)
+        # 3) Wiki-Hinweis + Snippet (Top-Treffer)
         wiki_hint, title, snippet = lookup_wiki_snippet(
-                original_user_input,
-                self.bot,
-                self.keyword_finder,
-                self.wiki_mode,
-                self.proxy_base,
-                self.wiki_snippet_limit,
-                self.wiki_timeout,
-            )
+            original_user_input,
+            self.bot,
+            self.keyword_finder,
+            self.wiki_mode,
+            self.proxy_base,
+            self.wiki_snippet_limit,
+            self.wiki_timeout,
+        )
 
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((original_user_input, wiki_hint))
-            yield None, chat_history  # Hinweis für den Nutzer ausgeben
+            yield None, chat_history
 
-        # 4) Optional: Wiki-Kontext injizieren (falls ein Snippet gefunden wurde)
+        # 4) Optional: Wiki-Kontext injizieren
         if snippet:
-            self._last_wiki_snippet = None       # Snippet wird sofort verbraucht, nicht für später gespeichert
-            self._last_wiki_title = title        # Titel des Wiki-Artikels merken für Folgefragen
-            inject_wiki_context(message_history, title, snippet)  # **Neuer Aufruf**: nutzt die ausgelagerte Funktion zum Kontext-Injektieren
+            self._last_wiki_snippet = None   # wird sofort verbraucht
+            self._last_wiki_title = title
+            inject_wiki_context(message_history, title, snippet)
 
-        # 5) Nutzerfrage zur Nachrichtenhistorie fürs LLM hinzufügen
+        # 5) Nutzerfrage ans LLM
         message_history.append({"role": "user", "content": original_user_input})
 
-        # 6) Antwort vom LLM streamen und in der UI anzeigen (Logik unverändert)
+        # 6) Antwort streamen
         yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
-
 
     def launch(self):
         # --- UI-Texte aus zentraler Config ---
-        ui = self.cfg.texts  # Single Source of Truth
-        model_name = self.cfg.core.get("model_name")
+        ui = self.cfg.texts
+        model_name           = self.cfg.core.get("model_name")
         project_title        = ui.get("project_name")
         choose_persona_txt   = ui.get("choose_persona")
-        new_chat_label       = ui.get("new_chat" )
-        input_placeholder    = ui.get("input_placeholder" )
+        new_chat_label       = ui.get("new_chat")
+        input_placeholder    = ui.get("input_placeholder")
         greeting_template    = ui.get("greeting")
         persona_btn_suffix   = ui.get("persona_button_suffix")
 
-        # Personas aus echter personas.py
+        # Personas
         persona_info = {p["name"].lower(): p for p in system_prompts}
 
-        # State: aktuell gewählte Persona (keine Default-Persona!)
-        selected_persona_state = gr.Textbox(value="", visible=False)
-
-        # --- Persona gewählt ---
+        # --- Event-Handler ---
         def on_persona_selected(key: str):
             if not key or key not in persona_info:
-                # Nichts umschalten, Startzustand bleibt
+                # Startzustand
                 return (
-                    gr.update(value=""),                         # selected_persona_state
+                    gr.update(value=""),                 # selected_persona_state
                     gr.update(visible=True),             # grid_group
                     gr.update(visible=False),            # focus_group
                     gr.update(),                         # focus_img
@@ -132,9 +136,8 @@ class WebUI:
                     gr.update(),                         # clear
                 )
 
-            p = persona_info[key]             # dict aus personas.py
-            self.bot = p["name"]              # "LEAH"/"DORIS"/"PETER" o.ä.
-
+            p = persona_info[key]
+            self.bot = p["name"]  # "LEAH"/"DORIS"/"PETER" etc.
             self.streamer = self.factory.get_streamer_for_persona(self.bot)
 
             display_name = p["name"].title()
@@ -142,64 +145,62 @@ class WebUI:
             focus_text = f"### {p['name']}\n{p['description']}"
 
             return (
-                gr.update(value=key),                             # selected_persona_state
-                gr.update(visible=False),                         # grid_group aus
-                gr.update(visible=True),                          # focus_group an
-                gr.update(value=p["image_path"]),                 # focus_img
-                gr.update(value=focus_text),                      # focus_md
-                gr.update(value=greeting, visible=True),          # greeting_md
-                gr.update(value=[], label=display_name, visible=True),  # chatbot sichtbar + Label
-                gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),  # txt an
-                gr.update(visible=True),                          # clear an
+                gr.update(value=key),                              # selected_persona_state
+                gr.update(visible=False),                          # grid_group aus
+                gr.update(visible=True),                           # focus_group an
+                gr.update(value=p["image_path"]),                  # focus_img
+                gr.update(value=focus_text),                       # focus_md
+                gr.update(value=greeting, visible=True),           # greeting_md
+                gr.update(value=[], label=display_name, visible=True),  # chatbot
+                gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),  # txt
+                gr.update(visible=True),                           # clear
             )
 
-        # --- Reset in den Ursprungszustand (Auswahlmenü) ---
         def on_reset_to_start():
             self.bot = None
             return (
                 gr.update(value=""),               # persona_state zurücksetzen
-                gr.update(visible=True),             # grid_group wieder sichtbar
-                gr.update(visible=False),            # focus_group verstecken
-                gr.update(value=None),               # focus_img leeren
-                gr.update(value=""),                 # focus_md leeren
-                gr.update(value="", visible=False),  # greeting_md verstecken
+                gr.update(visible=True),           # grid_group sichtbar
+                gr.update(visible=False),          # focus_group verstecken
+                gr.update(value=None),             # focus_img leeren
+                gr.update(value=""),               # focus_md leeren
+                gr.update(value="", visible=False),# greeting_md verstecken
                 gr.update(value=[], label="", visible=False),  # chatbot leeren
                 gr.update(value="", visible=False, interactive=False),  # txt leeren
-                gr.update(visible=False),            # clear verstecken
+                gr.update(visible=False),          # clear verstecken
             )
 
         # --- UI ---
         with gr.Blocks() as demo:
+            # FIX: selected_persona_state MUSS im selben Blocks-Kontext erzeugt werden!
+            # Du kannst Textbox als Hidden-State nutzen oder gr.State. Wir lassen deine Variante.
+            selected_persona_state = gr.Textbox(value="", visible=False)
 
             gr.HTML("""
                 <style>
-                .persona-row { gap:16px; }                       /* Abstand zwischen Spalten */
-                .persona-card { border:1px solid #e3e7ed;
-                                border-radius:10px; padding:12px; }
+                .persona-row { gap:16px; }
+                .persona-card { border:1px solid #e3e7ed; border-radius:10px; padding:12px; }
                 .persona-card img { display:block; margin:0 auto 8px; border-radius:8px; }
                 .persona-card .name { font-weight:600; margin:6px 0 4px; text-align:center; }
                 .persona-card .desc { color:#444; font-size:0.95rem; margin-bottom:8px; text-align:center; }
                 </style>
-                """)
-            # H1: Projekttitel aus Config
+            """)
             gr.Markdown(f"# {project_title}")
 
             # Auswahl-Grid (Startzustand)
             with gr.Group(visible=True) as grid_group:
                 gr.Markdown(choose_persona_txt)
-                with gr.Row(elem_classes="persona-row", equal_height=True):   # <— nur elem_classes ergänzt
+                with gr.Row(elem_classes="persona-row", equal_height=True):
                     persona_buttons = []
                     for key, p in persona_info.items():
                         with gr.Column(scale=1, min_width=220):
-                            # NEU: eine Group als „Karte“ (für Rahmen/Padding per CSS)
                             with gr.Group(elem_classes="persona-card"):
                                 gr.Image(p["image_path"], show_label=False, width=256, height=256, container=False)
                                 gr.Markdown(f"<div class='name'>{p['name']}</div><div class='desc'>{p['description']}</div>")
                                 btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
                                 persona_buttons.append((key, btn))
 
-
-            # Fokus-Panel: nur gewählte Persona groß
+            # Fokus-Panel
             with gr.Group(visible=False) as focus_group:
                 with gr.Row():
                     with gr.Column(scale=1):
@@ -214,7 +215,7 @@ class WebUI:
             txt = gr.Textbox(show_label=False, placeholder=input_placeholder, visible=False, interactive=False)
             clear = gr.Button(new_chat_label, visible=False)
 
-            # Buttons sauber verdrahten (Late-Binding vermeiden)
+            # Persona-Buttons binden
             for key, btn in persona_buttons:
                 btn.click(
                     fn=lambda key=key: on_persona_selected(key),
@@ -228,7 +229,7 @@ class WebUI:
                     queue=False,
                 )
 
-            # Streaming (unverändert)
+            # Streaming
             txt.submit(
                 fn=self.respond_streaming,
                 inputs=[txt, chatbot],
@@ -236,11 +237,10 @@ class WebUI:
                 queue=True,
             )
 
-            # Reset → Ursprungszustand
-            # Click-Bindung
+            # Reset
             clear.click(
                 fn=on_reset_to_start,
-                inputs=[],  # <— wichtig: keine rohen Strings hier!
+                inputs=[],
                 outputs=[
                     selected_persona_state,
                     grid_group,
