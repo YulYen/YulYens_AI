@@ -114,14 +114,14 @@ class WebUI:
         persona_info = {p["name"].lower(): p for p in system_prompts}
 
         # State: aktuell gewählte Persona (keine Default-Persona!)
-        selected_persona_state = gr.State(None)
+        selected_persona_state = gr.Textbox(value="", visible=False)
 
         # --- Persona gewählt ---
         def on_persona_selected(key: str):
             if not key or key not in persona_info:
                 # Nichts umschalten, Startzustand bleibt
                 return (
-                    gr.update(),                         # selected_persona_state
+                    gr.update(value=""),                         # selected_persona_state
                     gr.update(visible=True),             # grid_group
                     gr.update(visible=False),            # focus_group
                     gr.update(),                         # focus_img
@@ -157,7 +157,7 @@ class WebUI:
         def on_reset_to_start():
             self.bot = None
             return (
-                gr.update(value=None),               # persona_state zurücksetzen
+                gr.update(value=""),               # persona_state zurücksetzen
                 gr.update(visible=True),             # grid_group wieder sichtbar
                 gr.update(visible=False),            # focus_group verstecken
                 gr.update(value=None),               # focus_img leeren
@@ -170,20 +170,34 @@ class WebUI:
 
         # --- UI ---
         with gr.Blocks() as demo:
+
+            gr.HTML("""
+                <style>
+                .persona-row { gap:16px; }                       /* Abstand zwischen Spalten */
+                .persona-card { border:1px solid #e3e7ed;
+                                border-radius:10px; padding:12px; }
+                .persona-card img { display:block; margin:0 auto 8px; border-radius:8px; }
+                .persona-card .name { font-weight:600; margin:6px 0 4px; text-align:center; }
+                .persona-card .desc { color:#444; font-size:0.95rem; margin-bottom:8px; text-align:center; }
+                </style>
+                """)
             # H1: Projekttitel aus Config
             gr.Markdown(f"# {project_title}")
 
             # Auswahl-Grid (Startzustand)
             with gr.Group(visible=True) as grid_group:
                 gr.Markdown(choose_persona_txt)
-                with gr.Row():
+                with gr.Row(elem_classes="persona-row", equal_height=True):   # <— nur elem_classes ergänzt
                     persona_buttons = []
                     for key, p in persona_info.items():
-                        with gr.Column():
-                            gr.Image(p["image_path"], show_label=False, width=128, height=128, container=False)
-                            gr.Markdown(f"### {p['name']}\n{p['description']}")
-                            btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
-                            persona_buttons.append((key, btn))
+                        with gr.Column(scale=1, min_width=220):
+                            # NEU: eine Group als „Karte“ (für Rahmen/Padding per CSS)
+                            with gr.Group(elem_classes="persona-card"):
+                                gr.Image(p["image_path"], show_label=False, width=256, height=256, container=False)
+                                gr.Markdown(f"<div class='name'>{p['name']}</div><div class='desc'>{p['description']}</div>")
+                                btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
+                                persona_buttons.append((key, btn))
+
 
             # Fokus-Panel: nur gewählte Persona groß
             with gr.Group(visible=False) as focus_group:
@@ -241,4 +255,4 @@ class WebUI:
                 queue=False,
             )
 
-        demo.launch(server_name="0.0.0.0", server_port=7860)
+        demo.launch(server_name="127.0.0.1", server_port=7860, show_api=False)
