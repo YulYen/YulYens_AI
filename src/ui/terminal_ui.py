@@ -75,9 +75,9 @@ class TerminalUI:
 
     def print_welcome(self) -> None:
         pname = getattr(self, "bot")
-        project = self.config.project_name
+        model = self.config.core["model_name"]
         tpl =  self.config.texts["greeting"]
-        print(tpl.format(persona_name=pname, project_name=project))
+        print(tpl.format(persona_name=pname, model_name=model))
         print(f"{Fore.MAGENTA}('exit' zum Beenden){Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}('clear' für neue Unterhaltung){Style.RESET_ALL}")
 

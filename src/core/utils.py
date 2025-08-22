@@ -25,7 +25,7 @@ def _system_prompt_with_date(name) -> str:
     return f"{base} | Heute ist der {today}."
 
 def _greeting_text(cfg, bot) -> str:
-    tpl = cfg.ui["greeting"]
+    tpl = cfg.texts["greeting"]
     values = {
         "model_name":   cfg.core["model_name"],
         "persona_name": bot,
