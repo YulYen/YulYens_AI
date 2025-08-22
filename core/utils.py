@@ -1,7 +1,7 @@
 # --------- Utilities (ohne Seiteneffekte nach außen) ---------
 import socket
 from datetime import datetime
-from personas import system_prompts, get_prompt_by_name
+from config.personas import system_prompts, get_prompt_by_name
 import re
 
 

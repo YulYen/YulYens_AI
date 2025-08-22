@@ -1,5 +1,5 @@
 from __future__ import annotations
-from config_singleton import Config
+from config.config_singleton import Config
 
 cfg = Config()
 

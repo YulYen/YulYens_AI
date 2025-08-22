@@ -1,5 +1,5 @@
 import pytest
-from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 # (1) Einfache positive Fälle
 easy_positive = [

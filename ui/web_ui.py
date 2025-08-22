@@ -1,6 +1,6 @@
 import gradio as gr
 import logging
-from personas import system_prompts
+from config.personas import system_prompts
 from core.streaming_core_ollama import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
 
 class WebUI:

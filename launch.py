@@ -12,12 +12,12 @@ import socket
 from api.app import app, set_provider
 
 # Logging
-from logging_setup import init_logging
+from config.logging_setup import init_logging
 
 # Core und Konfiguration
 from core.factory import AppFactory
 from core import utils
-from config_singleton import Config
+from config.config_singleton import Config
 
 
 def main():
@@ -101,7 +101,7 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
         return None
 
     # Im selben Prozess als Thread starten
-    import wikipedia_proxy as wiki_proxy  # nutzt die in wikipedia-proxy.py gesetzten Konfigwerte
+    import wiki.wikipedia_proxy as wiki_proxy  # nutzt die in wikipedia-proxy.py gesetzten Konfigwerte
     t = threading.Thread(target=wiki_proxy.run, name="WikiProxy", daemon=True)
     t.start()
 

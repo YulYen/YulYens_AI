@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
-from personas import get_all_persona_names, system_prompts
+from config.personas import get_all_persona_names, system_prompts
 import logging
 from core import utils
 

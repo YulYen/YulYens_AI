@@ -4,14 +4,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from config_singleton import Config
-from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+from config.config_singleton import Config
+from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 from core.streaming_core_ollama import OllamaStreamer
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
 from core import utils
 
-import personas
+import config.personas as personas
 
 
 class AppFactory:

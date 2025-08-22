@@ -2,8 +2,8 @@
 import pytest
 
 from core.utils import _greeting_text, _wiki_mode_enabled
-from personas import system_prompts
-from config_singleton import Config
+from config.personas import system_prompts
+from config.config_singleton import Config
 
 
 def test_greeting_replaces_placeholders(tmp_path):

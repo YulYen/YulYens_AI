@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 import json, re
 import logging
 from datetime import datetime
-from logging_setup import init_logging
-from config_singleton import Config
+from config.logging_setup import init_logging
+from config.config_singleton import Config
 
 # --- Konfiguration --------------------------------------------------------------
 config = Config()  # Singleton-Instanz laden (lädt YAML beim ersten Aufruf)
