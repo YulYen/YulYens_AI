@@ -1,0 +1,1 @@
+ C:\Python\Python310\python.exe c:/J_KI/src/launch.py
