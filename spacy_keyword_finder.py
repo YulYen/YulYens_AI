@@ -7,7 +7,7 @@ RELEVANT_LABELS = ["PER", "ORG", "LOC", "EVENT", "GPE"]
 BLOCKWORDS = {
     "hallo", "hübsche", "hi", "na", "servus", "moin", "schatz",
     "liebling", "guten", "grüß", "tag", "huhu", "toll", "danke", "bitte",
-    "super", "cool", "prima", "jo", "gern", "okay", "schreib"
+    "super", "cool", "prima", "jo", "gern", "okay", "schreib", "hey"
 }
 
 W_TOKENS = {"wer", "was", "welches", "welcher", "welche", "wann", "wo", "wie", "warum", "wieso"}

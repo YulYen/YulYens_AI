@@ -178,11 +178,20 @@ class WebUI:
 
             gr.HTML("""
                 <style>
-                .persona-row { gap:16px; }
-                .persona-card { border:1px solid #e3e7ed; border-radius:10px; padding:12px; }
-                .persona-card img { display:block; margin:0 auto 8px; border-radius:8px; }
-                .persona-card .name { font-weight:600; margin:6px 0 4px; text-align:center; }
-                .persona-card .desc { color:#444; font-size:0.95rem; margin-bottom:8px; text-align:center; }
+                .persona-row { gap:24px; }  /* etwas mehr Abstand */
+                .persona-card { 
+                    border:1px solid #e3e7ed; 
+                    border-radius:10px; 
+                    padding:12px; 
+                    text-align:center;     /* alle Inhalte inkl. Bild mittig */
+                }
+                .persona-card img { 
+                    max-width: 100%; 
+                    height: auto; 
+                    display:inline-block; 
+                }
+                .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
+                .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
                 </style>
             """)
             gr.Markdown(f"# {project_title}")
@@ -195,8 +204,17 @@ class WebUI:
                     for key, p in persona_info.items():
                         with gr.Column(scale=1, min_width=220):
                             with gr.Group(elem_classes="persona-card"):
-                                gr.Image(p["image_path"], show_label=False, width=256, height=256, container=False)
-                                gr.Markdown(f"<div class='name'>{p['name']}</div><div class='desc'>{p['description']}</div>")
+                                gr.Image(
+                                    p["image_path"],
+                                    show_label=False,
+                                    height=350,
+                                    container=False,
+                                    elem_classes="persona-img"  # <- für gezieltes CSS
+                                )
+                                # Name + Beschreibung getrennt, klarer
+                                gr.Markdown(
+                                    f"<div class='name'>{p['name']}</div>"
+                                    f"<div class='desc'>{p['description']}</div>")
                                 btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
                                 persona_buttons.append((key, btn))
 
