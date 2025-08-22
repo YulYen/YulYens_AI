@@ -7,8 +7,8 @@ from typing import Optional
 from config_singleton import Config
 from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 from core.streaming_core_ollama import OllamaStreamer
-from terminal_ui import TerminalUI
-from web_ui import WebUI
+from ui.terminal_ui import TerminalUI
+from ui.web_ui import WebUI
 from core import utils
 
 import personas
@@ -63,7 +63,7 @@ class AppFactory:
                 return None
             from api.provider import AiApiProvider
             self._api_provider = AiApiProvider(
-                self.get_streamer("PETER"), # PETER als default für API-Calls
+                self.get_streamer_for_persona("PETER"), # PETER als default für API-Calls
                 keyword_finder=self.get_keyword_finder(),
                 wiki_mode=self._cfg.wiki["mode"],
                 wiki_proxy_port=int(self._cfg.wiki["proxy_port"]),
