@@ -1,7 +1,7 @@
 import gradio as gr
 import logging
 from personas import system_prompts
-from streaming_core_ollama import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
+from core.streaming_core_ollama import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
 
 class WebUI:
     def __init__(self, factory, config, keyword_finder, ip,

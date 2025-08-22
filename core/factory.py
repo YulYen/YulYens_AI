@@ -6,7 +6,7 @@ from typing import Optional
 
 from config_singleton import Config
 from spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
-from streaming_core_ollama import OllamaStreamer
+from core.streaming_core_ollama import OllamaStreamer
 from terminal_ui import TerminalUI
 from web_ui import WebUI
 from core import utils
