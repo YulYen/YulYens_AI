@@ -37,5 +37,6 @@ models/
 *.pt
 *.zim
 .ollama/
+nix_mit_AI/
 
 
