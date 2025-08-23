@@ -6,7 +6,7 @@ core:
   
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:
-  type: web   # Optionen: "web", "terminal", null (= nur API)
+  type: terminal   # Optionen: "web", "terminal", null (= nur API)
   web:
     host: "0.0.0.0"
     port: 7860

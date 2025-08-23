@@ -18,7 +18,7 @@ def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]
     patched = list(messages)
     # Reminder VOR die letzte Message (die aktuelle User-Frage) setzen
     patched.insert(len(patched) - 1, {"role": "system", "content": str(reminder)})
-    logging.info("Reminder injected:" + str(reminder) )
+    logging.info(f"Reminder injected: {reminder}")
     return patched
 
 class OllamaStreamer:
@@ -27,7 +27,7 @@ class OllamaStreamer:
         self.reminder = None
         self.persona_prompt = persona
         if reminder: 
-            self.reminder =  " ".join(reminder)
+            self.reminder =  reminder
         self._logs_dir = "logs"
         os.makedirs(self._logs_dir, exist_ok=True)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
