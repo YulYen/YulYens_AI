@@ -58,6 +58,7 @@ Das Projekt unterstützt:
 
 ---
 
+
 ## Installation
 
 ```bash
@@ -72,6 +73,21 @@ source .venv/bin/activate   # Linux/macOS
 # Abhängigkeiten installieren
 pip install -r requirements.txt
 ```
+
+### Sprachmodell für spaCy
+
+Für die Wikipedia-Integration wird ein deutsches Sprachmodell benötigt.  
+Die Auswahl soll zukünftig über die Konfiguration (`config.yaml`) erfolgen.  
+Zusätzlich muss das jeweilige Modell manuell installiert werden:
+
+```bash
+# Mittleres Modell (Kompromiss)
+python -m spacy download de_core_news_md
+
+# Großes Modell (genauer, aber etwas langsamer und größer)
+python -m spacy download de_core_news_lg
+```
+
 
 ---
 
