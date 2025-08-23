@@ -8,6 +8,39 @@ This is a private project and repository. The short introduction is written in E
 **Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter) vereint.  
 Sie alle basieren auf einem lokalen LLM (über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.  
 
+```mermaid
+flowchart TD
+    A[🪄 Dirigent (Julian / Yul Yen)] --> B{🎤 Stimmen}
+    B --> L[Leah – empathisch]
+    B --> D[Doris – sarkastisch]
+    B --> P[Peter – nerdig]
+
+    A --> C{🖥️ Core Plattform}
+    C --> O[Ollama Runtime]
+    C --> W[Gradio WebUI 🎹]
+    C --> T[Terminal UI 🥁]
+
+    O --> M[(LLM-Modelle: Leo13B, GPT-OSS20B...)]
+    
+    W --> X[Publikum 👥]
+    T --> X
+
+    A --> H{📖 Wissen & Struktur}
+    H --> K[Wiki-Proxy / Kiwix – Spickzettel]
+    H --> CFG[Config (yaml/json) – Notenheft]
+    H --> LOG[Logging – Partituren]
+
+    A --> Z{🔮 Zukunft}
+    Z --> R[RAG / Kontextkompression – Karl]
+    Z --> S[Tool-Use / TTS-STT]
+
+    style A fill:#ffe6cc,stroke:#333,stroke-width:2px
+    style B fill:#f0f0f0,stroke:#999
+    style C fill:#f0f0f0,stroke:#999
+    style H fill:#f0f0f0,stroke:#999
+    style Z fill:#f0f0f0,stroke:#999
+```
+
 Das Projekt unterstützt:
 - **Terminal-UI** mit farbiger Konsolenausgabe & Streaming  
 - **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)  
