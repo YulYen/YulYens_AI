@@ -19,6 +19,9 @@ from core.factory import AppFactory
 from core import utils
 from config.config_singleton import Config
 
+from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
+
+
 
 def main():
     cfg = Config()  # einmalig laden
@@ -45,6 +48,13 @@ def main():
     wiki_mode = cfg.wiki["mode"]
     if utils._wiki_mode_enabled(wiki_mode):
         start_wiki_proxy_thread()
+        # Neu: Offline-Wiki bei Bedarf starten
+        try:
+            ok = ensure_kiwix_running_if_offlinemode_and_autostart(cfg)
+            if not ok:
+                logging.warning("Offline-Wiki autostart requested but not available. Continuing without it.")
+        except Exception as e:
+            logging.error(f"Unexpected error during kiwix autostart. Continuing. {e}")
 
     # 3) Objekte bauen (Factory) – ohne zu starten
     factory = AppFactory()
