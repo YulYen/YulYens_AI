@@ -40,7 +40,7 @@ wiki:
   timeout_connect: 5.0 # <-- EIN Timeout-Set, gilt für online & offline
   timeout_read: 8.0
   offline:  # ---- nur relevant, wenn mode == "offline", d.h. nur für offline Wiki  ----
-    host: "127.0.0.1"  # wo kiwix-serve laufen soll        
+    host: "127.0.0.1"  # wo kiwix-serve laufen soll -  127.0.0.1 wesentlich performanter als localhost      
     kiwix_port: 8080 #
     zim_prefix: "wikipedia_de_all_nopic_2025-06" 
     autostart: true

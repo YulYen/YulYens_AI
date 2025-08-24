@@ -19,6 +19,7 @@ SNIPPET_LIMIT = int(WIKI_CFG["snippet_limit"])
 TIMEOUT = (float(WIKI_CFG["timeout_connect"]), float(WIKI_CFG["timeout_read"]))
 
 KIWIX_PORT = int(OFFLINE_CFG["kiwix_port"])
+KIWIX_HOST = OFFLINE_CFG["host"]
 PROXY_PORT = int(WIKI_CFG["proxy_port"])
 ZIM_PREFIX = OFFLINE_CFG["zim_prefix"]
 
@@ -52,7 +53,7 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
 
 # ---------- Helper für Request-Verarbeitung ------------------------------------
 def _build_kiwix_url(term: str) -> str:
-    return f"http://localhost:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
+    return f"http://{KIWIX_HOST}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
 def _build_online_url(term: str) -> str:
     # Wikipedia akzeptiert Unterstriche als Leerzeichen
@@ -189,12 +190,17 @@ def _parse_limit(query: dict) -> int:
 def _fetch_kiwix(term: str):
     url = _build_kiwix_url(term)
     logger.info(f"[Fetch] {url}")
+    start_kiwix = time.perf_counter()
     try:
         r = requests.get(url, timeout=KIWIX_TIMEOUT)
         return r.status_code, r
     except Exception as e:
         logger.error(f"[FetchError] {e}")
         return 500, None
+    finally:
+        # Immer Gesamtdauer loggen
+        duration_total = (time.perf_counter() - start_kiwix) * 1000
+        logger.info(f'[_fetch_kiwix] Anfrage "{term}" beantwortet in {duration_total:.1f} ms')
     
 def _fetch_online(term: str):
     """Holt Kurztext aus echter deutscher Wikipedia (REST Summary API)."""
