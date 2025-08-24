@@ -10,8 +10,6 @@ Sie alle basieren auf einem lokalen LLM (über [Ollama](https://ollama.com/) ode
 
 ```mermaid
 flowchart TD
-  %% GitHub-safe: keine Emojis, einfache Labels
-
   A[Dirigent: Julian / Yul Yen]
 
   subgraph Stimmen
@@ -20,27 +18,26 @@ flowchart TD
     P[Peter - nerdig]
   end
 
-  subgraph Core_Plattform
+  subgraph Core
     O[Ollama Runtime]
-    W[WebUI (Gradio)]
+    W[WebUI Gradio]
     T[Terminal UI]
-    M[(LLM-Modelle: Leo13B, GPT-OSS-20B)]
+    M[LLM-Modelle: Leo13B, GPT-OSS-20B]
   end
 
   subgraph Wissen_und_Struktur
     K[Wiki-Proxy / Kiwix]
-    CFG[Config (yaml/json)]
+    CFG[Config yaml/json]
     LOG[Logging]
   end
 
   subgraph Zukunft
-    R[RAG / Kontextkompression "Karl"]
+    R[RAG / Kontextkompression Karl]
     S[Tool-Use / TTS-STT]
   end
 
-  %% Kanten
   A --> Stimmen
-  A --> Core_Plattform
+  A --> Core
   A --> Wissen_und_Struktur
   A --> Zukunft
 
