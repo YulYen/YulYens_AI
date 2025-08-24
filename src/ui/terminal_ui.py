@@ -74,10 +74,7 @@ class TerminalUI:
         init(autoreset=True)
 
     def print_welcome(self) -> None:
-        pname = getattr(self, "bot")
-        model = self.config.core["model_name"]
-        tpl =  self.config.texts["greeting"]
-        print(tpl.format(persona_name=pname, model_name=model))
+        print(self.greeting)
         print(f"{Fore.MAGENTA}('exit' zum Beenden){Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}('clear' für neue Unterhaltung){Style.RESET_ALL}")
 
@@ -111,9 +108,8 @@ class TerminalUI:
         if self.streamer is None:
             self.choose_persona()
 
-        # 2. Begrüßung ausgeben
+        # 2. Begrüßung ausgeben inkl. Befehle exit und clear
         self.print_welcome()
-        print(self.greeting)
 
         while True:
             user_input = self.prompt_user()

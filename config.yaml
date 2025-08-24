@@ -1,7 +1,7 @@
 # --- Core-Einstellungen ----------------------------------------------------------
 core:
   # Standard-Modelname für den Start
-  model_name: "leo-hessianai-13b-chat.Q5"
+  model_name: "mistral7b-local"
   warm_up: false
   
 # --- UI-Einstellungen ----------------------------------------------------------
