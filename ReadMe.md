@@ -10,35 +10,51 @@ Sie alle basieren auf einem lokalen LLM (über [Ollama](https://ollama.com/) ode
 
 ```mermaid
 flowchart TD
-    A[🪄 Dirigent (Julian / Yul Yen)] --> B{🎤 Stimmen}
-    B --> L[Leah – empathisch]
-    B --> D[Doris – sarkastisch]
-    B --> P[Peter – nerdig]
+  %% GitHub-safe: keine Emojis, einfache Labels
 
-    A --> C{🖥️ Core Plattform}
-    C --> O[Ollama Runtime]
-    C --> W[Gradio WebUI 🎹]
-    C --> T[Terminal UI 🥁]
+  A[Dirigent: Julian / Yul Yen]
 
-    O --> M[(LLM-Modelle: Leo13B, GPT-OSS20B...)]
-    
-    W --> X[Publikum 👥]
-    T --> X
+  subgraph Stimmen
+    L[Leah - empathisch]
+    D[Doris - sarkastisch]
+    P[Peter - nerdig]
+  end
 
-    A --> H{📖 Wissen & Struktur}
-    H --> K[Wiki-Proxy / Kiwix – Spickzettel]
-    H --> CFG[Config (yaml/json) – Notenheft]
-    H --> LOG[Logging – Partituren]
+  subgraph Core_Plattform
+    O[Ollama Runtime]
+    W[WebUI (Gradio)]
+    T[Terminal UI]
+    M[(LLM-Modelle: Leo13B, GPT-OSS-20B)]
+  end
 
-    A --> Z{🔮 Zukunft}
-    Z --> R[RAG / Kontextkompression – Karl]
-    Z --> S[Tool-Use / TTS-STT]
+  subgraph Wissen_und_Struktur
+    K[Wiki-Proxy / Kiwix]
+    CFG[Config (yaml/json)]
+    LOG[Logging]
+  end
 
-    style A fill:#ffe6cc,stroke:#333,stroke-width:2px
-    style B fill:#f0f0f0,stroke:#999
-    style C fill:#f0f0f0,stroke:#999
-    style H fill:#f0f0f0,stroke:#999
-    style Z fill:#f0f0f0,stroke:#999
+  subgraph Zukunft
+    R[RAG / Kontextkompression "Karl"]
+    S[Tool-Use / TTS-STT]
+  end
+
+  %% Kanten
+  A --> Stimmen
+  A --> Core_Plattform
+  A --> Wissen_und_Struktur
+  A --> Zukunft
+
+  O --> M
+  W -->|Nutzerinteraktion| X[Publikum]
+  T -->|Nutzerinteraktion| X
+
+  K -.->|Kontext-Snippets| L
+  CFG -.->|Einstellungen| W
+  CFG -.-> T
+  LOG -.->|Analyse| A
+
+  R -.-> L
+  S -.-> W
 ```
 
 Das Projekt unterstützt:
