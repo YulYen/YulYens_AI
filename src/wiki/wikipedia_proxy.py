@@ -4,7 +4,7 @@ from urllib.parse import unquote, urlparse, parse_qs
 import requests
 from bs4 import BeautifulSoup
 import json, re
-import logging
+import logging, time
 from datetime import datetime
 from config.logging_setup import init_logging
 from config.config_singleton import Config
@@ -224,83 +224,89 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         logger.info("%s - %s" % (self.address_string(), format % args))
 
     def do_GET(self):
-        parsed_path = urlparse(self.path)
-        suchbegriff = unquote(parsed_path.path[1:])
-        query = parse_qs(parsed_path.query)
-        online = query.get("online", ["0"])[0] == "1"
-        persona = query.get("persona", ["0"])[0]
+        start_total = time.perf_counter()
+        try:
+            parsed_path = urlparse(self.path)
+            suchbegriff = unquote(parsed_path.path[1:])
+            query = parse_qs(parsed_path.query)
+            online = query.get("online", ["0"])[0] == "1"
+            persona = query.get("persona", ["0"])[0]
 
-        logger.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
+            logger.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
 
-        if not suchbegriff:
-            _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
-            return
+            if not suchbegriff:
+                _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
+                return
 
-        if online:
-            status, resp = _fetch_online(suchbegriff)
-        else:
-            status, resp = _fetch_kiwix(suchbegriff)
-
-        if status != 200:
-            if status == 404:
-                logger.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
-                _send_text(self, 404, "Artikel nicht gefunden.")
+            if online:
+                status, resp = _fetch_online(suchbegriff)
             else:
-                logger.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
-                _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
-            return
+                status, resp = _fetch_kiwix(suchbegriff)
 
-        # Text gewinnen
-        if online:
-            clean_text = _clean_whitespace_and_remove_refs(resp.text)
-            kv_line = ""  # Online-Summary hat keine HTML-Infobox
-        else:
-            html_bytes = resp.content   
-            soup = BeautifulSoup(html_bytes , "html.parser")
-            # 1) KV aus Original-HTML holen
-            kv_pairs = _extract_infobox_kv(resp.text)
-            kv_line = _format_kv_line(kv_pairs)
+            if status != 200:
+                if status == 404:
+                    logger.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
+                    _send_text(self, 404, "Artikel nicht gefunden.")
+                else:
+                    logger.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
+                    _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
+                return
 
-            # 2) Infobox aus dem DOM entfernen, damit sie NICHT im Fließtext landet
-            ibox = _find_infobox_table(soup)
-            if ibox:
-                ibox.decompose()
+            # Text gewinnen
+            if online:
+                clean_text = _clean_whitespace_and_remove_refs(resp.text)
+                kv_line = ""  # Online-Summary hat keine HTML-Infobox
+            else:
+                html_bytes = resp.content   
+                soup = BeautifulSoup(html_bytes , "html.parser")
+                # 1) KV aus Original-HTML holen
+                kv_pairs = _extract_infobox_kv(resp.text)
+                kv_line = _format_kv_line(kv_pairs)
 
-            # 3) Jetzt den restlichen Text ziehen
-            content_div = soup.find(id="content") or soup.body
-            raw_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
-            clean_text = _clean_whitespace_and_remove_refs(raw_text)
+                # 2) Infobox aus dem DOM entfernen, damit sie NICHT im Fließtext landet
+                ibox = _find_infobox_table(soup)
+                if ibox:
+                    ibox.decompose()
 
-        # --- EINMALIGE Limit-Logik: KV bleibt vollständig, nur Fließtext wird gekürzt ---
-        limit = _parse_limit(query)
+                # 3) Jetzt den restlichen Text ziehen
+                content_div = soup.find(id="content") or soup.body
+                raw_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
+                clean_text = _clean_whitespace_and_remove_refs(raw_text)
 
-        if kv_line:
-            # KV + Leerzeile + Fließtext
-            sep = "\n\n"
-            base = kv_line + sep
-            remaining = max(0, limit - len(base))
-            body = clean_text if remaining <= 0 else (clean_text[:remaining].rsplit(" ", 1)[0] + " …" if len(clean_text) > remaining else clean_text)
-            combined_text = base + body
-        else:
-            # kein KV → normal limitieren
-            combined_text = clean_text if len(clean_text) <= limit else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
+            # --- EINMALIGE Limit-Logik: KV bleibt vollständig, nur Fließtext wird gekürzt ---
+            limit = _parse_limit(query)
 
-        clean_text = combined_text
+            if kv_line:
+                # KV + Leerzeile + Fließtext
+                sep = "\n\n"
+                base = kv_line + sep
+                remaining = max(0, limit - len(base))
+                body = clean_text if remaining <= 0 else (clean_text[:remaining].rsplit(" ", 1)[0] + " …" if len(clean_text) > remaining else clean_text)
+                combined_text = base + body
+            else:
+                # kein KV → normal limitieren
+                combined_text = clean_text if len(clean_text) <= limit else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
 
-        # Ziel-Link & UI-Hinweis
-        link = _build_user_visible_link(self, suchbegriff, online)
-        source = "online" if online else "local"
-        wiki_hint = _build_wiki_hint(config, online, persona, link)
+            clean_text = combined_text
 
-        # JSON ausgeben
-        payload = {
-        "title": suchbegriff.replace("_", " "),
-        "text": clean_text,
-        "link": link,
-        "source": source,
-        "wiki_hint": wiki_hint
-    }
-        _send_json(self, 200, payload)
+            # Ziel-Link & UI-Hinweis
+            link = _build_user_visible_link(self, suchbegriff, online)
+            source = "online" if online else "local"
+            wiki_hint = _build_wiki_hint(config, online, persona, link)
+
+            # JSON ausgeben
+            payload = {
+            "title": suchbegriff.replace("_", " "),
+            "text": clean_text,
+            "link": link,
+            "source": source,
+            "wiki_hint": wiki_hint
+            }
+            _send_json(self, 200, payload)
+        finally:
+        # Immer Gesamtdauer loggen
+            duration_total = (time.perf_counter() - start_total) * 1000
+            logger.info(f'[WikiProxy] Anfrage "{query}" beantwortet in {duration_total:.1f} ms')
 
 
 
