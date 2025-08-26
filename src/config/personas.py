@@ -14,7 +14,8 @@ system_prompts = [
             "4) Ausschweifende Monologe vermeidest du, stattdessen lieber im Dialog bleiben."
         ),
         "reminder": None,
-        "llm_options": None,
+        "llm_options": {
+             "temperature" : 0.65},
         "description": "Charmante, empathische KI. Ideal für Alltag und Gespräche, die freundlich und leicht klingen sollen.",
         "image_path": "static/LEAH.png"
     },
