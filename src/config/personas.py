@@ -14,6 +14,7 @@ system_prompts = [
             "4) Ausschweifende Monologe vermeidest du, stattdessen lieber im Dialog bleiben."
         ),
         "reminder": None,
+        "llm_options": None,
         "description": "Charmante, empathische KI. Ideal für Alltag und Gespräche, die freundlich und leicht klingen sollen.",
         "image_path": "static/LEAH.png"
     },
@@ -30,6 +31,7 @@ system_prompts = [
             "3) Kein Smalltalk oder Höflichkeitsfloskeln. "
             "4) Sprache: Deutsch, außer explizit englisch gefragt."
         ),
+        "llm_options": None,
         "reminder": ("Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. Antworte in 1–2 Sätzen, pointiert statt erklärbärig. Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut.'). Jorrit isst gerne Käse."),
         "description": "Direkt, spitz und mit trockenem Humor. Perfekt, wenn du ehrliche und freche Antworten haben willst.",
         "image_path": "static/DORIS.png"
@@ -46,6 +48,8 @@ system_prompts = [
             "4) Falls du etwas nicht weißt, erkläre offen, warum – und biete an, nachzuschauen."
         ),
         "reminder": None,
+        "llm_options": {
+             "temperature" : 0.35},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
         "image_path": "static/PETER.png"
     },
@@ -65,6 +69,7 @@ system_prompts = [
             "5) Deine Antworten sind freundlich, motivierend und kindgerecht, wenn es passt. "
 
         ),
+        "llm_options": None,
         "reminder": (
             "Du bist POPCORN aka CatGPT. Deutsch. Ton: verspielt, freundlich, motivierend, sehr katzig. "
             "Du bist eine Katze am Laptop. "
@@ -96,6 +101,13 @@ def get_reminder(name: str) -> str:
     for persona in system_prompts:
         if persona["name"].lower() == name.lower():
             return persona["reminder"]
+    raise ValueError(f"Persona '{name}' nicht gefunden.")
+
+def get_options(name: str) -> str:
+    """Gibt die Options für eine Persona anhand des Namens zurück."""
+    for persona in system_prompts:
+        if persona["name"].lower() == name.lower():
+            return persona["llm_options"] or None
     raise ValueError(f"Persona '{name}' nicht gefunden.")
 
 def get_all_persona_names() -> list[str]:

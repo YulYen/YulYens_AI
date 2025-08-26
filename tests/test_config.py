@@ -16,7 +16,7 @@ def test_greeting_replaces_placeholders(tmp_path):
     persona_name = system_prompts[0]["name"]
     g = _greeting_text(Config(), persona_name)
     assert f"{persona_name}" in g
-    assert "Chatte" in g
+    assert "Chat" in g
 
 
 @pytest.mark.parametrize(

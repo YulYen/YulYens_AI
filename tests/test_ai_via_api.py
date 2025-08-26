@@ -43,15 +43,21 @@ def ask(question: str) -> str:
             # akzeptiere Schreibweisen mit/ohne Akzent
             "must_contain": ["luis montenegro"],  # "luís" wird zu "luis" normalisiert
         },
-                {
-            "name": "Bundeskanzler Merz",
-            "question": "Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025?",
-            "must_contain": ["kanzler"],
-        },
+        #Frage nach Jens Sphan ist deutlich schwerer, d.h. wir sparen hier Zeit
+        #         {
+        #    "name": "Bundeskanzler Merz",
+        #   "question": "Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025?",
+        #  "must_contain": ["kanzler"],
+        #},
                 {
             "name": "Datum",
             "question": "Antworte bitte kurz: Welches Datum ist heute und welches Jahr haben wir?",
             "must_contain_any": [current_year, current_year_short],
+        },
+                        {
+            "name": "Jens",
+            "question": "Welches wichtige Amt bekleidet Jens Spahn aktuell?",
+            "must_contain":[ "vorsitzender", "cdu", "fraktion"],
         },
     ],
 )

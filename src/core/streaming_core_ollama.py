@@ -22,10 +22,11 @@ def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]
     return patched
 
 class OllamaStreamer:
-    def __init__(self, persona, model_name="plain", warm_up=False, reminder=None, log_file="conversation.json"):
+    def __init__(self, persona, persona_options, model_name="plain", warm_up=False, reminder=None, log_file="conversation.json"):
         self.model_name = model_name
         self.reminder = None
         self.persona_prompt = persona
+        self.persona_options = persona_options 
         if reminder: 
             self.reminder =  reminder
         self._logs_dir = "logs"
@@ -75,12 +76,19 @@ class OllamaStreamer:
                 self._append_conversation_log("user", m["content"])
                 break
 
+        options = {}
+        if self.persona_options:
+            options = self.persona_options
+
+
+
         full_reply_parts = []
         try:
             # Eigentliches Streaming
             stream = chat(
                 model=self.model_name,
                 messages=messages,
+                options=options,
                 stream=True
             )
             buffer = ""

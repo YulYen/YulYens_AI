@@ -46,6 +46,7 @@ class AppFactory:
         core = self._cfg.core
         persona_promot = utils._system_prompt_with_date(persona_name) # Prompt der Persona laden
         reminder = personas.get_reminder(persona_name)  
+        options = personas.get_options(persona_name)  
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
         return OllamaStreamer(
@@ -53,6 +54,7 @@ class AppFactory:
             warm_up=bool(core.get("warm_up", False)),
             reminder=reminder,
             persona=persona_promot,
+            persona_options=options,
             log_file=conv_log_file,
         )
 
