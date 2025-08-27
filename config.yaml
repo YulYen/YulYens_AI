@@ -61,3 +61,10 @@ api:
   enabled: true
   host: "127.0.0.1"
   port: 8013
+
+security:
+  enabled: true
+  guard: BasicGuard
+  prompt_injection_protection: true
+  pii_protection: true
+  output_blocklist: true
