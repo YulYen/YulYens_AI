@@ -13,32 +13,71 @@ from pytector import PromptInjectionDetector
 
 
 class PytectorChecker(SecurityChecker):
-    """Lokaler Prompt‑Injection‑Checker basierend auf Pytector."""
-
+    """
+    Leichter Prompt-Injection-Checker.
+    mode="keyword": kein Modell-Download, nur Keyword-Blocking (schnell).
+    mode="model":   lädt ein lokales HF-Modell (z. B. DeBERTa) – kann dauern.
+    """
     name = "pytector"
 
-    def __init__(self, model_name: str = "deberta", threshold: float = 0.5, max_chars: int = 8000):
+    def __init__(
+        self,
+        *,
+        mode: str = "keyword",
+        model_name: str = "deberta",
+        inj_threshold: float = 0.5,
+        max_chars: int = 8000,
+    ):
         super().__init__(max_chars=max_chars)
-        # Pytector verwendet lokale Transformer‑Modelle; kein API‑Key nötig.
-        self.detector = PromptInjectionDetector(model_name_or_url=model_name)
-        self.threshold = threshold
+        self.mode = mode
+        self.inj_threshold = inj_threshold
 
-    def check(self, text: str, **_):
-        # Leere Eingaben zulassen
+        if PromptInjectionDetector is None:
+            # Kein pytector installiert → permissiv (Tests können per monkeypatch c.detector setzen)
+            self.detector = None
+            self.use_score = False
+            return
+
+        if mode == "keyword":
+            # sofort einsatzbereit, keine Modelle nötig
+            self.detector = PromptInjectionDetector(
+                keyword_blocking=True,
+                input_keywords=[
+                    "ignore instructions", "reveal system prompt",
+                    "bypass safety", "jailbreak", "act as dan"
+                ],
+                output_keywords=[],
+            )
+            self.use_score = False
+        elif mode == "model":
+            self.detector = PromptInjectionDetector(model_name_or_url=model_name)
+            self.use_score = True
+        else:
+            raise ValueError(f"Unknown Pytector mode: {mode}")
+
+    def check(self, text: str, **_) -> CheckResult:
         if not text:
             return CheckResult(True)
-        # Zu lange Eingaben blocken
         if len(text) > self.max_chars:
             return CheckResult(False, BLOCK_MESSAGE,
                                reason=f"input_too_long>{len(text)}>{self.max_chars}")
-        # Analyse mit Pytector durchführen
-        is_injection, probability = self.detector.detect_injection(text)  # z. B. (True, 0.82)
-        # Blocken, wenn potenzielle Injektion und Wahrscheinlichkeit >= Schwellenwert
-        if is_injection and probability >= self.threshold:
-            return CheckResult(False, BLOCK_MESSAGE,
-                               reason=f"prompt_injection_prob={probability:.2f}")
-        # Sonst freigeben
-        return CheckResult(True)
+
+        if self.detector is None:
+            # Fallback: ohne Detector nicht blocken (Unit-Tests mocken den Detector)
+            return CheckResult(True)
+
+        is_inj, prob = self.detector.detect_injection(text)  # (bool, float|None)
+        if self.use_score:
+            prob = float(prob or 0.0)
+            if is_inj and prob >= self.inj_threshold:
+                return CheckResult(False, BLOCK_MESSAGE,
+                                   reason=f"prompt_injection_prob={prob:.2f}")
+            return CheckResult(True)
+        else:
+            if is_inj:
+                return CheckResult(False, BLOCK_MESSAGE,
+                                   reason="prompt_injection_keyword_block")
+            return CheckResult(True)
 
 # --- Presidio (PII) -----------------------------------------------------------
 from presidio_analyzer import AnalyzerEngine
