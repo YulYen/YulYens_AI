@@ -2,6 +2,7 @@
 
 | Nr. | Name                               | Beschreibung                    | Aufwand | Nutzen | Kategorie        |
 |----:|------------------------------------|---------------------------------|:------:|:-----:|------------------|
+| -1   | Security-Kram                      | Eingaben prüfen etc.      |   S    |   M   | Technische Basis |
 | 0   | Config Parameter                    | Temperatur/Top‑p in config      |   S    |   M   | Technische Basis |
 | 1   | Bug: Datum                          | z.B. Leah nennt häufig das Datum grundlos      |   S    |   M   | Technische Basis |
 | 2   | Mehr Unit‑Tests                     | Kernpfade absichern             |   S    |   L   | Technische Basis |
@@ -11,7 +12,7 @@
 | 6   | Anmeldung am System                 | Nutzer‑Login & Rechte           |   M    |   M   | Technische Basis |
 | 7   | E‑Mail an/von AI                    | Mail lesen/schreiben/versenden  |   M    |   M   | Integration      |
 | 8   | Karl (Kontextzusammenfasser)        | Verlauf komprimieren bei Bedarf |   XL   |   XL  | Technische Basis |
-| 9   | Persona‑abhängige Modellwahl        | Modell je Persona wählen        |   M    |   M   | Technische Basis |
+| 10  | Qwen2.5-14B-Instruct-Q4_K_S.gguf    | Als Test/Vergleich              |   M    |   M   | Technische Basis |
 | 11  | Yul‑Yen‑Bild verstecken             | Easter‑Egg im Gradio            |   S    |   S   | Cooles Feature   |
 | 12  | Easter‑Egg Logik                    | Stichwort → Nachsatz            |   M    |   M   | Cooles Feature   |
 | 13  | GPT‑OSS‑20B Integration             | Großes Modell testen/einbinden  |   XL   |   XL  | Technische Basis |
