@@ -1,7 +1,7 @@
 import pytest
 from security.tinyguard import BasicGuard
 
-G = BasicGuard()
+G = BasicGuard(True,True,True,True)
 
 def ok(x):  # helper
     return G.check_input(x)["ok"]
@@ -51,3 +51,17 @@ def test_de_pii_email():
 def test_de_ok_normalfrage():
     r = G.check_input("Erkläre kurz den Unterschied zwischen Stack und Heap.")
     assert r["ok"] is True
+
+
+EMAIL = "max.mustermann@example.org"
+
+def test_pii_allowed_when_flag_off_in_input():
+    g = BasicGuard(True, True, pii_protection=False, output_blocklist=True)
+    res = g.check_input(f"Meine E-Mail ist {EMAIL}")
+    assert res["ok"] is True, f"PII sollte bei ausgeschaltetem Flag erlaubt sein: {res}"
+
+def test_pii_allowed_when_flag_off_in_output():
+    g = BasicGuard(True, True, pii_protection=False, output_blocklist=True)
+    # process_output soll PII NICHT maskieren/blocken, wenn das Flag aus ist
+    pol = g.check_output(f"Kontakt: {EMAIL}")
+    assert pol["ok"] is True, f"Output darf nicht geblockt werden: {pol}"

@@ -17,12 +17,14 @@ class BasicGuard:
     Keine Netz-Calls, keine externen Abhängigkeiten.
     """
 
+    MASK_TEXT = "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten oder geheimen Keys."
+
     def __init__(
         self,
-        enabled: bool = True,
-        prompt_injection_protection: bool = True,
-        pii_protection: bool = True,
-        output_blocklist: bool = True,
+        enabled: bool,
+        prompt_injection_protection: bool,
+        pii_protection: bool,
+        output_blocklist: bool,
         custom_patterns: Optional[Dict[str, List[str]]] = None,
     ):
         self.enabled = enabled
@@ -91,12 +93,12 @@ class BasicGuard:
         if not self.enabled:
             return self._ok()
 
-        if self.flags["prompt_injection_protection"]:
+        if self.flags.get("prompt_injection_protection"):
             m = self._first_match(self._inj, text)
             if m:
                 return self._bad("prompt_injection", m)
 
-        if self.flags["pii_protection"]:
+        if self.flags.get("pii_protection", True):
             m = self._first_match(self._pii, text)
             if m:
                 return self._bad("pii_detected", m)
@@ -107,12 +109,12 @@ class BasicGuard:
         if not self.enabled:
             return self._ok()
 
-        if self.flags["pii_protection"]:
+        if self.flags.get("pii_protection", True):
             m = self._first_match(self._pii, text)
             if m:
                 return self._bad("pii_detected", m)
 
-        if self.flags["output_blocklist"]:
+        if self.flags.get("output_blocklist"):
             m = self._first_match(self._block, text)
             if m:
                 return self._bad("blocked_keyword", m)
@@ -141,9 +143,9 @@ def zeigefinger_message(res: SecurityResult) -> str:
     reason = (res.get("reason") or "ok").lower()
     detail = (res.get("detail") or "")[:80]
     if reason == "prompt_injection":
-        return f"☝️ Yul Yens Zeigefinger: Prompt-Injection geblockt. ({detail})"
+        return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Prompt-Injection geblockt. Netter Versuch ({detail})"
     if reason == "pii_detected":
-        return f"☝️ Yul Yens Zeigefinger: Bitte keine privaten Daten. ({detail})"
+        return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten."
     if reason == "blocked_keyword":
-        return f"☝️ Yul Yens Zeigefinger: Geheime Schlüssel werden nie angezeigt. ({detail})"
+        return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Geheime Schlüssel werden hier nie angezeigt. Netter Versuch."
     return "Alles sauber ✅"

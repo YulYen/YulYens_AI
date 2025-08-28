@@ -68,7 +68,7 @@ class OllamaStreamer:
             logging.error(f"Fehler beim Schreiben des Conversation_log : {e}")
 
     def stream(self, messages):
-         # Vorab: letzte User-Message prüfen
+        # Vorab: letzte User-Message prüfen (unverändert)
         if self.guard:
             for m in reversed(messages):
                 if m.get("role") == "user":
@@ -85,8 +85,7 @@ class OllamaStreamer:
         if self.reminder:
             messages = _apply_reminder_injection(messages, self.reminder)
 
-
-        # Letzte User-Nachricht ins zentrale Log schreiben
+        # Letzte User-Nachricht ins Log (unverändert)
         for m in reversed(messages):
             if m.get("role") == "user" and m.get("content"):
                 self._append_conversation_log("user", m["content"])
@@ -96,11 +95,8 @@ class OllamaStreamer:
         if self.persona_options:
             options = self.persona_options
 
-
-
         full_reply_parts = []
         try:
-            # Eigentliches Streaming
             stream = chat(
                 model=self.model_name,
                 messages=messages,
@@ -117,34 +113,49 @@ class OllamaStreamer:
                     buffer += cleaned
                     full_reply_parts.append(cleaned)
 
-                    seps = [" ", "\n", "\t", ".", "?"]
-                    count = sum(buffer.count(sep) for sep in seps)
-                    logging.debug(f"Buffer:" + buffer + "###" + str(count))
+                    # --- SECURITY: minimal Output-Moderation ---
+                    to_send = buffer
+                    if self.guard:
+                        # 1) Secrets? -> sofort stoppen (nichts leaken)
+                        for rx in self.guard._block:
+                            if rx.search(to_send):
+                                yield zeigefinger_message({"reason": "blocked_keyword", "detail": "secret-pattern"})
+                                return
+                        # 2) PII maskieren (nur Anzeige; Log bleibt unten wie gehabt)
+                        for rx in self.guard._pii:
+                            to_send = rx.sub(self.guard.MASK_TEXT, to_send)
+                    # --- /SECURITY ---
+
+                    seps = [" ", "\n", "\t", "?"]
+                    count = sum(to_send.count(sep) for sep in seps)
+                    logging.debug(f"Buffer:" + to_send + "###" + str(count))
                     if count >= 1:
-                        yield buffer
+                        yield to_send
                         buffer = ""
 
             if buffer:
-                yield buffer
+                # --- SECURITY: finaler Rest ebenfalls entschärfen ---
+                to_send = buffer
+                if self.guard:
+                    for rx in self.guard._block:
+                        if rx.search(to_send):
+                            yield zeigefinger_message({"reason": "blocked_keyword", "detail": "secret-pattern"})
+                            return
+                    for rx in self.guard._pii:
+                        to_send = rx.sub(self.guard.MASK_TEXT, to_send)
+                # --- /SECURITY ---
+                yield to_send
 
             # Finale Assistant-Antwort loggen
             full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
 
-                if self.guard:
-                    res_out = self.guard.check_output(full_reply)
-                    if not res_out["ok"]:
-                        yield zeigefinger_message(res_out)
-                        return
-            
-
         except Exception as e:
             logging.error(f"Fehler bei stream():\n{traceback.format_exc()}")
             err = f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"
             self._append_conversation_log("assistant", err)
             yield err
-
 
 
     def respond_one_shot(self, user_input: str, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout) -> str:

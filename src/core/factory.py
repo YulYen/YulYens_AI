@@ -65,9 +65,9 @@ class AppFactory:
         if bool(sec_cfg.get("enabled", True)):
             guard = BasicGuard(
                 enabled=True,
-                prompt_injection_protection=bool(sec_cfg.get("prompt_injection_protection", True)),
-                pii_protection=bool(sec_cfg.get("pii_protection", True)),
-                output_blocklist=bool(sec_cfg.get("output_blocklist", True)),
+                prompt_injection_protection=bool(sec_cfg.get("prompt_injection_protection")),
+                pii_protection=bool(sec_cfg.get("pii_protection")),
+                output_blocklist=bool(sec_cfg.get("output_blocklist")),
             )
             streamer.set_guard(guard)
 
