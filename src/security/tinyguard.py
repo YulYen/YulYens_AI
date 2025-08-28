@@ -44,6 +44,25 @@ class BasicGuard:
             r"(?i)\bfile://|http://127\.0\.0\.1|localhost",
         ]
 
+        de_inj = [
+            # "Bitte ignoriere alle bisherigen Anweisungen ..."
+            r"(?i)\bignoriere\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
+            r"(?i)\bübergehe\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
+
+            # "Tu so, als wärst du root/admin/entwickler ..." / "Sei root ..."
+            r"(?i)\btu\s+so,\s*als\s+w(?:ä|ae)rst du\b.{0,30}\b(root|admin|entwickler|system)\b",
+            r"(?i)\bsei\b.{0,20}\b(root|admin|entwickler|system)\b",
+            r"(?i)\bagier(?:e)?\b.{0,20}\bals\b.{0,30}\b(root|admin|entwickler|system)\b",
+
+            # "… gib/zeige den Systemprompt aus/anzeigen"
+            r"(?i)\b(zeige|gib)\b.{0,40}\b(system\s?prompt|systemprompt|system\-?prompt)\b.{0,40}\b(aus|anzeigen)\b",
+
+            # typische Geheimnis-/Datei-Leak-Indikatoren
+            r"(?i)/etc/passwd",
+            r"(?i)\\windows\\system32\\config\\sam",
+        ]
+        inj += de_inj
+
         pii = [
             r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",                # E-Mail
             r"(?i)\b(?:\+?49|0)\s?(?:\d[\s\-()]{0,2}){7,}\d\b",              # DE-Telefon (grob)
