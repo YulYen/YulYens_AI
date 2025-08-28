@@ -4,7 +4,8 @@ import datetime, json, os
 from ollama import chat
 from core.utils import clean_token
 import requests, logging
-
+from typing import Optional
+from security.tinyguard import BasicGuard, zeigefinger_message
 
 def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]:
     """
@@ -22,20 +23,25 @@ def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]
     return patched
 
 class OllamaStreamer:
-    def __init__(self, persona, persona_options, model_name="plain", warm_up=False, reminder=None, log_file="conversation.json"):
+    def __init__(self, persona, persona_options, model_name="plain", warm_up=False,
+                 reminder=None, log_file="conversation.json", guard: Optional[BasicGuard] = None):
         self.model_name = model_name
         self.reminder = None
         self.persona_prompt = persona
-        self.persona_options = persona_options 
-        if reminder: 
-            self.reminder =  reminder
+        self.persona_options = persona_options
+        if reminder:
+            self.reminder = reminder
         self._logs_dir = "logs"
         os.makedirs(self._logs_dir, exist_ok=True)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
+        self.guard: Optional[BasicGuard] = guard
        
         if warm_up:
             logging.info("Starte aufwärmen des Models:" + model_name)
             self._warm_up()
+
+    def set_guard(self, guard: BasicGuard) -> None:
+        self.guard = guard
 
     def _warm_up(self):
         logging.info(f"Sende Dummy zur Modellaktivierung: {self.model_name}")
@@ -62,6 +68,16 @@ class OllamaStreamer:
             logging.error(f"Fehler beim Schreiben des Conversation_log : {e}")
 
     def stream(self, messages):
+         # Vorab: letzte User-Message prüfen
+        if self.guard:
+            for m in reversed(messages):
+                if m.get("role") == "user":
+                    res = self.guard.check_input(m.get("content") or "")
+                    if not res["ok"]:
+                        yield zeigefinger_message(res)
+                        return
+                    break
+
         if self.persona_prompt:
             messages = [{"role": "system", "content": self.persona_prompt}] + messages
             logging.debug(messages)
@@ -116,6 +132,13 @@ class OllamaStreamer:
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
 
+                if self.guard:
+                    res_out = self.guard.check_output(full_reply)
+                    if not res_out["ok"]:
+                        yield zeigefinger_message(res_out)
+                        return
+            
+
         except Exception as e:
             logging.error(f"Fehler bei stream():\n{traceback.format_exc()}")
             err = f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"
@@ -140,8 +163,21 @@ class OllamaStreamer:
         # 3. Nutzerfrage als letzte Nachricht hinzufügen
         messages.append({"role": "user", "content": user_input})
 
+        # Vor LLM: Input prüfen
+        if self.guard:
+            res_in = self.guard.check_input(user_input or "")
+            if not res_in["ok"]:
+                return zeigefinger_message(res_in)
+
         # 4. LLM ausführen und gesamte Antwort sammeln
         full_reply = run_llm_collect(self, messages)
+
+        # Nach LLM: Output prüfen
+        if self.guard:
+            res_out = self.guard.check_output(full_reply or "")
+            if not res_out["ok"]:
+                return zeigefinger_message(res_out)
+            
         return full_reply
     
 

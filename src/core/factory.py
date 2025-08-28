@@ -7,6 +7,8 @@ from typing import Optional
 from config.config_singleton import Config
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 from core.streaming_core_ollama import OllamaStreamer
+from typing import Optional
+from security.tinyguard import BasicGuard, zeigefinger_message
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
 from core import utils
@@ -49,7 +51,7 @@ class AppFactory:
         options = personas.get_options(persona_name)  
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
-        return OllamaStreamer(
+        streamer = OllamaStreamer(
             model_name=core["model_name"],
             warm_up=bool(core.get("warm_up", False)),
             reminder=reminder,
@@ -57,6 +59,19 @@ class AppFactory:
             persona_options=options,
             log_file=conv_log_file,
         )
+
+        # Security-Guard aus YAML (optional)
+        sec_cfg = getattr(self._cfg, "security", {}) or {}
+        if bool(sec_cfg.get("enabled", True)):
+            guard = BasicGuard(
+                enabled=True,
+                prompt_injection_protection=bool(sec_cfg.get("prompt_injection_protection", True)),
+                pii_protection=bool(sec_cfg.get("pii_protection", True)),
+                output_blocklist=bool(sec_cfg.get("output_blocklist", True)),
+            )
+            streamer.set_guard(guard)
+
+        return streamer
 
     def get_api_provider(self):
         """Nur bauen, wenn in YAML aktiviert. Kein Serverstart hier."""

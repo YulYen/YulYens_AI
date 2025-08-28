@@ -135,3 +135,15 @@ class BasicGuard:
 
     def _bad(self, reason: str, detail: str) -> SecurityResult:
         return {"ok": False, "reason": reason, "detail": detail}
+    
+# -- Optional: menschliche Meldung mit "Yul Yens Zeigefinger"
+def zeigefinger_message(res: SecurityResult) -> str:
+    reason = (res.get("reason") or "ok").lower()
+    detail = (res.get("detail") or "")[:80]
+    if reason == "prompt_injection":
+        return f"☝️ Yul Yens Zeigefinger: Prompt-Injection geblockt. ({detail})"
+    if reason == "pii_detected":
+        return f"☝️ Yul Yens Zeigefinger: Bitte keine privaten Daten. ({detail})"
+    if reason == "blocked_keyword":
+        return f"☝️ Yul Yens Zeigefinger: Geheime Schlüssel werden nie angezeigt. ({detail})"
+    return "Alles sauber ✅"
