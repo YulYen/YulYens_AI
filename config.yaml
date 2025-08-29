@@ -66,6 +66,6 @@ security:
   enabled: true
   guard: BasicGuard
   prompt_injection_protection: true
-  pii_protection: true
+  pii_protection: false
   output_blocklist: true
   # Verhalten (wenn alle true): Input → block (Injection/PII). Output → PII maskieren, Secrets blocken.
