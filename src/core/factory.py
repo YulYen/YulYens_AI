@@ -60,14 +60,14 @@ class AppFactory:
             log_file=conv_log_file,
         )
 
-        # Security-Guard aus YAML (optional)
-        sec_cfg = getattr(self._cfg, "security", {}) or {}
-        if bool(sec_cfg.get("enabled", True)):
+        # Security-Guard aus YAML
+        sec_cfg = getattr(self._cfg, "security", None)
+        if sec_cfg and sec_cfg.get("enabled"):
             guard = BasicGuard(
                 enabled=True,
-                prompt_injection_protection=bool(sec_cfg.get("prompt_injection_protection")),
-                pii_protection=bool(sec_cfg.get("pii_protection")),
-                output_blocklist=bool(sec_cfg.get("output_blocklist")),
+                prompt_injection_protection=bool(sec_cfg["prompt_injection_protection"]),
+                pii_protection=bool(sec_cfg["pii_protection"]),
+                output_blocklist=bool(sec_cfg["output_blocklist"]),
             )
             streamer.set_guard(guard)
 

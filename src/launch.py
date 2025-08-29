@@ -24,6 +24,8 @@ from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autosta
 
 
 def main():
+
+    # TODO/FIXME: Bessere Fehlermeldung bringen, weenn laden der Config fehlschlägt
     cfg = Config()  # einmalig laden
 
     # 1) Logging ZUERST initialisieren

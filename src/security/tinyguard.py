@@ -121,6 +121,40 @@ class BasicGuard:
 
         return self._ok()
 
+
+    def process_output(self, text: str) -> dict:
+        """
+        Policy-Entscheidung für Output (SRP: bleibt im Guard).
+        Rückgabe:
+        {
+            "blocked": bool,            # True => nichts anzeigen (z.B. Secret)
+            "reason": str|None,         # z.B. "blocked_keyword"
+            "text": str,                # ggf. maskierter Text
+            "masked": bool              # True, wenn PII maskiert wurde
+        }
+        """
+        if not self.enabled or not text:
+            return {"blocked": False, "reason": None, "text": text, "masked": False}
+
+        # 1) Secrets blockieren (nur wenn Flag aktiv)
+        if self.flags.get("output_blocklist"):
+            for rx in self._block:
+                if rx.search(text):
+                    return {"blocked": True, "reason": "blocked_keyword", "text": "", "masked": False}
+
+        # 2) PII maskieren (nur wenn Flag aktiv)
+        out = text
+        masked = False
+        if self.flags.get("pii_protection"):
+            for rx in self._pii:
+                new_out = rx.sub(self.MASK_TEXT, out)
+                if new_out != out:
+                    masked = True
+                    out = new_out
+                else:
+                    out = new_out
+
+        return {"blocked": False, "reason": None, "text": out, "masked": masked}
     # ---- Helpers ----------------------------------------------------------
 
     def _first_match(self, patterns: List[re.Pattern], text: str) -> Optional[str]:

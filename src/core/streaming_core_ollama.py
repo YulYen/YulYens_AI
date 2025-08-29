@@ -116,17 +116,13 @@ class OllamaStreamer:
                     # --- SECURITY: minimal Output-Moderation ---
                     to_send = buffer
                     if self.guard:
-                        # 1) Secrets? -> sofort stoppen (nichts leaken)
-                        for rx in self.guard._block:
-                            if rx.search(to_send):
-                                yield zeigefinger_message({"reason": "blocked_keyword", "detail": "secret-pattern"})
-                                return
-                        # 2) PII maskieren (nur Anzeige; Log bleibt unten wie gehabt)
-                        for rx in self.guard._pii:
-                            to_send = rx.sub(self.guard.MASK_TEXT, to_send)
-                    # --- /SECURITY ---
+                        pol = self.guard.process_output(to_send)
+                        if pol["blocked"]:
+                            yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
+                            return
+                        to_send = pol["text"]
 
-                    seps = [" ", "\n", "\t", "?"]
+                    seps = [" ", "\n", "\t", ".", "?"]
                     count = sum(to_send.count(sep) for sep in seps)
                     logging.debug(f"Buffer:" + to_send + "###" + str(count))
                     if count >= 1:
@@ -137,13 +133,11 @@ class OllamaStreamer:
                 # --- SECURITY: finaler Rest ebenfalls entschärfen ---
                 to_send = buffer
                 if self.guard:
-                    for rx in self.guard._block:
-                        if rx.search(to_send):
-                            yield zeigefinger_message({"reason": "blocked_keyword", "detail": "secret-pattern"})
-                            return
-                    for rx in self.guard._pii:
-                        to_send = rx.sub(self.guard.MASK_TEXT, to_send)
-                # --- /SECURITY ---
+                    pol = self.guard.process_output(to_send)
+                    if pol["blocked"]:
+                        yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
+                        return
+                    to_send = pol["text"]
                 yield to_send
 
             # Finale Assistant-Antwort loggen
