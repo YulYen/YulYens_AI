@@ -122,7 +122,7 @@ class OllamaStreamer:
                             return
                         to_send = pol["text"]
 
-                    seps = [" ", "\n", "\t", ".", "?"]
+                    seps = [" ", "\n", "\t", "!", "?"]
                     count = sum(to_send.count(sep) for sep in seps)
                     logging.debug(f"Buffer:" + to_send + "###" + str(count))
                     if count >= 1:
