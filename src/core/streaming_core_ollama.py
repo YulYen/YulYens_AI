@@ -1,8 +1,8 @@
 # streaming_core_ollama.py
 import traceback
 import datetime, json, os
-from ollama import chat
 from core.utils import clean_token
+from ollama import Client
 import requests, logging
 from typing import Optional
 from security.tinyguard import BasicGuard, zeigefinger_message
@@ -23,12 +23,14 @@ def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]
     return patched
 
 class OllamaStreamer:
-    def __init__(self, persona, persona_options, model_name="plain", warm_up=False,
+    def __init__(self, base_url, persona, persona_prompt, persona_options, model_name="plain", warm_up=False,
                  reminder=None, log_file="conversation.json", guard: Optional[BasicGuard] = None):
         self.model_name = model_name
         self.reminder = None
-        self.persona_prompt = persona
+        self.persona = persona
+        self.persona_prompt = persona_prompt
         self.persona_options = persona_options
+        self._ollama_client = Client(host=base_url)
         if reminder:
             self.reminder = reminder
         self._logs_dir = "logs"
@@ -46,7 +48,7 @@ class OllamaStreamer:
     def _warm_up(self):
         logging.info(f"Sende Dummy zur Modellaktivierung: {self.model_name}")
         try:
-            chat(
+            self._ollama_client.chathat(
                 model=self.model_name,
                 messages=[{"role": "user", "content": "..."}]
             )
@@ -59,6 +61,8 @@ class OllamaStreamer:
             entry = {
                 "ts": datetime.datetime.now().isoformat(timespec="seconds"),
                 "model": self.model_name,
+                "bot" : self.persona,
+                "options" : self.persona_options,
                 "role": role,
                 "content": content
             }
@@ -97,7 +101,7 @@ class OllamaStreamer:
 
         full_reply_parts = []
         try:
-            stream = chat(
+            stream = self._ollama_client.chat(
                 model=self.model_name,
                 messages=messages,
                 options=options,
