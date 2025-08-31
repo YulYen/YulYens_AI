@@ -15,7 +15,7 @@ def set_provider(p: AiApiProvider) -> None:
 def get_provider() -> AiApiProvider:
     global _provider
     if _provider is None:
-        _provider = AiApiProvider()  
+        raise RuntimeError("AiApiProvider not set; call set_provider() first")
     return _provider
 
 class AskRequest(BaseModel):
