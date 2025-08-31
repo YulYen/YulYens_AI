@@ -59,7 +59,7 @@ class OllamaStreamer:
     def _append_conversation_log(self, role, content):
         try:
             entry = {
-                "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+                "ts": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
                 "model": self.model_name,
                 "bot" : self.persona,
                 "options" : self.persona_options,

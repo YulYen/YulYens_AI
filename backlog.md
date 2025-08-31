@@ -2,8 +2,7 @@
 
 | Nr. | Name                               | Beschreibung                    | Aufwand | Nutzen | Kategorie        |
 |----:|------------------------------------|---------------------------------|:------:|:-----:|------------------|
-| -1   | Security-Kram                      | Eingaben prüfen etc.      |   S    |   M   | Technische Basis |
-| 0   | Config Parameter                    | Temperatur/Top‑p in config      |   S    |   M   | Technische Basis |
+| 0   | Config Parameter: Weitere                    | ggf. z.B.Top‑p in config      |   S    |   M   | Technische Basis |
 | 1   | Bug: Datum                          | z.B. Leah nennt häufig das Datum grundlos      |   S    |   M   | Technische Basis |
 | 2   | Mehr Unit‑Tests                     | Kernpfade absichern             |   S    |   L   | Technische Basis |
 | 3   | Healthchecks/Monitoring             | Statusseite (Ollama/VRAM)       |   S    |   M   | Technische Basis |

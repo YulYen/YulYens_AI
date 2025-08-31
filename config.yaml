@@ -31,29 +31,26 @@ texts:
 
 # --- Wiki-Einstellungen --------------------------------------------------------
 wiki:
-  # Ob das lokale Offline-Wiki (Kiwix) genutzt wird: offline
-  # Oder Wikipedia: online
-  # Oder kein wiki-Tool: false
+# offline = Kiwix, online = Wikipedia, false keine Wiki-Snippets
   mode: offline
-  # Immer notwendig, egal ob offline oder online
+  # Port des lokalen Proxy (immer nötig)
   proxy_port: 8042
   # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen
   snippet_limit: 1600
-  timeout_connect: 5.0 # <-- EIN Timeout-Set, gilt für online & offline
+  timeout_connect: 5.0 
   timeout_read: 8.0
   offline:  # ---- nur relevant, wenn mode == "offline", d.h. nur für offline Wiki  ----
-    host: "127.0.0.1"  # wo kiwix-serve laufen soll -  127.0.0.1 wesentlich performanter als localhost      
+    host: "127.0.0.1"  # Host für kiwix-serve  127.0.0.1 wesentlich performanter als localhost      
     kiwix_port: 8080 #
     zim_prefix: "wikipedia_de_all_nopic_2025-06" 
     autostart: true
     kiwix_exe: "C:/wikipedia-de-offline/kiwix-serve.exe"   # Pfad zu kiwix-serve (Windows-Beispiel)
-    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2025-06.zim"   # Pfad zur ZIM-Datei
-    startup_timeout_s: 7         # Wartezeit, bis der Port erreichbar ist
+    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2025-06.zim"  
+    startup_timeout_s: 7        
 
 # --- Logging -------------------------------------------------------------------
 logging:
-  # DEBUG, INFO, WARNING, ERROR
-  level: "INFO"
+  level: "INFO"   # DEBUG, INFO, WARNING, ERROR
   to_console: false
   dir: "logs"
   conversation_prefix: "conversation" 
@@ -70,4 +67,4 @@ security:
   prompt_injection_protection: true
   pii_protection: false
   output_blocklist: true
-  # Verhalten (wenn alle true): Input → block (Injection/PII). Output → PII maskieren, Secrets blocken.
+  # Input → block (Injection/PII). Output → PII maskieren, Secrets blocken.
