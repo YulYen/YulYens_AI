@@ -5,6 +5,7 @@ core:
   warm_up: false
   # Base URL für Ollama (protokoll + host + port) z.B. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"
+  include_date: true  # <— DER Schalter fürs aktuelle Datum im System-Prompt der personas
   
 # --- UI-Einstellungen ----------------------------------------------------------
 ui:

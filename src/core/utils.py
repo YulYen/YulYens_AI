@@ -19,10 +19,12 @@ def _local_ip() -> str:
     finally:
         s.close()
 
-def _system_prompt_with_date(name) -> str:
+def _system_prompt_with_date(name, include_date) -> str:
     base = get_prompt_by_name(name)
     today = datetime.now().strftime("%Y-%m-%d")
-    return f"{base} | Heute ist der {today}."
+    if include_date:
+        base =  f"{base} | Heute ist der {today}."
+    return base
 
 def _greeting_text(cfg, bot) -> str:
     tpl = cfg.texts["greeting"]
