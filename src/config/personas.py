@@ -50,7 +50,8 @@ system_prompts = [
         ),
         "reminder": None,
         "llm_options": {
-             "temperature" : 0.35},
+             "temperature" : 0.35,
+             "seed" : 42},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
         "image_path": "static/PETER.png"
     },
