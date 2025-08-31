@@ -23,6 +23,15 @@ def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]
     return patched
 
 class OllamaStreamer:
+    """
+    Wrapper um den Ollama‑Client mit Streaming‑Unterstützung.
+
+    Der Streamer nimmt System‑Prompt, Persona‑Name, LLM‑Optionen und
+    die Host‑URL des Ollama‑Servers entgegen.  Diese URL wird
+    ausschließlich aus der Konfiguration gelesen; es gibt keinen
+    stillen Fallback.  Die Klasse kümmert sich um Reminder‑Einblendung,
+    Logging und Output‑Moderation via SecurityGuard.
+    """
     def __init__(self, base_url, persona, persona_prompt, persona_options, model_name="plain", warm_up=False,
                  reminder=None, log_file="conversation.json", guard: Optional[BasicGuard] = None):
         self.model_name = model_name

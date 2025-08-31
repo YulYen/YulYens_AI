@@ -141,12 +141,20 @@ python -m spacy download de_core_news_lg
 
 ### Konfiguration (`config.yaml`)
 
+Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Beispiel:
+
 ```yaml
 core:
+  # Standardmodell für Ollama
   model_name: "leo-hessianai-13b-chat.Q5"
+  # URL des lokal laufenden Ollama‑Servers (Protokoll + Host + Port).
+  # Dieser Wert muss explizit gesetzt werden – es gibt keinen stillen Default.
+  ollama_url: "http://127.0.0.1:11434"
+  # Warm‑up: ob beim Start ein Dummy‑Aufruf zum Modell geschickt wird.
+  warm_up: false
 
 ui:
-  type: "terminal"   # Alternativen: "web", null (nur API)
+  type: "terminal"   # Alternativen: "web" oder null (nur API)
   web:
     host: "0.0.0.0"
     port: 7860
