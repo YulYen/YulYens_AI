@@ -3,6 +3,7 @@ import traceback
 import datetime, json, os
 from core.utils import clean_token
 from ollama import Client
+import hashlib
 import requests, logging
 from typing import Optional
 from security.tinyguard import BasicGuard, zeigefinger_message
@@ -108,6 +109,15 @@ class OllamaStreamer:
         if self.persona_options:
             options = self.persona_options
 
+         # --- Logging des vollständigen Payloads (Nachrichten und Optionen) ---+        # Wir berechnen eine kanonische JSON-Repräsentation und einen SHA-256‑Hash.
+        try:
+            _payload = {"messages": messages, "options": options}
+            _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+            _hash = hashlib.sha256(_canon.encode('utf-8')).hexdigest()
+            logging.debug(f"[OLLAMA INPUT] sha256={_hash} payload={_canon}")
+        except Exception as _e:
+            logging.warning(f"Unable to log Ollama input: {_e}")
+
         full_reply_parts = []
         try:
             stream = self._ollama_client.chat(
@@ -157,6 +167,14 @@ class OllamaStreamer:
             full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
+             # --- Logging des vollständigen Outputs ---
+             # Hashen und loggen der kompletten Antwort für Determinismus-Untersuchungen
+                try:
+                    _canon_out = full_reply
+                    _hash_out = hashlib.sha256(_canon_out.encode('utf-8')).hexdigest()
+                    logging.debug(f"[OLLAMA OUTPUT] sha256={_hash_out} content={_canon_out}")
+                except Exception as _e:
+                    logging.warning(f"Unable to log Ollama output: {_e}")
 
         except Exception as e:
             logging.error(f"Fehler bei stream():\n{traceback.format_exc()}")
