@@ -1,0 +1,8 @@
+FROM ./gpt-oss-20b-Q4_K_S.gguf
+
+TEMPLATE """<|start|>system<|message|>{{ .System }}<|end|>
+<|start|>user<|message|>{{ .Prompt }}<|end|>
+<|start|>assistant"""
+
+# WICHTIG: Bei Harmony beendet das Modell seine Ausgabe mit <|return|>.
+PARAMETER stop "<|return|>"
