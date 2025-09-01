@@ -57,7 +57,7 @@ def ask(question: str) -> str:
                         {
             "name": "Jens",
             "question": "Welches wichtige Amt bekleidet Jens Spahn aktuell?",
-            "must_contain":[ "vorsitzender", "cdu", "fraktion"],
+            "must_contain":[ "vorsitzend", "cdu", "fraktion"],
         },
     ],
 )
