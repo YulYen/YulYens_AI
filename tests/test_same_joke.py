@@ -23,7 +23,8 @@ def test_same_joke(client):
     #assert r2.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peeks hier servieren."'
+    # a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peeks hier servieren."' #LEO
+    a2 = 'Warum war der Byte immer so beliebt? – Weil er immer 8 Bits zusammenhielt und damit die ganze Party „byte“!' #GPT-OSS
 
 
     # Nicht leer, keine reinen Whitespaces
