@@ -1,6 +1,6 @@
 # streaming_core_ollama.py
 import traceback
-import datetime, json, os
+import datetime, json, os, time
 from core.utils import clean_token
 from ollama import Client
 import hashlib
@@ -120,6 +120,8 @@ class OllamaStreamer:
 
         full_reply_parts = []
         try:
+            t_start = time.time()
+            first_token_time = None
             stream = self._ollama_client.chat(
                 model=self.model_name,
                 messages=messages,
@@ -128,6 +130,8 @@ class OllamaStreamer:
             )
             buffer = ""
             for chunk in stream:
+                if first_token_time is None:
+                    first_token_time = time.time()
                 token = chunk.get("message", {}).get("content", "")
                 if token:
                     cleaned = clean_token(token)
@@ -163,6 +167,9 @@ class OllamaStreamer:
                     to_send = pol["text"]
                 yield to_send
 
+            #Performance loggen
+            t_end = time.time()
+            logging.info(f"model {self.model_name} options: {options} t_first_ms: {int((first_token_time - t_start)*1000)} t_total_ms: {int((t_end - t_start)*1000)}")
             # Finale Assistant-Antwort loggen
             full_reply = "".join(full_reply_parts).strip()
             if full_reply:
