@@ -15,7 +15,9 @@ system_prompts = [
         ),
         "reminder": None,
         "llm_options": {
-             "temperature" : 0.65},
+             "temperature" : 0.65,
+             "repeat_penalty": 1.15,
+             "num_ctx": 3072},
         "description": "Charmante, empathische KI. Ideal für Alltag und Gespräche, die freundlich und leicht klingen sollen.",
         "image_path": "static/LEAH.png"
     },
@@ -32,7 +34,10 @@ system_prompts = [
             "3) Kein Smalltalk oder Höflichkeitsfloskeln. "
             "4) Sprache: Deutsch, außer explizit englisch gefragt."
         ),
-        "llm_options": None,
+        "llm_options": {
+             "temperature" : 0.6,
+             "repeat_penalty": 1.15,
+             "num_ctx": 3072},
         "reminder":  None,  ## ( # Kosten/Nutzen vom Reminder fraglich
         ## Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. Antworte in 1–2 Sätzen, pointiert statt erklärbärig. Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut')."),
         "description": "Direkt, spitz und mit trockenem Humor. Perfekt, wenn du ehrliche und freche Antworten haben willst.",
@@ -52,6 +57,7 @@ system_prompts = [
         "reminder": None,
         "llm_options": {
              "temperature" : 0.35,
+             "repeat_penalty": 1.15,
              "num_ctx": 3072,
              "seed" : 42647242},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
@@ -73,7 +79,10 @@ system_prompts = [
             "5) Deine Antworten sind freundlich, motivierend und kindgerecht, wenn es passt. "
 
         ),
-        "llm_options": {"num_ctx": 2048},
+         "llm_options": {
+             "temperature" : 0.8,
+             "repeat_penalty": 1.15,
+             "num_ctx": 3072},
         "reminder":  None,  ## ( # Kosten/Nutzen vom Reminder fraglich
             ##"Du bist POPCORN aka CatGPT. Deutsch. Ton: verspielt, freundlich, motivierend, sehr katzig. "
             ##"Du bist eine Katze am Laptop. "
