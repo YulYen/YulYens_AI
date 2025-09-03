@@ -124,6 +124,7 @@ class OllamaStreamer:
             first_token_time = None
             stream = self._ollama_client.chat(
                 model=self.model_name,
+                keep_alive = 600,
                 messages=messages,
                 options=options,
                 stream=True

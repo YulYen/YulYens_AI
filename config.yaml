@@ -36,8 +36,8 @@ wiki:
   mode: offline
   # Port des lokalen Proxy (immer nötig)
   proxy_port: 8042
-  # Maximale Länge der Wiki-Snippets (Zeichen): 1600 empfohlen
-  snippet_limit: 1600
+  # Maximale Länge der Wiki-Snippets (Zeichen): 1200 bis 1600 empfohlen
+  snippet_limit: 1200
   timeout_connect: 5.0 
   timeout_read: 8.0
   offline:  # ---- nur relevant, wenn mode == "offline", d.h. nur für offline Wiki  ----

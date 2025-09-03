@@ -9,11 +9,15 @@ from api.app import app, set_provider
 
 @pytest.mark.slow
 @pytest.mark.ollama
+@pytest.mark.skip(reason="wackelt mit verschiedenen Modellen")
 def test_same_joke(client):
     """
     Erwartung: zweimal gleiche Frage → exakt gleiche Antwort.
     Voraussetzung: Persona-Optionen enthalten einen fixen Seed bzw. deterministische Settings.
     """
+
+    ## TODO @pytest.mark.skipif(model == "Leo13B", reason="Gleicher Witz Nur unter Leo stabil")
+
 
     prompt = "Erzähl bitte einen kurzen Nerd-Witz über Bytes."
     r1 = client.post("/ask", json={"question": prompt})
