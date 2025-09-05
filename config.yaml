@@ -1,7 +1,7 @@
 # --- Core-Einstellungen ----------------------------------------------------------
 core:
   # Standard-Modelname für den Start
-  model_name: "leo-hessianai-13b-chat.Q5" # z.B. ""gptoss20b-q4ks""  "mistral7b-local" oder "leo-hessianai-13b-chat.Q5" wie lokal in ollama erzeugt
+  model_name: "gptoss20b-q4ks" # z.B. ""gptoss20b-q4ks""  "mistral7b-local" oder "leo-hessianai-13b-chat.Q5" wie lokal in ollama erzeugt
   warm_up: false
   # Base URL für Ollama (protokoll + host + port) z.B. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"

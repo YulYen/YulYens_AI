@@ -122,61 +122,73 @@ class OllamaStreamer:
         try:
             t_start = time.time()
             first_token_time = None
-            stream = self._ollama_client.chat(
+
+            # stream_obj referenzieren, damit wir es im finally schließen können
+            stream_obj = self._ollama_client.chat(
                 model=self.model_name,
-                keep_alive = 600,
+                keep_alive=600,
                 messages=messages,
                 options=options,
                 stream=True
             )
-            buffer = ""
-            for chunk in stream:
-                if first_token_time is None:
-                    first_token_time = time.time()
-                token = chunk.get("message", {}).get("content", "")
-                if token:
-                    cleaned = clean_token(token)
-                    if not cleaned:
-                        continue
-                    buffer += cleaned
-                    full_reply_parts.append(cleaned)
 
-                    # --- SECURITY: minimal Output-Moderation ---
+            try:
+                for chunk in stream_obj:
+                    if first_token_time is None:
+                        first_token_time = time.time()
+                    token = chunk.get("message", {}).get("content", "")
+                    if token:
+                        cleaned = clean_token(token)
+                        if not cleaned:
+                            continue
+                        buffer += cleaned
+                        full_reply_parts.append(cleaned)
+
+                        to_send = buffer
+                        if self.guard:
+                            pol = self.guard.process_output(to_send)
+                            if pol["blocked"]:
+                                yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
+                                # Wichtig: nicht return, damit finally den Stream schließt
+                                break
+                            to_send = pol["text"]
+
+                        seps = [" ", "\n", "\t", "!", "?"]
+                        count = sum(to_send.count(sep) for sep in seps)
+                        logging.debug(f"Buffer:" + to_send + "###" + str(count))
+                        if count >= 1:
+                            yield to_send
+                            buffer = ""
+
+                # nach der Schleife (auch bei break) evtl. Rest senden
+                if buffer:
                     to_send = buffer
                     if self.guard:
                         pol = self.guard.process_output(to_send)
                         if pol["blocked"]:
                             yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
-                            return
-                        to_send = pol["text"]
-
-                    seps = [" ", "\n", "\t", "!", "?"]
-                    count = sum(to_send.count(sep) for sep in seps)
-                    logging.debug(f"Buffer:" + to_send + "###" + str(count))
-                    if count >= 1:
+                        else:
+                            yield pol["text"]
+                    else:
                         yield to_send
-                        buffer = ""
 
-            if buffer:
-                # --- SECURITY: finaler Rest ebenfalls entschärfen ---
-                to_send = buffer
-                if self.guard:
-                    pol = self.guard.process_output(to_send)
-                    if pol["blocked"]:
-                        yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
-                        return
-                    to_send = pol["text"]
-                yield to_send
+            finally:
+                #  Stream IMMER schließen, wenn möglich
+                try:
+                    close = getattr(stream_obj, "close", None)
+                    if callable(close):
+                        close()
+                except Exception:
+                    pass
 
-            #Performance loggen
+            #Performance loggen (unverändert)
             t_end = time.time()
             logging.info(f"model {self.model_name} options: {options} t_first_ms: {int((first_token_time - t_start)*1000)} t_total_ms: {int((t_end - t_start)*1000)}")
-            # Finale Assistant-Antwort loggen
+
+            # Finale Assistant-Antwort loggen (unverändert)
             full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
-             # --- Logging des vollständigen Outputs ---
-             # Hashen und loggen der kompletten Antwort für Determinismus-Untersuchungen
                 try:
                     _canon_out = full_reply
                     _hash_out = hashlib.sha256(_canon_out.encode('utf-8')).hexdigest()
@@ -195,7 +207,8 @@ class OllamaStreamer:
         messages = []
 
         # Feste Persona für respond_one_shot
-        persona = "PETER"
+        # persona = "PETER"
+        persona = "DORIS"
         
         # 1. Wikipedia-Snippet suchen
         wiki_hint, topic_title, snippet = lookup_wiki_snippet(user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout)
