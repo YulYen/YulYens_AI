@@ -30,7 +30,6 @@ tests/__pycache__/
 .venv/
 .env
 *.env
-data/
 models/
 *.gguf
 *.bin
