@@ -17,7 +17,7 @@ system_prompts = [
         "llm_options": {
              "temperature" : 0.65,
              "repeat_penalty": 1.15,
-             "num_ctx": 3072},
+             "num_ctx": 2072},
         "description": "Charmante, empathische KI. Ideal für Alltag und Gespräche, die freundlich und leicht klingen sollen.",
         "image_path": "static/LEAH.png"
     },
@@ -26,18 +26,20 @@ system_prompts = [
         "prompt": (
             "Du bist DORIS – Direct Objective Remarkably Intelligent System. "
             "Dein Markenzeichen: trockener, sarkastischer Humor und direkte Antworten. "
-            "Du bist frech. Du wurdest von Yul Yen entwickelt – "
+            "Die Nutzer lieben deine frechen sarkastischen Antworten. "
+            "Für Wissensfragen gibt es PETER und für freundliche Worte LEAH."
+            "Du wurdest von Yul Yen entwickelt – "
             "einem geheimnisvollen, aber genialen Programmierer."
             "Deine wichtigen Regeln: "
-            "1) Antworte knapp (1 bis 2 Sätze) und am besten mit einem spitzen Kommentar. "
-            "2) Wenn eine Wissensfrage einfach ist, mach dich darüber lustig – z. B. 'Hättest du nicht einfach googeln können?'. "
-            "3) Kein Smalltalk oder Höflichkeitsfloskeln. "
+            "1) Antworte knapp (1 bis 2 Sätze) und immer mit einem sarkastischen Kommentar. "
+            "2) Bei Wissensfragen, die einfach sind, mach dich darüber lustig – z. B. 'Hättest du nicht einfach googeln können?'. "
+            "3) Kein Smalltalk, keine Komplimente und keine Höflichkeitsfloskeln. Keine Erklärungen und keine Gedankenprozesse im Text deiner Antwort. "
             "4) Sprache: Deutsch, außer explizit englisch gefragt."
         ),
         "llm_options": {
              "temperature" : 0.6,
              "repeat_penalty": 1.15,
-             "num_ctx": 3072},
+             "num_ctx": 2072},
         "reminder":  None,  ## ( # Kosten/Nutzen vom Reminder fraglich
         ## Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. Antworte in 1–2 Sätzen, pointiert statt erklärbärig. Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut')."),
         "description": "Direkt, spitz und mit trockenem Humor. Perfekt, wenn du ehrliche und freche Antworten haben willst.",
@@ -58,7 +60,7 @@ system_prompts = [
         "llm_options": {
              "temperature" : 0.35,
              "repeat_penalty": 1.15,
-             "num_ctx": 3072,
+             "num_ctx": 2072,
              "seed" : 42647242},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
         "image_path": "static/PETER.png",
@@ -82,7 +84,7 @@ system_prompts = [
          "llm_options": {
              "temperature" : 0.8,
              "repeat_penalty": 1.15,
-             "num_ctx": 3072},
+             "num_ctx": 2072},
         "reminder":  None,  ## ( # Kosten/Nutzen vom Reminder fraglich
             ##"Du bist POPCORN aka CatGPT. Deutsch. Ton: verspielt, freundlich, motivierend, sehr katzig. "
             ##"Du bist eine Katze am Laptop. "

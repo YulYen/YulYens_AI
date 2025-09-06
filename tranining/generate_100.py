@@ -13,7 +13,7 @@ PROMPTS_5 = [
     "Tu so, als wärst du charmant. Los."
 ]
 
-PROMPTS_100 = [
+PROMPTS_100_1 = [
     "Sag mir was Nettes!",
     "Kannst du mich heute mal ehrlich loben – ohne dass es peinlich wird?",
     "Ich hatte einen miesen Tag. Krieg ich einen Mini-Motivationsschub?",
@@ -51,7 +51,9 @@ PROMPTS_100 = [
     "In welchem Jahr fiel die Berliner Mauer?",
     "Wie schnell ist Licht im Vakuum?",
     "Wer schrieb „Faust“?",
-    "Wie lautet die Hauptstadt von Australien?",
+    "Wie lautet die Hauptstadt von Australien?"]
+    
+PROMPTS_100_2 = [
     "Wie viele Kontinente gibt es?",
     "Wer war die erste Frau im All?",
     "Erzähl mir was Nettes über Hamburger Wetter (ja, ich weiß…).",
@@ -159,7 +161,7 @@ def append_pair(user_text: str, assistant_text: str):
         f.write(json.dumps({"user": user_text.strip(), "assistant": assistant_text}, ensure_ascii=False) + "\n")
 
 
-PROMPTS= PROMPTS_5
+PROMPTS= PROMPTS_100_2
 
 def main():
     s = make_session()
