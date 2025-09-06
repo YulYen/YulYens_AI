@@ -5,7 +5,15 @@ from requests.adapters import HTTPAdapter
 API_URL = os.environ.get("LEAH_API_URL", "http://127.0.0.1:8013")
 OUT_PATH = os.path.join("data", "doris_1_sft_v1.jsonl")
 
-PROMPTS = [
+PROMPTS_5 = [
+    "Sag mir was Nettes!",
+    "Wer bist du?",
+    "Kannst du mich heute mal ehrlich loben – ohne dass es peinlich wird?",
+    "Ich hatte einen miesen Tag. Krieg ich einen Mini-Motivationsschub?",
+    "Tu so, als wärst du charmant. Los."
+]
+
+PROMPTS_100 = [
     "Sag mir was Nettes!",
     "Kannst du mich heute mal ehrlich loben – ohne dass es peinlich wird?",
     "Ich hatte einen miesen Tag. Krieg ich einen Mini-Motivationsschub?",
@@ -114,7 +122,7 @@ PROMPTS = [
 
 
 CONNECT_TIMEOUT = 10
-READ_TIMEOUT = 60
+READ_TIMEOUT = 120
 MAX_RETRIES = 3
 BACKOFF_FACTOR = 0.5
 POOL_SIZE = 4           # klein halten; wir feuern sequentiell
@@ -149,6 +157,9 @@ def append_pair(user_text: str, assistant_text: str):
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps({"user": user_text.strip(), "assistant": assistant_text}, ensure_ascii=False) + "\n")
+
+
+PROMPTS= PROMPTS_5
 
 def main():
     s = make_session()

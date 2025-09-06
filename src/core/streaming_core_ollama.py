@@ -133,6 +133,7 @@ class OllamaStreamer:
             )
 
             try:
+                buffer = ""
                 for chunk in stream_obj:
                     if first_token_time is None:
                         first_token_time = time.time()
