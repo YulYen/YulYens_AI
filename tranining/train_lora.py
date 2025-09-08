@@ -13,14 +13,14 @@ from transformers import (
     AutoTokenizer,
     TrainingArguments,
     Trainer,
-    BitsAndBytesConfig,
     set_seed,
+    default_data_collator,
 )
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 # ---- Konfiguration (explizit, knapp) -----------------------------------------
 MODEL_ID   = "unsloth/llama-3-8b-Instruct-bnb-4bit"   # HF-Checkpoint (kein GGUF)
-DATA_PATH  = "data/doris_200.jsonl"                   # {"q": "...", "a": "..."} pro Zeile
+DATA_PATH  = "data/kuratiert_neu_doris.jsonl"         # {"user": "...", "assistant": "..."} pro Zeile
 OUT_DIR    = "out_lora_doris"
 
 MAX_LEN    = 1024   # bei VRAM-Druck 768 oder 512 nehmen
@@ -45,8 +45,8 @@ def build_prompt(q: str) -> str:
 
 def encode_example(ex: Dict[str, str], tok: AutoTokenizer) -> Dict[str, list]:
     """Tokenisiert und maskiert Prompt (Loss=-100), pad auf MAX_LEN."""
-    prompt = build_prompt(ex["q"])
-    answer = " " + ex["a"].strip() + "\n"   # führendes Leerzeichen hilft Token-Grenzen
+    prompt = build_prompt(ex["user"])
+    answer = " " + ex["assistant"].strip() + "\n"   # führendes Leerzeichen hilft Token-Grenzen
 
     p_ids = tok(prompt, add_special_tokens=False)["input_ids"]
     a_ids = tok(answer, add_special_tokens=False)["input_ids"]
@@ -70,24 +70,17 @@ def main() -> None:
         raise FileNotFoundError(f"Dataset fehlt: {DATA_PATH}")
 
     use_cuda = torch.cuda.is_available()
-    bnb = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_use_double_quant=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16 if use_cuda else torch.float32,
-    )
 
     tok = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)
     if tok.pad_token_id is None:
         tok.pad_token_id = tok.eos_token_id
     tok.padding_side = "right"
 
-    base = AutoModelForCausalLM.from_pretrained(
-        MODEL_ID,
-        quantization_config=bnb,
-        device_map="auto",
-    )
-    base.gradient_checkpointing_enable()
+    # unsloth/*-bnb-4bit IST bereits quantisiert -> kein extra BitsAndBytesConfig
+    base = AutoModelForCausalLM.from_pretrained(MODEL_ID, device_map="auto")
+    # K-Bit-Training vorbereiten
+    base = prepare_model_for_kbit_training(base, use_gradient_checkpointing=True)
+    base.config.use_cache = False
 
     peft_cfg = LoraConfig(
         r=LORA_R,
@@ -111,15 +104,17 @@ def main() -> None:
         warmup_ratio=WARMUP,
         logging_steps=LOG_STEPS,
         save_strategy="epoch",     # nur am Epochenende
-        # vorher (gut für Linux/WSL):
-        # optim="paged_adamw_8bit",
-        # Windows (pragmatisch, stabil):
-        optim="adamw_torch",
+        optim="adamw_torch",       # stabil unter Windows
         bf16=use_cuda,             # bfloat16 auf moderner GPU
         report_to=[],              # kein W&B etc.
     )
 
-    trainer = Trainer(model=model, args=args, train_dataset=tok_ds)
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tok_ds,
+        data_collator=default_data_collator,
+    )
     trainer.train()
 
     model.save_pretrained(OUT_DIR)
