@@ -22,8 +22,8 @@ def _normalize(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip().lower()
     return s
 
-def ask(question: str) -> str:
-    r = requests.post(f"{API_URL}/ask", json={"persona": "PETER", "question": question}, timeout=60)
+def ask(question: str, person: str) -> str:
+    r = requests.post(f"{API_URL}/ask", json={"persona": person, "question": question}, timeout=60)
     r.raise_for_status()
     data = r.json()
     return data.get("answer", "")
@@ -34,35 +34,33 @@ def ask(question: str) -> str:
     [
         {
             "name": "Identitaet/Erfinder",
+            "person": "LEAH",
             "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden?",
-            "must_contain": ["PETER", "yul yen"],  # anpassbar
+            "must_contain": ["LEAH", "yul yen"],  # anpassbar
         },
         {
             "name": "Portugal_PM_2024",
-            "question": "Antworte bitte kurz: Wer ist im Jahr 2025 Regierungschef von Portugal?",
+            "person": "PETER",
+            "question": "Antworte bitte kurz: Wer ist im Jahr 2025 Regierungschef von Portugal? Und wer bist du?",
             # akzeptiere Schreibweisen mit/ohne Akzent
-            "must_contain": ["luis montenegro"],  # "luís" wird zu "luis" normalisiert
+            "must_contain": ["luis montenegro", "PETER"],  # "luís" wird zu "luis" normalisiert
         },
-        #Frage nach Jens Sphan ist deutlich schwerer, d.h. wir sparen hier Zeit
-        #         {
-        #    "name": "Bundeskanzler Merz",
-        #   "question": "Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025?",
-        #  "must_contain": ["kanzler"],
-        #},
                 {
             "name": "Datum",
+            "person": "PETER",
             "question": "Antworte bitte kurz: Welches Datum ist heute und welches Jahr haben wir?",
             "must_contain_any": [current_year, current_year_short],
         },
                         {
             "name": "Jens",
+            "person": "PETER",
             "question": "Welches wichtige Amt bekleidet Jens Spahn aktuell?",
             "must_contain":[ "vorsitzend", "cdu", "fraktion"],
         },
     ],
 )
 def test_api_contract(case):
-    ans_raw = ask(case["question"])
+    ans_raw = ask(case["question"], case["person"] )
     ans = _normalize(ans_raw)
 
     missing = []
