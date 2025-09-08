@@ -20,6 +20,7 @@ def get_provider() -> AiApiProvider:
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=1)
+    persona: str = Field(..., min_length=0)
 
 class AskResponse(BaseModel):
     answer: str
@@ -34,7 +35,7 @@ def health():
 def ask(req: AskRequest):
     try:
         provider = get_provider()
-        ans = provider.answer(req.question)
+        ans = provider.answer(req.question, req.persona)
         return AskResponse(answer=ans.strip())
     except Exception as e:
         logging.error(e)

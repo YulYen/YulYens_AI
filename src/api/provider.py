@@ -16,7 +16,7 @@ class AiApiProvider:
 
 
 
-    def answer(self, question: str) -> str:
+    def answer(self, question: str, persona: str) -> str:
         q = (question or "").strip()
         if not q:
             return cfg.ui["texts"]["empty_question"]
@@ -27,5 +27,6 @@ class AiApiProvider:
             wiki_proxy_port=self.wiki_proxy_port,
             wiki_snippet_limit=self.wiki_snippet_limit,
             wiki_timeout=self.wiki_timeout,
+            persona=persona,
 
         ).strip()

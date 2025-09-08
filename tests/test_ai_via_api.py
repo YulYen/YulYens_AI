@@ -23,7 +23,7 @@ def _normalize(s: str) -> str:
     return s
 
 def ask(question: str) -> str:
-    r = requests.post(f"{API_URL}/ask", json={"question": question}, timeout=60)
+    r = requests.post(f"{API_URL}/ask", json={"persona": "PETER", "question": question}, timeout=60)
     r.raise_for_status()
     data = r.json()
     return data.get("answer", "")
