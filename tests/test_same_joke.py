@@ -9,26 +9,21 @@ from api.app import app, set_provider
 
 @pytest.mark.slow
 @pytest.mark.ollama
-@pytest.mark.skip(reason="wackelt mit verschiedenen Modellen")
+## TODO @pytest.mark.skipif(model =! "Leo13B", reason="Gleicher Witz Nur unter Leo stabil")
+#@pytest.mark.skip(reason="wackelt mit verschiedenen Modellen")
 def test_same_joke(client):
     """
     Erwartung: zweimal gleiche Frage → exakt gleiche Antwort.
     Voraussetzung: Persona-Optionen enthalten einen fixen Seed bzw. deterministische Settings.
     """
-
-    ## TODO @pytest.mark.skipif(model == "Leo13B", reason="Gleicher Witz Nur unter Leo stabil")
-
-
     prompt = "Erzähl bitte einen kurzen Nerd-Witz über Bytes."
-    r1 = client.post("/ask", json={"question": prompt})
-    #r2 = client.post("/ask", json={"question": prompt})
+    r1 = client.post("/ask", json={"question": prompt, "persona": "PETER"})
 
     assert r1.status_code == 200
-    #assert r2.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    # a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peeks hier servieren."' #LEO
-    a2 = 'Warum war der Byte immer so beliebt? – Weil er immer 8 Bits zusammenhielt und damit die ganze Party „byte“!' #GPT-OSS
+    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peeks hier servieren."' #LEO
+    #a2 = 'Warum war der Byte immer so beliebt? – Weil er immer 8 Bits zusammenhielt und damit die ganze Party „byte“!' #GPT-OSS
 
 
     # Nicht leer, keine reinen Whitespaces

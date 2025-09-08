@@ -27,7 +27,7 @@ class OllamaLLMCore:
         Führt einen Dummy‑Aufruf aus, um das Modell vorzuladen.
         :param model_name: Name des zu wärmenden Modells
         """
-        self._client.chathat(
+        self._client.chat(
             model=model_name,
             messages=[{"role": "user", "content": "..."}],
         )
@@ -47,6 +47,8 @@ class OllamaLLMCore:
         :param keep_alive: Keep‑Alive‑Timeout
         :returns: Iterator über die Antwort‑Chunks
         """
+
+
         return self._client.chat(
             model=model_name,
             keep_alive=keep_alive,
