@@ -3,7 +3,7 @@ import importlib.util as iu
 import torch, bitsandbytes as bnb
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-MODEL_ID = "unsloth/llama-3-8b-Instruct-bnb-4bit"
+MODEL_ID = "LeoLM/leo-hessianai-13b"
 
 # -------------------- Diagnose (GPU/BnB/Sanity) --------------------
 print("=== Diagnose ===")

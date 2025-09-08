@@ -1,88 +1,120 @@
-# streaming_core_ollama.py
-import traceback
-import datetime, json, os, time
-from core.utils import clean_token
-from ollama import Client
+"""
+Streaming‑Provider mit Persona‑Handling, Reminder, Logging und Sicherheitschecks.
+
+Alle direkten Ollama‑Aufrufe sind in einer separaten Klasse (`OllamaLLMCore`)
+gekapselt. Diese Klasse kümmert sich um Prompt‑Einblendung, Reminder,
+Logging (conversation.log) und optionale Output‑Moderation via SecurityGuard.
+"""
+
+from __future__ import annotations
+
+import datetime
 import hashlib
-import requests, logging
-from typing import Optional
+import json
+import logging
+import os
+import time
+import traceback
+from typing import Any, Dict, List, Optional
+
+import requests
+
+from core.utils import clean_token
 from security.tinyguard import BasicGuard, zeigefinger_message
+from .ollama_llm_core import OllamaLLMCore
+
 
 def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]:
     """
-    Fügt VOR der aktuellen User-Message eine kurze system-Reminder-Message ein.
-    Minimalinvasiv: Wir gehen davon aus, dass die letzte Message die User-Frage ist.
+    Fügt vor der aktuellen User‑Message eine kurze System‑Reminder‑Message ein.
+    Wir duplizieren die Liste, um die Caller‑Referenz nicht zu verändern.
     """
     if not messages:
         return messages
-
-    # wir duplizieren die Liste, um nichts an der Caller-Referenz zu ändern
     patched = list(messages)
-    # Reminder VOR die letzte Message (die aktuelle User-Frage) setzen
     patched.insert(len(patched) - 1, {"role": "system", "content": str(reminder)})
     logging.info(f"Reminder injected: {reminder}")
     return patched
 
+
 class YulYenStreamingProvider:
     """
-    Wrapper um den Ollama‑Client mit Streaming‑Unterstützung.
+    Wrapper um das LLM mit Streaming‑Unterstützung.
 
-    Der Streamer nimmt System‑Prompt, Persona‑Name, LLM‑Optionen und
-    die Host‑URL des Ollama‑Servers entgegen.  Diese URL wird
-    ausschließlich aus der Konfiguration gelesen; es gibt keinen
-    stillen Fallback.  Die Klasse kümmert sich um Reminder‑Einblendung,
-    Logging und Output‑Moderation via SecurityGuard.
+    Der Streamer nimmt System‑Prompt, Persona‑Name, LLM‑Optionen und die
+    Host‑URL entgegen. Die Klasse kümmert sich um Reminder‑Einblendung,
+    Logging (conversation.log) und optional um Output‑Moderation via SecurityGuard.
+    Der eigentliche LLM‑Aufruf wird an `OllamaLLMCore` delegiert.
     """
-    def __init__(self, base_url, persona, persona_prompt, persona_options, model_name="plain", warm_up=False,
-                 reminder=None, log_file="conversation.json", guard: Optional[BasicGuard] = None):
+
+    def __init__(
+        self,
+        base_url: str,
+        persona: str,
+        persona_prompt: str,
+        persona_options: Dict[str, Any],
+        model_name: str = "plain",
+        warm_up: bool = False,
+        reminder: Optional[str] = None,
+        log_file: str = "conversation.json",
+        guard: Optional[BasicGuard] = None,
+        *,
+        llm_core: Optional[OllamaLLMCore] = None,
+    ) -> None:
         self.model_name = model_name
-        self.reminder = None
+        self.reminder = reminder or None
         self.persona = persona
         self.persona_prompt = persona_prompt
         self.persona_options = persona_options
-        self._ollama_client = Client(host=base_url)
-        if reminder:
-            self.reminder = reminder
+
+        # LLM‑Core initialisieren oder injiziertes verwenden
+        self._llm_core = llm_core or OllamaLLMCore(base_url)
+
+        # Logging konfigurieren
         self._logs_dir = "logs"
         os.makedirs(self._logs_dir, exist_ok=True)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
         self.guard: Optional[BasicGuard] = guard
-       
+
         if warm_up:
-            logging.info("Starte aufwärmen des Models:" + model_name)
+            logging.info("Starte Aufwärmen des Modells: %s", model_name)
             self._warm_up()
 
     def set_guard(self, guard: BasicGuard) -> None:
+        """Setzt den Security‑Guard für spätere Checks."""
         self.guard = guard
 
-    def _warm_up(self):
-        logging.info(f"Sende Dummy zur Modellaktivierung: {self.model_name}")
+    def _warm_up(self) -> None:
+        """Ruft das LLM einmal auf, um es vorzuheizen."""
+        logging.info("Sende Dummy zur Modellaktivierung: %s", self.model_name)
         try:
-            self._ollama_client.chathat(
-                model=self.model_name,
-                messages=[{"role": "user", "content": "..."}]
-            )
+            self._llm_core.warm_up(self.model_name)
             logging.info("Modell erfolgreich vorgewärmt.")
         except Exception:
-            logging.error(f"Fehler beim Aufwärmen des Modells:\n{traceback.format_exc()}")
+            logging.error("Fehler beim Aufwärmen des Modells:\n%s", traceback.format_exc())
 
-    def _append_conversation_log(self, role, content):
+    def _append_conversation_log(self, role: str, content: str) -> None:
+        """Schreibt einen Eintrag in die conversation.log."""
         try:
             entry = {
                 "ts": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
                 "model": self.model_name,
-                "bot" : self.persona,
-                "options" : self.persona_options,
+                "bot": self.persona,
+                "options": self.persona_options,
                 "role": role,
-                "content": content
+                "content": content,
             }
             with open(self.conversation_log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
-            logging.error(f"Fehler beim Schreiben des Conversation_log : {e}")
+            logging.error("Fehler beim Schreiben des Conversation_log: %s", e)
 
-    def stream(self, messages):
-        # Vorab: letzte User-Message prüfen (unverändert)
+    def stream(self, messages: List[Dict[str, Any]]):
+        """
+        Generator, der tokenweise Antworten aus dem LLM zurückliefert.
+        Reminder‑Injektion, Logging und Security‑Checks bleiben erhalten.
+        """
+        # Vorab: letzte User‑Message prüfen
         if self.guard:
             for m in reversed(messages):
                 if m.get("role") == "user":
@@ -92,44 +124,43 @@ class YulYenStreamingProvider:
                         return
                     break
 
+        # System‑Prompt voranstellen
         if self.persona_prompt:
             messages = [{"role": "system", "content": self.persona_prompt}] + messages
             logging.debug(messages)
 
+        # Reminder injizieren
         if self.reminder:
             messages = _apply_reminder_injection(messages, self.reminder)
 
-        # Letzte User-Nachricht ins Log (unverändert)
+        # Letzte User‑Nachricht im Log festhalten
         for m in reversed(messages):
             if m.get("role") == "user" and m.get("content"):
                 self._append_conversation_log("user", m["content"])
                 break
 
-        options = {}
+        # LLM‑Options übernehmen
+        options: Dict[str, Any] = {}
         if self.persona_options:
             options = self.persona_options
 
-         # --- Logging des vollständigen Payloads (Nachrichten und Optionen) ---+        # Wir berechnen eine kanonische JSON-Repräsentation und einen SHA-256‑Hash.
+        # Payload (Messages + Options) hashen und loggen
         try:
             _payload = {"messages": messages, "options": options}
-            _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
-            _hash = hashlib.sha256(_canon.encode('utf-8')).hexdigest()
-            logging.debug(f"[OLLAMA INPUT] sha256={_hash} payload={_canon}")
-        except Exception as _e:
-            logging.warning(f"Unable to log Ollama input: {_e}")
+            _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
+            logging.debug("[OLLAMA INPUT] sha256=%s payload=%s", _hash, _canon)
+        except Exception as exc:
+            logging.warning("Unable to log Ollama input: %s", exc)
 
         full_reply_parts = []
         try:
             t_start = time.time()
-            first_token_time = None
+            first_token_time: Optional[float] = None
 
-            # stream_obj referenzieren, damit wir es im finally schließen können
-            stream_obj = self._ollama_client.chat(
-                model=self.model_name,
-                keep_alive=600,
-                messages=messages,
-                options=options,
-                stream=True
+            # Delegation an den LLM‑Core
+            stream_obj = self._llm_core.stream_chat(
+                model_name=self.model_name, messages=messages, options=options, keep_alive=600
             )
 
             try:
@@ -149,19 +180,21 @@ class YulYenStreamingProvider:
                         if self.guard:
                             pol = self.guard.process_output(to_send)
                             if pol["blocked"]:
-                                yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
-                                # Wichtig: nicht return, damit finally den Stream schließt
+                                yield zeigefinger_message(
+                                    {"reason": pol.get("reason") or "blocked_keyword", "detail": ""}
+                                )
                                 break
                             to_send = pol["text"]
 
+                        # Batching heuristisch – Senden, wenn mindestens ein Separator
                         seps = [" ", "\n", "\t", "!", "?"]
                         count = sum(to_send.count(sep) for sep in seps)
-                        logging.debug(f"Buffer:" + to_send + "###" + str(count))
+                        logging.debug("Buffer:" + to_send + "###" + str(count))
                         if count >= 1:
                             yield to_send
                             buffer = ""
 
-                # nach der Schleife (auch bei break) evtl. Rest senden
+                # Rest senden
                 if buffer:
                     to_send = buffer
                     if self.guard:
@@ -174,7 +207,7 @@ class YulYenStreamingProvider:
                         yield to_send
 
             finally:
-                #  Stream IMMER schließen, wenn möglich
+                # Stream immer schließen, wenn möglich
                 try:
                     close = getattr(stream_obj, "close", None)
                     if callable(close):
@@ -182,71 +215,99 @@ class YulYenStreamingProvider:
                 except Exception:
                     pass
 
-            #Performance loggen (unverändert)
+            # Performance loggen
             t_end = time.time()
-            logging.info(f"model {self.model_name} options: {options} t_first_ms: {int((first_token_time - t_start)*1000)} t_total_ms: {int((t_end - t_start)*1000)}")
+            if first_token_time is not None:
+                t_first_ms = int((first_token_time - t_start) * 1000)
+            else:
+                t_first_ms = None
+            logging.info(
+                "model %s options: %s t_first_ms: %s t_total_ms: %s",
+                self.model_name,
+                options,
+                t_first_ms,
+                int((t_end - t_start) * 1000),
+            )
 
-            # Finale Assistant-Antwort loggen (unverändert)
+            # Finale Assistant‑Antwort loggen
             full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
                 try:
                     _canon_out = full_reply
-                    _hash_out = hashlib.sha256(_canon_out.encode('utf-8')).hexdigest()
-                    logging.debug(f"[OLLAMA OUTPUT] sha256={_hash_out} content={_canon_out}")
-                except Exception as _e:
-                    logging.warning(f"Unable to log Ollama output: {_e}")
+                    _hash_out = hashlib.sha256(_canon_out.encode("utf-8")).hexdigest()
+                    logging.debug("[OLLAMA OUTPUT] sha256=%s content=%s", _hash_out, _canon_out)
+                except Exception as exc:
+                    logging.warning("Unable to log Ollama output: %s", exc)
 
-        except Exception as e:
-            logging.error(f"Fehler bei stream():\n{traceback.format_exc()}")
-            err = f"[FEHLER] Ollama antwortet nicht korrekt: {str(e)}"
+        except Exception:
+            logging.error("Fehler bei stream():\n%s", traceback.format_exc())
+            err = "[FEHLER] Ollama antwortet nicht korrekt."
             self._append_conversation_log("assistant", err)
             yield err
 
+    def respond_one_shot(
+        self,
+        user_input: str,
+        persona: str,
+        keyword_finder,
+        wiki_mode: str,
+        wiki_proxy_port: int,
+        wiki_snippet_limit: int,
+        wiki_timeout: tuple[float, float],
+    ) -> str:
+        """
+        Convenience‑Methode für die API: Führt einen einzigen Prompt aus
+        und liefert die komplette Antwort als String zurück.
+        """
+        messages: List[Dict[str, Any]] = []
 
-    def respond_one_shot(self, user_input: str, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout) -> str:
-        messages = []
+        # Wikipedia‑Snippet suchen
+        wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+            user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout
+        )
 
-        # Feste Persona für respond_one_shot
-        # persona = "PETER"
-        persona = "DORIS"
-        
-        # 1. Wikipedia-Snippet suchen
-        wiki_hint, topic_title, snippet = lookup_wiki_snippet(user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout)
-
-        # 2. Wikipedia-Kontext (falls vorhanden) als System-Nachrichten anhängen
+        # Kontext anhängen
         if snippet:
             inject_wiki_context(messages, topic_title, snippet)
 
-        # 3. Nutzerfrage als letzte Nachricht hinzufügen
+        # Nutzerfrage als letzte Nachricht
         messages.append({"role": "user", "content": user_input})
 
-        # Vor LLM: Input prüfen
+        # Guard‑Input prüfen
         if self.guard:
             res_in = self.guard.check_input(user_input or "")
             if not res_in["ok"]:
                 return zeigefinger_message(res_in)
 
-        # 4. LLM ausführen und gesamte Antwort sammeln
+        # LLM ausführen und Antwort sammeln
         full_reply = run_llm_collect(self, messages)
 
-        # Nach LLM: Output prüfen
+        # Guard‑Output prüfen
         if self.guard:
             res_out = self.guard.check_output(full_reply or "")
             if not res_out["ok"]:
                 return zeigefinger_message(res_out)
-            
+
         return full_reply
-    
 
 
-
-def lookup_wiki_snippet(question: str, persona_name: str, keyword_finder, wiki_mode: str, proxy_port: int,
-                        limit: int, timeout: tuple[float, float]) -> tuple[str, str, str]:
-    snippet = None
-    wiki_hint = None
-    topic_title = None
-    proxy_base = "http://localhost:"+str(proxy_port)
+def lookup_wiki_snippet(
+    question: str,
+    persona_name: str,
+    keyword_finder,
+    wiki_mode: str,
+    proxy_port: int,
+    limit: int,
+    timeout: tuple[float, float],
+) -> tuple[str, str, str]:
+    """
+    Hilfsfunktion: Holt ein Wikipedia‑Snippet über einen lokalen Proxy.
+    """
+    snippet: Optional[str] = None
+    wiki_hint: Optional[str] = None
+    topic_title: Optional[str] = None
+    proxy_base = "http://localhost:" + str(proxy_port)
 
     if not keyword_finder:
         return (None, None, None)
@@ -268,62 +329,35 @@ def lookup_wiki_snippet(question: str, persona_name: str, keyword_finder, wiki_m
             else:
                 wiki_hint = f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}"
         except Exception as e:
-            logging.error(f"[WIKI EXC] topic='{topic}' err={e}")
+            logging.error("[WIKI EXC] topic='%s' err=%s", topic, e)
             wiki_hint = f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*{topic}"
     return (wiki_hint, topic_title, snippet)
 
+
 def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
     """
-    Inject Wikipedia context into the message history as system prompts.
-
-    Fügt (sofern ein Wikipedia-Snippet vorhanden ist) zwei System-Nachrichten in die gegebene 
-    Nachrichten-History ein: eine Guardrail-Nachricht und eine Kontext-Nachricht mit dem Wiki-Text.
-
-    Parameter:
-        history (list): Das Nachrichten-Array (Liste von {"role": ..., "content": ...}-Dictionaries), 
-                        das um den Wiki-Kontext erweitert werden soll.
-        topic (str): Titel des Wikipedia-Themas, passend zum Snippet (z.B. "Albert_Einstein"). 
-                     Wird in der Nachricht in lesbarer Form (Unterstriche→Leerzeichen) angezeigt.
-        snippet (str): Der aus Wikipedia extrahierte Textausschnitt. Falls None oder leer, 
-                       wird kein Kontext hinzugefügt.
-
-    Rückgabe:
-        None – die `history`-Liste wird direkt modifiziert.
+    Füge (falls ein Wikipedia‑Snippet vorhanden ist) zwei System‑Nachrichten an:
+    eine Guardrail‑Nachricht und eine Kontext‑Nachricht mit dem Wiki‑Text.
     """
     if not snippet:
-        return  # Nichts zu tun, wenn kein Wiki-Snippet vorhanden ist
-
-    # Guardrail-Systemnachricht: Modell anweisen, nur diesen Kontext zu nutzen
+        return
     guardrail = (
         "Nutze ausschließlich den folgenden Kontext aus Wikipedia. "
         "Wenn etwas dort nicht steht, sag knapp, dass du es nicht sicher weißt."
     )
     history.append({"role": "system", "content": guardrail})
-
-    # Kontext-Systemnachricht mit dem Wikipedia-Ausschnitt
     context_message = (
         f"Kontext zum Thema {topic.replace('_', ' ')}: "
         f"[Quelle: Wikipedia] {snippet}"
     )
     history.append({"role": "system", "content": context_message})
 
-def run_llm_collect(streamer: YulYenStreamingProvider, messages: list[dict]) -> str:
+
+def run_llm_collect(streamer: YulYenStreamingProvider, messages: List[Dict[str, Any]]) -> str:
     """
-    Execute the LLM stream and collect all tokens into a single response string.
-
-    Parameter:
-        streamer (OllamaStreamer): Der LLM-Streamer, der verwendet werden soll. Dieser stellt die 
-                                   Methode `.stream(messages)` bereit, welche tokenweise antwortet.
-        messages (list[dict]): Die Nachrichten-Historie (Liste von Message-Dictionaries), 
-                               die an das LLM geschickt werden soll.
-
-    Rückgabe:
-        str: Die vollständige Antwort des LLM (alle empfangenen Tokens als zusammengesetzter String, 
-             ohne führende/trailing Leerzeichen).
+    Führt das Streaming aus und sammelt alle Tokens zu einer Antwort.
     """
     full_reply_parts = []
     for token in streamer.stream(messages=messages):
         full_reply_parts.append(token)
-    # Alle gesammelten Token zu einem String verbinden und säubern
-    full_reply = "".join(full_reply_parts).strip()
-    return full_reply
+    return "".join(full_reply_parts).strip()
