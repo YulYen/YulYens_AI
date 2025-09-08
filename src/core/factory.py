@@ -87,7 +87,6 @@ class AppFactory:
                 return None
             from api.provider import AiApiProvider
             self._api_provider = AiApiProvider(
-                self.get_streamer_for_persona("DORIS"),
                 keyword_finder=self.get_keyword_finder(),
                 wiki_mode=self._cfg.wiki["mode"],
                 wiki_proxy_port=int(self._cfg.wiki["proxy_port"]),
@@ -96,6 +95,7 @@ class AppFactory:
                     float(self._cfg.wiki["timeout_connect"]),
                     float(self._cfg.wiki["timeout_read"]),
                 ),
+                factory=self,
             )
         return self._api_provider
 
