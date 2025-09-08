@@ -6,7 +6,7 @@ from typing import Optional
 
 from config.config_singleton import Config
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
-from core.streaming_core_ollama import OllamaStreamer
+from core.streaming_provider import YulYenStreamingProvider
 from typing import Optional
 from security.tinyguard import BasicGuard, zeigefinger_message
 from ui.terminal_ui import TerminalUI
@@ -26,7 +26,7 @@ class AppFactory:
     def __init__(self) -> None:
         self._cfg = Config()
         self._keyword_finder: Optional[SpacyKeywordFinder] = None
-        self._streamer: Optional[OllamaStreamer] = None
+        self._streamer: Optional[YulYenStreamingProvider] = None
         self._api_provider = None
         self._ui = None  # TerminalUI oder WebUI
 
@@ -43,7 +43,7 @@ class AppFactory:
         return self._keyword_finder
 
     
-    def get_streamer_for_persona(self, persona_name: str) -> OllamaStreamer:
+    def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
         core = self._cfg.core
         persona_prompt = utils._system_prompt_with_date(persona_name, core["include_date"]) # Prompt der Persona laden
@@ -51,7 +51,7 @@ class AppFactory:
         options = personas.get_options(persona_name)  
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
-        streamer = OllamaStreamer(
+        streamer = YulYenStreamingProvider(
             base_url=core["ollama_url"],
             model_name=core["model_name"],
             warm_up=bool(core.get("warm_up", False)),

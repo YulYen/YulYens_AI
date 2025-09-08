@@ -23,7 +23,7 @@ def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]
     logging.info(f"Reminder injected: {reminder}")
     return patched
 
-class OllamaStreamer:
+class YulYenStreamingProvider:
     """
     Wrapper um den Ollama‑Client mit Streaming‑Unterstützung.
 
@@ -307,7 +307,7 @@ def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
     )
     history.append({"role": "system", "content": context_message})
 
-def run_llm_collect(streamer: OllamaStreamer, messages: list[dict]) -> str:
+def run_llm_collect(streamer: YulYenStreamingProvider, messages: list[dict]) -> str:
     """
     Execute the LLM stream and collect all tokens into a single response string.
 

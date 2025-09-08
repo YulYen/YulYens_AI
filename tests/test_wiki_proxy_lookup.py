@@ -1,6 +1,6 @@
 # tests/test_wiki_proxy_lookup.py
 import pytest
-from core.streaming_core_ollama import lookup_wiki_snippet
+from core.streaming_provider import lookup_wiki_snippet
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 def test_lookup_wiki_snippet_for_germany():

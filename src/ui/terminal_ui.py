@@ -9,7 +9,7 @@ from core import utils
 
 
 # Gemeinsame Core-Utilities & Streamer
-from core.streaming_core_ollama import (
+from core.streaming_provider import (
     lookup_wiki_snippet,
     inject_wiki_context,
 )
