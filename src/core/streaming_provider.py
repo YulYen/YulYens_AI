@@ -313,6 +313,8 @@ def lookup_wiki_snippet(
     topic_title: Optional[str] = None
     proxy_base = "http://localhost:" + str(proxy_port)
 
+
+
     if not keyword_finder:
         return (None, None, None)
 
@@ -321,18 +323,20 @@ def lookup_wiki_snippet(
         online_flag = "1" if wiki_mode == "online" else "0"
         url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
         try:
-            r = requests.get(url, timeout=timeout)
-            if r.status_code == 200:
-                data = r.json()
+            proxy_respone = requests.get(url, timeout=timeout)
+
+            if proxy_respone.status_code == 200:
+                data = proxy_respone.json()
                 text = (data.get("text") or "").replace("\r", " ").strip()
                 snippet = text[:limit]
                 wiki_hint = data.get("wiki_hint")
                 topic_title = topic
-            elif r.status_code == 404:
+            elif proxy_respone.status_code == 404:
                 wiki_hint = f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}"
             else:
                 wiki_hint = f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}"
         except Exception as e:
+            breakpoint()
             logging.error("[WIKI EXC] topic='%s' err=%s", topic, e)
             wiki_hint = f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*{topic}"
     return (wiki_hint, topic_title, snippet)

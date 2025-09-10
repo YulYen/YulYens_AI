@@ -1,11 +1,8 @@
 # tests/test_api_contract.py
-import os
 import re
 import unicodedata
-import requests
 import pytest
 
-API_URL = os.environ.get("LEAH_API_URL", "http://127.0.0.1:8013")
 
 from datetime import datetime
 
@@ -22,13 +19,12 @@ def _normalize(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip().lower()
     return s
 
-def ask(question: str, person: str) -> str:
-    r = requests.post(f"{API_URL}/ask", json={"persona": person, "question": question}, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    return data.get("answer", "")
+def ask(question: str, person: str, client) -> str:
+    r1 = client.post("/ask", json={"question": question, "persona": person})
+    return  r1.json().get("answer", "")
 
 @pytest.mark.slow
+@pytest.mark.ollama
 @pytest.mark.parametrize(
     "case",
     [
@@ -59,8 +55,8 @@ def ask(question: str, person: str) -> str:
         },
     ],
 )
-def test_api_contract(case):
-    ans_raw = ask(case["question"], case["person"] )
+def test_api_contract(case, client_with_date_and_wiki):
+    ans_raw = ask(case["question"], case["person"], client_with_date_and_wiki)
     ans = _normalize(ans_raw)
 
     missing = []

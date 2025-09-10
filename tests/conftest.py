@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 from config.config_singleton import Config
 from api.app import app, set_provider
 from core.factory import AppFactory
+from launch import  start_wiki_proxy_thread, ensure_kiwix_running_if_offlinemode_and_autostart
 
 @pytest.fixture(scope="function")
 def client():
@@ -16,6 +17,27 @@ def client():
     # Provider aus Factory erstellen und injizieren
     factory = AppFactory()
     set_provider(factory.get_api_provider())
+    # TestClient bereitstellen
+    client = TestClient(app)
+    yield client
+    # Aufräumen: Provider zurücksetzen und Config löschen
+    set_provider(None)
+    Config.reset_instance()
+
+@pytest.fixture(scope="function")
+def client_with_date_and_wiki():
+    # Config-Singleton zurücksetzen und Test-Config laden
+    Config.reset_instance()
+    cfg = Config("config.yaml")
+
+    # Wiki starten
+    start_wiki_proxy_thread()
+    ensure_kiwix_running_if_offlinemode_and_autostart(cfg)
+
+    # Provider aus Factory erstellen und injizieren
+    factory = AppFactory()
+    set_provider(factory.get_api_provider())
+
     # TestClient bereitstellen
     client = TestClient(app)
     yield client
