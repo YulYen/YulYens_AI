@@ -1,8 +1,9 @@
 """
 Streaming‑Provider mit Persona‑Handling, Reminder, Logging und Sicherheitschecks.
 
-Alle direkten Ollama‑Aufrufe sind in einer separaten Klasse (`OllamaLLMCore`)
-gekapselt. Diese Klasse kümmert sich um Prompt‑Einblendung, Reminder,
+Alle direkten Aufrufe an das eigentliche LLM werden durch einen
+``LLMCore`` abstrahiert (z. B. ``OllamaLLMCore`` oder ``DummyLLMCore``).
+Diese Klasse kümmert sich um Prompt‑Einblendung, Reminder,
 Logging (conversation.log) und optionale Output‑Moderation via SecurityGuard.
 """
 
@@ -21,6 +22,9 @@ import requests
 
 from core.utils import clean_token
 from security.tinyguard import BasicGuard, zeigefinger_message
+
+# LLM‑Interface importieren
+from .llm_core import LLMCore
 from .ollama_llm_core import OllamaLLMCore
 
 
@@ -44,7 +48,7 @@ class YulYenStreamingProvider:
     Der Streamer nimmt System‑Prompt, Persona‑Name, LLM‑Optionen und die
     Host‑URL entgegen. Die Klasse kümmert sich um Reminder‑Einblendung,
     Logging (conversation.log) und optional um Output‑Moderation via SecurityGuard.
-    Der eigentliche LLM‑Aufruf wird an `OllamaLLMCore` delegiert.
+    Der eigentliche LLM‑Aufruf wird an ein ``LLMCore`` delegiert.
     """
 
     def __init__(
@@ -59,7 +63,7 @@ class YulYenStreamingProvider:
         log_file: str = "conversation.json",
         guard: Optional[BasicGuard] = None,
         *,
-        llm_core: Optional[OllamaLLMCore] = None,
+        llm_core: Optional[LLMCore] = None,
     ) -> None:
         self.model_name = model_name
         self.reminder = reminder or None
@@ -68,7 +72,7 @@ class YulYenStreamingProvider:
         self.persona_options = persona_options
 
         # LLM‑Core initialisieren oder injiziertes verwenden
-        self._llm_core = llm_core or OllamaLLMCore(base_url)
+        self._llm_core: LLMCore = llm_core or OllamaLLMCore(base_url)
 
         # Logging konfigurieren
         self._logs_dir = "logs"
@@ -149,9 +153,9 @@ class YulYenStreamingProvider:
             _payload = {"messages": messages, "options": options}
             _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
             _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
-            logging.debug("[OLLAMA INPUT] sha256=%s payload=%s", _hash, _canon)
+            logging.debug("[LLM INPUT] sha256=%s payload=%s", _hash, _canon)
         except Exception as exc:
-            logging.warning("Unable to log Ollama input: %s", exc)
+            logging.warning("Unable to log OLLM llama input: %s", exc)
 
         full_reply_parts = []
         try:
@@ -236,13 +240,13 @@ class YulYenStreamingProvider:
                 try:
                     _canon_out = full_reply
                     _hash_out = hashlib.sha256(_canon_out.encode("utf-8")).hexdigest()
-                    logging.debug("[OLLAMA OUTPUT] sha256=%s content=%s", _hash_out, _canon_out)
+                    logging.debug("[LLM OUTPUT] sha256=%s content=%s", _hash_out, _canon_out)
                 except Exception as exc:
-                    logging.warning("Unable to log Ollama output: %s", exc)
+                    logging.warning("Unable to log LLM output: %s", exc)
 
         except Exception:
             logging.error("Fehler bei stream():\n%s", traceback.format_exc())
-            err = "[FEHLER] Ollama antwortet nicht korrekt."
+            err = "[FEHLER] LLM antwortet nicht korrekt."
             self._append_conversation_log("assistant", err)
             yield err
 

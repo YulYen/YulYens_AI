@@ -61,7 +61,7 @@ system_prompts = [
              "temperature" : 0.35,
              "repeat_penalty": 1.15,
              "num_ctx": 2072,
-             "seed" : 42647242},
+             "seed" : 42},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
         "image_path": "static/PETER.png",
     },

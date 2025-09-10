@@ -22,9 +22,7 @@ def test_same_joke(client):
     assert r1.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peeks hier servieren."' #LEO
-    #a2 = 'Warum war der Byte immer so beliebt? – Weil er immer 8 Bits zusammenhielt und damit die ganze Party „byte“!' #GPT-OSS
-
+    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."' #LEO
 
     # Nicht leer, keine reinen Whitespaces
     assert a1.strip() and a2.strip()
