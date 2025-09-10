@@ -20,6 +20,8 @@ class ModelVariant(str, Enum):
     LARGE = "de_core_news_lg"
 
 class SpacyKeywordFinder:
+    """Findet relevante Stichwörter in deutschem Text für die Wikipedia-Suche."""
+
     def __init__(self, variant):
         self.model_name = variant.value
         logging.info(f"Lade spaCy-Modell: {self.model_name}")

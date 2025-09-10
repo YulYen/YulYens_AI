@@ -5,6 +5,8 @@ cfg = Config()
 
 
 class AiApiProvider:
+    """Stellt KI-Antworten über die API bereit (One-Shot)."""
+
     def __init__(self, *, keyword_finder, wiki_mode,
                  wiki_proxy_port, wiki_snippet_limit, wiki_timeout, factory):
         self.keyword_finder = keyword_finder
@@ -17,6 +19,8 @@ class AiApiProvider:
 
 
     def answer(self, question: str, persona: str) -> str:
+        """Bearbeitet eine Frage mit gegebener Persona und gibt die Antwort als Text zurück."""
+
         q = (question or "").strip()
         if not q:
             return cfg.ui["texts"]["empty_question"]

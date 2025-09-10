@@ -1,11 +1,11 @@
 # Yul Yen’s AI Orchestra
 
 **Note (English):**  
-This is a private project and repository. The short introduction is written in English in case someone outside Germany stumbles upon it – but from here on the documentation continues in German, since the AI personas (Leah, Doris, Peter) are primarily designed to operate in German.  
+This is a private project and repository. The short introduction is written in English in case someone outside Germany stumbles upon it – but from here on the documentation continues in German, since the AI personas (Leah, Doris, Peter, Popcorn) are primarily designed to operate in German.  
 
 *Yul Yen’s AI Orchestra is a local AI project with multiple personas, designed for private use and experimentation.*
 
-**Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter) vereint.  
+**Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter, Popcorn) vereint.  
 Sie alle basieren auf einem lokalen LLM (über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.  
 
 ```mermaid
@@ -16,6 +16,7 @@ flowchart TD
     L[Leah - empathisch]
     D[Doris - sarkastisch]
     P[Peter - nerdig]
+    Po[Popcorn - verspielt]
   end
 
   subgraph Core
@@ -54,12 +55,16 @@ flowchart TD
   S -.-> W
 ```
 
-Das Projekt unterstützt:
+Das Projekt unterstützt:  
 - **Terminal-UI** mit farbiger Konsolenausgabe & Streaming  
 - **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)  
 - **API (FastAPI)** zur Integration in externe Anwendungen  
 - **Wikipedia-Integration** (online oder offline via Kiwix-Proxy)  
+- **Sicherheits-Filter** (Prompt-Injection-Schutz & PII-Erkennung)  
 - **Logging & Tests** für stabile Nutzung  
+
+
+siehe auch: [Features.md](Features.md)
 
 ---
 
@@ -70,6 +75,7 @@ Das Projekt unterstützt:
   - **Leah**: empathisch, freundlich  
   - **Doris**: sarkastisch, humorvoll  
   - **Peter**: faktenorientiert, analytisch  
+  - **Popcorn**: verspielt, kindgerecht  
 - **Erweiterbares Fundament** für zukünftige Features (z. B. LoRA-Finetuning, Tool-Use, RAG)  
 - **KISS-Prinzip**: einfache, nachvollziehbare Architektur  
 
@@ -104,14 +110,13 @@ Das Projekt unterstützt:
 
 ---
 
-
 ## Installation
 
 ```bash
 git clone https://github.com/YulYen/YulYens_AI.git
 cd YulYens_AI
 
-# Virtuelle Umgebung
+# Virtuelle Umgebung erstellen
 python -m venv .venv
 source .venv/bin/activate   # Linux/macOS
 .venv\Scripts\activate      # Windows
@@ -127,13 +132,12 @@ Die Auswahl soll zukünftig über die Konfiguration (`config.yaml`) erfolgen.
 Zusätzlich muss das jeweilige Modell manuell installiert werden:
 
 ```bash
-# Mittleres Modell (Kompromiss)
+# Mittleres Modell (Kompromiss zwischen Größe und Genauigkeit)
 python -m spacy download de_core_news_md
 
-# Großes Modell (genauer, aber etwas langsamer und größer)
+# Großes Modell (genauer, aber langsamer und speicherintensiver)
 python -m spacy download de_core_news_lg
 ```
-
 
 ---
 
@@ -147,10 +151,10 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Beispiel:
 core:
   # Standardmodell für Ollama
   model_name: "leo-hessianai-13b-chat.Q5"
-  # URL des lokal laufenden Ollama‑Servers (Protokoll + Host + Port).
+  # URL des lokal laufenden Ollama-Servers (Protokoll + Host + Port).
   # Dieser Wert muss explizit gesetzt werden – es gibt keinen stillen Default.
   ollama_url: "http://127.0.0.1:11434"
-  # Warm‑up: ob beim Start ein Dummy‑Aufruf zum Modell geschickt wird.
+  # Warm-up: ob beim Start ein Dummy-Aufruf zum Modell geschickt wird.
   warm_up: false
 
 ui:
@@ -160,7 +164,7 @@ ui:
     port: 7860
 
 wiki:
-  mode: "offline"    # "offline", "online" oder false
+  mode: "offline"    # "offline", "online" oder false (deaktiviert)
   proxy_port: 8042
   snippet_limit: 1600
 ```
@@ -172,20 +176,23 @@ python src/launch.py
 ```
 
 - **Terminal-UI**  
-  - Eingabe: Fragen tippen  
-  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung)  
+  - Bei `ui.type: "terminal"` im Terminal nutzen  
+  - Eingabe: Fragen einfach eintippen  
+  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten)  
 
 - **Web-UI**  
-  - Startet automatisch bei `ui.type: "web"`  
-  - Im Browser öffnen: `http://127.0.0.1:7860`  
-  - Persona auswählen, chatten  
+  - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet  
+  - Im Browser öffnen: http://127.0.0.1:7860  
+  - Persona auswählen und loschatten  
 
 - **API (FastAPI)**  
-  ```bash
-  curl -X POST http://127.0.0.1:8013/ask \
-       -H "Content-Type: application/json" \
-       -d '{"question":"Wer hat die Relativitätstheorie entwickelt?"}'
-  ```
+  - Automatisch aktiv bei `api.enabled: true`  
+  - Beispielaufruf per `curl`:
+    ```bash
+    curl -X POST http://127.0.0.1:8013/ask \
+         -H "Content-Type: application/json" \
+         -d '{"question":"Wer hat die Relativitätstheorie entwickelt?", "persona":"LEAH"}'
+    ```  
 
 ---
 
@@ -210,5 +217,5 @@ pytest tests/
 
 ## Status
 
-🚧 **Work in Progress** – stabil nutzbar, aber aktiv in Entwicklung.  
+🚧 **Work in Progress** – stabil nutzbar, aber aktiv in Entwicklung (inkl. erster LoRA-Finetuning-Experimente).  
 Privates Projekt, **nicht für Produktivbetrieb gedacht**.

@@ -4,6 +4,12 @@ from config.personas import system_prompts
 from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
 
 class WebUI:
+    """
+    Web-Chat-Oberfläche mit Gradio.
+    Bietet grafische Persona-Auswahl (mit Avatar) und einen laufenden Chatverlauf im Browser.
+    Wiki-Hinweise und -Snippets werden analog zur Terminal-UI verarbeitet (Hinweis nur sichtbar, Snippet als Kontext).
+    Antworten des KI-Modells werden tokenweise gestreamt und direkt im UI aktualisiert.
+    """
     def __init__(self, factory, config, keyword_finder, ip,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
