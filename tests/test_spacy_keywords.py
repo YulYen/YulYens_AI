@@ -1,4 +1,7 @@
 import pytest
+
+pytest.importorskip("de_core_news_lg", reason="spaCy model 'de_core_news_lg' is required")
+
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 # (1) Einfache positive Fälle

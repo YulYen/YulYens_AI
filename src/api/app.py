@@ -19,7 +19,7 @@ def get_provider() -> AiApiProvider:
     return _provider
 
 class AskRequest(BaseModel):
-    question: str = Field(..., min_length=1)
+    question: str = Field(..., min_length=0)
     persona: str = Field(..., min_length=0)
 
 class AskResponse(BaseModel):

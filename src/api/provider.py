@@ -21,14 +21,15 @@ class AiApiProvider:
     def answer(self, question: str, persona: str) -> str:
         """Bearbeitet eine Frage mit gegebener Persona und gibt die Antwort als Text zurück."""
 
-        q = (question or "").strip()
-        if not q:
+        frage = (question or "").strip()
+       
+        if  len(frage)==0:
             return cfg.texts["empty_question"]
         
         streamer = self.factory.get_streamer_for_persona(persona)
 
         return streamer.respond_one_shot(
-            q,
+            frage,
             keyword_finder=self.keyword_finder,
             wiki_mode=self.wiki_mode,
             wiki_proxy_port=self.wiki_proxy_port,

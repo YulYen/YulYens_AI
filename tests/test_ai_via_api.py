@@ -1,9 +1,8 @@
-# tests/test_api_contract.py
 import re
 import unicodedata
 import pytest
 from datetime import datetime
-from zoneinfo import ZoneInfo  # stdlib ab Py3.9
+from zoneinfo import ZoneInfo
 
 # ---- Zeit deterministisch in Europe/Berlin -----------------------------------
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -11,6 +10,12 @@ _now = datetime.now(tz=BERLIN)
 current_year = str(_now.year)
 current_year_short = current_year[-2:]  # "25" bei 2025
 
+def test_empty_question_rejected(client):
+    response = client.post("/ask", json={"question": "", "persona": "PETER"})
+    assert response.status_code == 200
+    a1 =response.json().get("answer", "")
+    a2 = "Bitte stell mir eine Frage 🙂"
+    assert a1 == a2
 
 @pytest.mark.slow
 @pytest.mark.ollama
