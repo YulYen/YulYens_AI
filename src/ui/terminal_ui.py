@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
-from config.personas import get_all_persona_names, system_prompts
+from config.personas import get_all_persona_names, system_prompts, get_drink
 import logging
 from core import utils
 
@@ -152,6 +152,12 @@ class TerminalUI:
 
             # --- (2) Nutzerfrage an die History hängen ---
             self.history.append({"role": "user", "content": user_input})
+
+            if self.streamer and utils.context_near_limit(
+                self.history, self.streamer.persona_options
+            ):
+                drink = get_drink(self.bot)
+                print(f"Einen Moment: {self.bot} holt sich {drink} ...")
 
             # --- (3) Streaming der Antwort (tokenweise) ---
             self.print_bot_prefix(self.bot)
