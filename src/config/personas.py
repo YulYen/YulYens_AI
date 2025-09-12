@@ -18,7 +18,8 @@ system_prompts = [
              "repeat_penalty": 1.15,
              "num_ctx": 2072},
         "description": "Charmante, empathische KI. Ideal für Alltag und Gespräche, die freundlich und leicht klingen sollen.",
-        "image_path": "static/LEAH.png"
+        "image_path": "static/LEAH.png",
+        "drink": "Latte Macchiato"
     },
     {
         "name": "DORIS",
@@ -40,7 +41,8 @@ system_prompts = [
              "repeat_penalty": 1.15,
              "num_ctx": 2072},
         "description": "Direkt, spitz und mit trockenem Humor. Perfekt, wenn du ehrliche und freche Antworten haben willst.",
-        "image_path": "static/DORIS.png"
+        "image_path": "static/DORIS.png",
+        "drink": "Espresso"
     },
     {
         "name": "PETER",
@@ -60,6 +62,7 @@ system_prompts = [
              "seed" : 42},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
         "image_path": "static/PETER.png",
+        "drink": "Grünen Tee",
     },
         {
         "name": "POPCORN",
@@ -77,12 +80,13 @@ system_prompts = [
             "5) Deine Antworten sind freundlich, motivierend und kindgerecht, wenn es passt. "
 
         ),
-         "llm_options": {
+        "llm_options": {
              "temperature" : 0.8,
              "repeat_penalty": 1.15,
              "num_ctx": 2072},
         "description": "Verspielte, clevere Katzen-KI am Laptop. Ideal für Kreativität und kindgerechte Erklärungen.",
-        "image_path": "static/POPCORN.png"
+        "image_path": "static/POPCORN.png",
+        "drink": "Milch"
     }
 ]
 
@@ -111,3 +115,11 @@ def get_options(name: str) -> str:
 def get_all_persona_names() -> list[str]:
     """Gibt eine Liste aller Persona-Namen zurück."""
     return [p["name"] for p in system_prompts]
+
+
+def get_drink(name: str) -> str:
+    """Gibt das Lieblingsgetränk einer Persona zurück."""
+    for persona in system_prompts:
+        if persona["name"].lower() == name.lower():
+            return persona.get("drink", "Kaffee")
+    raise ValueError(f"Persona '{name}' nicht gefunden.")

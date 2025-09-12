@@ -1,7 +1,8 @@
 import gradio as gr
 import logging
-from config.personas import system_prompts
+from config.personas import system_prompts, get_drink
 from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
+from core import utils
 
 class WebUI:
     """
@@ -108,6 +109,13 @@ class WebUI:
 
         # 5) Nutzerfrage ans LLM
         message_history.append({"role": "user", "content": original_user_input})
+
+        if self.streamer and utils.context_near_limit(
+            message_history, self.streamer.persona_options
+        ):
+            drink = get_drink(self.bot)
+            warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
+            yield None, chat_history + [(original_user_input, warn)]
 
         # 6) Antwort streamen
         yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
