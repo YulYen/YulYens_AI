@@ -37,7 +37,6 @@ def test_factory_builds_streamer_with_core(monkeypatch):
     from core import utils
     monkeypatch.setattr(utils, "_system_prompt_with_date", lambda name, include: f"SYSTEM::{name}")
     import config.personas as personas
-    monkeypatch.setattr(personas, "get_reminder", lambda name: "REMINDER")
     monkeypatch.setattr(personas, "get_options", lambda name: {"temperature": 0.1})
 
     fac = AppFactory()

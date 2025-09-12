@@ -13,7 +13,6 @@ system_prompts = [
             "3) Du antwortest immer auf deutsch, es sei denn du wurdest ganz klar auf englisch angesprochen. "
             "4) Ausschweifende Monologe vermeidest du, stattdessen lieber im Dialog bleiben."
         ),
-        "reminder": None,
         "llm_options": {
              "temperature" : 0.65,
              "repeat_penalty": 1.15,
@@ -40,8 +39,6 @@ system_prompts = [
              "temperature" : 0.6,
              "repeat_penalty": 1.15,
              "num_ctx": 2072},
-        "reminder":  None,  ## ( # Kosten/Nutzen vom Reminder fraglich
-        ## Du bist DORIS. Deutsch. Ton: trocken, sarkastisch, frech. Antworte in 1–2 Sätzen, pointiert statt erklärbärig. Kein Smalltalk, keine Emojis, keine Höflichkeitsfloskeln, keine Meta-Sätze über dich. Wenn Fakten unsicher sind oder kein Kontext vorliegt: 'Weiß ich nicht.'. Bei reinen Höflichkeitsfloskeln wie 'Danke' gibst du eine kurze, spitze Antwort (z. B. 'Schon gut')."),
         "description": "Direkt, spitz und mit trockenem Humor. Perfekt, wenn du ehrliche und freche Antworten haben willst.",
         "image_path": "static/DORIS.png"
     },
@@ -56,7 +53,6 @@ system_prompts = [
             "3) Antworte auf deutsch, es sei denn, die Frage ist klar auf englisch. "
             "4) Falls du etwas nicht weißt, erkläre offen, warum – und biete an, nachzuschauen."
         ),
-        "reminder": None,
         "llm_options": {
              "temperature" : 0.35,
              "repeat_penalty": 1.15,
@@ -85,12 +81,6 @@ system_prompts = [
              "temperature" : 0.8,
              "repeat_penalty": 1.15,
              "num_ctx": 2072},
-        "reminder":  None,  ## ( # Kosten/Nutzen vom Reminder fraglich
-            ##"Du bist POPCORN aka CatGPT. Deutsch. Ton: verspielt, freundlich, motivierend, sehr katzig. "
-            ##"Du bist eine Katze am Laptop. "
-            ##"Immer eine Katzen-Anspielung oder Emoji pro Antwort oder ein dezentes 'miau', 'maunz' oder 'mau'. "
-            ##"Kinderfreundlich erklären, wenn es passt. Keine Halluzinationen – Unsicherheiten offen benennen."
-        ##),
         "description": "Verspielte, clevere Katzen-KI am Laptop. Ideal für Kreativität und kindgerechte Erklärungen.",
         "image_path": "static/POPCORN.png"
     }
@@ -110,13 +100,6 @@ def get_image_by_name(name: str) -> str:
             return persona["image_path"]
     raise ValueError(f"Persona '{name}' nicht gefunden.")
 
-
-def get_reminder(name: str) -> str:
-    """Gibt den Reminder-Text für eine Persona anhand des Namens zurück."""
-    for persona in system_prompts:
-        if persona["name"].lower() == name.lower():
-            return persona["reminder"]
-    raise ValueError(f"Persona '{name}' nicht gefunden.")
 
 def get_options(name: str) -> str:
     """Gibt die Options für eine Persona anhand des Namens zurück."""

@@ -47,7 +47,6 @@ class AppFactory:
         persona_prompt = utils._system_prompt_with_date(
             persona_name, core_cfg["include_date"]
         )
-        reminder = personas.get_reminder(persona_name)
         options = personas.get_options(persona_name)
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
@@ -59,7 +58,6 @@ class AppFactory:
             base_url=core_cfg["ollama_url"],
             model_name=core_cfg["model_name"],
             warm_up=bool(core_cfg.get("warm_up", False)),
-            reminder=reminder,
             persona=persona_name,
             persona_prompt=persona_prompt,
             persona_options=options,

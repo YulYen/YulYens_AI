@@ -1,9 +1,9 @@
 """
-Streaming‑Provider mit Persona‑Handling, Reminder, Logging und Sicherheitschecks.
+Streaming‑Provider mit Persona‑Handling Logging und Sicherheitschecks.
 
 Alle direkten Aufrufe an das eigentliche LLM werden durch einen
 ``LLMCore`` abstrahiert (z. B. ``OllamaLLMCore`` oder ``DummyLLMCore``).
-Diese Klasse kümmert sich um Prompt‑Einblendung, Reminder,
+Diese Klasse kümmert sich um Prompt‑Einblendung, etc.,
 Logging (conversation.log) und optionale Output‑Moderation via SecurityGuard.
 """
 
@@ -28,25 +28,13 @@ from .llm_core import LLMCore
 from .ollama_llm_core import OllamaLLMCore
 
 
-def _apply_reminder_injection(messages: list[dict], reminder: str) -> list[dict]:
-    """
-    Fügt vor der aktuellen User‑Message eine kurze System‑Reminder‑Message ein.
-    Wir duplizieren die Liste, um die Caller‑Referenz nicht zu verändern.
-    """
-    if not messages:
-        return messages
-    patched = list(messages)
-    patched.insert(len(patched) - 1, {"role": "system", "content": str(reminder)})
-    logging.info(f"Reminder injected: {reminder}")
-    return patched
-
 
 class YulYenStreamingProvider:
     """
     Wrapper um das LLM mit Streaming‑Unterstützung.
 
     Der Streamer nimmt System‑Prompt, Persona‑Name, LLM‑Optionen und die
-    Host‑URL entgegen. Die Klasse kümmert sich um Reminder‑Einblendung,
+    Host‑URL entgegen. Die Klasse kümmert sich um
     Logging (conversation.log) und optional um Output‑Moderation via SecurityGuard.
     Der eigentliche LLM‑Aufruf wird an ein ``LLMCore`` delegiert.
     """
@@ -59,14 +47,12 @@ class YulYenStreamingProvider:
         persona_options: Dict[str, Any],
         model_name: str = "plain",
         warm_up: bool = False,
-        reminder: Optional[str] = None,
         log_file: str = "conversation.json",
         guard: Optional[BasicGuard] = None,
         *,
         llm_core: Optional[LLMCore] = None,
     ) -> None:
         self.model_name = model_name
-        self.reminder = reminder or None
         self.persona = persona
         self.persona_prompt = persona_prompt
         self.persona_options = persona_options
@@ -116,7 +102,7 @@ class YulYenStreamingProvider:
     def stream(self, messages: List[Dict[str, Any]]):
         """
         Generator, der tokenweise Antworten aus dem LLM zurückliefert.
-        Reminder‑Injektion, Logging und Security‑Checks bleiben erhalten.
+        Logging und Security‑Checks.
         """
         # Vorab: letzte User‑Message prüfen
         if self.guard:
@@ -132,10 +118,6 @@ class YulYenStreamingProvider:
         if self.persona_prompt:
             messages = [{"role": "system", "content": self.persona_prompt}] + messages
             logging.debug(messages)
-
-        # Reminder injizieren
-        if self.reminder:
-            messages = _apply_reminder_injection(messages, self.reminder)
 
         # Letzte User‑Nachricht im Log festhalten
         for m in reversed(messages):
@@ -155,7 +137,7 @@ class YulYenStreamingProvider:
             _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
             logging.debug("[LLM INPUT] sha256=%s payload=%s", _hash, _canon)
         except Exception as exc:
-            logging.warning("Unable to log OLLM llama input: %s", exc)
+            logging.warning("Unable to log LLM input: %s", exc)
 
         full_reply_parts = []
         try:
