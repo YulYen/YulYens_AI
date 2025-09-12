@@ -16,9 +16,6 @@ def test_dummy_llm_core_echoes_input() -> None:
     assert chunks[0]["message"]["content"] == "ECHO: Hallo Welt"
 
 
-
-
-
 def test_streaming_provider_with_dummy_llm() -> None:
     """Der StreamingProvider soll mit einem injizierten DummyLLMCore funktionieren."""
     llm = DummyLLMCore()

@@ -23,7 +23,7 @@ class AiApiProvider:
 
         q = (question or "").strip()
         if not q:
-            return cfg.ui["texts"]["empty_question"]
+            return cfg.texts["empty_question"]
         
         streamer = self.factory.get_streamer_for_persona(persona)
 
