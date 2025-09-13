@@ -1,5 +1,7 @@
 # download_and_test.py
 import importlib.util as iu
+import os
+
 import torch, bitsandbytes as bnb
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
@@ -26,10 +28,14 @@ if tok.pad_token_id is None:
     tok.pad_token_id = tok.eos_token_id
 
 print("Lade Modell ...")
+OFFLOAD_DIR = os.path.join(os.path.dirname(__file__), "offload")
+os.makedirs(OFFLOAD_DIR, exist_ok=True)
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_ID,
     quantization_config=bnb_cfg,
     device_map="auto",
+    load_in_8bit_fp32_cpu_offload=True,
+    offload_folder=OFFLOAD_DIR,
 )
 first_dev = next(model.parameters()).device
 print("first param device:", first_dev)
