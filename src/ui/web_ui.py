@@ -323,11 +323,16 @@ class WebUI:
             input_placeholder,
             new_chat_label,
         )
-        self._bind_events(
-            components,
-            persona_info,
-            model_name,
-            greeting_template,
-            input_placeholder,
-        )
+        # Gradio 4.x verlangt, dass Events innerhalb eines Blocks-Kontexts
+        # gebunden werden. Durch das erneute Öffnen des Demos als Kontext
+        # können wir die bestehende Struktur beibehalten und trotzdem die
+        # Events korrekt registrieren.
+        with demo:
+            self._bind_events(
+                components,
+                persona_info,
+                model_name,
+                greeting_template,
+                input_placeholder,
+            )
         self._start_server(demo)
