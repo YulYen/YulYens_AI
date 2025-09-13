@@ -1,6 +1,9 @@
-import json, time, os, requests, random
+import json, time, os, requests, random, sys
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+from core.utils import ensure_dir_exists
 
 API_URL = os.environ.get("LEAH_API_URL", "http://127.0.0.1:8013")
 OUT_PATH = os.path.join("data", "doris_1_sft_v1.jsonl")
@@ -232,7 +235,7 @@ def ask(session: requests.Session, question: str) -> str:
         return (data.get("answer") or "").strip()
 
 def append_pair(user_text: str, assistant_text: str):
-    os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
+    ensure_dir_exists(os.path.dirname(OUT_PATH))
     with open(OUT_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps({"user": user_text.strip(), "assistant": assistant_text}, ensure_ascii=False) + "\n")
 

@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from core.utils import clean_token
+from core.utils import clean_token, ensure_dir_exists
 from security.tinyguard import BasicGuard, zeigefinger_message
 
 # LLM‑Interface importieren
@@ -62,7 +62,7 @@ class YulYenStreamingProvider:
 
         # Logging konfigurieren
         self._logs_dir = "logs"
-        os.makedirs(self._logs_dir, exist_ok=True)
+        ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
         self.guard: Optional[BasicGuard] = guard
 

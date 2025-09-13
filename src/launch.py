@@ -29,7 +29,7 @@ def main():
     cfg = Config()  # einmalig laden
 
     # 1) Logging ZUERST initialisieren
-    os.makedirs(cfg.logging["dir"], exist_ok=True)
+    utils.ensure_dir_exists(cfg.logging["dir"])
     logfile = os.path.join(
         cfg.logging["dir"],
         f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
