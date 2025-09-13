@@ -115,7 +115,11 @@ class WebUI:
         ):
             drink = get_drink(self.bot)
             warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
-            yield None, chat_history + [(original_user_input, warn)]
+            # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
+            chat_history.append((original_user_input, warn))
+            message_history = utils.karl_prepare_quick_and_dirty(message_history, int(self.streamer.persona_options("num_ctx"))
+)
+            yield None, chat_history
 
         # 6) Antwort streamen
         yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)

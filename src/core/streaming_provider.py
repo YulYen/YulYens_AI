@@ -152,6 +152,7 @@ class YulYenStreamingProvider:
             try:
                 buffer = ""
                 for chunk in stream_obj:
+                    logging.debug("[RAW CHUNK] %r", chunk) 
                     if first_token_time is None:
                         first_token_time = time.time()
                     token = chunk.get("message", {}).get("content", "")
