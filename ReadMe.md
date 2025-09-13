@@ -173,6 +173,8 @@ wiki:
 
 ```bash
 python src/launch.py
+# Optional: Persona direkt festlegen (nur Terminal-UI)
+python src/launch.py --persona LEAH
 ```
 
 - **Terminal-UI**  

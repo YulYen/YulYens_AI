@@ -7,6 +7,7 @@ import threading
 import uvicorn
 import time
 import socket
+import argparse
 
 # API-Import
 from api.app import app, set_provider
@@ -24,6 +25,10 @@ from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autosta
 
 
 def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--persona", help="Persona für die Terminal-UI", default=None)
+    args = parser.parse_args()
 
     # TODO/FIXME: Bessere Fehlermeldung bringen, wenn Laden der Config fehlschlägt
     cfg = Config()  # einmalig laden
@@ -75,7 +80,11 @@ def main():
         threading.Event().wait()
         return
     else:
-        ui.launch()  # TerminalUI oder WebUI
+        try:
+            ui.launch(args)
+        except ValueError as e:
+            print(e)
+            return
 
 
 def start_api_in_background(api_cfg, provider):

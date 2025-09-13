@@ -120,7 +120,8 @@ class WebUI:
         # 6) Antwort streamen
         yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
 
-    def launch(self):
+    def launch(self, cli_args=None):
+        # cli_args wird derzeit ignoriert (z. B. persona)
         # --- UI-Texte aus zentraler Config ---
         ui = self.cfg.texts
         model_name           = self.cfg.core.get("model_name")

@@ -45,30 +45,33 @@ class TerminalUI:
         # Für optionale Folge-Logik (nicht zwingend genutzt, aber praktisch)
         self._last_wiki_title: Optional[str] = None
 
-    def choose_persona(self) -> None:
-        """Fragt den Nutzer nach der gewünschten Persona und setzt den Streamer."""
+    def choose_persona(self, persona_name: Optional[str] = None) -> None:
+        """Setzt die Persona. Optional mit Vorgabe, sonst per Nutzereingabe."""
         names = get_all_persona_names()
-        print("Bitte wähle eine Persona:")
-        for idx, name in enumerate(names, start=1):
-            # optional: kurze Beschreibung anzeigen
-            desc = next(p for p in system_prompts if p["name"] == name)["description"]
-            print(f"{idx}. {name} – {desc}")
-        while True:
-            sel = input("Nummer der gewünschten Persona: ").strip()
-            try:
-                choice = int(sel) - 1
-                if 0 <= choice < len(names):
-                    persona_name = names[choice]
-                    # Streamer für gewählte Persona bauen
-                    self.streamer = self.factory.get_streamer_for_persona(persona_name)
-                    self.bot = persona_name
-                    self.greeting = utils._greeting_text(self.config, self.bot)
+        if persona_name:
+            if persona_name not in names:
+                raise ValueError(f"Unbekannte Persona: {persona_name}")
+        else:
+            print("Bitte wähle eine Persona:")
+            for idx, name in enumerate(names, start=1):
+                desc = next(p for p in system_prompts if p["name"] == name)["description"]
+                print(f"{idx}. {name} – {desc}")
+            while True:
+                sel = input("Nummer der gewünschten Persona: ").strip()
+                try:
+                    choice = int(sel) - 1
+                    if 0 <= choice < len(names):
+                        persona_name = names[choice]
+                        break
+                except ValueError:
+                    pass
+                print("Ungültige Eingabe, bitte erneut versuchen.")
 
-                    print(f"Persona {self.bot} ausgewählt.")
-                    break
-            except ValueError:
-                pass
-            print("Ungültige Eingabe, bitte erneut versuchen.")
+        # Streamer für gewählte Persona bauen
+        self.streamer = self.factory.get_streamer_for_persona(persona_name)
+        self.bot = persona_name
+        self.greeting = utils._greeting_text(self.config, self.bot)
+        print(f"Persona {self.bot} ausgewählt.")
 
     # ---------- kleine UI‑Hilfen ----------
     def init_ui(self) -> None:
@@ -100,14 +103,15 @@ class TerminalUI:
             return socket.gethostbyname(socket.gethostname())
 
     # ---------- Haupt-Loop ----------
-    def launch(self) -> None:
+    def launch(self, cli_args=None) -> None:
+        """Startet die Terminal-UI. Fragt zuerst nach der Persona-Auswahl."""
+        persona_name = getattr(cli_args, "persona", None) if cli_args else None
         self.init_ui()
         logging.info(f"Launching TerminalUI")
 
-        """Startet die Terminal-UI. Fragt zuerst nach der Persona-Auswahl."""
         # 1. Persona wählen, falls noch kein Streamer gesetzt
         if self.streamer is None:
-            self.choose_persona()
+            self.choose_persona(persona_name)
 
         # 2. Begrüßung ausgeben inkl. Befehle exit und clear
         self.print_welcome()
