@@ -15,11 +15,12 @@ from transformers import (
     Trainer,
     set_seed,
     default_data_collator,
+    BitsAndBytesConfig,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 # ---- Konfiguration (explizit, knapp) -----------------------------------------
-MODEL_ID   = "unsloth/llama-3-8b-Instruct-bnb-4bit"   # HF-Checkpoint (kein GGUF)
+MODEL_ID   = "LeoLM/leo-hessianai-13b"                # HF-Checkpoint (kein GGUF)
 DATA_PATH  = "data/kuratiert_neu_doris.jsonl"         # {"user": "...", "assistant": "..."} pro Zeile
 OUT_DIR    = "out_lora_doris"
 
@@ -76,8 +77,17 @@ def main() -> None:
         tok.pad_token_id = tok.eos_token_id
     tok.padding_side = "right"
 
-    # unsloth/*-bnb-4bit IST bereits quantisiert -> kein extra BitsAndBytesConfig
-    base = AutoModelForCausalLM.from_pretrained(MODEL_ID, device_map="auto")
+    bnb_cfg = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16 if use_cuda else torch.float32,
+    )
+    base = AutoModelForCausalLM.from_pretrained(
+        MODEL_ID,
+        device_map="auto",
+        quantization_config=bnb_cfg,
+    )
     # K-Bit-Training vorbereiten
     base = prepare_model_for_kbit_training(base, use_gradient_checkpointing=True)
     base.config.use_cache = False

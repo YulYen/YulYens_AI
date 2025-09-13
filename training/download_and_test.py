@@ -34,8 +34,8 @@ model = AutoModelForCausalLM.from_pretrained(
     MODEL_ID,
     quantization_config=bnb_cfg,
     device_map="auto",
-    load_in_8bit_fp32_cpu_offload=True,
     offload_folder=OFFLOAD_DIR,
+    offload_state_dict=True,
 )
 first_dev = next(model.parameters()).device
 print("first param device:", first_dev)
