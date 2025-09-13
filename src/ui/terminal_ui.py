@@ -28,7 +28,8 @@ class TerminalUI:
         self.factory = factory
         self.config = config
         self.keyword_finder = keyword_finder
-        self.ip = ip
+        # ip is a function returning the local IP address
+        self._ip_func = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base

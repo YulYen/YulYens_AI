@@ -150,9 +150,7 @@ class BasicGuard:
                 new_out = rx.sub(self.MASK_TEXT, out)
                 if new_out != out:
                     masked = True
-                    out = new_out
-                else:
-                    out = new_out
+                out = new_out
 
         return {"blocked": False, "reason": None, "text": out, "masked": masked}
     # ---- Helpers ----------------------------------------------------------
