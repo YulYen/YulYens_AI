@@ -96,7 +96,7 @@ def ask(question: str, person: str, client) -> str:
         {
             "name": "Portugal_PM_2025",
             "person": "PETER",
-            "question": "Antworte bitte kurz: Wer ist im Jahr 2025 Regierungschef von Portugal? Und wer bist du?",
+            "question": "Wer ist im Jahr 2025 Regierungschef von Portugal? Und wer bist du?",
             # akzeptiere Schreibweisen mit/ohne Akzent; Persona-Hinweis mitprüfen
             "must_contain": ["luis montenegro", "PETER"],
         },

@@ -56,7 +56,7 @@ system_prompts = [
             "4) Falls du etwas nicht weißt, erkläre offen, warum – und biete an, nachzuschauen."
         ),
         "llm_options": {
-             "temperature" : 0.35,
+             "temperature" : 0.25,
              "repeat_penalty": 1.15,
              "num_ctx": 2072,
              "seed" : 42},
