@@ -3,7 +3,8 @@ import socket
 from datetime import datetime
 from config.personas import system_prompts, get_prompt_by_name
 import re
-from typing import List, Dict, Any
+from pathlib import Path
+from typing import List, Dict, Any, Union
 
 
 def _wiki_mode_enabled(mode_val) -> bool:
@@ -34,6 +35,11 @@ def _greeting_text(cfg, bot) -> str:
         "persona_name": bot,
     }
     return tpl.format_map(values)
+
+
+def ensure_dir_exists(path: Union[str, Path]) -> None:
+    """Create a directory if it does not already exist."""
+    Path(path).mkdir(parents=True, exist_ok=True)
 
 def clean_token(token: str) -> str:
     # Dummy-Tags raus
