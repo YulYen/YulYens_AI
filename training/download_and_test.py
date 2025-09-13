@@ -36,6 +36,8 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
     offload_folder=OFFLOAD_DIR,
     offload_state_dict=True,
+    # enable CPU offload for layers that don't fit in GPU memory
+    load_in_8bit_fp32_cpu_offload=True,
 )
 first_dev = next(model.parameters()).device
 print("first param device:", first_dev)
