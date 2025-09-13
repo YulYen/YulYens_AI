@@ -1,13 +1,12 @@
 import pytest
-import spacy
 
-
+from tests.util import has_spacy_model
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
-try:
-    spacy.load("de_core_news_lg")
-except OSError:
-    pytest.skip("spaCy model de_core_news_lg not installed", allow_module_level=True)
+pytestmark = pytest.mark.skipif(
+    not has_spacy_model("de_core_news_lg"),
+    reason="spaCy model de_core_news_lg not installed",
+)
 
 # (1) Einfache positive Fälle
 easy_positive = [
