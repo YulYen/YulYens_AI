@@ -119,90 +119,24 @@ class WebUI:
 
         # 6) Antwort streamen
         yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
-
-    def launch(self):
-        # --- UI-Texte aus zentraler Config ---
-        ui = self.cfg.texts
-        model_name           = self.cfg.core.get("model_name")
-        project_title        = ui.get("project_name")
-        choose_persona_txt   = ui.get("choose_persona")
-        new_chat_label       = ui.get("new_chat")
-        input_placeholder    = ui.get("input_placeholder")
-        greeting_template    = ui.get("greeting")
-        persona_btn_suffix   = ui.get("persona_button_suffix")
-
-        # Personas
-        persona_info = {p["name"].lower(): p for p in system_prompts}
-
-        # --- Event-Handler ---
-        def on_persona_selected(key: str):
-            if not key or key not in persona_info:
-                # Startzustand
-                return (
-                    gr.update(value=""),                 # selected_persona_state
-                    gr.update(visible=True),             # grid_group
-                    gr.update(visible=False),            # focus_group
-                    gr.update(),                         # focus_img
-                    gr.update(),                         # focus_md
-                    gr.update(),                         # greeting_md
-                    gr.update(),                         # chatbot
-                    gr.update(),                         # txt
-                    gr.update(),                         # clear
-                )
-
-            p = persona_info[key]
-            self.bot = p["name"]  # "LEAH"/"DORIS"/"PETER" etc.
-            self.streamer = self.factory.get_streamer_for_persona(self.bot)
-
-            display_name = p["name"].title()
-            greeting = greeting_template.format(persona_name=display_name, model_name=model_name)
-            focus_text = f"### {p['name']}\n{p['description']}"
-
-            return (
-                gr.update(value=key),                              # selected_persona_state
-                gr.update(visible=False),                          # grid_group aus
-                gr.update(visible=True),                           # focus_group an
-                gr.update(value=p["image_path"]),                  # focus_img
-                gr.update(value=focus_text),                       # focus_md
-                gr.update(value=greeting, visible=True),           # greeting_md
-                gr.update(value=[], label=display_name, visible=True),  # chatbot
-                gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),  # txt
-                gr.update(visible=True),                           # clear
-            )
-
-        def on_reset_to_start():
-            self.bot = None
-            return (
-                gr.update(value=""),               # persona_state zurücksetzen
-                gr.update(visible=True),           # grid_group sichtbar
-                gr.update(visible=False),          # focus_group verstecken
-                gr.update(value=None),             # focus_img leeren
-                gr.update(value=""),               # focus_md leeren
-                gr.update(value="", visible=False),# greeting_md verstecken
-                gr.update(value=[], label="", visible=False),  # chatbot leeren
-                gr.update(value="", visible=False, interactive=False),  # txt leeren
-                gr.update(visible=False),          # clear verstecken
-            )
-
-        # --- UI ---
+    def _build_ui(self, project_title, choose_persona_txt, persona_info,
+                  persona_btn_suffix, input_placeholder, new_chat_label):
         with gr.Blocks() as demo:
-            # FIX: selected_persona_state MUSS im selben Blocks-Kontext erzeugt werden!
-            # Du kannst Textbox als Hidden-State nutzen oder gr.State. Wir lassen deine Variante.
             selected_persona_state = gr.Textbox(value="", visible=False)
 
             gr.HTML("""
                 <style>
-                .persona-row { gap:24px; }  /* etwas mehr Abstand */
-                .persona-card { 
-                    border:1px solid #e3e7ed; 
-                    border-radius:10px; 
-                    padding:12px; 
-                    text-align:center;     /* alle Inhalte inkl. Bild mittig */
+                .persona-row { gap:24px; }
+                .persona-card {
+                    border:1px solid #e3e7ed;
+                    border-radius:10px;
+                    padding:12px;
+                    text-align:center;
                 }
-                .persona-card img { 
-                    max-width: 100%; 
-                    height: auto; 
-                    display:inline-block; 
+                .persona-card img {
+                    max-width: 100%;
+                    height: auto;
+                    display:inline-block;
                 }
                 .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
                 .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
@@ -210,7 +144,6 @@ class WebUI:
             """)
             gr.Markdown(f"# {project_title}")
 
-            # Auswahl-Grid (Startzustand)
             with gr.Group(visible=True) as grid_group:
                 gr.Markdown(choose_persona_txt)
                 with gr.Row(elem_classes="persona-row", equal_height=True):
@@ -223,16 +156,14 @@ class WebUI:
                                     show_label=False,
                                     height=350,
                                     container=False,
-                                    elem_classes="persona-img"  # <- für gezieltes CSS
+                                    elem_classes="persona-img"
                                 )
-                                # Name + Beschreibung getrennt, klarer
                                 gr.Markdown(
                                     f"<div class='name'>{p['name']}</div>"
                                     f"<div class='desc'>{p['description']}</div>")
                                 btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
                                 persona_buttons.append((key, btn))
 
-            # Fokus-Panel
             with gr.Group(visible=False) as focus_group:
                 with gr.Row():
                     with gr.Column(scale=1):
@@ -241,37 +172,95 @@ class WebUI:
                         focus_md = gr.Markdown("")
                 gr.Markdown("---")
 
-            # Chat (initial versteckt)
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
-            txt = gr.Textbox(show_label=False, placeholder=input_placeholder, visible=False, interactive=False)
+            txt = gr.Textbox(show_label=False, placeholder=input_placeholder,
+                             visible=False, interactive=False)
             clear = gr.Button(new_chat_label, visible=False)
 
-            # Persona-Buttons binden
-            for key, btn in persona_buttons:
-                btn.click(
-                    fn=lambda key=key: on_persona_selected(key),
-                    inputs=[],
-                    outputs=[
-                        selected_persona_state,
-                        grid_group, focus_group,
-                        focus_img, focus_md,
-                        greeting_md, chatbot, txt, clear,
-                    ],
-                    queue=False,
+        components = {
+            "demo": demo,
+            "selected_persona_state": selected_persona_state,
+            "grid_group": grid_group,
+            "focus_group": focus_group,
+            "focus_img": focus_img,
+            "focus_md": focus_md,
+            "greeting_md": greeting_md,
+            "chatbot": chatbot,
+            "txt": txt,
+            "clear": clear,
+            "persona_buttons": persona_buttons,
+        }
+        return demo, components
+
+    def _bind_events(self, components, persona_info, model_name,
+                     greeting_template, input_placeholder):
+        selected_persona_state = components["selected_persona_state"]
+        grid_group = components["grid_group"]
+        focus_group = components["focus_group"]
+        focus_img = components["focus_img"]
+        focus_md = components["focus_md"]
+        greeting_md = components["greeting_md"]
+        chatbot = components["chatbot"]
+        txt = components["txt"]
+        clear = components["clear"]
+
+        def on_persona_selected(key: str):
+            if not key or key not in persona_info:
+                return (
+                    gr.update(value=""),
+                    gr.update(visible=True),
+                    gr.update(visible=False),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
+                    gr.update(),
                 )
 
-            # Streaming
-            txt.submit(
-                fn=self.respond_streaming,
-                inputs=[txt, chatbot],
-                outputs=[txt, chatbot],
-                queue=True,
+            p = persona_info[key]
+            self.bot = p["name"]
+            self.streamer = self.factory.get_streamer_for_persona(self.bot)
+
+            display_name = p["name"].title()
+            greeting = greeting_template.format(
+                persona_name=display_name, model_name=model_name
+            )
+            focus_text = f"### {p['name']}\n{p['description']}"
+
+            return (
+                gr.update(value=key),
+                gr.update(visible=False),
+                gr.update(visible=True),
+                gr.update(value=p["image_path"]),
+                gr.update(value=focus_text),
+                gr.update(value=greeting, visible=True),
+                gr.update(value=[], label=display_name, visible=True),
+                gr.update(
+                    value="", visible=True, interactive=True,
+                    placeholder=input_placeholder
+                ),
+                gr.update(visible=True),
             )
 
-            # Reset
-            clear.click(
-                fn=on_reset_to_start,
+        def on_reset_to_start():
+            self.bot = None
+            return (
+                gr.update(value=""),
+                gr.update(visible=True),
+                gr.update(visible=False),
+                gr.update(value=None),
+                gr.update(value=""),
+                gr.update(value="", visible=False),
+                gr.update(value=[], label="", visible=False),
+                gr.update(value="", visible=False, interactive=False),
+                gr.update(visible=False),
+            )
+
+        for key, btn in components["persona_buttons"]:
+            btn.click(
+                fn=lambda key=key: on_persona_selected(key),
                 inputs=[],
                 outputs=[
                     selected_persona_state,
@@ -287,4 +276,58 @@ class WebUI:
                 queue=False,
             )
 
+        txt.submit(
+            fn=self.respond_streaming,
+            inputs=[txt, chatbot],
+            outputs=[txt, chatbot],
+            queue=True,
+        )
+
+        clear.click(
+            fn=on_reset_to_start,
+            inputs=[],
+            outputs=[
+                selected_persona_state,
+                grid_group,
+                focus_group,
+                focus_img,
+                focus_md,
+                greeting_md,
+                chatbot,
+                txt,
+                clear,
+            ],
+            queue=False,
+        )
+
+    def _start_server(self, demo):
         demo.launch(server_name="127.0.0.1", server_port=7860, show_api=False)
+
+    def launch(self):
+        ui = self.cfg.texts
+        model_name = self.cfg.core.get("model_name")
+        project_title = ui.get("project_name")
+        choose_persona_txt = ui.get("choose_persona")
+        new_chat_label = ui.get("new_chat")
+        input_placeholder = ui.get("input_placeholder")
+        greeting_template = ui.get("greeting")
+        persona_btn_suffix = ui.get("persona_button_suffix")
+
+        persona_info = {p["name"].lower(): p for p in system_prompts}
+
+        demo, components = self._build_ui(
+            project_title,
+            choose_persona_txt,
+            persona_info,
+            persona_btn_suffix,
+            input_placeholder,
+            new_chat_label,
+        )
+        self._bind_events(
+            components,
+            persona_info,
+            model_name,
+            greeting_template,
+            input_placeholder,
+        )
+        self._start_server(demo)
