@@ -1,8 +1,13 @@
 import pytest
+import spacy
 
-pytest.importorskip("de_core_news_lg", reason="spaCy model 'de_core_news_lg' is required")
 
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+
+try:
+    spacy.load("de_core_news_lg")
+except OSError:
+    pytest.skip("spaCy model de_core_news_lg not installed", allow_module_level=True)
 
 # (1) Einfache positive Fälle
 easy_positive = [
@@ -81,6 +86,7 @@ tricky_negative = [
     ("Guten Morgen, Siri!", []),
 
 ]
+
 
 @pytest.fixture(scope="module")
 def keyword_finder():
