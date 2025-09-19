@@ -36,9 +36,9 @@ def main():
         details = exc.strerror or str(exc)
         print(
             (
-                "[Yul Yens AI] Kritischer Fehler: Konfigurationsdatei "
-                f"'{config_location}' konnte nicht geladen werden ({details}). "
-                "Bitte prüfen Sie Pfad und Zugriffsrechte."
+                "[Yul Yens AI] Critical error: Configuration file "
+                f"'{config_location}' could not be loaded ({details}). "
+                "Please check the path and access permissions."
             ),
             file=sys.stderr,
         )
@@ -47,9 +47,9 @@ def main():
         config_location = os.path.abspath(config_path)
         print(
             (
-                "[Yul Yens AI] Kritischer Fehler: Konfigurationsdatei "
-                f"'{config_location}' enthält ungültiges YAML ({exc}). "
-                "Bitte korrigieren Sie die Datei."
+                "[Yul Yens AI] Critical error: Configuration file "
+                f"'{config_location}' contains invalid YAML ({exc}). "
+                "Please fix the file."
             ),
             file=sys.stderr,
         )

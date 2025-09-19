@@ -24,7 +24,7 @@ def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
 
     captured = capfd.readouterr()
     expected_path = tmp_path / "config.yaml"
-    assert "Konfigurationsdatei" in captured.err
+    assert "Configuration file" in captured.err
     assert str(expected_path) in captured.err
 
     Config.reset_instance()
