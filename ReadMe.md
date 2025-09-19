@@ -180,9 +180,9 @@ python src/launch.py
   - Eingabe: Fragen einfach eintippen  
   - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten)  
 
-- **Web-UI**  
-  - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet  
-  - Im Browser öffnen: http://127.0.0.1:7860  
+- **Web-UI**
+  - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
+  - Im Browser öffnen: `http://<host>:<port>` entsprechend der Einstellungen unter `ui.web` (Standard: `http://127.0.0.1:7860`)
   - Persona auswählen und loschatten  
 
 - **API (FastAPI)**  
