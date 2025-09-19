@@ -10,6 +10,25 @@ import importlib
 from core.factory import AppFactory
 from core.streaming_provider import YulYenStreamingProvider
 
+
+def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
+    from src import launch
+
+    Config.reset_instance()
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(SystemExit) as excinfo:
+        launch.main()
+
+    assert excinfo.value.code != 0
+
+    captured = capfd.readouterr()
+    expected_path = tmp_path / "config.yaml"
+    assert "Konfigurationsdatei" in captured.err
+    assert str(expected_path) in captured.err
+
+    Config.reset_instance()
+
 def test_factory_builds_streamer_with_core(monkeypatch):
     # Konfig hart patchen, damit kein Default greift und nichts ins Netz geht
     class DummyCfg:
