@@ -1,12 +1,79 @@
 # tests/test_wiki_proxy_lookup.py
+import logging
 from types import SimpleNamespace
 
 import pytest
+import requests
 
 from tests.util import has_spacy_model
 from core.factory import AppFactory
 from core.streaming_provider import lookup_wiki_snippet
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+
+
+class _DummyKeywordFinder:
+    def __init__(self, topic: str) -> None:
+        self._topic = topic
+
+    def find_top_keyword(self, question: str) -> str:  # pragma: no cover - trivial
+        return self._topic
+
+
+def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
+    """Der Wiki-Fallback informiert die UI verständlich über Netzwerkfehler."""
+
+    def _raise_connection_error(*args, **kwargs):
+        raise requests.exceptions.ConnectionError("proxy down")
+
+    dummy_finder = _DummyKeywordFinder("Testthema")
+    monkeypatch.setattr("core.streaming_provider.requests.get", _raise_connection_error)
+
+    caplog.set_level(logging.ERROR)
+
+    wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+        question="Was ist los?",
+        persona_name="TEST",
+        keyword_finder=dummy_finder,
+        wiki_mode="offline",
+        proxy_port=9999,
+        limit=42,
+        timeout=(1.0, 1.0),
+    )
+
+    assert topic_title is None
+    assert snippet is None
+    assert "Wikipedia-Proxy nicht erreichbar" in wiki_hint
+    assert "Bitte prüfe die Verbindung" in wiki_hint
+    assert "[WIKI EXC]" in caplog.text
+
+
+def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
+    """Selbst unerwartete Exceptions liefern einen UI-Fallback-Hinweis."""
+
+    def _raise_unexpected_error(*args, **kwargs):
+        raise RuntimeError("kaputt")
+
+    dummy_finder = _DummyKeywordFinder("Testthema")
+    monkeypatch.setattr("core.streaming_provider.requests.get", _raise_unexpected_error)
+
+    caplog.set_level(logging.ERROR)
+
+    wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+        question="Was ist los?",
+        persona_name="TEST",
+        keyword_finder=dummy_finder,
+        wiki_mode="offline",
+        proxy_port=9999,
+        limit=42,
+        timeout=(1.0, 1.0),
+    )
+
+    assert topic_title is None
+    assert snippet is None
+    assert "Unbekannter Fehler" in wiki_hint
+    assert "[WIKI EXC]" in caplog.text
+    assert "kaputt" in caplog.text
+
 
 skip_without_medium_model = pytest.mark.skipif(
     not has_spacy_model("de_core_news_md"),

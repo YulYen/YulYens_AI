@@ -318,10 +318,23 @@ def lookup_wiki_snippet(
                 wiki_hint = f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}"
             else:
                 wiki_hint = f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}"
-        except Exception as e:
-            breakpoint()
-            logging.error("[WIKI EXC] topic='%s' err=%s", topic, e)
-            wiki_hint = f"🕵️‍♀️ *Fehler: Wikipedia nicht erreichbar.*{topic}"
+        except requests.exceptions.RequestException as err:
+            logging.error(
+                "[WIKI EXC] Netzwerkfehler beim Abruf von '%s': %s",
+                topic,
+                err,
+                exc_info=True,
+            )
+            wiki_hint = (
+                "🕵️‍♀️ *Wikipedia-Proxy nicht erreichbar.* "
+                "Bitte prüfe die Verbindung oder versuche es später erneut."
+            )
+        except Exception as err:  # pragma: no cover - unerwartete Fehler
+            logging.exception("[WIKI EXC] Unerwarteter Fehler für topic='%s'", topic)
+            wiki_hint = (
+                "🕵️‍♀️ *Unbekannter Fehler beim Wikipedia-Abruf.* "
+                "Bitte versuche es später erneut."
+            )
     return (wiki_hint, topic_title, snippet)
 
 
