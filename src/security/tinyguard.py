@@ -1,6 +1,6 @@
 from __future__ import annotations
 import re
-from typing import TypedDict, Optional, Dict, List
+from typing import Any, TypedDict, Optional, Dict, List
 
 
 class SecurityResult(TypedDict):
@@ -169,7 +169,47 @@ class BasicGuard:
 
     def _bad(self, reason: str, detail: str) -> SecurityResult:
         return {"ok": False, "reason": reason, "detail": detail}
-    
+
+# ---------------------------------------------------------------------------
+
+
+class DisabledGuard(BasicGuard):
+    """Stub-Variante, die sämtliche Prüfungen deaktiviert."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            enabled=False,
+            prompt_injection_protection=False,
+            pii_protection=False,
+            output_blocklist=False,
+        )
+
+
+DISABLED_GUARD_NAMES = {"disabledguard", "disabled", "none", "off"}
+
+
+def create_guard(name: str, settings: Dict[str, Any]) -> BasicGuard:
+    """Factory, die bekannte Guard-Klassen aus der Konfiguration instanziiert."""
+
+    normalized = (name or "").strip().lower()
+    if not normalized:
+        normalized = "basicguard"
+
+    if normalized == "basicguard":
+        return BasicGuard(
+            enabled=bool(settings.get("enabled", True)),
+            prompt_injection_protection=bool(settings.get("prompt_injection_protection", True)),
+            pii_protection=bool(settings.get("pii_protection", True)),
+            output_blocklist=bool(settings.get("output_blocklist", True)),
+            custom_patterns=settings.get("custom_patterns"),
+        )
+
+    if normalized in DISABLED_GUARD_NAMES:
+        return DisabledGuard()
+
+    raise ValueError(f"Unbekannter Security-Guard: {name!r}")
+
+
 # -- Optional: menschliche Meldung mit "Yul Yens Zeigefinger"
 def zeigefinger_message(res: SecurityResult) -> str:
     reason = (res.get("reason") or "ok").lower()
