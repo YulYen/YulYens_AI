@@ -305,7 +305,7 @@ class WebUI:
         )
 
     def _start_server(self, demo):
-        demo.launch(server_name="127.0.0.1", server_port=7860, show_api=False)
+        demo.launch(server_name=self.web_host, server_port=self.web_port, show_api=False)
 
     def launch(self):
         ui = self.cfg.texts
