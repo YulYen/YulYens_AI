@@ -6,7 +6,7 @@ from typing import Optional
 from config.config_singleton import Config
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 from core.streaming_provider import YulYenStreamingProvider
-from security.tinyguard import BasicGuard
+from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
 from core import utils
@@ -67,16 +67,34 @@ class AppFactory:
 
         # Security-Guard aus YAML
         sec_cfg = getattr(self._cfg, "security", None)
-        if sec_cfg and sec_cfg.get("enabled"):
-            guard = BasicGuard(
-                enabled=True,
-                prompt_injection_protection=bool(sec_cfg["prompt_injection_protection"]),
-                pii_protection=bool(sec_cfg["pii_protection"]),
-                output_blocklist=bool(sec_cfg["output_blocklist"]),
-            )
+        guard = self._build_guard(sec_cfg)
+        if guard:
             streamer.set_guard(guard)
 
         return streamer
+
+    def _build_guard(self, sec_cfg: Optional[dict]) -> Optional[BasicGuard]:
+        if not isinstance(sec_cfg, dict):
+            return None
+
+        enabled = bool(sec_cfg.get("enabled", True))
+        if not enabled:
+            return None
+
+        raw_guard_name = sec_cfg.get("guard", "BasicGuard")
+        guard_name = "BasicGuard" if raw_guard_name is None else str(raw_guard_name).strip()
+        if not guard_name:
+            guard_name = "BasicGuard"
+
+        guard_settings = dict(sec_cfg)
+        guard_settings["enabled"] = enabled
+
+        try:
+            return create_guard(guard_name, guard_settings)
+        except ValueError as exc:
+            raise ValueError(
+                f"Unbekannter Security-Guard in security.guard: {raw_guard_name!r}"
+            ) from exc
 
     def get_api_provider(self):
         """Nur bauen, wenn in YAML aktiviert. Kein Serverstart hier."""
