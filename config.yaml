@@ -34,6 +34,8 @@ texts:
 wiki:
 # offline = Kiwix, online = Wikipedia, false keine Wiki-Snippets
   mode: offline
+  # spaCy-Modell-Variante für Keyword-Erkennung: "medium" oder "large"
+  spacy_model_variant: "large"
   # Port des lokalen Proxy (immer nötig)
   proxy_port: 8042
   # Maximale Länge der Wiki-Snippets (Zeichen): 1200 bis 1600 empfohlen

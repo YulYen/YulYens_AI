@@ -127,8 +127,10 @@ pip install -r requirements.txt
 
 ### Sprachmodell für spaCy
 
-Für die Wikipedia-Integration wird ein deutsches Sprachmodell benötigt.  
-Die Auswahl soll zukünftig über die Konfiguration (`config.yaml`) erfolgen.  
+Für die Wikipedia-Integration wird ein deutsches Sprachmodell benötigt.
+Welche Variante geladen wird, steuerst du über `wiki.spacy_model_variant` in
+der Konfiguration (`config.yaml`). Unterstützt werden aktuell die Werte
+`medium` (`de_core_news_md`) und `large` (`de_core_news_lg`).
 Zusätzlich muss das jeweilige Modell manuell installiert werden:
 
 ```bash
@@ -165,6 +167,7 @@ ui:
 
 wiki:
   mode: "offline"    # "offline", "online" oder false (deaktiviert)
+  spacy_model_variant: "large"  # Alternativen: "medium" oder direkter Modellname
   proxy_port: 8042
   snippet_limit: 1600
 ```
@@ -180,9 +183,9 @@ python src/launch.py
   - Eingabe: Fragen einfach eintippen  
   - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten)  
 
-- **Web-UI**  
-  - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet  
-  - Im Browser öffnen: http://127.0.0.1:7860  
+- **Web-UI**
+  - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
+  - Im Browser öffnen: `http://<host>:<port>` entsprechend der Einstellungen unter `ui.web` (Standard: `http://127.0.0.1:7860`)
   - Persona auswählen und loschatten  
 
 - **API (FastAPI)**  
