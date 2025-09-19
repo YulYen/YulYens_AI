@@ -25,7 +25,14 @@ class SpacyKeywordFinder:
     def __init__(self, variant):
         self.model_name = variant.value
         logging.info(f"Lade spaCy-Modell: {self.model_name}")
-        self.nlp = spacy.load(self.model_name)
+        try:
+            self.nlp = spacy.load(self.model_name)
+        except (OSError, ImportError) as exc:
+            msg = (
+                f"SpaCy-Modell '{self.model_name}' konnte nicht geladen werden. "
+                "Ist es installiert?"
+            )
+            raise RuntimeError(msg) from exc
 
     def _normalize_keyword(self, text: str) -> str:
         """Hilfsmethode: Vereinheitlicht Leerzeichen, ß usw."""

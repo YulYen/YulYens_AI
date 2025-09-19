@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -13,6 +14,9 @@ from core import utils
 from core.ollama_llm_core import OllamaLLMCore  # neu: Kern injizieren
 
 import config.personas as personas
+
+
+logger = logging.getLogger(__name__)
 
 
 class AppFactory:
@@ -36,7 +40,16 @@ class AppFactory:
     def get_keyword_finder(self) -> Optional[SpacyKeywordFinder]:
         if self._keyword_finder is None:
             if utils._wiki_mode_enabled(self._cfg.wiki["mode"]):
-                self._keyword_finder = SpacyKeywordFinder(ModelVariant.LARGE)
+                try:
+                    self._keyword_finder = SpacyKeywordFinder(ModelVariant.LARGE)
+                except RuntimeError as exc:
+                    logger.warning(
+                        "spaCy-Modell konnte nicht geladen werden (%s). "
+                        "Wechsle auf 'kein Wiki'.",
+                        exc,
+                    )
+                    self._cfg.wiki["mode"] = False
+                    self._keyword_finder = None
             else:
                 self._keyword_finder = None
         return self._keyword_finder
