@@ -127,8 +127,10 @@ pip install -r requirements.txt
 
 ### Sprachmodell für spaCy
 
-Für die Wikipedia-Integration wird ein deutsches Sprachmodell benötigt.  
-Die Auswahl soll zukünftig über die Konfiguration (`config.yaml`) erfolgen.  
+Für die Wikipedia-Integration wird ein deutsches Sprachmodell benötigt.
+Welche Variante geladen wird, steuerst du über `wiki.spacy_model_variant` in
+der Konfiguration (`config.yaml`). Unterstützt werden aktuell die Werte
+`medium` (`de_core_news_md`) und `large` (`de_core_news_lg`).
 Zusätzlich muss das jeweilige Modell manuell installiert werden:
 
 ```bash
@@ -165,6 +167,7 @@ ui:
 
 wiki:
   mode: "offline"    # "offline", "online" oder false (deaktiviert)
+  spacy_model_variant: "large"  # Alternativen: "medium" oder direkter Modellname
   proxy_port: 8042
   snippet_limit: 1600
 ```

@@ -1,15 +1,19 @@
 # tests/test_wiki_proxy_lookup.py
+from types import SimpleNamespace
+
 import pytest
 
 from tests.util import has_spacy_model
+from core.factory import AppFactory
 from core.streaming_provider import lookup_wiki_snippet
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
-pytestmark = pytest.mark.skipif(
+skip_without_medium_model = pytest.mark.skipif(
     not has_spacy_model("de_core_news_md"),
     reason="spaCy model de_core_news_md not installed",
 )
 
+@skip_without_medium_model
 def test_lookup_wiki_snippet_for_germany():
     """
     Integrationstest: prüft, ob der lokale Wiki-Proxy läuft und
@@ -35,3 +39,68 @@ def test_lookup_wiki_snippet_for_germany():
 
     # Hauptstadt Berlin sollte im Snippet vorkommen (Groß-/Kleinschreibung egal)
     assert "berlin" in snippet.lower()
+
+
+def _capture_variant(monkeypatch, wiki_config):
+    dummy_cfg = SimpleNamespace(wiki=wiki_config)
+
+    monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
+
+    captured = {}
+
+    class DummyFinder:
+        def __init__(self, variant):
+            captured["variant"] = variant
+
+    monkeypatch.setattr("core.factory.SpacyKeywordFinder", DummyFinder)
+
+    factory = AppFactory()
+    finder = factory.get_keyword_finder()
+
+    assert isinstance(finder, DummyFinder)
+    return captured["variant"]
+
+
+def test_get_keyword_finder_uses_medium_variant(monkeypatch):
+    variant = _capture_variant(
+        monkeypatch,
+        {"mode": "offline", "spacy_model_variant": "medium"},
+    )
+
+    assert variant is ModelVariant.MEDIUM
+
+
+def test_get_keyword_finder_supports_model_name(monkeypatch):
+    variant = _capture_variant(
+        monkeypatch,
+        {"mode": "offline", "spacy_model_variant": "de_core_news_md"},
+    )
+
+    assert variant is ModelVariant.MEDIUM
+
+
+def test_get_keyword_finder_falls_back_to_large(monkeypatch):
+    variant = _capture_variant(
+        monkeypatch,
+        {"mode": "offline", "spacy_model_variant": "unbekannt"},
+    )
+
+    assert variant is ModelVariant.LARGE
+
+
+def test_get_keyword_finder_defaults_when_missing(monkeypatch):
+    variant = _capture_variant(
+        monkeypatch,
+        {"mode": "offline"},
+    )
+
+    assert variant is ModelVariant.LARGE
+
+
+def test_get_keyword_finder_accepts_enum_value(monkeypatch):
+    variant = _capture_variant(
+        monkeypatch,
+        {"mode": "offline", "spacy_model_variant": ModelVariant.MEDIUM},
+    )
+
+    assert variant is ModelVariant.MEDIUM

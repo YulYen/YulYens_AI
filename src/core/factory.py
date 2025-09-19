@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -36,10 +37,41 @@ class AppFactory:
     def get_keyword_finder(self) -> Optional[SpacyKeywordFinder]:
         if self._keyword_finder is None:
             if utils._wiki_mode_enabled(self._cfg.wiki["mode"]):
-                self._keyword_finder = SpacyKeywordFinder(ModelVariant.LARGE)
+                variant = self._resolve_spacy_model_variant()
+                self._keyword_finder = SpacyKeywordFinder(variant)
             else:
                 self._keyword_finder = None
         return self._keyword_finder
+
+    def _resolve_spacy_model_variant(self) -> ModelVariant:
+        """Ermittelt die konfigurierte spaCy-Modellvariante mit sinnvollem Fallback."""
+
+        wiki_cfg = getattr(self._cfg, "wiki", {}) or {}
+        raw_variant = wiki_cfg.get("spacy_model_variant")
+
+        if isinstance(raw_variant, ModelVariant):
+            return raw_variant
+
+        if isinstance(raw_variant, str):
+            normalized = raw_variant.strip().lower()
+            for variant in ModelVariant:
+                if normalized in {variant.name.lower(), variant.value.lower()}:
+                    return variant
+
+            logging.warning(
+                "Unbekannte spaCy-Variante '%s' – fallback auf %s",
+                raw_variant,
+                ModelVariant.LARGE.value,
+            )
+
+        elif raw_variant is not None:
+            logging.warning(
+                "Ungültiger Typ für spaCy-Variante (%s) – fallback auf %s",
+                type(raw_variant).__name__,
+                ModelVariant.LARGE.value,
+            )
+
+        return ModelVariant.LARGE
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
