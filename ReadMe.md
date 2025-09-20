@@ -83,10 +83,10 @@ siehe auch: [Features.md](Features.md)
 
 ## Architekturüberblick
 
-- **Konfiguration**: Alle Einstellungen zentral in `config.yaml`  
-- **Core**:  
-  - `OllamaStreamer` für LLM-Aufrufe & Streaming  
-  - Wikipedia-Support inkl. spaCy-basiertem Keyword-Extractor  
+- **Konfiguration**: Alle Einstellungen zentral in `config.yaml`
+- **Core**:
+  - Austauschbarer LLM-Core (`OllamaLLMCore`, `DummyLLMCore` für Tests) samt `YulYenStreamingProvider`
+  - Wikipedia-Support inkl. spaCy-basiertem Keyword-Extractor
 - **Personas**: Systemprompts & Eigenheiten in `src/config/personas.py`  
 - **UI**:  
   - `TerminalUI` für CLI  
@@ -100,13 +100,15 @@ siehe auch: [Features.md](Features.md)
 
 ## Voraussetzungen
 
-- **Python 3.10+**  
-- **Ollama** (oder anderes kompatibles Backend) mit installiertem Modell, z. B.:  
+- **Python 3.10+**
+- **Ollama** (oder anderes kompatibles Backend) mit installiertem Modell, z. B.:
   ```bash
   ollama pull leo-hessianai-13b-chat:Q5
-  ```  
-- Optional für Offline-Wiki:  
-  - [Kiwix](https://kiwix.org/) + deutsches ZIM-Archiv  
+  ```
+- Für Tests ohne Ollama kann `core.backend: "dummy"` gesetzt werden – das Echo-Backend kommt ohne
+  zusätzliche Downloads aus und eignet sich für CI oder schnelles Prototyping.
+- Optional für Offline-Wiki:
+  - [Kiwix](https://kiwix.org/) + deutsches ZIM-Archiv
 
 ---
 
@@ -151,6 +153,8 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Beispiel:
 
 ```yaml
 core:
+  # Backend auswählen: "ollama" (Standard) oder "dummy" (Echo-Backend für Tests)
+  backend: "ollama"
   # Standardmodell für Ollama
   model_name: "leo-hessianai-13b-chat.Q5"
   # URL des lokal laufenden Ollama-Servers (Protokoll + Host + Port).
@@ -171,6 +175,17 @@ wiki:
   proxy_port: 8042
   snippet_limit: 1600
 ```
+
+#### LLM-Backends
+
+Der Schlüssel `core.backend` entscheidet, welcher LLM-Core zum Einsatz kommt:
+
+- `ollama` *(Standard)* bindet einen laufenden Ollama-Server ein. Dafür muss das Python-Paket
+  [`ollama`](https://pypi.org/project/ollama/) installiert sein (z. B. via `pip install ollama`),
+  und `core.ollama_url` zeigt auf die Ollama-Instanz.
+- `dummy` nutzt den `DummyLLMCore`, der jede Eingabe als `ECHO: …` zurückgibt. Das ist ideal für
+  Unit-Tests, Continuous Integration oder Demos ohne verfügbares LLM. In diesem Modus reicht ein
+  Platzhalter für `core.ollama_url`; weder ein laufender Ollama-Server noch das Python-Paket sind nötig.
 
 #### Security-Guard
 
