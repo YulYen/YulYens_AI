@@ -25,7 +25,6 @@ from security.tinyguard import BasicGuard, zeigefinger_message
 
 # LLM‑Interface importieren
 from .llm_core import LLMCore
-from .ollama_llm_core import OllamaLLMCore
 
 
 
@@ -58,7 +57,25 @@ class YulYenStreamingProvider:
         self.persona_options = persona_options
 
         # LLM‑Core initialisieren oder injiziertes verwenden
-        self._llm_core: LLMCore = llm_core or OllamaLLMCore(base_url)
+        self._llm_core: LLMCore
+        if llm_core is not None:
+            self._llm_core = llm_core
+        else:
+            try:
+                from .ollama_llm_core import OllamaLLMCore
+            except ModuleNotFoundError as exc:
+                missing_name = getattr(exc, "name", None)
+                message = str(exc)
+                if missing_name == "ollama" or (
+                    missing_name is None and "ollama" in message.lower()
+                ):
+                    raise RuntimeError(
+                        "Es wurde kein LLM-Core injiziert und das Python-Paket 'ollama' fehlt. "
+                        "Installiere 'ollama' oder übergib eine Dummy-Implementierung."
+                    ) from exc
+                raise
+
+            self._llm_core = OllamaLLMCore(base_url)
 
         # Logging konfigurieren
         self._logs_dir = "logs"

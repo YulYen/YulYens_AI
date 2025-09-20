@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Type
 
 from config.config_singleton import Config
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
@@ -11,7 +11,8 @@ from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
 from core import utils
-from core.ollama_llm_core import OllamaLLMCore  # neu: Kern injizieren
+from core.dummy_llm_core import DummyLLMCore
+from core.llm_core import LLMCore
 
 import config.personas as personas
 
@@ -83,11 +84,16 @@ class AppFactory:
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
 
-        # LLM-Core hier zentral bauen und injizieren
-        llm_core = OllamaLLMCore(base_url=core_cfg["ollama_url"])
+        base_url = core_cfg.get("ollama_url")
+        backend = self._determine_backend(core_cfg)
+        llm_core = self._create_llm_core(backend, base_url)
+
+        logging.debug("Erzeuge Streamer für %s mit Backend '%s'", persona_name, backend)
+
+        streamer_base_url = base_url if base_url is not None else ""
 
         streamer = YulYenStreamingProvider(
-            base_url=core_cfg["ollama_url"],
+            base_url=streamer_base_url,
             model_name=core_cfg["model_name"],
             warm_up=bool(core_cfg.get("warm_up", False)),
             persona=persona_name,
@@ -104,6 +110,67 @@ class AppFactory:
             streamer.set_guard(guard)
 
         return streamer
+
+    def _determine_backend(self, core_cfg: dict) -> str:
+        """Liest den gewünschten LLM-Backend-Typ aus der Config."""
+
+        raw_backend = core_cfg.get("backend", "ollama")
+        if raw_backend is None:
+            return "ollama"
+
+        if isinstance(raw_backend, str):
+            backend = raw_backend.strip().lower()
+        else:
+            backend = str(raw_backend).strip().lower()
+
+        if not backend:
+            return "ollama"
+
+        if backend in {"ollama", "dummy"}:
+            return backend
+
+        raise ValueError(
+            "Unbekannter Wert für core.backend: "
+            f"{raw_backend!r}. Unterstützt werden 'ollama' und 'dummy'."
+        )
+
+    def _create_llm_core(self, backend: str, base_url: Optional[str]) -> LLMCore:
+        """Erzeugt die konkrete LLM-Core-Implementierung basierend auf dem Backend."""
+
+        if backend == "dummy":
+            return DummyLLMCore()
+
+        if backend == "ollama":
+            if not base_url:
+                raise KeyError(
+                    "core.ollama_url muss gesetzt sein, wenn core.backend auf 'ollama' steht."
+                )
+
+            try:
+                ollama_core_cls = self._load_ollama_core_class()
+            except ModuleNotFoundError as exc:
+                missing_name = getattr(exc, "name", None)
+                message = str(exc)
+                if missing_name == "ollama" or (
+                    missing_name is None and "ollama" in message.lower()
+                ):
+                    raise RuntimeError(
+                        "Das Ollama-Backend ist aktiviert (core.backend: 'ollama'), "
+                        "aber das Python-Paket 'ollama' ist nicht installiert. "
+                        "Installiere es mit 'pip install ollama' oder stelle core.backend auf 'dummy'."
+                    ) from exc
+                raise
+
+            return ollama_core_cls(base_url=base_url)
+
+        raise ValueError(f"Unsupported backend: {backend!r}")
+
+    def _load_ollama_core_class(self) -> Type[LLMCore]:
+        """Isolierter Import, um optionale Abhängigkeit sauber zu kapseln."""
+
+        from core.ollama_llm_core import OllamaLLMCore
+
+        return OllamaLLMCore
 
     def _build_guard(self, sec_cfg: Optional[dict]) -> Optional[BasicGuard]:
         if not isinstance(sec_cfg, dict):
