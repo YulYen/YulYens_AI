@@ -172,6 +172,17 @@ wiki:
   snippet_limit: 1600
 ```
 
+#### Security-Guard
+
+Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
+
+- `security.guard: "BasicGuard"` (Standard) lädt den eingebauten Basisschutz. Die Schalter
+  `prompt_injection_protection`, `pii_protection` und `output_blocklist` bestimmen, welche
+  Prüfungen aktiv sind.
+- `security.guard: "DisabledGuard"` deaktiviert die Prüfungen über einen Stub. Die Aliase
+  `"disabled"`, `"none"` und `"off"` werden ebenfalls akzeptiert.
+- `security.enabled: false` deaktiviert die Guard-Logik vollständig, unabhängig vom gewählten Namen.
+
 ### Start
 
 ```bash

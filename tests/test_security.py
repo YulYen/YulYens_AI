@@ -1,13 +1,28 @@
 import pytest
-from security.tinyguard import BasicGuard
 
-G = BasicGuard(True,True,True,True)
+from config.config_singleton import Config
+from core.factory import AppFactory
+from security.tinyguard import BasicGuard, DisabledGuard
+
+G = BasicGuard(True, True, True, True)
 
 def ok(x):  # helper
     return G.check_input(x)["ok"]
 
 def bad(x): # helper
     return not G.check_input(x)["ok"]
+
+
+def _streamer_with_security(overrides=None):
+    Config.reset_instance()
+    try:
+        cfg = Config("config.yaml")
+        if overrides:
+            cfg.override("security", overrides)
+        factory = AppFactory()
+        return factory.get_streamer_for_persona("LEAH")
+    finally:
+        Config.reset_instance()
 
 def test_normal_input_ok():
     assert ok("Wie funktioniert die Merge-Sort-Algorithmusidee in O(n log n)?")
@@ -65,3 +80,42 @@ def test_pii_allowed_when_flag_off_in_output():
     # process_output soll PII NICHT maskieren/blocken, wenn das Flag aus ist
     pol = g.check_output(f"Kontakt: {EMAIL}")
     assert pol["ok"] is True, f"Output darf nicht geblockt werden: {pol}"
+
+
+def test_factory_creates_basic_guard():
+    overrides = {
+        "guard": "BasicGuard",
+        "enabled": True,
+        "prompt_injection_protection": True,
+        "pii_protection": True,
+        "output_blocklist": True,
+    }
+    streamer = _streamer_with_security(overrides)
+    guard = streamer.guard
+    assert isinstance(guard, BasicGuard)
+    assert guard.enabled is True
+    assert guard.flags["prompt_injection_protection"] is True
+    assert guard.flags["pii_protection"] is True
+    assert guard.flags["output_blocklist"] is True
+
+
+def test_factory_uses_disabled_guard_stub():
+    streamer = _streamer_with_security({"guard": "DisabledGuard", "enabled": True})
+    guard = streamer.guard
+    assert isinstance(guard, DisabledGuard)
+    assert guard.enabled is False
+
+
+def test_factory_accepts_disabled_alias():
+    streamer = _streamer_with_security({"guard": "disabled", "enabled": True})
+    assert isinstance(streamer.guard, DisabledGuard)
+
+
+def test_factory_returns_no_guard_when_security_disabled():
+    streamer = _streamer_with_security({"enabled": False})
+    assert streamer.guard is None
+
+
+def test_factory_unknown_guard_raises():
+    with pytest.raises(ValueError):
+        _streamer_with_security({"guard": "NopeGuard", "enabled": True})

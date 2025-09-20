@@ -2,6 +2,7 @@
 
 # Allgemeine Imports
 import os, logging, socket
+import sys
 from datetime import datetime
 import threading
 import uvicorn
@@ -18,6 +19,7 @@ from config.logging_setup import init_logging
 from core.factory import AppFactory
 from core import utils
 from config.config_singleton import Config
+from yaml import YAMLError
 
 from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
 
@@ -25,8 +27,33 @@ from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autosta
 
 def main():
 
-    # TODO/FIXME: Bessere Fehlermeldung bringen, wenn Laden der Config fehlschlägt
-    cfg = Config()  # einmalig laden
+    config_path = "config.yaml"
+
+    try:
+        cfg = Config(config_path)  # einmalig laden
+    except OSError as exc:
+        config_location = os.path.abspath(getattr(exc, "filename", config_path) or config_path)
+        details = exc.strerror or str(exc)
+        print(
+            (
+                "[Yul Yens AI] Critical error: Configuration file "
+                f"'{config_location}' could not be loaded ({details}). "
+                "Please check the path and access permissions."
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    except YAMLError as exc:
+        config_location = os.path.abspath(config_path)
+        print(
+            (
+                "[Yul Yens AI] Critical error: Configuration file "
+                f"'{config_location}' contains invalid YAML ({exc}). "
+                "Please fix the file."
+            ),
+            file=sys.stderr,
+        )
+        sys.exit(3)
 
     # 1) Logging ZUERST initialisieren
     utils.ensure_dir_exists(cfg.logging["dir"])
