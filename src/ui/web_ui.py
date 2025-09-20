@@ -117,8 +117,32 @@ class WebUI:
             warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((original_user_input, warn))
-            message_history = utils.karl_prepare_quick_and_dirty(message_history, int(self.streamer.persona_options("num_ctx"))
-)
+            persona_options = getattr(self.streamer, "persona_options", {}) or {}
+            num_ctx_value = None
+            if hasattr(persona_options, "get"):
+                num_ctx_value = persona_options.get("num_ctx")
+
+            ctx_limit = None
+            if num_ctx_value is not None:
+                try:
+                    ctx_limit = int(num_ctx_value)
+                except (TypeError, ValueError):
+                    logging.warning(
+                        "Ungültiger 'num_ctx'-Wert für Persona %r: %r",
+                        self.bot,
+                        num_ctx_value,
+                    )
+
+            if ctx_limit and ctx_limit > 0:
+                message_history = utils.karl_prepare_quick_and_dirty(
+                    message_history, ctx_limit
+                )
+            else:
+                logging.debug(
+                    "Überspringe 'karl_prepare_quick_and_dirty' für Persona %r: num_ctx=%r",
+                    self.bot,
+                    num_ctx_value,
+                )
             yield None, chat_history
 
         # 6) Antwort streamen
