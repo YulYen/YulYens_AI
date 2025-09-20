@@ -45,7 +45,7 @@ def karl_prepare_quick_and_dirty(messages, num_ctx: int):
         dropped += 1
 
     result = messages[:protect_head] + core + tail
-    logging.debug("[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
+    logging.info("[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
                   used_before, _approx_token_count(result), target, dropped)
     return result
 
