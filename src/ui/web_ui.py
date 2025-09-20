@@ -1,7 +1,7 @@
 import gradio as gr
 import logging
 from config.personas import system_prompts, get_drink
-from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
+from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context 
 from core import utils
 
 class WebUI:
@@ -26,7 +26,7 @@ class WebUI:
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
-        self.bot = None  # FIX: explizit initialisieren
+        self.bot = None   # wird später gesetzt
         self._last_wiki_snippet = None
         self._last_wiki_title = None
 
@@ -172,6 +172,9 @@ class WebUI:
 
         # 6) Antwort streamen
         yield from self._stream_reply(message_history, original_user_input, chat_history, ui_hints)
+
+
+    
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
                   persona_btn_suffix, input_placeholder, new_chat_label):
         with gr.Blocks() as demo:
