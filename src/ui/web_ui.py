@@ -47,6 +47,9 @@ class WebUI:
                 hist.append({"role": "assistant", "content": cleaned})
         return hist
 
+    def _reset_conversation_state(self):
+        return []
+
     # Streaming der Antwort (UI wird fortlaufend aktualisiert)
     def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
         reply = ""
@@ -55,35 +58,38 @@ class WebUI:
             if wiki_hint:
                 combined = wiki_hint + "\n\n" + reply
                 # zwei Outputs: (txt bleibt unverändert) + Chatverlauf
-                yield None, chat_history[:-1] + [(original_user_input, combined)]
+                yield None, chat_history[:-1] + [(original_user_input, combined)], message_history
             else:
-                yield None, chat_history + [(original_user_input, reply)]
+                yield None, chat_history + [(original_user_input, reply)], message_history
         # Abschluss: finalen Reply in den Verlauf übernehmen
         if wiki_hint and chat_history:
             chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
         else:
             chat_history.append((original_user_input, reply))
-        yield None, chat_history
+        message_history.append({"role": "assistant", "content": reply})
+        yield None, chat_history, message_history
 
-    def respond_streaming(self, user_input, chat_history):
+    def respond_streaming(self, user_input, chat_history, history_state):
+        history = list(history_state or [])
         # Schutz: Kein Text / Reset-Kommando
         if not user_input or user_input.strip().lower() == "clear":
-            yield "", []
+            yield "", [], self._reset_conversation_state()
             return
 
         # Schutz: Persona noch nicht gewählt → UI verhindert das, aber doppelt hält besser
         if not self.bot:
-            yield "", chat_history
+            yield "", chat_history, history_state
             return
 
         original_user_input = user_input
         logging.info(f"User input: {user_input}")
 
         # 1) Verlauf für LLM ohne UI-Hinweise
-        message_history = self._build_history(chat_history)
+        if not history:
+            history = self._build_history(chat_history)
 
         # 2) Eingabefeld leeren
-        yield "", chat_history
+        yield "", chat_history, history
 
         # 3) Wiki-Hinweis + Snippet (Top-Treffer)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -99,19 +105,19 @@ class WebUI:
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((original_user_input, wiki_hint))
-            yield None, chat_history
+            yield None, chat_history, history
 
         # 4) Optional: Wiki-Kontext injizieren
         if snippet:
             self._last_wiki_snippet = None   # wird sofort verbraucht
             self._last_wiki_title = title
-            inject_wiki_context(message_history, title, snippet)
+            inject_wiki_context(history, title, snippet)
 
         # 5) Nutzerfrage ans LLM
-        message_history.append({"role": "user", "content": original_user_input})
+        history.append({"role": "user", "content": original_user_input})
 
         if self.streamer and utils.context_near_limit(
-            message_history, self.streamer.persona_options
+            history, self.streamer.persona_options
         ):
             drink = get_drink(self.bot)
             warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
@@ -134,8 +140,8 @@ class WebUI:
                     )
 
             if ctx_limit and ctx_limit > 0:
-                message_history = utils.karl_prepare_quick_and_dirty(
-                    message_history, ctx_limit
+                history = utils.karl_prepare_quick_and_dirty(
+                    history, ctx_limit
                 )
             else:
                 logging.debug(
@@ -143,10 +149,10 @@ class WebUI:
                     self.bot,
                     num_ctx_value,
                 )
-            yield None, chat_history
+            yield None, chat_history, history
 
         # 6) Antwort streamen
-        yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
+        yield from self._stream_reply(history, original_user_input, chat_history, wiki_hint)
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
                   persona_btn_suffix, input_placeholder, new_chat_label):
         with gr.Blocks() as demo:
@@ -205,6 +211,7 @@ class WebUI:
             txt = gr.Textbox(show_label=False, placeholder=input_placeholder,
                              visible=False, interactive=False)
             clear = gr.Button(new_chat_label, visible=False)
+            history_state = gr.State(self._reset_conversation_state())
 
         components = {
             "demo": demo,
@@ -218,6 +225,7 @@ class WebUI:
             "txt": txt,
             "clear": clear,
             "persona_buttons": persona_buttons,
+            "history_state": history_state,
         }
         return demo, components
 
@@ -232,6 +240,7 @@ class WebUI:
         chatbot = components["chatbot"]
         txt = components["txt"]
         clear = components["clear"]
+        history_state = components["history_state"]
 
         def on_persona_selected(key: str):
             if not key or key not in persona_info:
@@ -245,6 +254,7 @@ class WebUI:
                     gr.update(),
                     gr.update(),
                     gr.update(),
+                    self._reset_conversation_state(),
                 )
 
             p = persona_info[key]
@@ -270,6 +280,7 @@ class WebUI:
                     placeholder=input_placeholder
                 ),
                 gr.update(visible=True),
+                self._reset_conversation_state(),
             )
 
         def on_reset_to_start():
@@ -284,6 +295,7 @@ class WebUI:
                 gr.update(value=[], label="", visible=False),
                 gr.update(value="", visible=False, interactive=False),
                 gr.update(visible=False),
+                self._reset_conversation_state(),
             )
 
         for key, btn in components["persona_buttons"]:
@@ -300,14 +312,15 @@ class WebUI:
                     chatbot,
                     txt,
                     clear,
+                    history_state,
                 ],
                 queue=False,
             )
 
         txt.submit(
             fn=self.respond_streaming,
-            inputs=[txt, chatbot],
-            outputs=[txt, chatbot],
+            inputs=[txt, chatbot, history_state],
+            outputs=[txt, chatbot, history_state],
             queue=True,
         )
 
@@ -324,6 +337,7 @@ class WebUI:
                 chatbot,
                 txt,
                 clear,
+                history_state,
             ],
             queue=False,
         )

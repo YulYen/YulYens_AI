@@ -59,6 +59,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     web_ui.streamer = streamer
 
     chat_history = []
+    history_state = []
 
     with patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)), \
          patch("ui.web_ui.inject_wiki_context"), \
@@ -68,7 +69,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
              "ui.web_ui.utils.karl_prepare_quick_and_dirty",
              side_effect=lambda history, limit: history,
          ) as mock_prepare:
-        list(web_ui.respond_streaming("Hallo", chat_history))
+        list(web_ui.respond_streaming("Hallo", chat_history, history_state))
 
     mock_prepare.assert_called_once()
     assert mock_prepare.call_args[0][1] == 4096
@@ -86,14 +87,63 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     web_ui.streamer = streamer
 
     chat_history = []
+    history_state = []
 
     with patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)), \
          patch("ui.web_ui.inject_wiki_context"), \
          patch("ui.web_ui.utils.context_near_limit", return_value=True), \
          patch("ui.web_ui.get_drink", return_value="☕"), \
          patch("ui.web_ui.utils.karl_prepare_quick_and_dirty") as mock_prepare:
-        list(web_ui.respond_streaming("Hallo", chat_history))
+        list(web_ui.respond_streaming("Hallo", chat_history, history_state))
 
     mock_prepare.assert_not_called()
     assert "Überspringe 'karl_prepare_quick_and_dirty'" in caplog.text
     streamer.stream.assert_called_once()
+
+
+def test_respond_streaming_keeps_session_histories_isolated():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    responses = [["Antwort 1"], ["Antwort 2"]]
+    captured_messages = []
+
+    def stream_side_effect(*args, **kwargs):
+        messages = kwargs["messages"]
+        captured_messages.append([msg.copy() for msg in messages])
+        return iter(responses.pop(0))
+
+    streamer.stream.side_effect = stream_side_effect
+    web_ui.streamer = streamer
+
+    session_one_state = []
+    session_two_state = []
+
+    with patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)), \
+         patch("ui.web_ui.utils.context_near_limit", return_value=False):
+        session_one_outputs = list(
+            web_ui.respond_streaming("Frage 1", [], session_one_state)
+        )
+        session_two_outputs = list(
+            web_ui.respond_streaming("Frage 2", [], session_two_state)
+        )
+
+    final_history_one = session_one_outputs[-1][2]
+    final_history_two = session_two_outputs[-1][2]
+
+    assert session_one_state == []
+    assert session_two_state == []
+    assert captured_messages == [
+        [{"role": "user", "content": "Frage 1"}],
+        [{"role": "user", "content": "Frage 2"}],
+    ]
+    assert final_history_one == [
+        {"role": "user", "content": "Frage 1"},
+        {"role": "assistant", "content": "Antwort 1"},
+    ]
+    assert final_history_two == [
+        {"role": "user", "content": "Frage 2"},
+        {"role": "assistant", "content": "Antwort 2"},
+    ]
+    assert final_history_one is not final_history_two
