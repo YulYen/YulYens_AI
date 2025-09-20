@@ -63,12 +63,10 @@ class WebUI:
         logging.info(f"User input: {user_input}")
 
         # 1) Eigener Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
-        base_history = list(history_state or [])
-        user_message = {"role": "user", "content": user_input}
-        provisional_history = base_history + [user_message]
+        llm_history = list(history_state or [])
 
         # 2) Eingabefeld leeren
-        yield "", chat_history, provisional_history
+        yield "", chat_history, llm_history
 
         # 3) Wiki-Hinweis + Snippet (Top-Treffer)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -84,14 +82,14 @@ class WebUI:
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((user_input, wiki_hint))
-            yield None, chat_history, provisional_history
+            yield None, chat_history, llm_history
 
         # 4) Optional: Wiki-Kontext injizieren
-        llm_history = list(base_history)
         if snippet:
             inject_wiki_context(llm_history, title, snippet)
 
         # 5) Nutzerfrage ans LLM
+        user_message = {"role": "user", "content": user_input}
         llm_history.append(user_message)
 
         # 6) Kontext-Komprimierung bei Bedarf
