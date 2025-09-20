@@ -64,7 +64,6 @@ class WebUI:
 
         # 1) Eigener Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
         llm_history = list(history_state or [])
-        llm_history.append({"role": "user", "content": user_input})
 
         # 2) Eingabefeld leeren
         yield "", chat_history, llm_history
@@ -90,7 +89,8 @@ class WebUI:
             inject_wiki_context(llm_history, title, snippet)
 
         # 5) Nutzerfrage ans LLM
-        llm_history.append({"role": "user", "content": user_input})
+        user_message = {"role": "user", "content": user_input}
+        llm_history.append(user_message)
 
         # 6) Kontext-Komprimierung bei Bedarf
         if self.streamer and utils.context_near_limit(llm_history, self.streamer.persona_options):
