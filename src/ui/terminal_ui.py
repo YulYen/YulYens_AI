@@ -154,11 +154,7 @@ class TerminalUI:
             # --- (2) Nutzerfrage an die History hängen ---
             self.history.append({"role": "user", "content": user_input})
 
-            if self.streamer and utils.context_near_limit(
-                self.history, self.streamer.persona_options
-            ):
-                drink = get_drink(self.bot)
-                print(f"Einen Moment: {self.bot} holt sich {drink} ...")
+            self._ensure_context_headroom()
 
             # --- (3) Streaming der Antwort (tokenweise) ---
             self.print_bot_prefix(self.bot)
@@ -176,3 +172,47 @@ class TerminalUI:
             trailing_nl = len(reply) - len(reply.rstrip("\n"))
             for _ in range(max(0, 2 - trailing_nl)):
                 print()
+
+    def _ensure_context_headroom(self) -> None:
+        """Trimmt den Verlauf, wenn das Kontextlimit fast erreicht ist."""
+
+        if not self.streamer:
+            return
+
+        persona_options = getattr(self.streamer, "persona_options", {}) or {}
+
+        if not utils.context_near_limit(self.history, persona_options):
+            return
+
+        drink = get_drink(self.bot)
+        print(f"Einen Moment: {self.bot} holt sich {drink} ...")
+
+        num_ctx = persona_options.get("num_ctx")
+        if not num_ctx:
+            logging.info(
+                "TerminalUI: Kontextlimit erreicht, aber 'num_ctx' ist nicht gesetzt."
+            )
+            return
+
+        try:
+            ctx_limit = int(num_ctx)
+        except (TypeError, ValueError):
+            logging.warning(
+                "TerminalUI: Ungültiger 'num_ctx'-Wert (%r); Verlauf wird nicht gekürzt.",
+                num_ctx,
+            )
+            return
+
+        original_length = len(self.history)
+        trimmed_history = utils.karl_prepare_quick_and_dirty(self.history, ctx_limit)
+        removed = original_length - len(trimmed_history)
+        self.history = trimmed_history
+
+        if removed > 0:
+            logging.info(
+                "TerminalUI: %s ältere Nachrichten entfernt, um Kontext freizugeben.",
+                removed,
+            )
+            print(
+                f"{Fore.YELLOW}Hinweis: Ältere Nachrichten wurden entfernt, um Platz zu schaffen.{Style.RESET_ALL}"
+            )
