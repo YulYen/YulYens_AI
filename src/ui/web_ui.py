@@ -31,11 +31,13 @@ class WebUI:
         self._last_wiki_title = None
 
     def _strip_wiki_hint(self, text: str) -> str:
-        # Entfernt den UI-Hinweis "🕵️‍♀️ …" samt der Leerzeile vor der eigentlichen Antwort.
-        if text.startswith("🕵️‍♀️"):
-            sep = "\n\n"
+        # Entfernt UI-Hinweise (Wiki + Kontextwarnung) samt der Leerzeile vor der eigentlichen Antwort.
+        sep = "\n\n"
+        while text.startswith("🕵️‍♀️") or text.startswith("Einen Moment:"):
             i = text.find(sep)
-            return text[i+len(sep):] if i != -1 else ""
+            if i == -1:
+                return ""
+            text = text[i + len(sep):]
         return text
 
     def _build_history(self, chat_history):
@@ -48,21 +50,40 @@ class WebUI:
         return hist
 
     # Streaming der Antwort (UI wird fortlaufend aktualisiert)
-    def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
+    def _stream_reply(self, message_history, original_user_input, chat_history, ui_hints):
         reply = ""
+        ui_hints = [hint for hint in (ui_hints or []) if hint]
+        hint_count = len(ui_hints)
+        base_len = len(chat_history) - hint_count
+        prefix = "\n\n".join(ui_hints)
+
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            if wiki_hint:
-                combined = wiki_hint + "\n\n" + reply
-                # zwei Outputs: (txt bleibt unverändert) + Chatverlauf
-                yield None, chat_history[:-1] + [(original_user_input, combined)]
+            if hint_count:
+                if prefix and reply:
+                    combined = f"{prefix}\n\n{reply}"
+                else:
+                    combined = prefix or reply
+                chat_history[base_len:] = [(original_user_input, combined)]
+                yield None, chat_history
             else:
-                yield None, chat_history + [(original_user_input, reply)]
+                if len(chat_history) == base_len:
+                    chat_history.append((original_user_input, reply))
+                else:
+                    chat_history[-1] = (original_user_input, reply)
+                yield None, chat_history
         # Abschluss: finalen Reply in den Verlauf übernehmen
-        if wiki_hint and chat_history:
-            chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
+        if hint_count:
+            if prefix and reply:
+                combined = f"{prefix}\n\n{reply}"
+            else:
+                combined = prefix or reply
+            chat_history[base_len:] = [(original_user_input, combined)]
         else:
-            chat_history.append((original_user_input, reply))
+            if len(chat_history) == base_len:
+                chat_history.append((original_user_input, reply))
+            else:
+                chat_history[-1] = (original_user_input, reply)
         yield None, chat_history
 
     def respond_streaming(self, user_input, chat_history):
@@ -96,9 +117,11 @@ class WebUI:
             self.wiki_timeout,
         )
 
+        ui_hints = []
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((original_user_input, wiki_hint))
+            ui_hints.append(wiki_hint)
             yield None, chat_history
 
         # 4) Optional: Wiki-Kontext injizieren
@@ -117,6 +140,7 @@ class WebUI:
             warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
             chat_history.append((original_user_input, warn))
+            ui_hints.append(warn)
             persona_options = getattr(self.streamer, "persona_options", {}) or {}
             num_ctx_value = None
             if hasattr(persona_options, "get"):
@@ -146,7 +170,7 @@ class WebUI:
             yield None, chat_history
 
         # 6) Antwort streamen
-        yield from self._stream_reply(message_history, original_user_input, chat_history, wiki_hint)
+        yield from self._stream_reply(message_history, original_user_input, chat_history, ui_hints)
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
                   persona_btn_suffix, input_placeholder, new_chat_label):
         with gr.Blocks() as demo:
