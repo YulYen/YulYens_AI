@@ -31,6 +31,48 @@ class WebUI:
 
     def _reset_conversation_state(self):
         return []
+    
+    def _handle_context_warning(self, llm_history, chat_history, user_input):
+
+        if not utils.context_near_limit(llm_history, self.streamer.persona_options):
+            return False
+
+        drink = get_drink(self.bot)
+        warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
+        if chat_history:
+            insert_at = max(len(chat_history) - 1, 0)
+            chat_history.insert(insert_at, (user_input, warn))
+        else:
+            chat_history.append((user_input, warn))
+
+        persona_options = getattr(self.streamer, "persona_options", {}) or {}
+        num_ctx_value = None
+        if hasattr(persona_options, "get"):
+            num_ctx_value = persona_options.get("num_ctx")
+
+        ctx_limit = None
+        if num_ctx_value is not None:
+            try:
+                ctx_limit = int(num_ctx_value)
+            except (TypeError, ValueError):
+                logging.warning(
+                    "Ungültiger 'num_ctx'-Wert für Persona %r: %r",
+                    self.bot,
+                    num_ctx_value,
+                )
+
+        if ctx_limit and ctx_limit > 0:
+            llm_history[:] = utils.karl_prepare_quick_and_dirty(
+                llm_history, ctx_limit
+            )
+        else:
+            logging.warning(
+                "Überspringe 'karl_prepare_quick_and_dirty' für Persona %r: num_ctx=%r",
+                self.bot,
+                num_ctx_value,
+            )
+
+        return True
 
 
     # Streaming der Antwort (UI wird fortlaufend aktualisiert)
@@ -93,33 +135,7 @@ class WebUI:
         llm_history.append(user_message)
 
         # 6) Kontext-Komprimierung bei Bedarf
-        if self.streamer and utils.context_near_limit(llm_history, self.streamer.persona_options):
-            drink = get_drink(self.bot)
-            warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
-            # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
-            chat_history.append((user_input, warn))
-            persona_options = getattr(self.streamer, "persona_options", {}) or {}
-            num_ctx_value = None
-            if hasattr(persona_options, "get"):
-                num_ctx_value = persona_options.get("num_ctx")
-
-            ctx_limit = None
-            if num_ctx_value is not None:
-                try:
-                    ctx_limit = int(num_ctx_value)
-                except (TypeError, ValueError):
-                    logging.warning( "Ungültiger 'num_ctx'-Wert für Persona %r: %r", self.bot,num_ctx_value, )
-
-            if ctx_limit and ctx_limit > 0:
-                llm_history = utils.karl_prepare_quick_and_dirty(
-                    llm_history, ctx_limit
-                )
-            else:
-                logging.warning(
-                    "Überspringe 'karl_prepare_quick_and_dirty' für Persona %r: num_ctx=%r",
-                    self.bot,
-                    num_ctx_value,
-                )
+        if self._handle_context_warning(llm_history, chat_history, user_input):
             yield None, chat_history, llm_history
 
         # 7) Antwort streamen
