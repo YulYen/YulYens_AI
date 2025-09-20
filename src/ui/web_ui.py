@@ -158,11 +158,12 @@ class WebUI:
                     )
 
             if ctx_limit and ctx_limit > 0:
+                logging.info("message_history muss komprimiert werden")
                 message_history = utils.karl_prepare_quick_and_dirty(
                     message_history, ctx_limit
                 )
             else:
-                logging.debug(
+                logging.warning(
                     "Überspringe 'karl_prepare_quick_and_dirty' für Persona %r: num_ctx=%r",
                     self.bot,
                     num_ctx_value,

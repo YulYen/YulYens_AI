@@ -45,7 +45,7 @@ def karl_prepare_quick_and_dirty(messages, num_ctx: int):
         dropped += 1
 
     result = messages[:protect_head] + core + tail
-    logging.debug("[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
+    logging.info("[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
                   used_before, _approx_token_count(result), target, dropped)
     return result
 
@@ -140,7 +140,7 @@ def approx_token_count(
 def context_near_limit(
     history: List[Dict[str, str]],
     persona_options: Dict[str, Any],
-    threshold: float = 0.9,
+    threshold: float = 0.8,
 ) -> bool:
     """Return True if the conversation is close to the persona's context limit."""
 
@@ -149,6 +149,7 @@ def context_near_limit(
 
     limit = int(persona_options.get("num_ctx") or 0)
     if not limit:
+        logging.warning("Kein Kontext-Limit gesetzt")
         return False
 
     used = approx_token_count(history)
