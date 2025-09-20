@@ -1,7 +1,7 @@
 import gradio as gr
 import logging
 from config.personas import system_prompts, get_drink
-from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context  # ausgelagerte Funktionen
+from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context
 from core import utils
 
 class WebUI:
@@ -26,7 +26,7 @@ class WebUI:
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
-        self.bot = None  # FIX: explizit initialisieren
+        self.bot = None  # wird später gesetzt
         self._last_wiki_snippet = None
         self._last_wiki_title = None
 
@@ -38,14 +38,6 @@ class WebUI:
             return text[i+len(sep):] if i != -1 else ""
         return text
 
-    def _build_history(self, chat_history):
-        hist = []
-        for user_msg, bot_msg in chat_history:
-            cleaned = self._strip_wiki_hint(bot_msg)
-            hist.append({"role": "user", "content": user_msg})
-            if cleaned:
-                hist.append({"role": "assistant", "content": cleaned})
-        return hist
 
     def _reset_conversation_state(self):
         return []
@@ -70,30 +62,26 @@ class WebUI:
         yield None, chat_history, message_history
 
     def respond_streaming(self, user_input, chat_history, history_state):
-        history = list(history_state or [])
-        # Schutz: Kein Text / Reset-Kommando
-        if not user_input or user_input.strip().lower() == "clear":
-            yield "", [], self._reset_conversation_state()
-            return
 
         # Schutz: Persona noch nicht gewählt → UI verhindert das, aber doppelt hält besser
         if not self.bot:
             yield "", chat_history, history_state
             return
 
-        original_user_input = user_input
         logging.info(f"User input: {user_input}")
 
-        # 1) Verlauf für LLM ohne UI-Hinweise
-        if not history:
-            history = self._build_history(chat_history)
+        # 1) Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
+        llm_history = list(history_state or None)
+        if not llm_history:
+              llm_history = []
+              llm_history.append({"role": "user", "content": user_input})
 
         # 2) Eingabefeld leeren
-        yield "", chat_history, history
+        yield "", chat_history, llm_history
 
         # 3) Wiki-Hinweis + Snippet (Top-Treffer)
         wiki_hint, title, snippet = lookup_wiki_snippet(
-            original_user_input,
+            user_input,
             self.bot,
             self.keyword_finder,
             self.wiki_mode,
@@ -104,25 +92,25 @@ class WebUI:
 
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
-            chat_history.append((original_user_input, wiki_hint))
-            yield None, chat_history, history
+            chat_history.append((user_input, wiki_hint))
+            yield None, chat_history, llm_history
 
         # 4) Optional: Wiki-Kontext injizieren
         if snippet:
             self._last_wiki_snippet = None   # wird sofort verbraucht
             self._last_wiki_title = title
-            inject_wiki_context(history, title, snippet)
+            inject_wiki_context(llm_history, title, snippet)
 
         # 5) Nutzerfrage ans LLM
-        history.append({"role": "user", "content": original_user_input})
+        llm_history.append({"role": "user", "content": user_input})
 
         if self.streamer and utils.context_near_limit(
-            history, self.streamer.persona_options
+            llm_history, self.streamer.persona_options
         ):
             drink = get_drink(self.bot)
             warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
-            chat_history.append((original_user_input, warn))
+            chat_history.append((user_input, warn))
             persona_options = getattr(self.streamer, "persona_options", {}) or {}
             num_ctx_value = None
             if hasattr(persona_options, "get"):
@@ -140,19 +128,21 @@ class WebUI:
                     )
 
             if ctx_limit and ctx_limit > 0:
-                history = utils.karl_prepare_quick_and_dirty(
-                    history, ctx_limit
+                llm_history = utils.karl_prepare_quick_and_dirty(
+                    llm_history, ctx_limit
                 )
             else:
-                logging.debug(
+                logging.warning(
                     "Überspringe 'karl_prepare_quick_and_dirty' für Persona %r: num_ctx=%r",
                     self.bot,
                     num_ctx_value,
                 )
-            yield None, chat_history, history
+            yield None, chat_history, llm_history
 
         # 6) Antwort streamen
-        yield from self._stream_reply(history, original_user_input, chat_history, wiki_hint)
+        yield from self._stream_reply(llm_history, user_input, chat_history, wiki_hint)
+
+
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
                   persona_btn_suffix, input_placeholder, new_chat_label):
         with gr.Blocks() as demo:
