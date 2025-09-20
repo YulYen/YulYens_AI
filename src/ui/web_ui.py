@@ -46,9 +46,8 @@ class WebUI:
             chat_history.append((user_input, warn))
 
         persona_options = getattr(self.streamer, "persona_options", {}) or {}
-        num_ctx_value = None
-        if hasattr(persona_options, "get"):
-            num_ctx_value = persona_options.get("num_ctx")
+
+        num_ctx_value = persona_options.get("num_ctx")
 
         ctx_limit = None
         if num_ctx_value is not None:

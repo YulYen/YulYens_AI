@@ -45,7 +45,7 @@ def karl_prepare_quick_and_dirty(messages, num_ctx: int):
         dropped += 1
 
     result = messages[:protect_head] + core + tail
-    logging.info("[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
+    logging.info("[karl_prepare] used=%s→%s, target=%s, dropped=%s ",
                   used_before, _approx_token_count(result), target, dropped)
     return result
 
@@ -126,7 +126,7 @@ def approx_token_count(
     overhead_tokens = per_request_overhead + n_msgs * per_message_overhead
     estimate = max(content_tokens + overhead_tokens, 0)
 
-    logging.debug(
+    logging.info(
         "[approx_token_count] "
         f"chars_per_token={chars_per_token}, "
         f"n_msgs={n_msgs}, total_chars={total_chars}, "
