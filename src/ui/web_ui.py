@@ -27,20 +27,11 @@ class WebUI:
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
         self.bot = None  # wird später gesetzt
-        self._last_wiki_snippet = None
-        self._last_wiki_title = None
-
-    def _strip_wiki_hint(self, text: str) -> str:
-        # Entfernt den UI-Hinweis "🕵️‍♀️ …" samt der Leerzeile vor der eigentlichen Antwort.
-        if text.startswith("🕵️‍♀️"):
-            sep = "\n\n"
-            i = text.find(sep)
-            return text[i+len(sep):] if i != -1 else ""
-        return text
 
 
     def _reset_conversation_state(self):
         return []
+
 
     # Streaming der Antwort (UI wird fortlaufend aktualisiert)
     def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
@@ -61,6 +52,7 @@ class WebUI:
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
+
     def respond_streaming(self, user_input, chat_history, history_state):
 
         # Schutz: Persona noch nicht gewählt → UI verhindert das, aber doppelt hält besser
@@ -70,11 +62,9 @@ class WebUI:
 
         logging.info(f"User input: {user_input}")
 
-        # 1) Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
-        llm_history = list(history_state or None)
-        if not llm_history:
-              llm_history = []
-              llm_history.append({"role": "user", "content": user_input})
+        # 1) Eigener Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
+        llm_history = list(history_state or [])
+        llm_history.append({"role": "user", "content": user_input})
 
         # 2) Eingabefeld leeren
         yield "", chat_history, llm_history
@@ -97,16 +87,13 @@ class WebUI:
 
         # 4) Optional: Wiki-Kontext injizieren
         if snippet:
-            self._last_wiki_snippet = None   # wird sofort verbraucht
-            self._last_wiki_title = title
             inject_wiki_context(llm_history, title, snippet)
 
         # 5) Nutzerfrage ans LLM
         llm_history.append({"role": "user", "content": user_input})
 
-        if self.streamer and utils.context_near_limit(
-            llm_history, self.streamer.persona_options
-        ):
+        # 6) Kontext-Komprimierung bei Bedarf
+        if self.streamer and utils.context_near_limit(llm_history, self.streamer.persona_options):
             drink = get_drink(self.bot)
             warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
@@ -121,11 +108,7 @@ class WebUI:
                 try:
                     ctx_limit = int(num_ctx_value)
                 except (TypeError, ValueError):
-                    logging.warning(
-                        "Ungültiger 'num_ctx'-Wert für Persona %r: %r",
-                        self.bot,
-                        num_ctx_value,
-                    )
+                    logging.warning( "Ungültiger 'num_ctx'-Wert für Persona %r: %r", self.bot,num_ctx_value, )
 
             if ctx_limit and ctx_limit > 0:
                 llm_history = utils.karl_prepare_quick_and_dirty(
@@ -139,7 +122,7 @@ class WebUI:
                 )
             yield None, chat_history, llm_history
 
-        # 6) Antwort streamen
+        # 7) Antwort streamen
         yield from self._stream_reply(llm_history, user_input, chat_history, wiki_hint)
 
 
