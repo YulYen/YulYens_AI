@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
-from .provider import AiApiProvider
+from .provider import AiApiProvider, UnknownPersonaError
 import logging
 import traceback
 
@@ -37,6 +37,9 @@ def ask(req: AskRequest):
         provider = get_provider()
         ans = provider.answer(req.question, req.persona)
         return AskResponse(answer=ans.strip())
+    except UnknownPersonaError as e:
+        logging.warning("Ungültige Persona angefragt: %s", req.persona)
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logging.error(e)
         logging.error(f"Fehler in der API:\n{traceback.format_exc()}")

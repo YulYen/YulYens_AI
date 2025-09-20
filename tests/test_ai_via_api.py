@@ -1,6 +1,7 @@
 import re
 import unicodedata
 import pytest
+from config.personas import get_all_persona_names
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -16,6 +17,17 @@ def test_empty_question_rejected(client):
     a1 =response.json().get("answer", "")
     a2 = "Bitte stell mir eine Frage 🙂"
     assert a1 == a2
+
+
+def test_invalid_persona_rejected(client):
+    response = client.post("/ask", json={"question": "Hallo?", "persona": "UNKNOWN"})
+    assert response.status_code == 400
+    payload = response.json()
+    detail = payload.get("detail", "")
+    assert "Unbekannte Persona" in detail
+    assert "Verfügbare Personas" in detail
+    for name in get_all_persona_names():
+        assert name in detail
 
 @pytest.mark.slow
 @pytest.mark.ollama
