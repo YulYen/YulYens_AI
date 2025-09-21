@@ -1,52 +1,83 @@
 # --------- Utilities (ohne Seiteneffekte nach außen) ---------
-import socket
-from datetime import datetime
-from config.personas import  get_prompt_by_name
-import re
-from pathlib import Path
-from typing import List, Dict, Any, Union
 import logging
 import math
+import re
+import socket
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Sequence, Tuple, Union
 
-def karl_prepare_quick_and_dirty(messages, num_ctx: int):
-    """
-    Quick & Dirty: Platz schaffen für Antwort-Headroom.
-    Dropt alte Messages, bis geschätzte Länge <= num_ctx - headroom.
-    TODO: Später durch Karl-Summarizer ersetzen.
-    """
-    import logging, math, re
+from config.personas import get_prompt_by_name
 
-    chars_per_token = 4.0
-    headroom_tokens = 256
-    headroom_ratio = 0.20
-    min_keep_tail = 2
+Message = Dict[str, Any]
 
-    def _approx_token_count(msgs):
-        total_chars = 0
-        for m in msgs:
-            c = (m.get("content") or "") if isinstance(m, dict) else ""
-            total_chars += len(re.sub(r"\s+", " ", c).strip())
-        return math.ceil(total_chars / chars_per_token)
+
+def _token_stats(messages: Sequence[Message], chars_per_token: float) -> Tuple[int, int, int]:
+    """Return (message_count, total_chars, content_tokens)."""
+
+    total_chars = 0
+    message_count = 0
+
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        content = message.get("content")
+        if not content:
+            continue
+        normalized = re.sub(r"\s+", " ", str(content)).strip()
+        if not normalized:
+            continue
+        message_count += 1
+        total_chars += len(normalized)
+
+    if total_chars:
+        content_tokens = math.ceil(total_chars / max(chars_per_token, 0.1))
+    else:
+        content_tokens = 0
+
+    return message_count, total_chars, content_tokens
+
+
+def karl_prepare_quick_and_dirty(
+    messages: Sequence[Message],
+    num_ctx: int,
+    *,
+    headroom_tokens: int = 256,
+    headroom_ratio: float = 0.20,
+    min_keep_tail: int = 2,
+    chars_per_token: float = 4.0,
+) -> List[Message]:
+    """Trim conversation history to leave space for the upcoming response."""
+
+    items = list(messages)
+    if not items or num_ctx <= 0:
+        return items
 
     target = max(0, num_ctx - max(headroom_tokens, int(num_ctx * headroom_ratio)))
-    used_before = _approx_token_count(messages)
+    used_before = _token_stats(items, chars_per_token)[2]
 
     if used_before <= target:
-        return messages
+        return items
 
-    # Systemprompt (erste) und letzte n Nachrichten schützen
-    protect_head = 1 if messages and messages[0].get("role") == "system" else 0
-    core = messages[protect_head:-min_keep_tail] if min_keep_tail > 0 else messages[protect_head:]
-    tail = messages[-min_keep_tail:] if min_keep_tail > 0 else []
+    head = items[:1] if items[0].get("role") == "system" else []
+    keep_tail = max(0, min(min_keep_tail, len(items) - len(head)))
+    tail = items[-keep_tail:] if keep_tail else []
+    core = items[len(head) : len(items) - keep_tail]
 
     dropped = 0
-    while core and _approx_token_count(messages[:protect_head] + core + tail) > target:
+    while core and _token_stats(head + core + tail, chars_per_token)[2] > target:
         core.pop(0)
         dropped += 1
 
-    result = messages[:protect_head] + core + tail
-    logging.info("[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
-                  used_before, _approx_token_count(result), target, dropped)
+    result = head + core + tail
+    used_after = _token_stats(result, chars_per_token)[2]
+    logging.info(
+        "[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
+        used_before,
+        used_after,
+        target,
+        dropped,
+    )
     return result
 
 
@@ -68,7 +99,7 @@ def _system_prompt_with_date(name, include_date) -> str:
     base = get_prompt_by_name(name)
     today = datetime.now().strftime("%Y-%m-%d")
     if include_date:
-        base =  f"{base} | Heute ist der {today}."
+        base = f"{base} | Heute ist der {today}."
     return base
 
 def _greeting_text(cfg, bot) -> str:
@@ -84,61 +115,49 @@ def ensure_dir_exists(path: Union[str, Path]) -> None:
     """Create a directory if it does not already exist."""
     Path(path).mkdir(parents=True, exist_ok=True)
 
+_UNWANTED_TOKENS = {"assistant", "assistent:", "antwort:"}
+
+
 def clean_token(token: str) -> str:
     # Dummy-Tags raus
     token = re.sub(r"<dummy\d+>", "", token)
 
     # Einzelne irrelevante Tokens rausfiltern
-    stripped = token.strip().lower()
-    if stripped in ["assistant", "assistent:", "antwort:"]:
+    if token.strip().lower() in _UNWANTED_TOKENS:
         return ""
 
     return token
 
 
 def approx_token_count(
-    messages: List[Dict[str, str]],
+    messages: Sequence[Message],
     *,
-    chars_per_token: float = 4.0,       # ~4 Zeichen pro Token (heuristisch, konservativ)
-    per_message_overhead: int = 3,      # Format/Role-Overhead je Nachricht
-    per_request_overhead: int = 3       # Einmaliger Zuschlag für System/Meta
+    chars_per_token: float = 4.0,  # ~4 Zeichen pro Token (heuristisch, konservativ)
+    per_message_overhead: int = 3,  # Format/Role-Overhead je Nachricht
+    per_request_overhead: int = 3,  # Einmaliger Zuschlag für System/Meta
 ) -> int:
-    """
-    Schätzt grob die Anzahl Tokens für Chatnachrichten ohne externen Tokenizer.
+    """Schätzt grob die Anzahl Tokens für Chatnachrichten ohne externen Tokenizer."""
 
-    Methode:
-      - Zählt Zeichen (nach Whitespace-Normalisierung).
-      - Rechnet sie in Tokens um: Zeichen / chars_per_token.
-      - Addiert Overheads für Nachrichten und Anfrage.
-    """
-    total_chars = 0
-    n_msgs = 0
-
-    for msg in messages:
-        content = msg.get("content") if isinstance(msg, dict) else None
-        if not content:
-            continue
-        n_msgs += 1
-        normalized = re.sub(r"\s+", " ", content).strip()
-        total_chars += len(normalized)
-
-    content_tokens = math.ceil(total_chars / max(chars_per_token, 0.1))
-    overhead_tokens = per_request_overhead + n_msgs * per_message_overhead
+    message_count, total_chars, content_tokens = _token_stats(messages, chars_per_token)
+    overhead_tokens = per_request_overhead + message_count * per_message_overhead
     estimate = max(content_tokens + overhead_tokens, 0)
 
     logging.debug(
-        "[approx_token_count] "
-        f"chars_per_token={chars_per_token}, "
-        f"n_msgs={n_msgs}, total_chars={total_chars}, "
-        f"content_tokens≈{content_tokens}, overhead={overhead_tokens}, "
-        f"estimate={estimate}"
+        "[approx_token_count] chars_per_token=%s, n_msgs=%s, total_chars=%s, "
+        "content_tokens≈%s, overhead=%s, estimate=%s",
+        chars_per_token,
+        message_count,
+        total_chars,
+        content_tokens,
+        overhead_tokens,
+        estimate,
     )
 
     return estimate
 
 
 def context_near_limit(
-    history: List[Dict[str, str]],
+    history: Sequence[Message],
     persona_options: Dict[str, Any],
     threshold: float = 0.9,
 ) -> bool:
