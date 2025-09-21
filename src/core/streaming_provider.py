@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from core.utils import clean_token, ensure_dir_exists
+from core.utils import clean_token, ensure_dir_exists, approx_token_count
 from security.tinyguard import BasicGuard, zeigefinger_message
 
 # LLM‑Interface importieren
@@ -116,6 +116,68 @@ class YulYenStreamingProvider:
         except Exception as e:
             logging.error("Fehler beim Schreiben des Conversation_log: %s", e)
 
+    def _log_generation_start(self, messages: List[Dict[str, Any]], options: Dict[str, Any]) -> None:
+        """Loggt vor dem eigentlichen LLM-Aufruf Kontext- und Wiki-Informationen.
+            TODO: Refaktor: Diese Methode kann wesentlich schlanker mit weniger übertriebenem Fehlerhandling
+        """
+
+        # Payload (Messages + Options) hashen und loggen
+        try:
+            _payload = {"messages": messages, "options": options}
+            _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
+            logging.debug("[LLM INPUT] sha256=%s payload=%s", _hash, _canon)
+        except Exception as exc:
+            logging.warning("Unable to log LLM input: %s", exc)
+
+
+        timestamp = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+        try:
+            estimated_tokens = approx_token_count(messages)
+        except Exception as exc:  # pragma: no cover - reine Absicherung
+            logging.warning("Konnte Token-Anzahl nicht schätzen: %s", exc)
+            estimated_tokens = None
+
+        persona_options = self.persona_options or {}
+        num_ctx_raw = persona_options.get("num_ctx") if isinstance(persona_options, dict) else None
+        num_ctx_value: Any
+        if num_ctx_raw is None:
+            num_ctx_value = None
+        else:
+            try:
+                num_ctx_value = int(num_ctx_raw)
+            except (TypeError, ValueError):
+                num_ctx_value = num_ctx_raw
+
+        wiki_snippets: List[Dict[str, Any]] = []
+        for msg in messages:
+            content = msg.get("content") if isinstance(msg, dict) else None
+            if not content or "[Quelle: Wikipedia]" not in content:
+                continue
+
+            _, _, snippet_raw = content.partition("[Quelle: Wikipedia]")
+            snippet_text = snippet_raw.strip() or content
+            snippet_message = [{"role": msg.get("role", "system"), "content": snippet_text}]
+            try:
+                snippet_estimate = approx_token_count(snippet_message)
+            except Exception:  # pragma: no cover - reine Absicherung
+                snippet_estimate = None
+
+            wiki_snippets.append({
+                "text": snippet_text,
+                "estimated_tokens": snippet_estimate,
+            })
+
+        log_payload = {
+            "ts": timestamp,
+            "estimated_tokens": estimated_tokens,
+            "num_ctx": num_ctx_value,
+            "wiki_snippets": wiki_snippets,
+        }
+
+        logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
+
+
     def stream(self, messages: List[Dict[str, Any]]):
         """
         Generator, der tokenweise Antworten aus dem LLM zurückliefert.
@@ -147,19 +209,12 @@ class YulYenStreamingProvider:
         if self.persona_options:
             options = self.persona_options
 
-        # Payload (Messages + Options) hashen und loggen
-        try:
-            _payload = {"messages": messages, "options": options}
-            _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-            _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
-            logging.debug("[LLM INPUT] sha256=%s payload=%s", _hash, _canon)
-        except Exception as exc:
-            logging.warning("Unable to log LLM input: %s", exc)
-
         full_reply_parts = []
         try:
             t_start = time.time()
             first_token_time: Optional[float] = None
+
+            self._log_generation_start(messages, options)
 
             # Delegation an den LLM‑Core
             stream_obj = self._llm_core.stream_chat(
@@ -382,3 +437,6 @@ def run_llm_collect(streamer: YulYenStreamingProvider, messages: List[Dict[str, 
     for token in streamer.stream(messages=messages):
         full_reply_parts.append(token)
     return "".join(full_reply_parts).strip()
+
+
+    
