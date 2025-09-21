@@ -68,11 +68,10 @@ def karl_prepare_quick_and_dirty(
     while core and _token_stats(head + core + tail, chars_per_token)[2] > target:
         core.pop(0)
         dropped += 1
-
     result = head + core + tail
     used_after = _token_stats(result, chars_per_token)[2]
     logging.info(
-        "[karl_prepare] used=%s→%s, target=%s, dropped=%s (TODO: Karl ersetzen)",
+        "[karl_prepare] used=%s→%s, target=%s, dropped=%s (Karl später geeignet ersetzen)",
         used_before,
         used_after,
         target,
@@ -142,7 +141,7 @@ def approx_token_count(
     overhead_tokens = per_request_overhead + message_count * per_message_overhead
     estimate = max(content_tokens + overhead_tokens, 0)
 
-    logging.debug(
+    logging.info(
         "[approx_token_count] chars_per_token=%s, n_msgs=%s, total_chars=%s, "
         "content_tokens≈%s, overhead=%s, estimate=%s",
         chars_per_token,

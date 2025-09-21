@@ -1,5 +1,6 @@
 import gradio as gr
 import logging
+from functools import partial
 from config.personas import system_prompts, get_drink
 from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context
 from core import utils
@@ -39,16 +40,12 @@ class WebUI:
 
         drink = get_drink(self.bot)
         warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
-        if chat_history:
-            insert_at = max(len(chat_history) - 1, 0)
-            chat_history.insert(insert_at, (user_input, warn))
-        else:
-            chat_history.append((user_input, warn))
+
+        chat_history.append((None, warn))
 
         persona_options = getattr(self.streamer, "persona_options", {}) or {}
-        num_ctx_value = None
-        if hasattr(persona_options, "get"):
-            num_ctx_value = persona_options.get("num_ctx")
+
+        num_ctx_value = persona_options.get("num_ctx")
 
         ctx_limit = None
         if num_ctx_value is not None:
@@ -76,21 +73,14 @@ class WebUI:
 
 
     # Streaming der Antwort (UI wird fortlaufend aktualisiert)
-    def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
+    def _stream_reply(self, message_history, chat_history):
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            if wiki_hint:
-                combined = wiki_hint + "\n\n" + reply
-                # zwei Outputs: (txt bleibt unverändert) + Chatverlauf
-                yield None, chat_history[:-1] + [(original_user_input, combined)], message_history
-            else:
-                yield None, chat_history + [(original_user_input, reply)], message_history
+            yield None, chat_history + [(None, reply)], message_history
+
         # Abschluss: finalen Reply in den Verlauf übernehmen
-        if wiki_hint and chat_history:
-            chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
-        else:
-            chat_history.append((original_user_input, reply))
+        chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
@@ -102,13 +92,15 @@ class WebUI:
             yield "", chat_history, history_state
             return
 
-        logging.info(f"User input: {user_input}")
 
         # 1) Eigener Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
         llm_history = list(history_state or [])
 
-        # 2) Eingabefeld leeren
+        # 2) Eingabefeld leeren und User-Input zeigen im Chatfenster
+        logging.info(f"User input: {user_input}")
+        chat_history.append((user_input, None ))
         yield "", chat_history, llm_history
+
 
         # 3) Wiki-Hinweis + Snippet (Top-Treffer)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -123,7 +115,7 @@ class WebUI:
 
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
-            chat_history.append((user_input, wiki_hint))
+            chat_history.append((None, wiki_hint))
             yield None, chat_history, llm_history
 
         # 4) Optional: Wiki-Kontext injizieren
@@ -139,7 +131,7 @@ class WebUI:
             yield None, chat_history, llm_history
 
         # 7) Antwort streamen
-        yield from self._stream_reply(llm_history, user_input, chat_history, wiki_hint)
+        yield from self._stream_reply(llm_history, chat_history)
 
 
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
@@ -218,6 +210,61 @@ class WebUI:
         }
         return demo, components
 
+    def _persona_selected_updates(self, persona_key, persona, greeting_template, model_name, input_placeholder):
+        display_name = persona["name"].title()
+        greeting = greeting_template.format(
+            persona_name=display_name, model_name=model_name
+        )
+        focus_text = f"### {persona['name']}\n{persona['description']}"
+
+        return (
+            gr.update(value=persona_key),
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(value=persona["image_path"]),
+            gr.update(value=focus_text),
+            gr.update(value=greeting, visible=True),
+            gr.update(value=[], label=display_name, visible=True),
+            gr.update(
+                value="", visible=True, interactive=True,
+                placeholder=input_placeholder
+            ),
+            gr.update(visible=True),
+            self._reset_conversation_state(),
+        )
+
+    def _reset_ui_updates(self):
+        return (
+            gr.update(value=""),
+            gr.update(visible=True),
+            gr.update(visible=False),
+            gr.update(value=None),
+            gr.update(value=""),
+            gr.update(value="", visible=False),
+            gr.update(value=[], label="", visible=False),
+            gr.update(value="", visible=False, interactive=False),
+            gr.update(visible=False),
+            self._reset_conversation_state(),
+        )
+
+    def _on_persona_selected(self, key, persona_info, greeting_template, model_name, input_placeholder):
+        persona = persona_info.get(key)
+        if not persona:
+            self.bot = None
+            self.streamer = None
+            return self._reset_ui_updates()
+
+        self.bot = persona["name"]
+        self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        return self._persona_selected_updates(
+            key, persona, greeting_template, model_name, input_placeholder
+        )
+
+    def _on_reset_to_start(self):
+        self.bot = None
+        self.streamer = None
+        return self._reset_ui_updates()
+
     def _bind_events(self, components, persona_info, model_name,
                      greeting_template, input_placeholder):
         selected_persona_state = components["selected_persona_state"]
@@ -231,78 +278,31 @@ class WebUI:
         clear = components["clear"]
         history_state = components["history_state"]
 
-        def on_persona_selected(key: str):
-            if not key or key not in persona_info:
-                return (
-                    gr.update(value=""),
-                    gr.update(visible=True),
-                    gr.update(visible=False),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    gr.update(),
-                    self._reset_conversation_state(),
-                )
-
-            p = persona_info[key]
-            self.bot = p["name"]
-            self.streamer = self.factory.get_streamer_for_persona(self.bot)
-
-            display_name = p["name"].title()
-            greeting = greeting_template.format(
-                persona_name=display_name, model_name=model_name
-            )
-            focus_text = f"### {p['name']}\n{p['description']}"
-
-            return (
-                gr.update(value=key),
-                gr.update(visible=False),
-                gr.update(visible=True),
-                gr.update(value=p["image_path"]),
-                gr.update(value=focus_text),
-                gr.update(value=greeting, visible=True),
-                gr.update(value=[], label=display_name, visible=True),
-                gr.update(
-                    value="", visible=True, interactive=True,
-                    placeholder=input_placeholder
-                ),
-                gr.update(visible=True),
-                self._reset_conversation_state(),
-            )
-
-        def on_reset_to_start():
-            self.bot = None
-            return (
-                gr.update(value=""),
-                gr.update(visible=True),
-                gr.update(visible=False),
-                gr.update(value=None),
-                gr.update(value=""),
-                gr.update(value="", visible=False),
-                gr.update(value=[], label="", visible=False),
-                gr.update(value="", visible=False, interactive=False),
-                gr.update(visible=False),
-                self._reset_conversation_state(),
-            )
+        persona_outputs = [
+            selected_persona_state,
+            grid_group,
+            focus_group,
+            focus_img,
+            focus_md,
+            greeting_md,
+            chatbot,
+            txt,
+            clear,
+            history_state,
+        ]
 
         for key, btn in components["persona_buttons"]:
             btn.click(
-                fn=lambda key=key: on_persona_selected(key),
+                fn=partial(
+                    self._on_persona_selected,
+                    key=key,
+                    persona_info=persona_info,
+                    greeting_template=greeting_template,
+                    model_name=model_name,
+                    input_placeholder=input_placeholder,
+                ),
                 inputs=[],
-                outputs=[
-                    selected_persona_state,
-                    grid_group,
-                    focus_group,
-                    focus_img,
-                    focus_md,
-                    greeting_md,
-                    chatbot,
-                    txt,
-                    clear,
-                    history_state,
-                ],
+                outputs=persona_outputs,
                 queue=False,
             )
 
@@ -314,20 +314,9 @@ class WebUI:
         )
 
         clear.click(
-            fn=on_reset_to_start,
+            fn=self._on_reset_to_start,
             inputs=[],
-            outputs=[
-                selected_persona_state,
-                grid_group,
-                focus_group,
-                focus_img,
-                focus_md,
-                greeting_md,
-                chatbot,
-                txt,
-                clear,
-                history_state,
-            ],
+            outputs=persona_outputs,
             queue=False,
         )
 
