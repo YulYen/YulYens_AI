@@ -40,11 +40,8 @@ class WebUI:
 
         drink = get_drink(self.bot)
         warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
-        if chat_history:
-            insert_at = max(len(chat_history) - 1, 0)
-            chat_history.insert(insert_at, (user_input, warn))
-        else:
-            chat_history.append((user_input, warn))
+
+        chat_history.append((None, warn))
 
         persona_options = getattr(self.streamer, "persona_options", {}) or {}
 
@@ -76,21 +73,14 @@ class WebUI:
 
 
     # Streaming der Antwort (UI wird fortlaufend aktualisiert)
-    def _stream_reply(self, message_history, original_user_input, chat_history, wiki_hint):
+    def _stream_reply(self, message_history, chat_history):
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            if wiki_hint:
-                combined = wiki_hint + "\n\n" + reply
-                # zwei Outputs: (txt bleibt unverändert) + Chatverlauf
-                yield None, chat_history[:-1] + [(original_user_input, combined)], message_history
-            else:
-                yield None, chat_history + [(original_user_input, reply)], message_history
+            yield None, chat_history + [(None, reply)], message_history
+
         # Abschluss: finalen Reply in den Verlauf übernehmen
-        if wiki_hint and chat_history:
-            chat_history[-1] = (original_user_input, wiki_hint + "\n\n" + reply)
-        else:
-            chat_history.append((original_user_input, reply))
+        chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
@@ -102,13 +92,15 @@ class WebUI:
             yield "", chat_history, history_state
             return
 
-        logging.info(f"User input: {user_input}")
 
         # 1) Eigener Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
         llm_history = list(history_state or [])
 
-        # 2) Eingabefeld leeren
+        # 2) Eingabefeld leeren und User-Input zeigen im Chatfenster
+        logging.info(f"User input: {user_input}")
+        chat_history.append((user_input, None ))
         yield "", chat_history, llm_history
+
 
         # 3) Wiki-Hinweis + Snippet (Top-Treffer)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -123,7 +115,7 @@ class WebUI:
 
         if wiki_hint:
             # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
-            chat_history.append((user_input, wiki_hint))
+            chat_history.append((None, wiki_hint))
             yield None, chat_history, llm_history
 
         # 4) Optional: Wiki-Kontext injizieren
@@ -139,7 +131,7 @@ class WebUI:
             yield None, chat_history, llm_history
 
         # 7) Antwort streamen
-        yield from self._stream_reply(llm_history, user_input, chat_history, wiki_hint)
+        yield from self._stream_reply(llm_history, chat_history)
 
 
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
