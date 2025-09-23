@@ -17,13 +17,13 @@ from transformers import (
     set_seed,
     default_data_collator,
     BitsAndBytesConfig,
+    logging as hf_logging,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 # ---- Konfiguration (explizit, knapp) -----------------------------------------
 MODEL_ID   = "LeoLM/leo-hessianai-13b"                # HF-Checkpoint (kein GGUF)
 DATA_PATH  = "data/kuratiert_neu_doris.jsonl"         # {"user": "...", "assistant": "..."} pro Zeile
-OUT_DIR    = "out_lora_doris"
 
 MAX_LEN    = 1024   # bei VRAM-Druck 768 oder 512 nehmen
 EPOCHS     = 1
@@ -31,7 +31,6 @@ LR         = 2e-4
 BATCH      = 1
 ACCUM      = 16
 WARMUP     = 0.03
-LOG_STEPS  = 10
 
 # LoRA-Ziele (Llama/Mistral-typische Projektionen)
 LORA_R        = 16
@@ -72,6 +71,12 @@ def main() -> None:
         raise FileNotFoundError(f"Dataset fehlt: {DATA_PATH}")
 
     use_cuda = torch.cuda.is_available()
+    if use_cuda:
+        # etwas schneller & stabiler auf NVIDIA (keine Genauigkeitseinbußen bei bf16)
+        torch.backends.cuda.matmul.allow_tf32 = True
+
+    # HF-Logging angenehm gesprächig (für echten Fortschritt sorgt tqdm unten)
+    hf_logging.set_verbosity_info()
 
     # --- Tokenizer
     tok = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)
@@ -110,20 +115,16 @@ def main() -> None:
         torch_dtype=torch.bfloat16 if use_cuda else torch.float32,
         device_map="auto",
         max_memory=max_memory,
-        offload_folder="offload_cache",   # Disk-Offload-Ordner (reicht, auch ohne 'disk' in max_memory)
+        offload_folder="offload_cache",   # Disk-Offload-Ordner
         low_cpu_mem_usage=True,
     )
 
-    # Optional nett: einmal schauen, wie gemappt wurde
-    try:
-        print(getattr(base, "hf_device_map", None))
-    except Exception:
-        pass
-
     # --- K-Bit-Training vorbereiten
     base = prepare_model_for_kbit_training(base, use_gradient_checkpointing=True)
+    # künftige Torch-Warnung vermeiden und i. d. R. stabiler:
+    base.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     base.config.use_cache = False
-    # Optional: wenn FA2 verfügbar ist, nach dem Laden aktivieren
+    # Optional: FA2 nur setzen, wenn installiert
     # base.config.attn_implementation = "flash_attention_2"
 
     # --- LoRA
@@ -140,16 +141,24 @@ def main() -> None:
     ds = load_dataset("json", data_files=DATA_PATH, split="train")
     tok_ds = ds.map(lambda ex: encode_example(ex, tok), remove_columns=ds.column_names)
 
+    # --- Output-Verzeichnis modellbezogen (kein „Gerümpel“-Mix)
+    model_name = MODEL_ID.split("/")[-1].replace(":", "_")
+    out_dir = Path(f"out_lora_{model_name}_doris")  # z.B. out_lora_leo-hessianai-13b_doris
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     # --- Training
     args = TrainingArguments(
-        output_dir=OUT_DIR,
+        output_dir=str(out_dir),
         num_train_epochs=EPOCHS,
         per_device_train_batch_size=BATCH,
         gradient_accumulation_steps=ACCUM,
         learning_rate=LR,
         lr_scheduler_type="cosine",
         warmup_ratio=WARMUP,
-        logging_steps=LOG_STEPS,
+        # klarer Live-Fortschritt:
+        disable_tqdm=False,
+        logging_steps=1,
+        log_level="info",
         save_strategy="epoch",
         optim="adamw_torch",
         bf16=use_cuda,
@@ -164,9 +173,9 @@ def main() -> None:
     )
     trainer.train()
 
-    model.save_pretrained(OUT_DIR)
-    tok.save_pretrained(OUT_DIR)
-    print(f"Fertig. Adapter liegt in: {OUT_DIR}")
+    model.save_pretrained(str(out_dir))
+    tok.save_pretrained(str(out_dir))
+    print(f"Fertig. Adapter liegt in: {out_dir}")
 
 
 if __name__ == "__main__":

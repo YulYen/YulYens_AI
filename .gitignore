@@ -39,5 +39,5 @@ models/
 nix_mit_AI/
 
 
-training/out_lora_doris/
+training/out_lora*
 gamerecording.pb
