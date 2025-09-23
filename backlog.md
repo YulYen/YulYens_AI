@@ -10,7 +10,7 @@
 | 8   | Ask-All (Broadcast)                    | Gleiche Frage nacheinander an Leah, Doris, Peter, Popcorn, getrennte Kontexte |   S    |   M   | Orchestrierung     |
 | 9   | Stage-Mode (Self-Talk)                 | Zwei+ Personas führen n Runden Dialog, Start nur mit 1 Auftaktsatz            |   M    |   L   | Orchestrierung     |
 | 10  | Easter-Egg Logik                       | Stichwort → Nachsatz                                                          |   M    |   M   | Cooles Feature     |
-| 12  | Karl (Kontextzusammenfasser)           | IN ARBEIT (inkl. Bugfix gegen Drift ins )  → Verlauf komprimieren bei Bedarf  |   L    |   L   | Technische Basis   |
+| 12  | Karl (Kontextzusammenfasser)           | Verlauf komprimieren bei Bedarf durch LLM-Summary statt aktuelle Lösung       |   L    |   L   | Technische Basis   |
 | 13  | STT/TTS (Sprache ↔ Text) MVP           | Einfache Sprach-I/O                                                           |   M    |   M   | Cooles Feature     |
 | 14  | E-Mail an/von AI                       | Mail lesen/schreiben/versenden                                                |   M    |   M   | Integration        |
 | 15  | Tagesbrief (IoT + RSS)                 | Tägliche Kurzupdates                                                          |   M    |   M   | Cooles Feature     |
