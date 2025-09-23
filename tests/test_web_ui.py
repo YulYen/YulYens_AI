@@ -63,10 +63,10 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
 
     with patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)), \
          patch("ui.web_ui.inject_wiki_context"), \
-         patch("ui.web_ui.utils.context_near_limit", return_value=True), \
+         patch("ui.web_ui.context_near_limit", return_value=True), \
          patch("ui.web_ui.get_drink", return_value="☕"), \
          patch(
-             "ui.web_ui.utils.karl_prepare_quick_and_dirty",
+             "ui.web_ui.karl_prepare_quick_and_dirty",
              side_effect=lambda history, limit: history,
          ) as mock_prepare:
         list(web_ui.respond_streaming("Hallo", chat_history, history_state))
@@ -91,9 +91,9 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
 
     with patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)), \
          patch("ui.web_ui.inject_wiki_context"), \
-         patch("ui.web_ui.utils.context_near_limit", return_value=True), \
+         patch("ui.web_ui.context_near_limit", return_value=True), \
          patch("ui.web_ui.get_drink", return_value="☕"), \
-         patch("ui.web_ui.utils.karl_prepare_quick_and_dirty") as mock_prepare:
+         patch("ui.web_ui.karl_prepare_quick_and_dirty") as mock_prepare:
         list(web_ui.respond_streaming("Hallo", chat_history, history_state))
 
     mock_prepare.assert_not_called()
@@ -121,7 +121,7 @@ def test_respond_streaming_keeps_session_histories_isolated():
     session_two_state = []
 
     with patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)), \
-         patch("ui.web_ui.utils.context_near_limit", return_value=False):
+         patch("ui.web_ui.context_near_limit", return_value=False):
         session_one_outputs = list(
             web_ui.respond_streaming("Frage 1", [], session_one_state)
         )

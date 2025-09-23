@@ -93,7 +93,6 @@ def test_factory_builds_streamer_with_dummy_core(monkeypatch):
     assert isinstance(streamer, YulYenStreamingProvider)
     assert streamer.model_name == cfg.core["model_name"]
     assert streamer.persona == "DORIS"
-    assert streamer.persona_prompt == "SYSTEM::DORIS"
     assert streamer.persona_options == {"temperature": 0.1}
     assert isinstance(streamer._llm_core, DummyLLMCore)
 

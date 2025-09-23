@@ -17,7 +17,7 @@ from config.logging_setup import init_logging
 
 # Core und Konfiguration
 from core.factory import AppFactory
-from core import utils
+from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from config.config_singleton import Config
 from yaml import YAMLError
 
@@ -56,7 +56,7 @@ def main():
         sys.exit(3)
 
     # 1) Logging ZUERST initialisieren
-    utils.ensure_dir_exists(cfg.logging["dir"])
+    ensure_dir_exists(cfg.logging["dir"])
     logfile = os.path.join(
         cfg.logging["dir"],
         f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
@@ -75,7 +75,7 @@ def main():
 
     # 2) Wiki-Proxy nur starten, wenn Modus aktiv
     wiki_mode = cfg.wiki["mode"]
-    if utils._wiki_mode_enabled(wiki_mode):
+    if _wiki_mode_enabled(wiki_mode):
         start_wiki_proxy_thread()
         # Neu: Offline-Wiki bei Bedarf starten
         try:

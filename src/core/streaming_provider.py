@@ -20,7 +20,9 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from core.utils import clean_token, ensure_dir_exists, approx_token_count
+from core.utils import clean_token, ensure_dir_exists
+from core.context_utils import approx_token_count
+
 from security.tinyguard import BasicGuard, zeigefinger_message
 
 # LLM‑Interface importieren

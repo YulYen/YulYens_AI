@@ -3,7 +3,7 @@ import logging
 from functools import partial
 from config.personas import system_prompts, get_drink
 from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context
-from core import utils
+from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
 class WebUI:
     """
@@ -35,7 +35,7 @@ class WebUI:
     
     def _handle_context_warning(self, llm_history, chat_history, user_input):
 
-        if not utils.context_near_limit(llm_history, self.streamer.persona_options):
+        if not context_near_limit(llm_history, self.streamer.persona_options):
             return False
 
         drink = get_drink(self.bot)
@@ -59,7 +59,7 @@ class WebUI:
                 )
 
         if ctx_limit and ctx_limit > 0:
-            llm_history[:] = utils.karl_prepare_quick_and_dirty(
+            llm_history[:] = karl_prepare_quick_and_dirty(
                 llm_history, ctx_limit
             )
         else:

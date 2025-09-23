@@ -5,7 +5,8 @@ from colorama import Fore, Style, init
 from typing import Callable, List, Dict, Optional
 from config.personas import get_all_persona_names, system_prompts, get_drink
 import logging
-from core import utils
+from core.utils import _greeting_text
+from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
 
 # Gemeinsame Core-Utilities & Streamer
@@ -62,7 +63,7 @@ class TerminalUI:
                     # Streamer für gewählte Persona bauen
                     self.streamer = self.factory.get_streamer_for_persona(persona_name)
                     self.bot = persona_name
-                    self.greeting = utils._greeting_text(self.config, self.bot)
+                    self.greeting = _greeting_text(self.config, self.bot)
 
                     print(f"Persona {self.bot} ausgewählt.")
                     break
@@ -181,7 +182,7 @@ class TerminalUI:
 
         persona_options = getattr(self.streamer, "persona_options", {}) or {}
 
-        if not utils.context_near_limit(self.history, persona_options):
+        if not context_near_limit(self.history, persona_options):
             return
 
         drink = get_drink(self.bot)
@@ -204,7 +205,7 @@ class TerminalUI:
             return
 
         original_length = len(self.history)
-        trimmed_history = utils.karl_prepare_quick_and_dirty(self.history, ctx_limit)
+        trimmed_history = karl_prepare_quick_and_dirty(self.history, ctx_limit)
         removed = original_length - len(trimmed_history)
         self.history = trimmed_history
 

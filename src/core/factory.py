@@ -10,7 +10,7 @@ from core.streaming_provider import YulYenStreamingProvider
 from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
-from core import utils
+from core.utils import _wiki_mode_enabled, _system_prompt_with_date, _local_ip
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
 
@@ -37,7 +37,7 @@ class AppFactory:
 
     def get_keyword_finder(self) -> Optional[SpacyKeywordFinder]:
         if self._keyword_finder is None:
-            if utils._wiki_mode_enabled(self._cfg.wiki["mode"]):
+            if _wiki_mode_enabled(self._cfg.wiki["mode"]):
                 variant = self._resolve_spacy_model_variant()
                 self._keyword_finder = SpacyKeywordFinder(variant)
             else:
@@ -77,7 +77,7 @@ class AppFactory:
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
         core_cfg = self._cfg.core
-        persona_prompt = utils._system_prompt_with_date(
+        persona_prompt = _system_prompt_with_date(
             persona_name, core_cfg["include_date"]
         )
         options = personas.get_options(persona_name)
@@ -232,7 +232,7 @@ class AppFactory:
 
         if ui_type == "terminal":
             self._ui = TerminalUI(
-                self, self._cfg, finder, utils._local_ip,
+                self, self._cfg, finder, _local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 wiki_timeout=(
                     float(wiki["timeout_connect"]),
@@ -244,7 +244,7 @@ class AppFactory:
             host = web_cfg["host"]
             port = int(web_cfg["port"])
             self._ui = WebUI(
-                self, self._cfg, finder, utils._local_ip,
+                self, self._cfg, finder, _local_ip,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 web_host=host, web_port=port,
                 wiki_timeout=(
