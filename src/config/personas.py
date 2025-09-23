@@ -16,7 +16,7 @@ system_prompts = [
         "llm_options": {
              "temperature" : 0.65,
              "repeat_penalty": 1.15,
-             "num_ctx": 2072},
+             "num_ctx": 4096},
         "description": "Charmante, empathische KI. Ideal für Alltag und Gespräche, die freundlich und leicht klingen sollen.",
         "image_path": "static/LEAH.png",
         "drink": "Latte Macchiato"
@@ -39,7 +39,7 @@ system_prompts = [
         "llm_options": {
              "temperature" : 0.6,
              "repeat_penalty": 1.15,
-             "num_ctx": 2072},
+             "num_ctx": 4096},
         "description": "Direkt, spitz und mit trockenem Humor. Perfekt, wenn du ehrliche und freche Antworten haben willst.",
         "image_path": "static/DORIS.png",
         "drink": "Espresso"
@@ -58,7 +58,7 @@ system_prompts = [
         "llm_options": {
              "temperature" : 0.2,
              "repeat_penalty": 1.15,
-             "num_ctx": 2072,
+             "num_ctx": 4096,
              "seed" : 42},
         "description": "Nerdige, faktenorientierte KI mit Herz. Liefert präzise Infos und Erklärungen verständlich aufbereitet.",
         "image_path": "static/PETER.png",
@@ -83,7 +83,7 @@ system_prompts = [
         "llm_options": {
              "temperature" : 0.8,
              "repeat_penalty": 1.15,
-             "num_ctx": 2072},
+             "num_ctx": 4096},
         "description": "Verspielte, clevere Katzen-KI am Laptop. Ideal für Kreativität und kindgerechte Erklärungen.",
         "image_path": "static/POPCORN.png",
         "drink": "Milch"

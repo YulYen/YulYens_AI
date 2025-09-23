@@ -139,7 +139,6 @@ class YulYenStreamingProvider:
         except Exception as exc:  # pragma: no cover - reine Absicherung
             logging.warning("Konnte Token-Anzahl nicht schätzen: %s", exc)
             estimated_tokens = None
-
         persona_options = self.persona_options or {}
         num_ctx_raw = persona_options.get("num_ctx") if isinstance(persona_options, dict) else None
         num_ctx_value: Any
@@ -150,33 +149,11 @@ class YulYenStreamingProvider:
                 num_ctx_value = int(num_ctx_raw)
             except (TypeError, ValueError):
                 num_ctx_value = num_ctx_raw
-
-        wiki_snippets: List[Dict[str, Any]] = []
-        for msg in messages:
-            content = msg.get("content") if isinstance(msg, dict) else None
-            if not content or "[Quelle: Wikipedia]" not in content:
-                continue
-
-            _, _, snippet_raw = content.partition("[Quelle: Wikipedia]")
-            snippet_text = snippet_raw.strip() or content
-            snippet_message = [{"role": msg.get("role", "system"), "content": snippet_text}]
-            try:
-                snippet_estimate = approx_token_count(snippet_message)
-            except Exception:  # pragma: no cover - reine Absicherung
-                snippet_estimate = None
-
-            wiki_snippets.append({
-                "text": snippet_text,
-                "estimated_tokens": snippet_estimate,
-            })
-
         log_payload = {
             "ts": timestamp,
             "estimated_tokens": estimated_tokens,
             "num_ctx": num_ctx_value,
-            "wiki_snippets": wiki_snippets,
         }
-
         logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
 
 

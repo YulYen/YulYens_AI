@@ -33,7 +33,7 @@ class WebUI:
     def _reset_conversation_state(self):
         return []
     
-    def _handle_context_warning(self, llm_history, chat_history, user_input):
+    def _handle_context_warning(self, llm_history, chat_history):
 
         if not context_near_limit(llm_history, self.streamer.persona_options):
             return False
@@ -126,8 +126,8 @@ class WebUI:
         user_message = {"role": "user", "content": user_input}
         llm_history.append(user_message)
 
-        # 6) Kontext-Komprimierung bei Bedarf
-        if self._handle_context_warning(llm_history, chat_history, user_input):
+        # 6) Kontext-Komprimierung bei Bedarf inkl. Info in Chat-History
+        if self._handle_context_warning(llm_history, chat_history):
             yield None, chat_history, llm_history
 
         # 7) Antwort streamen

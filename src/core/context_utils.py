@@ -7,9 +7,11 @@ from typing import Any, Dict, List, Sequence, Tuple
 Message = Dict[str, Any]
 
 chars_per_token: float = 3.25  # ~3,25 Zeichen pro Token (heuristisch, konservativ)
+
 threshold: float = 0.75 # Kontext nur zu 75% Füllen
-headroom_tokens: int = 300 # 300 Token mindestens 'Luft' 
-headroom_ratio: float = 1 - threshold # oder 100% - threshold 'Luft lassen
+
+headroom_tokens: int = 500 # 500 Token mindestens 'Luft' 
+headroom_ratio: float = 0.5 # oder 50% 'Luft lassen, wenn ohnehin gekürzt wird
 
 
 def _token_stats(messages: Sequence[Message]) -> Tuple[int, int, int]:
@@ -81,7 +83,7 @@ def approx_token_count(
     messages: Sequence[Message],
     *,
     per_message_overhead: int = 3,  # Format/Role-Overhead je Nachricht
-    per_request_overhead: int = 3,  # Einmaliger Zuschlag für System/Meta
+    per_request_overhead: int = 400,  # Einmaliger Zuschlag für System-Prompt/Meta
 ) -> int:
     """Schätzt grob die Anzahl Tokens für Chatnachrichten ohne externen Tokenizer."""
 
