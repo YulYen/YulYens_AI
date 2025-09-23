@@ -25,7 +25,7 @@ from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 MODEL_ID   = "LeoLM/leo-hessianai-13b"                # HF-Checkpoint (kein GGUF)
 DATA_PATH  = "data/kuratiert_neu_doris.jsonl"         # {"user": "...", "assistant": "..."} pro Zeile
 
-MAX_LEN    = 1024   # bei VRAM-Druck 768 oder 512 nehmen
+MAX_LEN    = 256   # DORIS-Beispiele sind sehr kurz, bei anderen Trainings wegen bei VRAM-Druck z.B. 768 oder 512 nehmen
 EPOCHS     = 1
 LR         = 2e-4
 BATCH      = 1
@@ -152,12 +152,14 @@ def main() -> None:
         num_train_epochs=EPOCHS,
         per_device_train_batch_size=BATCH,
         gradient_accumulation_steps=ACCUM,
+        group_by_length=True,
         learning_rate=LR,
         lr_scheduler_type="cosine",
         warmup_ratio=WARMUP,
         # klarer Live-Fortschritt:
         disable_tqdm=False,
         logging_steps=1,
+        logging_first_step=True,  # <- erste Loss-Zeile kommt direkt
         log_level="info",
         save_strategy="epoch",
         optim="adamw_torch",
