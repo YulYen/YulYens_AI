@@ -1,4 +1,5 @@
-language: "de"
+# Sprache: Deutsch (de) oder Englisch (en)
+language: "en"
 
 # --- Core-Einstellungen ----------------------------------------------------------
 core:
