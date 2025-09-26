@@ -22,14 +22,19 @@ from transformers import (
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 
 # ---- Konfiguration (explizit, knapp) -----------------------------------------
-MODEL_ID   = "LeoLM/leo-hessianai-13b"                # HF-Checkpoint (kein GGUF)
+MODEL_ID = "LeoLM/leo-hessianai-13b-chat"
 DATA_PATH  = "data/kuratiert_neu_doris.jsonl"         # {"user": "...", "assistant": "..."} pro Zeile
 
-MAX_LEN    = 256   # DORIS-Beispiele sind sehr kurz, bei anderen Trainings wegen bei VRAM-Druck z.B. 768 oder 512 nehmen
+
+#tok = AutoTokenizer.from_pretrained(MODEL_ID)
+#print(bool(getattr(tok, "chat_template", None)))
+#breakpoint()
+
+MAX_LEN    = 256   # DORIS-Beispiele sind sehr kurz, bei anderen Trainings wegen VRAM-Druck z.B. 768 oder 512 nehmen
 EPOCHS     = 1
 LR         = 2e-4
 BATCH      = 1
-ACCUM      = 16
+ACCUM      = 4     # weniger Accum -> mehr, kürzere Steps -> sichtbarer Fortschrittsbalken
 WARMUP     = 0.03
 
 # LoRA-Ziele (Llama/Mistral-typische Projektionen)
@@ -74,6 +79,7 @@ def main() -> None:
     if use_cuda:
         # etwas schneller & stabiler auf NVIDIA (keine Genauigkeitseinbußen bei bf16)
         torch.backends.cuda.matmul.allow_tf32 = True
+        torch.set_float32_matmul_precision("high")
 
     # HF-Logging angenehm gesprächig (für echten Fortschritt sorgt tqdm unten)
     hf_logging.set_verbosity_info()
@@ -124,8 +130,8 @@ def main() -> None:
     # künftige Torch-Warnung vermeiden und i. d. R. stabiler:
     base.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     base.config.use_cache = False
-    # Optional: FA2 nur setzen, wenn installiert
-    # base.config.attn_implementation = "flash_attention_2"
+    # Stabil und verfügbar auf Windows (statt evtl. kaputtem FA2)
+    base.config.attn_implementation = "sdpa"
 
     # --- LoRA
     peft_cfg = LoraConfig(
@@ -141,9 +147,9 @@ def main() -> None:
     ds = load_dataset("json", data_files=DATA_PATH, split="train")
     tok_ds = ds.map(lambda ex: encode_example(ex, tok), remove_columns=ds.column_names)
 
-    # --- Output-Verzeichnis modellbezogen (kein „Gerümpel“-Mix)
+    # --- Output-Verzeichnis modellbezogen
     model_name = MODEL_ID.split("/")[-1].replace(":", "_")
-    out_dir = Path(f"out_lora_{model_name}_doris")  # z.B. out_lora_leo-hessianai-13b_doris
+    out_dir = Path(f"out_lora_{model_name}_doris")
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # --- Training
@@ -153,13 +159,14 @@ def main() -> None:
         per_device_train_batch_size=BATCH,
         gradient_accumulation_steps=ACCUM,
         group_by_length=True,
+        dataloader_num_workers=0,
         learning_rate=LR,
         lr_scheduler_type="cosine",
         warmup_ratio=WARMUP,
         # klarer Live-Fortschritt:
         disable_tqdm=False,
         logging_steps=1,
-        logging_first_step=True,  # <- erste Loss-Zeile kommt direkt
+        logging_first_step=True,
         log_level="info",
         save_strategy="epoch",
         optim="adamw_torch",
@@ -177,7 +184,7 @@ def main() -> None:
 
     model.save_pretrained(str(out_dir))
     tok.save_pretrained(str(out_dir))
-    print(f"Fertig. Adapter liegt in: {out_dir}")
+    print(f"Fertig. Hurra! Adapter liegt in: {out_dir}")
 
 
 if __name__ == "__main__":

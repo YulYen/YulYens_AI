@@ -5,7 +5,7 @@ import os
 import torch, bitsandbytes as bnb
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
-MODEL_ID = "LeoLM/leo-hessianai-13b"
+MODEL_ID = "LeoLM/leo-hessianai-13b-chat" 
 
 # -------------------- Diagnose (GPU/BnB/Sanity) --------------------
 print("=== Diagnose ===")
