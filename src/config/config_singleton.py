@@ -1,5 +1,11 @@
 # src/config/config_singleton.py
+from __future__ import annotations
+
+from pathlib import Path
+
 import yaml
+
+from .texts import Texts
 
 class Config:
     _instance: 'Config | None' = None
@@ -19,11 +25,31 @@ class Config:
         """
         cls._instance = None
 
-    def _load_config(self, path: str):
-        """Lädt die YAML-Datei und speichert die Daten als Attribute."""
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        # Jede Top-Level-Sektion (core, ui, wiki, logging, api) als Attribut speichern:
+    def _load_config(self, path: str) -> None:
+        """Lädt die YAML-Datei, Texte und speichert die Daten als Attribute."""
+        config_path = Path(path)
+        with config_path.open("r", encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+
+        if not isinstance(data, dict):
+            raise ValueError(f"Configuration file '{config_path}' must contain a mapping of settings.")
+
+        try:
+            language = data.pop("language")
+        except KeyError as exc:
+            raise KeyError(f"Configuration file '{config_path}' is missing required key 'language'.") from exc
+
+        if not isinstance(language, str) or not language.strip():
+            raise ValueError("Config value 'language' must be a non-empty string like 'de' or 'en'.")
+
+        self.language = language
+        locales_dir = config_path.parent / "locales"
+        text_catalog = Texts(language=language, locales_dir=locales_dir)
+        self.texts = text_catalog
+        self.t = text_catalog.format
+
+        # Jede weitere Top-Level-Sektion (core, ui, wiki, logging, api, security, ...)
+        # als Attribut speichern.
         for section, settings in data.items():
             setattr(self, section, settings)
 
@@ -35,4 +61,11 @@ class Config:
         """
         if hasattr(self, section):
             section_dict = getattr(self, section)
-            section_dict.update(updates)
+            if isinstance(section_dict, dict):
+                section_dict.update(updates)
+            else:
+                # Text-Kataloge implementieren eine Mapping-Schnittstelle.
+                try:
+                    section_dict.update(updates)
+                except AttributeError as exc:
+                    raise TypeError(f"Section '{section}' does not support updates.") from exc
