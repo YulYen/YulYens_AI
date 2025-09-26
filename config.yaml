@@ -1,3 +1,5 @@
+language: "de"
+
 # --- Core-Einstellungen ----------------------------------------------------------
 core:
   # Backend-Auswahl: "ollama" für echte LLMs, "dummy" für schnelle Echo-Tests
@@ -15,22 +17,6 @@ ui:
   web:
     host: "0.0.0.0"
     port: 7860
-
-texts:
-    project_name: "Yul Yen’s AI Orchestra"
-    # Begrüßungstext – Platzhalter in { } werden zur Laufzeit ersetzt
-    # Verfügbare Platzhalter: {model_name} und {persona_name}
-    greeting: "Chat mit {persona_name} auf Basis der Modellversion {model_name}:"
-    choose_persona: "Wähle zuerst eine Persona:"
-    new_chat: "🔄 Neue Unterhaltung"
-    input_placeholder: "Schreibe…"
-    no_selection_warning: "Bitte zuerst eine Persona auswählen."
-    persona_button_suffix: " wählen"
-    ask_placeholder: "Frag {persona_name} etwas …"
-    empty_question: "Bitte stell mir eine Frage 🙂"
-    footer_hint: "Powered by {project_name}"
-    wiki_lookup_prefix_online:  "🕵️ {persona_name} wirft einen Blick in die echte Wikipedia:"
-    wiki_lookup_prefix_offline: "🕵️‍♀️ {persona_name} blättert im lokalen Wikipedia-Archiv:"
 
 # --- Wiki-Einstellungen --------------------------------------------------------
 wiki:
