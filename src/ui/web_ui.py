@@ -28,7 +28,8 @@ class WebUI:
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
         self.bot = None  # wird später gesetzt
-
+        self.texts = config.texts
+        self._t = config.t
 
     def _reset_conversation_state(self):
         return []
@@ -39,7 +40,9 @@ class WebUI:
             return False
 
         drink = get_drink(self.bot)
-        warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
+        warn = self._t(
+            "context_wait_message", persona_name=self.bot, drink=drink
+        )
 
         chat_history.append((None, warn))
 
@@ -324,7 +327,7 @@ class WebUI:
         demo.launch(server_name=self.web_host, server_port=self.web_port, show_api=False)
 
     def launch(self):
-        ui = self.cfg.texts
+        ui = self.texts
         model_name = self.cfg.core.get("model_name")
         project_title = ui.get("project_name")
         choose_persona_txt = ui.get("choose_persona")

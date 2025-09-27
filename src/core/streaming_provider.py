@@ -28,6 +28,11 @@ from security.tinyguard import BasicGuard, zeigefinger_message
 # LLM‑Interface importieren
 from .llm_core import LLMCore
 
+from config.config_singleton import Config
+
+
+cfg = Config()
+
 
 
 class YulYenStreamingProvider:
@@ -345,6 +350,7 @@ def lookup_wiki_snippet(
     snippet: Optional[str] = None
     wiki_hint: Optional[str] = None
     topic_title: Optional[str] = None
+    texts = cfg.texts
     proxy_base = "http://localhost:" + str(proxy_port)
 
 
@@ -366,9 +372,9 @@ def lookup_wiki_snippet(
                 wiki_hint = data.get("wiki_hint")
                 topic_title = topic
             elif proxy_respone.status_code == 404:
-                wiki_hint = f"🕵️‍♀️ *Kein Eintrag gefunden:*{topic}"
+                wiki_hint = cfg.t("wiki_hint_not_found", topic=topic)
             else:
-                wiki_hint = f"🕵️‍♀️ *Wikipedia nicht erreichbar.*{topic}"
+                wiki_hint = cfg.t("wiki_hint_unreachable", topic=topic)
         except requests.exceptions.RequestException as err:
             logging.error(
                 "[WIKI EXC] Netzwerkfehler beim Abruf von '%s': %s",
@@ -376,16 +382,10 @@ def lookup_wiki_snippet(
                 err,
                 exc_info=True,
             )
-            wiki_hint = (
-                "🕵️‍♀️ *Wikipedia-Proxy nicht erreichbar.* "
-                "Bitte prüfe die Verbindung oder versuche es später erneut."
-            )
+            wiki_hint = texts["wiki_hint_proxy_error"]
         except Exception as err:  # pragma: no cover - unerwartete Fehler
             logging.exception("[WIKI EXC] Unerwarteter Fehler für topic='%s'", topic)
-            wiki_hint = (
-                "🕵️‍♀️ *Unbekannter Fehler beim Wikipedia-Abruf.* "
-                "Bitte versuche es später erneut."
-            )
+            wiki_hint = texts["wiki_hint_unknown_error"]
     return (wiki_hint, topic_title, snippet)
 
 
