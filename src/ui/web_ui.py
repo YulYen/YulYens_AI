@@ -29,6 +29,33 @@ class WebUI:
         self.wiki_timeout = wiki_timeout
         self.bot = None  # wird später gesetzt
 
+        fallback_config = None
+
+        if hasattr(config, "texts"):
+            self.texts = config.texts
+        else:
+            from config.config_singleton import Config
+
+            fallback_config = Config()
+            self.texts = fallback_config.texts
+
+        if hasattr(config, "t"):
+            self._t = config.t
+        else:
+            if fallback_config is None:
+                from config.config_singleton import Config
+
+                fallback_config = Config()
+
+            if hasattr(fallback_config, "t"):
+                self._t = fallback_config.t
+            else:
+                def _format(key: str, **variables):
+                    template = self.texts[key]
+                    return template.format(**variables)
+
+                self._t = _format
+
 
     def _reset_conversation_state(self):
         return []
@@ -39,7 +66,9 @@ class WebUI:
             return False
 
         drink = get_drink(self.bot)
-        warn = f"Einen Moment: {self.bot} holt sich {drink} ..."
+        warn = self._t(
+            "context_wait_message", persona_name=self.bot, drink=drink
+        )
 
         chat_history.append((None, warn))
 
@@ -324,7 +353,7 @@ class WebUI:
         demo.launch(server_name=self.web_host, server_port=self.web_port, show_api=False)
 
     def launch(self):
-        ui = self.cfg.texts
+        ui = self.texts
         model_name = self.cfg.core.get("model_name")
         project_title = ui.get("project_name")
         choose_persona_txt = ui.get("choose_persona")

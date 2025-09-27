@@ -1,12 +1,17 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 from core import context_utils
+from config.texts import Texts
 from ui.terminal_ui import TerminalUI
 
 
 def _create_terminal_ui() -> TerminalUI:
+    locales_dir = Path(__file__).resolve().parents[1] / "locales"
+    catalog = Texts(language="de", locales_dir=locales_dir)
     dummy_config = SimpleNamespace(
-        texts={"greeting": "Hallo {persona_name}"},
+        texts=catalog,
+        t=catalog.format,
         core={"model_name": "dummy"},
     )
 

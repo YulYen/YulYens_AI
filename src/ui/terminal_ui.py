@@ -15,7 +15,6 @@ from core.streaming_provider import (
     inject_wiki_context,
 )
 
-
 class TerminalUI:
     """
     Terminal-Chat – nutzt die gleiche Wiki-Logik wie die WebUI:
@@ -39,6 +38,16 @@ class TerminalUI:
         self.bot = None # wird nach Auswahl gesetzt
         self.streamer = None # wird nach Auswahl gesetzt
 
+        if not hasattr(config, "texts"):
+            raise AttributeError("config must provide a 'texts' catalog for translations.")
+
+        self.texts = config.texts
+
+        if not hasattr(config, "t"):
+            raise AttributeError("config must expose a 't' helper for formatted translations.")
+
+        self._t = config.t
+
 
         # Nur echte Konversation (User/Assistant) + ggf. System-Kontexte (Wiki)
         self.history: List[Dict[str, str]] = []
@@ -49,13 +58,14 @@ class TerminalUI:
     def choose_persona(self) -> None:
         """Fragt den Nutzer nach der gewünschten Persona und setzt den Streamer."""
         names = get_all_persona_names()
-        print("Bitte wähle eine Persona:")
+        print(self.texts["choose_persona"])
         for idx, name in enumerate(names, start=1):
             # optional: kurze Beschreibung anzeigen
             desc = next(p for p in system_prompts if p["name"] == name)["description"]
-            print(f"{idx}. {name} – {desc}")
+            persona_line = f"{idx}. {name} – {desc}"
+            print(persona_line)
         while True:
-            sel = input("Nummer der gewünschten Persona: ").strip()
+            sel = input(f"{self.texts['terminal_persona_prompt']} ").strip()
             try:
                 choice = int(sel) - 1
                 if 0 <= choice < len(names):
@@ -65,11 +75,14 @@ class TerminalUI:
                     self.bot = persona_name
                     self.greeting = _greeting_text(self.config, self.bot)
 
-                    print(f"Persona {self.bot} ausgewählt.")
+                    selected_msg = self._t(
+                        "terminal_persona_selected", persona_name=self.bot
+                    )
+                    print(selected_msg)
                     break
             except ValueError:
                 pass
-            print("Ungültige Eingabe, bitte erneut versuchen.")
+            print(self.texts["terminal_invalid_selection"])
 
     # ---------- kleine UI‑Hilfen ----------
     def init_ui(self) -> None:
@@ -77,20 +90,23 @@ class TerminalUI:
 
     def print_welcome(self) -> None:
         print(self.greeting)
-        print(f"{Fore.MAGENTA}('exit' zum Beenden){Style.RESET_ALL}")
-        print(f"{Fore.MAGENTA}('clear' für neue Unterhaltung){Style.RESET_ALL}")
+        print(f"{Fore.MAGENTA}{self.texts['terminal_exit_hint']}{Style.RESET_ALL}")
+        print(f"{Fore.MAGENTA}{self.texts['terminal_clear_hint']}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
-        return input(f"{Fore.GREEN}🧑 Du:{Style.RESET_ALL} ").strip()
+        return input(
+            f"{Fore.GREEN}{self.texts['terminal_user_prompt']}{Style.RESET_ALL} "
+        ).strip()
 
     def print_bot_prefix(self, bot) -> None:
-        print(f"{Fore.CYAN}🧠 {bot}:{Style.RESET_ALL} ", end="", flush=True)
+        bot_prefix = self._t("terminal_bot_prefix", persona_name=bot)
+        print(f"{Fore.CYAN}{bot_prefix}{Style.RESET_ALL} ", end="", flush=True)
 
     def print_stream(self, text: str) -> None:
         print(text, end="", flush=True)
 
     def print_exit(self) -> None:
-        print("👋 Auf Wiedersehen!")
+        print(self.texts["terminal_exit_message"])
 
     def local_ip(self) -> str:
         try:
@@ -127,7 +143,9 @@ class TerminalUI:
             if user_input.lower() == "clear":
                 self.history.clear()
                 self._last_wiki_title = None
-                print(f"{Fore.BLUE}🔄 Neue Unterhaltung gestartet.{Style.RESET_ALL}\n")
+                print(
+                    f"{Fore.BLUE}{self.texts['terminal_new_chat_started']}{Style.RESET_ALL}\n"
+                )
                 continue
 
             # --- (1) Wiki‑Lookup: nur Top‑Treffer, Hinweis anzeigen, Snippet ggf. injizieren ---
@@ -186,7 +204,10 @@ class TerminalUI:
             return
 
         drink = get_drink(self.bot)
-        print(f"Einen Moment: {self.bot} holt sich {drink} ...")
+        wait_msg = self._t(
+            "context_wait_message", persona_name=self.bot, drink=drink
+        )
+        print(wait_msg)
 
         num_ctx = persona_options.get("num_ctx")
         if not num_ctx:
@@ -214,6 +235,5 @@ class TerminalUI:
                 "TerminalUI: %s ältere Nachrichten entfernt, um Kontext freizugeben.",
                 removed,
             )
-            print(
-                f"{Fore.YELLOW}Hinweis: Ältere Nachrichten wurden entfernt, um Platz zu schaffen.{Style.RESET_ALL}"
-            )
+            notice = self.texts["terminal_context_trim_notice"]
+            print(f"{Fore.YELLOW}{notice}{Style.RESET_ALL}")
