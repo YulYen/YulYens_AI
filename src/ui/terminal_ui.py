@@ -37,15 +37,7 @@ class TerminalUI:
         self.greeting = None # wird nach Auswahl gesetzt
         self.bot = None # wird nach Auswahl gesetzt
         self.streamer = None # wird nach Auswahl gesetzt
-
-        if not hasattr(config, "texts"):
-            raise AttributeError("config must provide a 'texts' catalog for translations.")
-
         self.texts = config.texts
-
-        if not hasattr(config, "t"):
-            raise AttributeError("config must expose a 't' helper for formatted translations.")
-
         self._t = config.t
 
 
