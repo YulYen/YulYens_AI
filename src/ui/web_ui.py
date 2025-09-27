@@ -28,34 +28,8 @@ class WebUI:
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
         self.bot = None  # wird später gesetzt
-
-        fallback_config = None
-
-        if hasattr(config, "texts"):
-            self.texts = config.texts
-        else:
-            from config.config_singleton import Config
-
-            fallback_config = Config()
-            self.texts = fallback_config.texts
-
-        if hasattr(config, "t"):
-            self._t = config.t
-        else:
-            if fallback_config is None:
-                from config.config_singleton import Config
-
-                fallback_config = Config()
-
-            if hasattr(fallback_config, "t"):
-                self._t = fallback_config.t
-            else:
-                def _format(key: str, **variables):
-                    template = self.texts[key]
-                    return template.format(**variables)
-
-                self._t = _format
-
+        self.texts = config.texts
+        self._t = config.t
 
     def _reset_conversation_state(self):
         return []
