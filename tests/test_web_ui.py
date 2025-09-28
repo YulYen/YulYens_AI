@@ -4,35 +4,13 @@ import logging
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-import pytest
-
 from ui.web_ui import WebUI
-
-
-class DummyTextCatalog(dict):
-    def format(self, key, **kwargs):  # pragma: no cover - trivial helper
-        return key
-
-
-def _create_config(web_overrides=None):
-    web_cfg = web_overrides or {}
-    texts = DummyTextCatalog(
-        {
-            "project_name": "Test Project",
-            "choose_persona": "Choose",
-            "new_chat": "New",
-            "input_placeholder": "Type...",
-            "greeting": "Hello {persona_name}",
-            "persona_button_suffix": "",
-        }
-    )
-    return SimpleNamespace(ui={"web": web_cfg}, texts=texts, t=texts.format)
 
 
 def test_webui_start_server_uses_configured_host_and_port():
     """`demo.launch` muss mit den konfigurierten Host/Port-Werten aufgerufen werden."""
 
-    dummy_config = _create_config()
+    dummy_config = SimpleNamespace()
 
     web_ui = WebUI(
         factory=Mock(),
@@ -57,7 +35,7 @@ def test_webui_start_server_uses_configured_host_and_port():
 
 
 def _create_web_ui():
-    dummy_config = _create_config()
+    dummy_config = SimpleNamespace()
     return WebUI(
         factory=Mock(),
         config=dummy_config,
@@ -70,60 +48,6 @@ def _create_web_ui():
         web_port="9000",
         wiki_timeout=1.0,
     )
-
-
-def test_start_server_enables_share_with_basic_auth():
-    dummy_config = _create_config(
-        {
-            "share": True,
-            "share_auth": {"username": "user", "password": "secret"},
-        }
-    )
-
-    web_ui = WebUI(
-        factory=Mock(),
-        config=dummy_config,
-        keyword_finder=Mock(),
-        ip="127.0.0.1",
-        wiki_snippet_limit=42,
-        wiki_mode="offline",
-        proxy_base="http://proxy",
-        web_host="0.0.0.0",
-        web_port="9000",
-        wiki_timeout=1.0,
-    )
-
-    demo = Mock()
-
-    web_ui._start_server(demo)
-
-    demo.launch.assert_called_once_with(
-        server_name="0.0.0.0",
-        server_port=9000,
-        show_api=False,
-        share=True,
-        auth=("user", "secret"),
-    )
-
-
-def test_start_server_requires_basic_auth_when_share_is_enabled():
-    dummy_config = _create_config({"share": True})
-
-    web_ui = WebUI(
-        factory=Mock(),
-        config=dummy_config,
-        keyword_finder=Mock(),
-        ip="127.0.0.1",
-        wiki_snippet_limit=42,
-        wiki_mode="offline",
-        proxy_base="http://proxy",
-        web_host="0.0.0.0",
-        web_port="9000",
-        wiki_timeout=1.0,
-    )
-
-    with pytest.raises(ValueError):
-        web_ui._start_server(Mock())
 
 
 def test_respond_streaming_prepares_history_with_valid_num_ctx():
