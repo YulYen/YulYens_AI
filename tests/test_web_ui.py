@@ -10,7 +10,7 @@ from ui.web_ui import WebUI
 def test_webui_start_server_uses_configured_host_and_port():
     """`demo.launch` muss mit den konfigurierten Host/Port-Werten aufgerufen werden."""
 
-    dummy_config = SimpleNamespace()
+    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key)
 
     web_ui = WebUI(
         factory=Mock(),
@@ -35,7 +35,7 @@ def test_webui_start_server_uses_configured_host_and_port():
 
 
 def _create_web_ui():
-    dummy_config = SimpleNamespace()
+    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key)
     return WebUI(
         factory=Mock(),
         config=dummy_config,
