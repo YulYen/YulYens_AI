@@ -18,6 +18,10 @@ ui:
   web:
     host: "0.0.0.0"
     port: 7860
+    share: false  # Bei true wird der öffentliche Gradio-Share-Link aktiviert
+    share_auth:
+      username: ""
+      password: ""
 
 # --- Wiki-Einstellungen --------------------------------------------------------
 wiki:

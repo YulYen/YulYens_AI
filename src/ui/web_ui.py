@@ -324,7 +324,36 @@ class WebUI:
         )
 
     def _start_server(self, demo):
-        demo.launch(server_name=self.web_host, server_port=self.web_port, show_api=False)
+        launch_kwargs = {
+            "server_name": self.web_host,
+            "server_port": self.web_port,
+            "show_api": False,
+        }
+
+        ui_cfg = getattr(self.cfg, "ui", None) or {}
+        if not isinstance(ui_cfg, dict) and hasattr(ui_cfg, "__dict__"):
+            ui_cfg = ui_cfg.__dict__
+        web_cfg = {}
+        if isinstance(ui_cfg, dict):
+            web_cfg = ui_cfg.get("web") or {}
+
+        share_enabled = bool(web_cfg.get("share"))
+        if share_enabled:
+            auth_cfg = web_cfg.get("share_auth") or {}
+            username = auth_cfg.get("username")
+            password = auth_cfg.get("password")
+
+            if not username or not password:
+                raise ValueError(
+                    "'ui.web.share_auth.username' und 'password' müssen gesetzt sein, wenn 'ui.web.share' aktiviert ist."
+                )
+
+            launch_kwargs.update({
+                "share": True,
+                "auth": (username, password),
+            })
+
+        demo.launch(**launch_kwargs)
 
     def launch(self):
         ui = self.texts
