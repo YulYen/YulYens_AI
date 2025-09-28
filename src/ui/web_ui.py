@@ -28,8 +28,10 @@ class WebUI:
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
         self.bot = None  # wird später gesetzt
-        self.texts = config.texts
-        self._t = config.t
+        self.texts = getattr(config, "texts", {}) or {}
+        self._t = getattr(config, "t", getattr(self.texts, "format", None))
+        if self._t is None:
+            self._t = lambda key, **kwargs: key
 
     def _reset_conversation_state(self):
         return []
@@ -324,7 +326,35 @@ class WebUI:
         )
 
     def _start_server(self, demo):
-        demo.launch(server_name=self.web_host, server_port=self.web_port, show_api=False)
+        launch_kwargs = {
+            "server_name": self.web_host,
+            "server_port": self.web_port,
+            "show_api": False,
+        }
+
+        ui_cfg = getattr(self.cfg, "ui", None)
+        if ui_cfg is not None:
+            if isinstance(ui_cfg, dict):
+                web_cfg = ui_cfg.get("web") or {}
+            else:
+                web_cfg = getattr(ui_cfg, "web", {}) or {}
+
+            if web_cfg.get("share"):
+                auth_cfg = web_cfg.get("share_auth") or {}
+                username = auth_cfg.get("username") or ""
+                password = auth_cfg.get("password") or ""
+
+                if username and password:
+                    launch_kwargs.update({
+                        "share": True,
+                        "auth": (username, password),
+                    })
+                else:
+                    logging.warning(
+                        "Gradio-Share deaktiviert: Zugangsdaten fehlen trotz 'ui.web.share: true'."
+                    )
+
+        demo.launch(**launch_kwargs)
 
     def launch(self):
         ui = self.texts
