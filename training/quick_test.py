@@ -76,8 +76,8 @@ def _chat(model, tok, question: str, max_new_tokens: int = 128) -> str:
 def test_before():
     tok, base = _load_base()
     for q in [
-        "Sag mir was sehr Nettes, bitte!",
-        "Wie hoch ist der Eiffelturm in Paris?",
+        "Sag mir was sehr Nettes, ein Kompliment, bitte!",
+        "Wie hoch ist dieser Eiffelturm in Paris?",
     ]:
         print("\nQ:", q)
         print("DORIS:", _chat(base, tok, q))
@@ -90,8 +90,8 @@ def test_after():
         raise FileNotFoundError(f"Adapter nicht gefunden: {adapter_path}")
     model = PeftModel.from_pretrained(base, str(adapter_path))
     for q in [
-        "Sag mir was sehr Nettes, bitte!",
-        "Wie hoch ist der Eiffelturm in Paris?",
+        "Sag mir was sehr Nettes, ein Kompliment, bitte!",
+        "Wie hoch ist dieser Eiffelturm in Paris?",
     ]:
         print("\nQ:", q)
         print("DORIS:", _chat(model, tok, q))
@@ -99,5 +99,5 @@ def test_after():
 if __name__ == "__main__":
     # === EINEN der beiden Aufrufe aktiv lassen: =========================
     test_before()   # ← vor dem Training (nur Base)
-    # test_after()  # ← nach dem Training (Base + LoRA)
+    test_after()  # ← nach dem Training (Base + LoRA)
     # ====================================================================
