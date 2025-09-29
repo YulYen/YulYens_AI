@@ -26,21 +26,17 @@ MODEL_ID = "LeoLM/leo-hessianai-13b-chat"
 DATA_PATH  = "data/kuratiert_neu_doris.jsonl"         # {"user": "...", "assistant": "..."} pro Zeile
 
 
-#tok = AutoTokenizer.from_pretrained(MODEL_ID)
-#print(bool(getattr(tok, "chat_template", None)))
-#breakpoint()
-
 MAX_LEN    = 256   # DORIS-Beispiele sind sehr kurz, bei anderen Trainings wegen VRAM-Druck z.B. 768 oder 512 nehmen
 EPOCHS     = 1
-LR         = 2e-4
+LR         = 1e-4
 BATCH      = 1
 ACCUM      = 4     # weniger Accum -> mehr, kürzere Steps -> sichtbarer Fortschrittsbalken
 WARMUP     = 0.03
 
 # LoRA-Ziele (Llama/Mistral-typische Projektionen)
-LORA_R        = 16
+LORA_R        = 8
 LORA_ALPHA    = 16
-LORA_DROPOUT  = 0.05
+LORA_DROPOUT  = 0.1
 TARGET_MODULES = ["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"]
 # ------------------------------------------------------------------------------
 
@@ -50,9 +46,13 @@ def build_prompt(q: str) -> str:
 
 
 def encode_example(ex: Dict[str, str], tok: AutoTokenizer) -> Dict[str, list]:
-    """Tokenisiert und maskiert Prompt (Loss=-100), pad auf MAX_LEN."""
-    prompt = build_prompt(ex["user"])
-    answer = " " + ex["assistant"].strip() + "\n"   # führendes Leerzeichen hilft Token-Grenzen
+    """Tokenisiert per Chat-Template und maskiert Prompt (Loss=-100)."""
+    messages = [
+        {"role": "system", "content": "Du bist DORIS: spitz, sarkastisch, kurz angebunden."},
+        {"role": "user", "content": ex["user"]},
+    ]
+    prompt = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    answer = " " + ex["assistant"].strip() + tok.eos_token
 
     p_ids = tok(prompt, add_special_tokens=False)["input_ids"]
     a_ids = tok(answer, add_special_tokens=False)["input_ids"]
@@ -68,6 +68,7 @@ def encode_example(ex: Dict[str, str], tok: AutoTokenizer) -> Dict[str, list]:
         labels    += [-100]*pad
 
     return {"input_ids": input_ids, "attention_mask": attn, "labels": labels}
+
 
 
 def main() -> None:
@@ -168,7 +169,8 @@ def main() -> None:
         logging_steps=1,
         logging_first_step=True,
         log_level="info",
-        save_strategy="epoch",
+        save_strategy="steps",
+        save_steps=50,
         optim="adamw_torch",
         bf16=use_cuda,
         report_to=[],
