@@ -1,9 +1,15 @@
+import json
 import re
 import unicodedata
+from pathlib import Path
+
 import pytest
-from config.personas import get_all_persona_names
 from datetime import datetime
 from zoneinfo import ZoneInfo
+
+from config.config_singleton import Config
+from config.personas import get_all_persona_names
+from core.streaming_provider import YulYenStreamingProvider
 
 # ---- Zeit deterministisch in Europe/Berlin -----------------------------------
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -28,6 +34,56 @@ def test_invalid_persona_rejected(client):
     assert "Verfügbare Personas" in detail
     for name in get_all_persona_names():
         assert name in detail
+
+
+def test_persona_name_normalized(client, monkeypatch):
+    cfg = Config()
+    logs_dir = Path(cfg.logging["dir"])
+    if not logs_dir.is_absolute():
+        logs_dir = Path.cwd() / logs_dir
+    if logs_dir.exists():
+        before_files = set(logs_dir.glob("*.json"))
+    else:
+        before_files = set()
+
+    captured: dict[str, str] = {}
+
+    def fake_respond(self, user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout):
+        captured["persona_arg"] = persona
+        answer = f"Persona arg: {persona} | Bot attr: {self.persona}"
+        self._append_conversation_log("user", user_input)
+        self._append_conversation_log("assistant", answer)
+        return answer
+
+    monkeypatch.setattr(YulYenStreamingProvider, "respond_one_shot", fake_respond)
+
+    response = client.post("/ask", json={"question": "Wer bist du?", "persona": "leah"})
+    assert response.status_code == 200
+    answer = response.json().get("answer", "")
+    assert "Persona arg: LEAH" in answer
+    assert "Bot attr: LEAH" in answer
+    assert captured.get("persona_arg") == "LEAH"
+
+    if logs_dir.exists():
+        after_files = set(logs_dir.glob("*.json"))
+    else:
+        after_files = set()
+
+    new_files = list(after_files - before_files)
+    assert new_files, "Es wurde keine neue Conversation-Logdatei erzeugt."
+    target = max(new_files, key=lambda path: path.stat().st_mtime)
+
+    try:
+        lines = target.read_text(encoding="utf-8").strip().splitlines()
+        assert lines, "Conversation-Logdatei enthält keine Einträge."
+        last_entry = json.loads(lines[-1])
+        assert last_entry.get("bot") == "LEAH"
+    finally:
+        for path in new_files:
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
 
 @pytest.mark.slow
 @pytest.mark.ollama
