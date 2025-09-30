@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from colorama import Fore, Style, init
-from typing import Callable, List, Dict, Optional
+from typing import List, Dict, Optional
 from config.personas import get_all_persona_names, system_prompts, get_drink
 import logging
 from core.utils import _greeting_text
@@ -22,14 +22,12 @@ class TerminalUI:
     - Wiki-Snippet (falls vorhanden) wird als System-Kontext injiziert
     - Tokenweises Streaming der LLM-Antwort bleibt unverändert
     """
-    def __init__(self, factory, config, keyword_finder, ip,
+    def __init__(self, factory, config, keyword_finder,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  wiki_timeout):
         self.factory = factory
         self.config = config
         self.keyword_finder = keyword_finder
-        # ip is a function returning the local IP address
-        self._ip_func = ip
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
@@ -99,14 +97,6 @@ class TerminalUI:
 
     def print_exit(self) -> None:
         print(self.texts["terminal_exit_message"])
-
-    def local_ip(self) -> str:
-        try:
-            return self._ip_func()
-        except Exception:
-            # Fallback (sollte selten nötig sein)
-            import socket
-            return socket.gethostbyname(socket.gethostname())
 
     # ---------- Haupt-Loop ----------
     def launch(self) -> None:

@@ -10,7 +10,7 @@ from core.streaming_provider import YulYenStreamingProvider
 from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
-from core.utils import _wiki_mode_enabled, _system_prompt_with_date, _local_ip
+from core.utils import _wiki_mode_enabled, _system_prompt_with_date
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
 
@@ -240,7 +240,7 @@ class AppFactory:
 
         if ui_type == "terminal":
             self._ui = TerminalUI(
-                self, self._cfg, finder, _local_ip,
+                self, self._cfg, finder,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 wiki_timeout=(
                     float(wiki["timeout_connect"]),
