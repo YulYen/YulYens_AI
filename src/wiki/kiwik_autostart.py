@@ -18,11 +18,20 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
     if not offline.get("autostart", False):
         return True  # Autostart aus → nichts tun
 
-    host = offline.get("host",)
+    host = offline.get("host")
     port = offline.get("kiwix_port")
     exe  = offline.get("kiwix_exe")
     zim  = offline.get("zim_path")
     timeout_s = offline.get("startup_timeout_s")
+
+    if not host or port in (None, ""):
+        if logger:
+            logger.error(
+                "Kiwix autostart requested, but host (%s) or kiwix_port (%s) missing.",
+                host,
+                port,
+            )
+        return False
 
     def is_up():
         try:

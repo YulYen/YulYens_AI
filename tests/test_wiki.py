@@ -9,6 +9,7 @@ from tests.util import has_spacy_model
 from core.factory import AppFactory
 from core.streaming_provider import lookup_wiki_snippet
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
 
 
 class _DummyKeywordFinder:
