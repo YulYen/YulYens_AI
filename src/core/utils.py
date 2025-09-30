@@ -1,6 +1,5 @@
 # --------- Allgemeine Utilities (ohne Seiteneffekte nach außen) ---------
 import re
-import socket
 from datetime import datetime
 from pathlib import Path
 from typing import  Union
@@ -14,14 +13,6 @@ def _wiki_mode_enabled(mode_val) -> bool:
         return mode_val
     s = str(mode_val).strip().lower()
     return s in ("online", "offline")
-
-def _local_ip() -> str:
-    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        s.connect(("8.8.8.8", 80))
-        return s.getsockname()[0]
-    finally:
-        s.close()
 
 def _system_prompt_with_date(name, include_date) -> str:
     base = get_prompt_by_name(name)
