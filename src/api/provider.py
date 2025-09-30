@@ -23,7 +23,7 @@ class AiApiProvider:
         self.wiki_timeout = wiki_timeout
         self.factory = factory
         self._known_personas = tuple(get_all_persona_names())
-        self._known_personas_lower = {name.lower() for name in self._known_personas}
+        self._persona_lookup = {name.lower(): name for name in self._known_personas}
 
 
 
@@ -36,13 +36,16 @@ class AiApiProvider:
             return cfg.texts["empty_question"]
         
         persona_name = (persona or "").strip()
-        if persona_name.lower() not in self._known_personas_lower:
+        persona_key = persona_name.lower()
+        if persona_key not in self._persona_lookup:
             known = ", ".join(self._known_personas)
             raise UnknownPersonaError(
                 f"Unbekannte Persona '{persona_name}'. Verfügbare Personas: {known}."
             )
 
-        streamer = self.factory.get_streamer_for_persona(persona_name)
+        canonical_persona = self._persona_lookup[persona_key]
+
+        streamer = self.factory.get_streamer_for_persona(canonical_persona)
 
         return streamer.respond_one_shot(
             frage,
@@ -51,6 +54,6 @@ class AiApiProvider:
             wiki_proxy_port=self.wiki_proxy_port,
             wiki_snippet_limit=self.wiki_snippet_limit,
             wiki_timeout=self.wiki_timeout,
-            persona=persona_name,
+            persona=canonical_persona,
 
         ).strip()
