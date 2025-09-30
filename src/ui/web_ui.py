@@ -12,13 +12,12 @@ class WebUI:
     Wiki-Hinweise und -Snippets werden analog zur Terminal-UI verarbeitet (Hinweis nur sichtbar, Snippet als Kontext).
     Antworten des KI-Modells werden tokenweise gestreamt und direkt im UI aktualisiert.
     """
-    def __init__(self, factory, config, keyword_finder, ip,
+    def __init__(self, factory, config, keyword_finder,
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
         self.streamer = None  # wird später gesetzt
         self.keyword_finder = keyword_finder
-        self.ip = ip
         self.cfg = config
         self.factory = factory
         self.wiki_snippet_limit = wiki_snippet_limit

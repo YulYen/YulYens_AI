@@ -244,7 +244,7 @@ class AppFactory:
             host = web_cfg["host"]
             port = int(web_cfg["port"])
             self._ui = WebUI(
-                self, self._cfg, finder, _local_ip,
+                self, self._cfg, finder,
                 int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
                 web_host=host, web_port=port,
                 wiki_timeout=(
