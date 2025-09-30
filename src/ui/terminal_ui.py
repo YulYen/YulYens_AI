@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from colorama import Fore, Style, init
-from typing import List, Dict, Optional
+from typing import List, Dict
 from config.personas import get_all_persona_names, system_prompts, get_drink
 import logging
 from core.utils import _greeting_text
@@ -42,8 +42,6 @@ class TerminalUI:
         # Nur echte Konversation (User/Assistant) + ggf. System-Kontexte (Wiki)
         self.history: List[Dict[str, str]] = []
 
-        # Für optionale Folge-Logik (nicht zwingend genutzt, aber praktisch)
-        self._last_wiki_title: Optional[str] = None
 
     def choose_persona(self) -> None:
         """Fragt den Nutzer nach der gewünschten Persona und setzt den Streamer."""
@@ -124,7 +122,6 @@ class TerminalUI:
             # Clear / neue Unterhaltung
             if user_input.lower() == "clear":
                 self.history.clear()
-                self._last_wiki_title = None
                 print(
                     f"{Fore.BLUE}{self.texts['terminal_new_chat_started']}{Style.RESET_ALL}\n"
                 )
@@ -150,7 +147,6 @@ class TerminalUI:
                 # Snippet als System-Kontext einfügen (Guardrail + Kontext)
                 if snippet:
                     inject_wiki_context(self.history, title, snippet)
-                    self._last_wiki_title = title
 
             # --- (2) Nutzerfrage an die History hängen ---
             self.history.append({"role": "user", "content": user_input})
