@@ -39,7 +39,15 @@ class AppFactory:
         if self._keyword_finder is None:
             if _wiki_mode_enabled(self._cfg.wiki["mode"]):
                 variant = self._resolve_spacy_model_variant()
-                self._keyword_finder = SpacyKeywordFinder(variant)
+                try:
+                    self._keyword_finder = SpacyKeywordFinder(variant)
+                except (OSError, ImportError) as exc:
+                    logging.warning(
+                        "Konnte spaCy Keyword Finder nicht initialisieren: %s. "
+                        "Wiki-Funktionen werden deaktiviert.",
+                        exc,
+                    )
+                    self._keyword_finder = None
             else:
                 self._keyword_finder = None
         return self._keyword_finder

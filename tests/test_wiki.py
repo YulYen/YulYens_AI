@@ -76,6 +76,24 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
     assert "kaputt" in caplog.text
 
 
+def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch, caplog):
+    dummy_cfg = SimpleNamespace(wiki={"mode": "offline"})
+    monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
+
+    def _raise_missing_model(*args, **kwargs):
+        raise OSError("model not found")
+
+    monkeypatch.setattr("core.factory.SpacyKeywordFinder", _raise_missing_model)
+
+    caplog.set_level(logging.WARNING)
+
+    factory = AppFactory()
+    finder = factory.get_keyword_finder()
+
+    assert finder is None
+    assert "Wiki-Funktionen werden deaktiviert" in caplog.text
+
+
 skip_without_medium_model = pytest.mark.skipif(
     not has_spacy_model("de_core_news_md"),
     reason="spaCy model de_core_news_md not installed",
