@@ -54,14 +54,6 @@ def get_prompt_by_name(name: str) -> str:
     raise ValueError(f"Persona '{name}' nicht gefunden.")
 
 
-def get_image_by_name(name: str) -> str:
-    """Gibt den Image-PATH für eine Persona anhand des Namens zurück."""
-    for persona in system_prompts:
-        if persona["name"].lower() == name.lower():
-            return persona["image_path"]
-    raise ValueError(f"Persona '{name}' nicht gefunden.")
-
-
 def get_options(name: str) -> Optional[Dict[str, Any]]:
     """Gibt die Options für eine Persona anhand des Namens zurück."""
     for persona in system_prompts:
