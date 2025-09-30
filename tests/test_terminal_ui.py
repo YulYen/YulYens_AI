@@ -1,7 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from core import context_utils
 from config.texts import Texts
 from ui.terminal_ui import TerminalUI
 
