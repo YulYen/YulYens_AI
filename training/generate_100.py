@@ -1,3 +1,9 @@
+# Dieses Skript wurde wiederholt auf einer gpt-oss-20b Instanz mit nur 8 GB VRAM
+# ausgeführt. Nach GPU-Crashes mussten Teilmengen der Prompts erneut eingespeist
+# werden, daher bleiben auch die älteren Batches verfügbar, um stepweise
+# Wiederholungen zu ermöglichen.
+
+import argparse
 import json, time, os, requests, random, sys
 from urllib3.util.retry import Retry
 from requests.adapters import HTTPAdapter
@@ -199,7 +205,14 @@ PROMPTS_100_2 = [
     "Endlich."
 ]
 
+PROMPT_BATCHES = {
+    "phase1": PROMPTS_5,
+    "phase2": PROMPTS_100_1,
+    "legacy": PROMPTS_100_OLD,
+    "current": PROMPTS_100_2,
+}
 
+DEFAULT_BATCH_NAME = "current"
 
 
 CONNECT_TIMEOUT = 10
@@ -240,12 +253,23 @@ def append_pair(user_text: str, assistant_text: str):
         f.write(json.dumps({"user": user_text.strip(), "assistant": assistant_text}, ensure_ascii=False) + "\n")
 
 
-PROMPTS= PROMPTS_100_2
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Generate training data from prompt batches")
+    parser.add_argument(
+        "--batch",
+        choices=sorted(PROMPT_BATCHES.keys()),
+        default=DEFAULT_BATCH_NAME,
+        help="Select which prompt batch to run",
+    )
+    return parser.parse_args(argv)
 
-def main():
+
+def main(argv=None):
+    args = parse_args(argv)
+    prompts = PROMPT_BATCHES[args.batch]
     s = make_session()
     try:
-        for i, q in enumerate(PROMPTS, 1):
+        for i, q in enumerate(prompts, 1):
             try:
                 a = ask(s, q)
                 if a:
