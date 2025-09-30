@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 import json, re
 import logging, time
 from datetime import datetime
-from config.logging_setup import init_logging
 from config.config_singleton import Config
 
 # --- Konfiguration --------------------------------------------------------------
