@@ -9,10 +9,6 @@ G = BasicGuard(True, True, True, True)
 def ok(x):  # helper
     return G.check_input(x)["ok"]
 
-def bad(x): # helper
-    return not G.check_input(x)["ok"]
-
-
 def _streamer_with_security(overrides=None):
     Config.reset_instance()
     try:
