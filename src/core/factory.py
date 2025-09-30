@@ -27,7 +27,6 @@ class AppFactory:
     def __init__(self) -> None:
         self._cfg = Config()
         self._keyword_finder: Optional[SpacyKeywordFinder] = None
-        self._streamer: Optional[YulYenStreamingProvider] = None
         self._api_provider = None
         self._ui = None  # TerminalUI oder WebUI
 
