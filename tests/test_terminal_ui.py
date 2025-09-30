@@ -19,7 +19,6 @@ def _create_terminal_ui() -> TerminalUI:
         factory=None,
         config=dummy_config,
         keyword_finder=None,
-        ip=lambda: "127.0.0.1",
         wiki_snippet_limit=0,
         wiki_mode=False,
         proxy_base="",
