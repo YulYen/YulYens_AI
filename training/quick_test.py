@@ -14,6 +14,18 @@ from peft import PeftModel
 BASE_MODEL = "LeoLM/leo-hessianai-13b-chat"
 ADAPTER    = "out_lora_leo-hessianai-13b-chat_doris"  # muss zum Training-Ausgabepfad passen
 
+# Gemeinsames Test-Set (2 alte + 5 neue)
+TEST_QUESTIONS = [
+    "Mach mir bitte ein nettes Kompliment!",
+    "Sag mir was nettes!",
+    "Wie hoch ist der berühmte Eiffelturm in Paris?",
+    "Wie heißt die Hauptstadt von Kanada?",
+    "Wie viele Planeten hat unser Sonnensystem?",
+    "Motiviere mich zum Aufräumen.",
+    "Erkläre Quicksort in drei Sätzen – aber nicht langweilig.",
+    "Was hältst du von Menschen, die 30 Browser-Tabs gleichzeitig offen haben?",
+]
+
 # 4-Bit Quantisierung (BnB)
 bnb_cfg = BitsAndBytesConfig(
     load_in_4bit=True,
@@ -74,30 +86,25 @@ def _chat(model, tok, question: str, max_new_tokens: int = 128) -> str:
 
 # --------- Modus 1: vor dem Training (nur Base) ----------
 def test_before():
+    print("DORIS vor LoRA-Finetuning:")
     tok, base = _load_base()
-    for q in [
-        "Sag mir was sehr Nettes, ein Kompliment, bitte!",
-        "Wie hoch ist dieser Eiffelturm in Paris?",
-    ]:
+    for q in TEST_QUESTIONS:
         print("\nQ:", q)
         print("DORIS:", _chat(base, tok, q))
 
 # --------- Modus 2: nach dem Training (Base + Adapter) ---
 def test_after():
+    print("DORIS nach LoRA-Finetuning:")
     tok, base = _load_base()
     adapter_path = Path(ADAPTER)
     if not adapter_path.exists():
         raise FileNotFoundError(f"Adapter nicht gefunden: {adapter_path}")
     model = PeftModel.from_pretrained(base, str(adapter_path))
-    for q in [
-        "Sag mir was sehr Nettes, ein Kompliment, bitte!",
-        "Wie hoch ist dieser Eiffelturm in Paris?",
-    ]:
+    for q in TEST_QUESTIONS:
         print("\nQ:", q)
         print("DORIS:", _chat(model, tok, q))
 
 if __name__ == "__main__":
-    # === EINEN der beiden Aufrufe aktiv lassen: =========================
+    # Achtung: beide Tests laden das Modell separat → doppelter VRAM-Bedarf
     test_before()   # ← vor dem Training (nur Base)
-    test_after()  # ← nach dem Training (Base + LoRA)
-    # ====================================================================
+    test_after()    # ← nach dem Training (Base + LoRA)
