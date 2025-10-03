@@ -149,9 +149,15 @@ python -m spacy download de_core_news_lg
 
 ### Konfiguration (`config.yaml`)
 
-Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Beispiel:
+Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Schalter:
+
+- `language`: steuert UI-Texte und Persona-Prompts (`"de"` oder `"en"`).
+- `ui.type`: wählt die Oberfläche (`"terminal"`, `"web"` oder `null` für nur API).
+
+Beispiel:
 
 ```yaml
+language: "de"
 core:
   # Backend auswählen: "ollama" (Standard) oder "dummy" (Echo-Backend für Tests)
   backend: "ollama"
@@ -168,6 +174,7 @@ ui:
   web:
     host: "0.0.0.0"
     port: 7860
+    share: false       # Optional Gradio-Share (Benutzername/Passwort nötig)
 
 wiki:
   mode: "offline"    # "offline", "online" oder false (deaktiviert)
@@ -198,6 +205,10 @@ Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
   `"disabled"`, `"none"` und `"off"` werden ebenfalls akzeptiert.
 - `security.enabled: false` deaktiviert die Guard-Logik vollständig, unabhängig vom gewählten Namen.
 
+#### Wikipedia (Proxy & Autostart)
+
+- Im Offline-Modus (`wiki.mode: "offline"`) kann `kiwix-serve` automatisch gestartet werden, wenn `wiki.offline.autostart: true` gesetzt ist.
+
 ### Start
 
 ```bash
@@ -212,10 +223,14 @@ python src/launch.py
 - **Web-UI**
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
   - Im Browser öffnen: `http://<host>:<port>` entsprechend der Einstellungen unter `ui.web` (Standard: `http://127.0.0.1:7860`)
-  - Persona auswählen und loschatten  
+  - Optional: Gradio-Share per `ui.web.share: true` aktivieren; Zugangsdaten kommen aus `ui.web.share_auth`
+  - Persona auswählen und loschatten
 
-- **API (FastAPI)**  
-  - Automatisch aktiv bei `api.enabled: true`  
+- **Nur API (ohne UI)**
+  - `ui.type: null` setzen – die FastAPI läuft weiter und bedient `/ask`
+
+- **API (FastAPI)**
+  - Automatisch aktiv bei `api.enabled: true`
   - Beispielaufruf per `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \
