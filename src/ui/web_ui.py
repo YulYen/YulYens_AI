@@ -101,7 +101,7 @@ class WebUI:
         llm_history = list(history_state or [])
 
         # 2) Eingabefeld leeren und User-Input zeigen im Chatfenster
-        logging.info(f"User input: {user_input}")
+        logging.debug("User input received (%d chars)", len(user_input))
         chat_history.append((user_input, None ))
         yield "", chat_history, llm_history
 
