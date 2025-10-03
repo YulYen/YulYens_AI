@@ -8,9 +8,6 @@ class UnknownPersonaError(ValueError):
 
     pass
 
-cfg = Config()
-
-
 class AiApiProvider:
     """Stellt KI-Antworten über die API bereit (One-Shot)."""
 
@@ -22,6 +19,7 @@ class AiApiProvider:
         self.wiki_snippet_limit = wiki_snippet_limit
         self.wiki_timeout = wiki_timeout
         self.factory = factory
+        self.cfg = factory.get_config() if factory is not None else Config()
         self._known_personas = tuple(get_all_persona_names())
         self._persona_lookup = {name.lower(): name for name in self._known_personas}
 
@@ -32,8 +30,8 @@ class AiApiProvider:
 
         frage = (question or "").strip()
        
-        if  len(frage)==0:
-            return cfg.texts["empty_question"]
+        if len(frage) == 0:
+            return self.cfg.texts["empty_question"]
         
         persona_name = (persona or "").strip()
         persona_key = persona_name.lower()
