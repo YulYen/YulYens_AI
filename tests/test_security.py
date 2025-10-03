@@ -66,6 +66,18 @@ def test_de_ok_normalfrage():
 
 EMAIL = "max.mustermann@example.org"
 
+
+def test_process_output_masks_pii_and_blocks_secrets():
+    guard = BasicGuard(True, True, True, True)
+
+    masked_result = guard.process_output(f"Kontakt: {EMAIL}")
+    assert masked_result["masked"] is True
+    assert BasicGuard.MASK_TEXT in masked_result["text"]
+
+    blocked_result = guard.process_output("Hier ist dein Key: sk-SECRETTOBLOCK123456789")
+    assert blocked_result["blocked"] is True and blocked_result["reason"] == "blocked_keyword"
+
+
 def test_pii_allowed_when_flag_off_in_input():
     g = BasicGuard(True, True, pii_protection=False, output_blocklist=True)
     res = g.check_input(f"Meine E-Mail ist {EMAIL}")
