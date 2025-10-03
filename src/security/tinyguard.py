@@ -79,9 +79,12 @@ class BasicGuard:
         ]
 
         if custom_patterns:
-            inj = custom_patterns.get("prompt_injection", inj) or inj
-            pii = custom_patterns.get("pii", pii) or pii
-            block = custom_patterns.get("output_blocklist", block) or block
+            if "prompt_injection" in custom_patterns:
+                inj = custom_patterns["prompt_injection"]
+            if "pii" in custom_patterns:
+                pii = custom_patterns["pii"]
+            if "output_blocklist" in custom_patterns:
+                block = custom_patterns["output_blocklist"]
 
         self._inj = [re.compile(p, re.IGNORECASE) for p in inj]
         self._pii = [re.compile(p, re.IGNORECASE) for p in pii]
