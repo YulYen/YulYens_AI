@@ -111,7 +111,7 @@ class TerminalUI:
 
         while True:
             user_input = self.prompt_user()
-            logging.info(f"[Terminal] User: {user_input}")
+            logging.debug("[Terminal] User input received (%d chars)", len(user_input))
             print()  # kleine Leerzeile nach der Eingabe
 
             # Exit
