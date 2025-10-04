@@ -41,3 +41,6 @@ nix_mit_AI/
 
 training/out_lora*
 gamerecording.pb
+
+# Generated persona assets
+assets/personas/**/*.webp

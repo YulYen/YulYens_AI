@@ -125,6 +125,10 @@ source .venv/bin/activate   # Linux/macOS
 
 # Abhängigkeiten installieren
 pip install -r requirements.txt
+
+# Statische Persona-Bilder aus den PNG-Quellen erzeugen (einmalig)
+pip install Pillow
+python scripts/generate_persona_assets.py
 ```
 
 ### Sprachmodell für spaCy

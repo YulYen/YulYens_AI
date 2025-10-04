@@ -1,9 +1,17 @@
 import gradio as gr
 import logging
 from functools import partial
+from pathlib import Path
+from typing import Dict, List
+
 from config.personas import system_prompts, get_drink
 from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
+from fastapi.staticfiles import StaticFiles
+
+
+_ASSETS_ROOT = Path(__file__).resolve().parents[2] / "assets"
+_PERSONA_ASSETS_DIR = _ASSETS_ROOT / "personas"
 
 class WebUI:
     """
@@ -31,6 +39,23 @@ class WebUI:
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         if self._t is None:
             self._t = lambda key, **kwargs: key
+        self._persona_assets = self._load_persona_assets()
+
+    @staticmethod
+    def _load_persona_assets() -> Dict[str, Dict[str, str]]:
+        assets: Dict[str, Dict[str, str]] = {}
+
+        for persona_dir in sorted(_PERSONA_ASSETS_DIR.glob("*")):
+            if not persona_dir.is_dir():
+                continue
+
+            key = persona_dir.name.lower()
+            assets[key] = {
+                "thumb": f"/assets/personas/{persona_dir.name}/thumb.webp",
+                "full": f"/assets/personas/{persona_dir.name}/full.webp",
+            }
+
+        return assets
 
     def _reset_conversation_state(self):
         return []
@@ -139,57 +164,40 @@ class WebUI:
 
 
     def _build_ui(self, project_title, choose_persona_txt, persona_info,
-                  persona_btn_suffix, input_placeholder, new_chat_label):
+                  input_placeholder, new_chat_label):
         with gr.Blocks() as demo:
-            selected_persona_state = gr.Textbox(value="", visible=False)
+            demo.app.mount(
+                "/assets",
+                StaticFiles(directory=str(_ASSETS_ROOT), html=False),
+                name="assets",
+            )
 
-            gr.HTML("""
-                <style>
-                .persona-row { gap:24px; }
-                .persona-card {
-                    border:1px solid #e3e7ed;
-                    border-radius:10px;
-                    padding:12px;
-                    text-align:center;
-                }
-                .persona-card img {
-                    max-width: 100%;
-                    height: auto;
-                    display:inline-block;
-                }
-                .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
-                .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
-                </style>
-            """)
+            selected_persona_state = gr.Textbox(value="", visible=False)
             gr.Markdown(f"# {project_title}")
+
+            gallery_items: List[List[str]] = []
+            persona_keys: List[str] = []
+            for key, persona in persona_info.items():
+                thumb_path = persona.get("thumb_path")
+                if not thumb_path:
+                    continue
+                gallery_items.append([thumb_path, persona["name"]])
+                persona_keys.append(key)
 
             with gr.Group(visible=True) as grid_group:
                 gr.Markdown(choose_persona_txt)
-                with gr.Row(elem_classes="persona-row", equal_height=True):
-                    persona_buttons = []
-                    for key, p in persona_info.items():
-                        with gr.Column(scale=1, min_width=220):
-                            with gr.Group(elem_classes="persona-card"):
-                                gr.Image(
-                                    p["image_path"],
-                                    show_label=False,
-                                    height=350,
-                                    container=False,
-                                    elem_classes="persona-img"
-                                )
-                                gr.Markdown(
-                                    f"<div class='name'>{p['name']}</div>"
-                                    f"<div class='desc'>{p['description']}</div>")
-                                btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
-                                persona_buttons.append((key, btn))
-
-            with gr.Group(visible=False) as focus_group:
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        focus_img = gr.Image(show_label=False, container=False)
-                    with gr.Column(scale=3):
-                        focus_md = gr.Markdown("")
-                gr.Markdown("---")
+                with gr.Row(equal_height=True):
+                    persona_gallery = gr.Gallery(
+                        value=gallery_items,
+                        show_label=False,
+                        columns=3,
+                        allow_preview=False,
+                        elem_id="persona-gallery",
+                    )
+                    with gr.Column(scale=1, min_width=320):
+                        with gr.Group(visible=False) as focus_group:
+                            focus_img = gr.Image(show_label=False, container=False)
+                            focus_md = gr.Markdown("")
 
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
@@ -202,6 +210,8 @@ class WebUI:
             "demo": demo,
             "selected_persona_state": selected_persona_state,
             "grid_group": grid_group,
+            "persona_gallery": persona_gallery,
+            "persona_keys": persona_keys,
             "focus_group": focus_group,
             "focus_img": focus_img,
             "focus_md": focus_md,
@@ -209,7 +219,6 @@ class WebUI:
             "chatbot": chatbot,
             "txt": txt,
             "clear": clear,
-            "persona_buttons": persona_buttons,
             "history_state": history_state,
         }
         return demo, components
@@ -220,13 +229,14 @@ class WebUI:
             persona_name=display_name, model_name=model_name
         )
         focus_text = f"### {persona['name']}\n{persona['description']}"
+        full_image_path = persona.get("full_path")
 
         return (
             gr.update(value=persona_key),
-            gr.update(visible=False),
             gr.update(visible=True),
-            gr.update(value=persona["image_path"]),
-            gr.update(value=focus_text),
+            gr.update(visible=True),
+            gr.update(value=full_image_path, visible=True),
+            gr.update(value=focus_text, visible=True),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
             gr.update(
@@ -242,13 +252,48 @@ class WebUI:
             gr.update(value=""),
             gr.update(visible=True),
             gr.update(visible=False),
-            gr.update(value=None),
-            gr.update(value=""),
+            gr.update(value=None, visible=False),
+            gr.update(value="", visible=False),
             gr.update(value="", visible=False),
             gr.update(value=[], label="", visible=False),
             gr.update(value="", visible=False, interactive=False),
             gr.update(visible=False),
             self._reset_conversation_state(),
+        )
+
+    def _on_persona_gallery_select(
+        self,
+        select_data,
+        persona_keys,
+        persona_info,
+        greeting_template,
+        model_name,
+        input_placeholder,
+    ):
+        persona_key = None
+
+        if select_data is not None:
+            value = getattr(select_data, "value", None)
+            if isinstance(value, (list, tuple)) and value:
+                candidate = value[-1]
+                if isinstance(candidate, str):
+                    persona_key = candidate.lower()
+
+            if persona_key is None:
+                index = getattr(select_data, "index", None)
+                if isinstance(index, int) and 0 <= index < len(persona_keys):
+                    persona_key = persona_keys[index]
+
+        if not persona_key:
+            logging.warning("Keine gültige Persona für Auswahl: %s", select_data)
+            return self._reset_ui_updates()
+
+        return self._on_persona_selected(
+            persona_key,
+            persona_info=persona_info,
+            greeting_template=greeting_template,
+            model_name=model_name,
+            input_placeholder=input_placeholder,
         )
 
     def _on_persona_selected(self, key, persona_info, greeting_template, model_name, input_placeholder):
@@ -273,6 +318,8 @@ class WebUI:
                      greeting_template, input_placeholder):
         selected_persona_state = components["selected_persona_state"]
         grid_group = components["grid_group"]
+        persona_gallery = components["persona_gallery"]
+        persona_keys = components["persona_keys"]
         focus_group = components["focus_group"]
         focus_img = components["focus_img"]
         focus_md = components["focus_md"]
@@ -295,20 +342,19 @@ class WebUI:
             history_state,
         ]
 
-        for key, btn in components["persona_buttons"]:
-            btn.click(
-                fn=partial(
-                    self._on_persona_selected,
-                    key=key,
-                    persona_info=persona_info,
-                    greeting_template=greeting_template,
-                    model_name=model_name,
-                    input_placeholder=input_placeholder,
-                ),
-                inputs=[],
-                outputs=persona_outputs,
-                queue=False,
-            )
+        persona_gallery.select(
+            fn=partial(
+                self._on_persona_gallery_select,
+                persona_keys=persona_keys,
+                persona_info=persona_info,
+                greeting_template=greeting_template,
+                model_name=model_name,
+                input_placeholder=input_placeholder,
+            ),
+            inputs=[],
+            outputs=persona_outputs,
+            queue=False,
+        )
 
         txt.submit(
             fn=self.respond_streaming,
@@ -363,15 +409,25 @@ class WebUI:
         new_chat_label = ui.get("new_chat")
         input_placeholder = ui.get("input_placeholder")
         greeting_template = ui.get("greeting")
-        persona_btn_suffix = ui.get("persona_button_suffix")
+        persona_info: Dict[str, Dict[str, str]] = {}
+        for persona in system_prompts:
+            key = persona["name"].lower()
+            persona_entry = dict(persona)
+            assets = self._persona_assets.get(key)
 
-        persona_info = {p["name"].lower(): p for p in system_prompts}
+            if assets:
+                persona_entry["thumb_path"] = assets["thumb"]
+                persona_entry["full_path"] = assets["full"]
+            else:
+                persona_entry["thumb_path"] = None
+                persona_entry["full_path"] = None
+
+            persona_info[key] = persona_entry
 
         demo, components = self._build_ui(
             project_title,
             choose_persona_txt,
             persona_info,
-            persona_btn_suffix,
             input_placeholder,
             new_chat_label,
         )
