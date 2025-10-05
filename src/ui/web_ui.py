@@ -1,7 +1,7 @@
 import gradio as gr
 import logging
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from config.personas import system_prompts, get_drink
 from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context
@@ -50,8 +50,8 @@ class WebUI:
 
             key = persona_dir.name.lower()
             assets[key] = {
-                "thumb": f"/assets/personas/{persona_dir.name}/thumb.webp",
-                "full": f"/assets/personas/{persona_dir.name}/full.webp",
+                "thumb": f"personas/{persona_dir.name}/thumb.webp",
+                "full": f"personas/{persona_dir.name}/full.webp",
             }
 
         return assets
@@ -174,20 +174,24 @@ class WebUI:
             selected_persona_state = gr.Textbox(value="", visible=False)
             gr.Markdown(f"# {project_title}")
 
-            gallery_items: List[List[str]] = []
+            gallery_entries: List[Dict[str, str]] = []
             persona_keys: List[str] = []
             for key, persona in persona_info.items():
-                thumb_path = persona.get("thumb_path")
-                if not thumb_path:
+                thumb_asset = persona.get("thumb_asset")
+                if not thumb_asset:
                     continue
-                gallery_items.append([thumb_path, persona["name"]])
+                gallery_entries.append({
+                    "key": key,
+                    "thumb_asset": thumb_asset,
+                    "name": persona["name"],
+                })
                 persona_keys.append(key)
 
             with gr.Group(visible=True) as grid_group:
                 gr.Markdown(choose_persona_txt)
                 with gr.Row(equal_height=True):
                     persona_gallery = gr.Gallery(
-                        value=gallery_items,
+                        value=[],
                         show_label=False,
                         columns=3,
                         allow_preview=False,
@@ -211,6 +215,7 @@ class WebUI:
             "grid_group": grid_group,
             "persona_gallery": persona_gallery,
             "persona_keys": persona_keys,
+            "gallery_entries": gallery_entries,
             "focus_group": focus_group,
             "focus_img": focus_img,
             "focus_md": focus_md,
@@ -222,19 +227,25 @@ class WebUI:
         }
         return demo, components
 
-    def _persona_selected_updates(self, persona_key, persona, greeting_template, model_name, input_placeholder):
+    def _persona_selected_updates(self, persona_key, persona, greeting_template,
+                                  model_name, input_placeholder,
+                                  full_image_url: Optional[str]):
         display_name = persona["name"].title()
         greeting = greeting_template.format(
             persona_name=display_name, model_name=model_name
         )
         focus_text = f"### {persona['name']}\n{persona['description']}"
-        full_image_path = persona.get("full_path")
+
+        if full_image_url:
+            focus_image_update = gr.update(value=full_image_url, visible=True)
+        else:
+            focus_image_update = gr.update(value=None, visible=False)
 
         return (
             gr.update(value=persona_key),
             gr.update(visible=True),
             gr.update(visible=True),
-            gr.update(value=full_image_path, visible=True),
+            focus_image_update,
             gr.update(value=focus_text, visible=True),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
@@ -268,6 +279,7 @@ class WebUI:
         greeting_template,
         model_name,
         input_placeholder,
+        request: Optional[gr.Request] = None,
     ):
         persona_key = None
 
@@ -293,9 +305,11 @@ class WebUI:
             greeting_template=greeting_template,
             model_name=model_name,
             input_placeholder=input_placeholder,
+            request=request,
         )
 
-    def _on_persona_selected(self, key, persona_info, greeting_template, model_name, input_placeholder):
+    def _on_persona_selected(self, key, persona_info, greeting_template, model_name,
+                             input_placeholder, request: Optional[gr.Request] = None):
         persona = persona_info.get(key)
         if not persona:
             self.bot = None
@@ -304,8 +318,15 @@ class WebUI:
 
         self.bot = persona["name"]
         self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        full_asset = persona.get("full_asset")
+        full_image_url = self._resolve_asset_url(full_asset, request)
         return self._persona_selected_updates(
-            key, persona, greeting_template, model_name, input_placeholder
+            key,
+            persona,
+            greeting_template,
+            model_name,
+            input_placeholder,
+            full_image_url,
         )
 
     def _on_reset_to_start(self):
@@ -313,12 +334,38 @@ class WebUI:
         self.streamer = None
         return self._reset_ui_updates()
 
+    def _resolve_asset_url(
+        self,
+        asset_path: Optional[str],
+        request: Optional[gr.Request] = None,
+    ) -> Optional[str]:
+        if not asset_path:
+            return None
+
+        if asset_path.startswith(("http://", "https://")):
+            return asset_path
+
+        normalized = asset_path.lstrip("/")
+
+        if request is None:
+            return f"/assets/{normalized}"
+
+        try:
+            return str(request.url_for("assets", path=normalized))
+        except Exception:
+            logging.debug(
+                "Konnte URL für Asset %s nicht auflösen", asset_path, exc_info=True
+            )
+            return f"/assets/{normalized}"
+
     def _bind_events(self, components, persona_info, model_name,
                      greeting_template, input_placeholder):
+        demo = components["demo"]
         selected_persona_state = components["selected_persona_state"]
         grid_group = components["grid_group"]
         persona_gallery = components["persona_gallery"]
         persona_keys = components["persona_keys"]
+        gallery_entries = components["gallery_entries"]
         focus_group = components["focus_group"]
         focus_img = components["focus_img"]
         focus_md = components["focus_md"]
@@ -341,7 +388,7 @@ class WebUI:
             history_state,
         ]
 
-        def _handle_gallery_select(select_data):
+        def _handle_gallery_select(select_data, request: gr.Request):
             return self._on_persona_gallery_select(
                 select_data,
                 persona_keys=persona_keys,
@@ -349,12 +396,29 @@ class WebUI:
                 greeting_template=greeting_template,
                 model_name=model_name,
                 input_placeholder=input_placeholder,
+                request=request,
             )
 
         persona_gallery.select(
             fn=_handle_gallery_select,
             inputs=None,
             outputs=persona_outputs,
+            queue=False,
+        )
+
+        def _populate_gallery(request: gr.Request):
+            items: List[List[str]] = []
+            for entry in gallery_entries:
+                thumb_url = self._resolve_asset_url(entry["thumb_asset"], request)
+                if not thumb_url:
+                    continue
+                items.append([thumb_url, entry["name"]])
+            return gr.update(value=items)
+
+        demo.load(
+            fn=_populate_gallery,
+            inputs=None,
+            outputs=persona_gallery,
             queue=False,
         )
 
@@ -418,11 +482,11 @@ class WebUI:
             assets = self._persona_assets.get(key)
 
             if assets:
-                persona_entry["thumb_path"] = assets["thumb"]
-                persona_entry["full_path"] = assets["full"]
+                persona_entry["thumb_asset"] = assets["thumb"]
+                persona_entry["full_asset"] = assets["full"]
             else:
-                persona_entry["thumb_path"] = None
-                persona_entry["full_path"] = None
+                persona_entry["thumb_asset"] = None
+                persona_entry["full_asset"] = None
 
             persona_info[key] = persona_entry
 
