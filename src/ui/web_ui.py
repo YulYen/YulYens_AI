@@ -34,6 +34,14 @@ class WebUI:
 
     def _reset_conversation_state(self):
         return []
+
+    @staticmethod
+    def _persona_thumbnail_path(persona_name):
+        return f"static/personas/{persona_name}/thumb.webp"
+
+    @staticmethod
+    def _persona_full_image_path(persona_name):
+        return f"static/personas/{persona_name}/full.webp"
     
     def _handle_context_warning(self, llm_history, chat_history):
 
@@ -171,7 +179,7 @@ class WebUI:
                         with gr.Column(scale=1, min_width=220):
                             with gr.Group(elem_classes="persona-card"):
                                 gr.Image(
-                                    "static/personas/"+p["name"]+"/thumb.webp",
+                                    self._persona_thumbnail_path(p["name"]),
                                     show_label=False,
                                     container=False,
                                     elem_classes="persona-img"
@@ -224,7 +232,7 @@ class WebUI:
             gr.update(value=persona_key),
             gr.update(visible=False),
             gr.update(visible=True),
-            gr.update(value="static/personas/"+persona["name"]+"/full.webp"),
+            gr.update(value=self._persona_full_image_path(persona["name"])),
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
