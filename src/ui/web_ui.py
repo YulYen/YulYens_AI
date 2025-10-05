@@ -1,6 +1,5 @@
 import gradio as gr
 import logging
-from functools import partial
 from pathlib import Path
 from typing import Dict, List
 
@@ -342,16 +341,19 @@ class WebUI:
             history_state,
         ]
 
-        persona_gallery.select(
-            fn=partial(
-                self._on_persona_gallery_select,
+        def _handle_gallery_select(select_data):
+            return self._on_persona_gallery_select(
+                select_data,
                 persona_keys=persona_keys,
                 persona_info=persona_info,
                 greeting_template=greeting_template,
                 model_name=model_name,
                 input_placeholder=input_placeholder,
-            ),
-            inputs=[],
+            )
+
+        persona_gallery.select(
+            fn=_handle_gallery_select,
+            inputs=None,
             outputs=persona_outputs,
             queue=False,
         )
