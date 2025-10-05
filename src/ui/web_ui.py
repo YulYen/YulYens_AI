@@ -388,7 +388,11 @@ class WebUI:
             history_state,
         ]
 
-        def _handle_gallery_select(select_data: gr.SelectData, *, request: gr.Request):
+        def _handle_gallery_select(
+            select_data: gr.SelectData,
+            *,
+            request: Optional[gr.Request] = None,
+        ):
             return self._on_persona_gallery_select(
                 select_data,
                 persona_keys=persona_keys,
@@ -406,7 +410,7 @@ class WebUI:
             queue=False,
         )
 
-        def _populate_gallery(*, request: gr.Request):
+        def _populate_gallery(*, request: Optional[gr.Request] = None):
             items: List[List[str]] = []
             for entry in gallery_entries:
                 thumb_url = self._resolve_asset_url(entry["thumb_asset"], request)
