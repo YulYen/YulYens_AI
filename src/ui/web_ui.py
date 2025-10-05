@@ -171,9 +171,8 @@ class WebUI:
                         with gr.Column(scale=1, min_width=220):
                             with gr.Group(elem_classes="persona-card"):
                                 gr.Image(
-                                    p["image_path"],
+                                    "static/personas/"+p["name"]+"/thumb.webp",
                                     show_label=False,
-                                    height=350,
                                     container=False,
                                     elem_classes="persona-img"
                                 )
@@ -225,7 +224,7 @@ class WebUI:
             gr.update(value=persona_key),
             gr.update(visible=False),
             gr.update(visible=True),
-            gr.update(value=persona["image_path"]),
+            gr.update(value="static/personas/"+persona["name"]+"/full.webp"),
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),

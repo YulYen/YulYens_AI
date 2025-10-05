@@ -1,6 +1,5 @@
 personas:
   - name: LEAH
-    image_path: static/LEAH.png
     llm_options:
       temperature: 0.65
       repeat_penalty: 1.15
@@ -8,20 +7,17 @@ personas:
     defaults:
       featured: true
   - name: DORIS
-    image_path: static/DORIS.png
     llm_options:
       temperature: 0.6
       repeat_penalty: 1.15
       num_ctx: 4096
   - name: PETER
-    image_path: static/PETER.png
     llm_options:
       temperature: 0.2
       repeat_penalty: 1.15
       num_ctx: 4096
       seed: 42
   - name: POPCORN
-    image_path: static/POPCORN.png
     llm_options:
       temperature: 0.8
       repeat_penalty: 1.15

@@ -30,7 +30,6 @@ def _load_system_prompts() -> List[Dict[str, Any]]:
             "prompt": localized["prompt"],
             "description": localized.get("description", ""),
             "drink": localized.get("drink", "Kaffee"),
-            "image_path": base_persona["image_path"],
             "llm_options": base_persona.get("llm_options", {}),
         }
 
