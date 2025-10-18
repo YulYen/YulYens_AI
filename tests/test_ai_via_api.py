@@ -20,7 +20,7 @@ current_year_short = current_year[-2:]  # "25" bei 2025
 def test_empty_question_rejected(client):
     response = client.post("/ask", json={"question": "", "persona": "PETER"})
     assert response.status_code == 200
-    a1 =response.json().get("answer", "")
+    a1 = response.json().get("answer", "")
     a2 = "Bitte stell mir eine Frage 🙂"
     assert a1 == a2
 
