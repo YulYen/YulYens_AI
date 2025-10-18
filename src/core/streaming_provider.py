@@ -31,9 +31,6 @@ from .llm_core import LLMCore
 from config.config_singleton import Config
 
 
-cfg = Config()
-
-
 
 class YulYenStreamingProvider:
     """
@@ -350,7 +347,8 @@ def lookup_wiki_snippet(
     snippet: Optional[str] = None
     wiki_hint: Optional[str] = None
     topic_title: Optional[str] = None
-    texts = cfg.texts
+    config = Config()
+    texts = config.texts
     proxy_base = "http://localhost:" + str(proxy_port)
 
 
@@ -372,9 +370,9 @@ def lookup_wiki_snippet(
                 wiki_hint = data.get("wiki_hint")
                 topic_title = topic
             elif proxy_respone.status_code == 404:
-                wiki_hint = cfg.t("wiki_hint_not_found", topic=topic)
+                wiki_hint = config.t("wiki_hint_not_found", topic=topic)
             else:
-                wiki_hint = cfg.t("wiki_hint_unreachable", topic=topic)
+                wiki_hint = config.t("wiki_hint_unreachable", topic=topic)
         except requests.exceptions.RequestException as err:
             logging.error(
                 "[WIKI EXC] Netzwerkfehler beim Abruf von '%s': %s",
