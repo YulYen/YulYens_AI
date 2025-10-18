@@ -96,3 +96,4 @@ def test_streaming_writes_conversation_log(tmp_path) -> None:
     roles = [row["role"] for row in rows]
 
     assert "user" in roles and "assistant" in roles
+    assert any(row.get("bot") == "DORIS" and row.get("model") == "LEAH13B" for row in rows)
