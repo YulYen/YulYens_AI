@@ -77,7 +77,7 @@ def _find_infobox_table(soup):
     """
     Sucht robust nach einer Infobox-Tabelle.
     Berücksichtigt unterschiedliche Class-Kombis ("infobox", "infobox vcard", ...)
-    und ist case-insensitiv.
+    und ist case-insensitive.
     """
 
     # 1) CSS-Selektor: direkte Treffer

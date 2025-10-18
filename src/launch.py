@@ -23,7 +23,7 @@ from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from config.config_singleton import Config
 from yaml import YAMLError
 
-from wiki.kiwik_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
+from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
 
 
 
