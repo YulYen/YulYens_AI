@@ -363,15 +363,15 @@ def lookup_wiki_snippet(
         online_flag = "1" if wiki_mode == "online" else "0"
         url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
         try:
-            proxy_respone = requests.get(url, timeout=timeout)
+            proxy_response = requests.get(url, timeout=timeout)
 
-            if proxy_respone.status_code == 200:
-                data = proxy_respone.json()
+            if proxy_response.status_code == 200:
+                data = proxy_response.json()
                 text = (data.get("text") or "").replace("\r", " ").strip()
                 snippet = text[:limit]
                 wiki_hint = data.get("wiki_hint")
                 topic_title = topic
-            elif proxy_respone.status_code == 404:
+            elif proxy_response.status_code == 404:
                 wiki_hint = cfg.t("wiki_hint_not_found", topic=topic)
             else:
                 wiki_hint = cfg.t("wiki_hint_unreachable", topic=topic)
