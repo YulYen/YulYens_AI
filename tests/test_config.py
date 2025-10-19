@@ -150,10 +150,10 @@ def test_others_have_no_seed_by_default():
 
 def test_greeting_replaces_placeholders(tmp_path):
     """
-    Prüft die 1:1-Platzhalterersetzung aus der YAML:
+    Verifies the one-to-one placeholder substitution from YAML:
     - {model_name} -> core.model_name
     - {persona_name} -> system_prompts[0].name
-    - unbekannte Platzhalter bleiben unverändert (SafeDict)
+    - unknown placeholders remain unchanged (SafeDict)
     """
     persona_name = system_prompts[0]["name"]
     g = _greeting_text(Config(), persona_name)
@@ -173,7 +173,7 @@ def test_greeting_replaces_placeholders(tmp_path):
 )
 def test_wiki_mode_enabled(mode, expected):
     """
-    Aktuelles Verhalten: KeywordFinder nur bei 'offline' und 'online' aktiv.
-    Alles andere (false/None) -> aus.
+    Current behavior: KeywordFinder active only for 'offline' and 'online'.
+    Everything else (false/None) → off.
     """
     assert _wiki_mode_enabled(mode) is expected

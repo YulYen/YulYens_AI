@@ -8,7 +8,7 @@ import yaml
 
 
 class Texts(MutableMapping[str, str]):
-    """Lädt Sprach-Kataloge und stellt komfortable Lookups bereit."""
+    """Loads language catalogs and offers convenient lookups."""
 
     def __init__(self, language: str, locales_dir: str | Path = "locales") -> None:
         if not isinstance(language, str) or not language.strip():

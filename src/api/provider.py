@@ -4,12 +4,12 @@ from config.personas import get_all_persona_names
 
 
 class UnknownPersonaError(ValueError):
-    """Wird ausgelöst, wenn eine unbekannte Persona angefragt wird."""
+    """Raised when an unknown persona is requested."""
 
     pass
 
 class AiApiProvider:
-    """Stellt KI-Antworten über die API bereit (One-Shot)."""
+    """Provides AI answers through the API (one-shot)."""
 
     def __init__(self, *, keyword_finder, wiki_mode,
                  wiki_proxy_port, wiki_snippet_limit, wiki_timeout, factory):
@@ -26,7 +26,7 @@ class AiApiProvider:
 
 
     def answer(self, question: str, persona: str) -> str:
-        """Bearbeitet eine Frage mit gegebener Persona und gibt die Antwort als Text zurück."""
+        """Handles a question for the given persona and returns the answer as text."""
 
         frage = (question or "").strip()
        

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 """
-Dünner Wrapper um den Ollama‑Client.
+Thin wrapper around the Ollama client.
 
-Diese Klasse kapselt alle direkten Aufrufe an das Ollama‑Backend, sodass das
-restliche System vom konkreten LLM entkoppelt ist. Sollte Ollama
-ausgetauscht werden, muss nur diese Klasse angepasst werden.
+This class encapsulates all direct calls to the Ollama backend so the
+rest of the system stays decoupled from the concrete LLM. If Ollama is
+replaced, only this class needs to change.
 """
 
 from typing import Any, Dict, List
@@ -16,21 +16,21 @@ from ollama import Client
 
 
 class OllamaLLMCore(LLMCore):
-    """Minimaler Wrapper für den Ollama‑Client."""
+    """Minimal wrapper for the Ollama client."""
 
     def __init__(self, base_url: str) -> None:
         """
-        Initialisiert den Ollama‑Client.
+        Initializes the Ollama client.
 
-        :param base_url: URL des Ollama‑Servers (z. B. http://localhost:11434)
+        :param base_url: URL of the Ollama server (e.g. http://localhost:11434)
         """
         self._client = Client(host=base_url)
 
     def warm_up(self, model_name: str) -> None:
         """
-        Führt einen Dummy‑Aufruf aus, um das Modell vorzuladen.
+        Performs a dummy call to preload the model.
 
-        :param model_name: Name des zu wärmenden Modells
+        :param model_name: Name of the model to warm up
         """
         self._client.chat(model=model_name, messages=[{"role": "user", "content": "..."}])
 
@@ -42,13 +42,13 @@ class OllamaLLMCore(LLMCore):
         keep_alive: int = 600,
     ):
         """
-        Startet einen Streaming‑Chat.
+        Starts a streaming chat.
 
-        :param model_name: Name des Modells
-        :param messages: Liste der Nachrichten (im Ollama‑Format)
-        :param options: Generierungsoptionen (temperature, top_p, …)
-        :param keep_alive: Keep‑Alive‑Timeout
-        :returns: Iterator über die Antwort‑Chunks
+        :param model_name: Name of the model
+        :param messages: List of messages (in Ollama format)
+        :param options: Generation options (temperature, top_p, …)
+        :param keep_alive: Keep-alive timeout
+        :returns: Iterator over the response chunks
         """
         return self._client.chat(
             model=model_name,

@@ -23,7 +23,7 @@ class _DummyKeywordFinder:
 
 
 def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
-    """Der Wiki-Fallback informiert die UI verständlich über Netzwerkfehler."""
+    """The wiki fallback informs the UI clearly about network errors."""
 
     def _raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("proxy down")
@@ -51,7 +51,7 @@ def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
 
 
 def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
-    """Selbst unerwartete Exceptions liefern einen UI-Fallback-Hinweis."""
+    """Even unexpected exceptions produce a UI fallback hint."""
 
     def _raise_unexpected_error(*args, **kwargs):
         raise RuntimeError("kaputt")
@@ -79,7 +79,7 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
 
 
 def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
-    """Ein Config-Reset mit Sprachwechsel spiegelt sich in den Wiki-Hinweisen wider."""
+    """A config reset with a language change is reflected in the wiki hints."""
 
     def _raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("proxy down")
@@ -152,8 +152,8 @@ skip_without_medium_model = pytest.mark.skipif(
 @skip_without_medium_model
 def test_lookup_wiki_snippet_for_germany():
     """
-    Integrationstest: prüft, ob der lokale Wiki-Proxy läuft und
-    zu 'Deutschland' ein Snippet mit Hauptstadt 'Berlin' liefert.
+    Integration test: verifies that the local wiki proxy is running and
+    returns a snippet for 'Deutschland' containing the capital 'Berlin'.
     """
     # KeywordFinder in medium mode (detects 'Deutschland')
     finder = SpacyKeywordFinder(ModelVariant.MEDIUM)

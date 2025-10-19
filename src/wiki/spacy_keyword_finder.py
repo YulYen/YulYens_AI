@@ -20,7 +20,7 @@ class ModelVariant(str, Enum):
     LARGE = "de_core_news_lg"
 
 class SpacyKeywordFinder:
-    """Findet relevante Stichwörter in deutschem Text für die Wikipedia-Suche."""
+    """Finds relevant keywords in German text for the Wikipedia search."""
 
     def __init__(self, variant):
         self.model_name = variant.value
@@ -28,7 +28,7 @@ class SpacyKeywordFinder:
         self.nlp = spacy.load(self.model_name)
 
     def _normalize_keyword(self, text: str) -> str:
-        """Hilfsmethode: Vereinheitlicht Leerzeichen, ß usw."""
+        """Helper method: normalizes spaces, ß, and similar details."""
         return text.strip().replace(" ", "_").replace("\u00df", "ss")
 
     def is_valid_keyword(self, ent):

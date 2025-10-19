@@ -1,8 +1,8 @@
-"""Deterministische LLM‑Core‑Implementierung für schnelle Tests.
+"""Deterministic LLM core implementation for quick tests.
 
-Diese Klasse implementiert das :class:`LLMCore`‑Interface und antwortet
-deterministisch mit einem einfachen Echo. Sie ist nützlich für Unit‑Tests,
-bei denen kein echtes LLM benötigt wird.
+This class implements the :class:`LLMCore` interface and responds
+deterministically with a simple echo. It is useful for unit tests where
+no real LLM is required.
 """
 
 from __future__ import annotations
@@ -13,10 +13,10 @@ from .llm_core import LLMCore
 
 
 class DummyLLMCore(LLMCore):
-    """Eine LLM‑Core‑Implementierung, die einfach den User‑Input zurückgibt."""
+    """An LLM core implementation that simply returns the user input."""
 
     def warm_up(self, model_name: str) -> None:
-        """Kein Vorheizen erforderlich für den Dummy."""
+        """No warm-up required for the dummy."""
         return None
 
     def stream_chat(
@@ -27,13 +27,13 @@ class DummyLLMCore(LLMCore):
         keep_alive: int = 600,
     ) -> Iterable[Dict[str, Any]]:
         """
-        Gibt genau einen Antwort‑Chunk zurück, der den User‑Input spiegelt.
+        Returns exactly one response chunk that mirrors the user input.
 
-        :param model_name: Wird ignoriert.
-        :param messages: Liste der Nachrichten; die letzte Nutzer‑Nachricht wird gespiegelt.
-        :param options: Ignoriert.
-        :param keep_alive: Ignoriert.
-        :returns: Iterator mit genau einem Element.
+        :param model_name: Ignored.
+        :param messages: List of messages; mirrors the last user message.
+        :param options: Ignored.
+        :param keep_alive: Ignored.
+        :returns: Iterator with exactly one element.
         """
         # Die letzte User‑Nachricht finden
         user_input = ""

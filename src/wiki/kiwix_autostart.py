@@ -5,10 +5,10 @@ logger.info("Wiki-Autostart bereit …")
 
 def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
     """
-    Startet kiwix-serve automatisch, wenn:
+    Automatically starts kiwix-serve when:
       - cfg["wiki"]["mode"] == "offline"
       - cfg["wiki"]["offline"]["autostart"] == True
-    Gibt True zurück, wenn der Dienst erreichbar ist (lief schon oder erfolgreich gestartet).
+    Returns True when the service is reachable (already running or started successfully).
     """
     wiki = cfg.wiki
     if wiki["mode"] != "offline":

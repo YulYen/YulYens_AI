@@ -1,10 +1,9 @@
 
-"""Abstrakte Basis-Klasse für alle LLM‑Kerne.
+"""Abstract base class for all LLM cores.
 
-Dieses Interface definiert die minimalen Methoden, die ein LLM‑Core zur
-Verfügung stellen muss. Durch die Verwendung dieser Basisklasse können
-verschiedene Implementierungen (z. B. für Ollama oder einen Dummy für Tests)
-austauschbar eingesetzt werden.
+This interface defines the minimal methods an LLM core must provide.
+By using this base class, different implementations (e.g. for Ollama or
+a dummy used in tests) can be swapped seamlessly.
 """
 
 from __future__ import annotations
@@ -14,14 +13,14 @@ from typing import Any, Dict, Iterable, List
 
 
 class LLMCore(ABC):
-    """Interface für den Zugriff auf ein Large Language Model."""
+    """Interface for accessing a large language model."""
 
     @abstractmethod
     def warm_up(self, model_name: str) -> None:
         """
-        Heizt das Modell vor, damit der erste Token schneller verfügbar ist.
+        Warms up the model so the first token is available faster.
 
-        :param model_name: Name des zu wärmenden Modells
+        :param model_name: Name of the model to warm up
         """
         raise NotImplementedError
 
@@ -34,12 +33,12 @@ class LLMCore(ABC):
         keep_alive: int = 600,
     ) -> Iterable[Dict[str, Any]]:
         """
-        Startet einen Chat im Streaming‑Modus.
+        Starts a chat in streaming mode.
 
-        :param model_name: Name des Modells
-        :param messages: Liste der Nachrichten (im LLM‑Format)
-        :param options: Generierungsoptionen (temperature, top_p, …)
-        :param keep_alive: Keep‑Alive‑Timeout in Sekunden
-        :returns: Iterable über die Antwort‑Chunks des LLMs
+        :param model_name: Name of the model
+        :param messages: List of messages (in the LLM format)
+        :param options: Generation options (temperature, top_p, …)
+        :param keep_alive: Keep-alive timeout in seconds
+        :returns: Iterable over the model's response chunks
         """
         raise NotImplementedError

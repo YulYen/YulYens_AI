@@ -17,10 +17,10 @@ from core.streaming_provider import (
 
 class TerminalUI:
     """
-    Terminal-Chat – nutzt die gleiche Wiki-Logik wie die WebUI:
-    - Wiki-Hinweis (🕵️‍♀️ …) wird NUR im Terminal angezeigt (nicht ans LLM geschickt)
-    - Wiki-Snippet (falls vorhanden) wird als System-Kontext injiziert
-    - Tokenweises Streaming der LLM-Antwort bleibt unverändert
+    Terminal chat—uses the same wiki logic as the WebUI:
+    - Wiki hint (🕵️‍♀️ …) is shown only in the terminal (not sent to the LLM)
+    - Wiki snippet (if available) is injected as system context
+    - Token-by-token streaming of the LLM response stays unchanged
     """
     def __init__(self, factory, config, keyword_finder,
                  wiki_snippet_limit, wiki_mode, proxy_base,
@@ -44,7 +44,7 @@ class TerminalUI:
 
 
     def choose_persona(self) -> None:
-        """Fragt den Nutzer nach der gewünschten Persona und setzt den Streamer."""
+        """Asks the user for the desired persona and configures the streamer."""
         names = get_all_persona_names()
         print(self.texts["choose_persona"])
         for idx, name in enumerate(names, start=1):
@@ -101,7 +101,7 @@ class TerminalUI:
         self.init_ui()
         logging.info(f"Launching TerminalUI")
 
-        """Startet die Terminal-UI. Fragt zuerst nach der Persona-Auswahl."""
+        """Starts the terminal UI. Prompts for persona selection first."""
         # 1. Select a persona if no streamer is configured yet
         if self.streamer is None:
             self.choose_persona()
@@ -171,7 +171,7 @@ class TerminalUI:
                 print()
 
     def _ensure_context_headroom(self) -> None:
-        """Trimmt den Verlauf, wenn das Kontextlimit fast erreicht ist."""
+        """Trims the history when the context limit is nearly reached."""
 
         if not self.streamer:
             return
