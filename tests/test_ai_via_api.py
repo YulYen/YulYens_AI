@@ -11,11 +11,11 @@ from config.config_singleton import Config
 from config.personas import get_all_persona_names
 from core.streaming_provider import YulYenStreamingProvider
 
-# ---- Zeit deterministisch in Europe/Berlin -----------------------------------
+# ---- Deterministic time in Europe/Berlin ------------------------------------
 BERLIN = ZoneInfo("Europe/Berlin")
 _now = datetime.now(tz=BERLIN)
 current_year = str(_now.year)
-current_year_short = current_year[-2:]  # "25" bei 2025
+current_year_short = current_year[-2:]  # "25" when the year is 2025
 
 def test_empty_question_rejected(client):
     response = client.post("/ask", json={"question": "", "persona": "PETER"})
@@ -99,20 +99,20 @@ def test_same_joke(client):
     assert r1.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."' #LEO
-    anfang = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier' # LEO stabiler Anfang
+    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."' # LEO reference answer
+    anfang = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier' # LEO stable beginning
 
-    # Nicht leer, keine reinen Whitespaces
+    # Non-empty and not just whitespace
     assert a1.strip() and a2.strip()
 
-    # Kernforderung: deterministisch identisch
+    # Core requirement: deterministic match
     assert anfang in a1, (
         "Antworten unterscheiden sich trotz identischem Prompt. "
         "Prüfe seed/temperature/top_p/repeat_penalty in den Persona-Optionen "
         "und setze ggf. include_date=False für diesen Test."
     )
 
-# ---- Normalisierung / Matching ------------------------------------------------
+# ---- Normalization / matching -------------------------------------------------
 def _normalize(s: str) -> str:
     """
     Kleines Normalisieren:
@@ -141,16 +141,16 @@ def _contains_any(ans_norm: str, items: list[str]) -> bool:
 # ---- API Helper ---------------------------------------------------------------
 def ask(question: str, person: str, client) -> str:
     r = client.post("/ask", json={"question": question, "persona": person})
-    # Defensiv: Falls Backend mal ein anderes Schema liefert
+    # Defensive: handle unexpected backend payloads
     try:
         data = r.json()
     except Exception:
         pytest.fail(f"Antwort ist kein JSON. Status={r.status_code}, Body={r.text[:500]}")
 
-    # Typischer Vertrag: {"answer": "..."}; fallback: ganze JSON anzeigen
+    # Typical contract: {"answer": "..."}; fallback to showing the full JSON
     return data.get("answer", str(data))
 
-# ---- Testfälle ----------------------------------------------------------------
+# ---- Test cases ----------------------------------------------------------------
 @pytest.mark.slow
 @pytest.mark.ollama
 @pytest.mark.parametrize(
@@ -160,20 +160,20 @@ def ask(question: str, person: str, client) -> str:
             "name": "Identitaet/Erfinder",
             "person": "LEAH",
             "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden?",
-            "must_contain": ["LEAH", "yul yen"],  # anpassbar
+            "must_contain": ["LEAH", "yul yen"],  # adjustable
         },
         {
             "name": "Portugal_PM_2025",
             "person": "PETER",
             "question": "Wer ist im Jahre 2025 der amtierende Regierungschef von Portugal? Und wer bist du?",
-            # akzeptiere Schreibweisen mit/ohne Akzent; Persona-Hinweis mitprüfen
+            # Accept spellings with or without accents; also verify persona mention
             "must_contain": ["luis montenegro", "PETER"],
         },
         {
             "name": "Jens_Spahn_Amt",
             "person": "PETER",
             "question": "Welches wichtige Amt bekleidet Jens Spahn aktuell? Und welches Datum haben wir heute?",
-            # bewusst grob (schreibweise/Beugung tolerant)
+            # Intentionally broad (tolerant to spelling and inflection)
             "must_contain": ["vorsitzend", "cdu", "fraktion"],
             "must_contain_any": [current_year, current_year_short],
         },
@@ -193,7 +193,7 @@ def test_api_contract(case, client_with_date_and_wiki):
 
     ok = (not missing_all) and ok_any
     if not ok:
-        # Präzise Diagnose
+        # Provide precise diagnostics
         fail_lines = [
             f"Case: {case.get('name')}",
             f"Persona: {case.get('person')}",

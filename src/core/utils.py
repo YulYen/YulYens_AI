@@ -1,4 +1,4 @@
-# --------- Allgemeine Utilities (ohne Seiteneffekte nach außen) ---------
+# --------- General utilities (no external side effects) ---------
 import re
 from datetime import datetime
 from pathlib import Path
@@ -38,10 +38,10 @@ _UNWANTED_TOKENS = {"assistant", "assistent:", "antwort:"}
 
 
 def clean_token(token: str) -> str:
-    # Dummy-Tags raus
+    # Remove dummy tags
     token = re.sub(r"<dummy\d+>", "", token)
 
-    # Einzelne irrelevante Tokens rausfiltern
+    # Filter out standalone irrelevant tokens
     if token.strip().lower() in _UNWANTED_TOKENS:
         return ""
 

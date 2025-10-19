@@ -8,7 +8,7 @@ pytestmark = pytest.mark.skipif(
     reason="spaCy model de_core_news_lg not installed",
 )
 
-# (1) Einfache positive Fälle
+# (1) Simple positive cases
 easy_positive = [
     ("Wer war Albert Einstein?", ["Albert_Einstein"]),
     ("Wer ist Elon Musk?", ["Elon_Musk"]),
@@ -22,7 +22,7 @@ easy_positive = [
     #("Kennst du Leonardo da Vinci?", ["Leonardo_da_Vinci"]),
 ]
 
-# (2) Einfache negative Fälle
+# (2) Simple negative cases
 easy_negative = [
     ("Wie geht es dir?", []),
     ("Danke!", []),
@@ -41,45 +41,45 @@ easy_negative = [
     ("Bist du ein Bot?", []),
 ]
 
-# (3) Knifflige positive Fälle
+# (3) Challenging positive cases
 tricky_positive = [
     ("Was weißt du über die RAF?", ["RAF"]),
     ("Erzähl mir etwas über Saturn.", ["Saturn"]),
-    #("Was weißt du über Merkel?", ["Merkel"]),
+    #("What do you know about Merkel?", ["Merkel"]),
     ("Kennst Ludwig van Beethoven?", ["Ludwig_van_Beethoven"]),
     ("Was weißt du über NASA?", ["NASA"]),
     ("Erzähl mir etwas über Amazon.", ["Amazon"]),
     #("Kennst du den Film Inception?", ["Inception"]),
     ("Was weißt du über die Olympischen Spiele 2012 in London?", ["London"]),
-    #("Erzähl mir von der Titanic.", ["Titanic"]),
+    #("Tell me about the Titanic.", ["Titanic"]),
     ("Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025??", ["Friedrich_Merz"]),
 ]
 
 top_pick_cases = [
     # 1
     ("Seit wann ist Donald Trump Präsident der USA?", ["Donald_Trump", "USA"]),
-    # 2 – zwei ORGs, frühe Position gewinnt
+    # 2 – two ORGs, earlier position wins
      ("Erzähl mir etwas über Bundesbank und die Amazon.", ["Bundesbank", "Amazon"]),
-    # 3 – zwei LOCs
+    # 3 – two LOCs
     ("Ist Paris größer als Berlin?", ["Paris", "Berlin"]),
-    # 4 – zwei Fußball-ORGs, längerer früher Span bevorzugt
+    # 4 – two football ORGs, prefer the longer early span
     ("Wie erfolgreich ist der FC Bayern München gegen Borussia Dortmund?", ["FC_Bayern_München", "Borussia_Dortmund"]),
-    # 5 – zwei ORGs
+    # 5 – two ORGs
     ("Hat die NASA mit SpaceX zusammengearbeitet?", ["NASA", "SpaceX"]),
     # 6 – LOC vs. LOC
     ("Wo liegt der Grand Canyon in den USA?", ["Grand_Canyon", "USA"]),
-    # 7 – zwei ORGs, längerer früher Span
+    # 7 – two ORGs, longer early span
     ("Was macht die Europäische Union im Vergleich zur NATO?", ["Europäische_Union", "NATO"]),
     # 8 – PER vs. LOC
     ("Wer war Kaiser Wilhelm II in Deutschland?", ["Kaiser_Wilhelm_II", "Deutschland"]),
-    # 9 – mehrere Himmelskörper (LOC)
+    # 9 – multiple celestial bodies (LOC)
     ("Ist Saturn weiter von der Erde entfernt als Jupiter?", ["Saturn", "Erde", "Jupiter"]),
-    # 10 – PER zuerst, dann ORG
+    # 10 – PER first, then ORG
     ("Welche Strategie verfolgt Satya Nadella bei Microsoft?", ["Satya_Nadella", "Microsoft"]),
 
 ]
 
-# (4) Knifflige negative Fälle (realistisch erreichbar)
+# (4) Challenging negative cases (realistically achievable)
 tricky_negative = [
     ("Hallo meine Liebe!", []),
     ("Guten Morgen, Siri!", []),
@@ -102,7 +102,7 @@ def test_top_keyword_selection(keyword_finder, text, expected_list):
     top = keyword_finder.find_top_keyword(text)
 
     if expected_list:
-        # Konvention: das erste erwartete Keyword gilt als „Top“
+        # Convention: treat the first expected keyword as the "top" entry
         assert top == expected_list[0]
     else:
         assert top is None

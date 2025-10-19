@@ -34,40 +34,40 @@ class SpacyKeywordFinder:
     def is_valid_keyword(self, ent):
         keyword = ent.text.strip().replace(" ", "_").replace("\u00df", "ss")
 
-        # Filter nach Entitätentyp
+        # Filter by entity type
         if ent.label_ not in RELEVANT_LABELS:
             return False
 
-        # Muss mindestens 1 Buchstaben enthalten
+        # Must contain at least one letter
         if not any(c.isalpha() for c in keyword):
             return False
 
-        # Nicht zu kurz und keine reinen Zahlen etc.
+        # Reject items that are too short or purely numeric
         if len(keyword) < 3:
             return False
 
-        # Wortweise Blockprüfung (z. B. "Hallo_Schatz" → beide geblockt)
+        # Blocklist check per word (e.g. "Hallo_Schatz" blocks both parts)
         if any(w in BLOCKWORDS for w in keyword.lower().split("_")):
             return False
 
-        # Nur Eigennamen oder Nomen akzeptieren
+        # Accept only proper nouns or nouns
         if ent.root.pos_ not in ("PROPN", "NOUN"):
             return False
 
-        # Sicherstellen, dass keine Imperative wie "Schreib" durchrutschen
+        # Ensure imperatives such as "Schreib" do not slip through
         if ent.root.lemma_.lower() in BLOCKWORDS:
             return False
 
-        # Kein Ausrufezeichen am Ende
+        # No trailing exclamation marks
         if keyword.endswith("!"):
             return False
         
-         # Neue, kleine Heuristik 1: W‑Fragewörter innerhalb der Entität → verwerfen
+         # New heuristic 1: drop entities containing W-question words
         ent_lemmas = [t.lemma_.lower() for t in ent]
         if any(l in W_TOKENS for l in ent_lemmas):
             return False
 
-        # Neue, kleine Heuristik 2: generische Nomen nur mit Eigennamen (PROPN) zulassen
+        # New heuristic 2: allow generic nouns only when paired with a proper noun
         if any(l in GENERIC_NOUNS for l in ent_lemmas):
             if not any(t.pos_ == "PROPN" for t in ent):
                 return False
@@ -78,7 +78,7 @@ class SpacyKeywordFinder:
         doc = self.nlp(text)
         treffer = []
 
-        # (1) normale spaCy-Entitäten
+        # (1) Standard spaCy entities
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
                 keyword = self._normalize_keyword(ent.text) 
@@ -95,7 +95,7 @@ class SpacyKeywordFinder:
 
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
-                # Score: früher im Text + Länge
+                # Score: earlier in the text plus span length
                 pos_score = 1.0 - (ent.start_char / max(1, len(text)))  # 0..1
                 len_score = min(len(ent.text) / 10.0, 1.0)              # max 1.0
                 score = pos_score + len_score

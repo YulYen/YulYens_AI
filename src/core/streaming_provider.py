@@ -25,7 +25,7 @@ from core.context_utils import approx_token_count
 
 from security.tinyguard import BasicGuard, zeigefinger_message
 
-# LLM‑Interface importieren
+# Import the LLM interface
 from .llm_core import LLMCore
 
 from config.config_singleton import Config
@@ -65,7 +65,7 @@ class YulYenStreamingProvider:
         self.persona_prompt = persona_prompt
         self.persona_options = persona_options
 
-        # LLM‑Core initialisieren oder injiziertes verwenden
+        # Initialize the LLM core or use the injected one
         self._llm_core: LLMCore
         if llm_core is not None:
             self._llm_core = llm_core
@@ -86,7 +86,7 @@ class YulYenStreamingProvider:
 
             self._llm_core = OllamaLLMCore(base_url)
 
-        # Logging konfigurieren
+        # Configure logging
         self._logs_dir = "logs"
         ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
@@ -130,7 +130,7 @@ class YulYenStreamingProvider:
             TODO: Refaktor: Diese Methode kann wesentlich schlanker mit weniger übertriebenem Fehlerhandling
         """
 
-        # Payload (Messages + Options) hashen und loggen
+        # Hash and log the payload (messages plus options)
         try:
             _payload = {"messages": messages, "options": options}
             _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
@@ -143,7 +143,7 @@ class YulYenStreamingProvider:
         timestamp = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
         try:
             estimated_tokens = approx_token_count(messages)
-        except Exception as exc:  # pragma: no cover - reine Absicherung
+        except Exception as exc:  # pragma: no cover - safety net
             logging.warning("Konnte Token-Anzahl nicht schätzen: %s", exc)
             estimated_tokens = None
         persona_options = self.persona_options or {}
@@ -169,7 +169,7 @@ class YulYenStreamingProvider:
         Generator, der tokenweise Antworten aus dem LLM zurückliefert.
         Logging und Security‑Checks.
         """
-        # Vorab: letzte User‑Message prüfen
+        # Pre-check: validate the latest user message
         if self.guard:
             for m in reversed(messages):
                 if m.get("role") == "user":
@@ -179,18 +179,18 @@ class YulYenStreamingProvider:
                         return
                     break
 
-        # System‑Prompt voranstellen
+        # Prepend the system prompt
         if self.persona_prompt:
             messages = [{"role": "system", "content": self.persona_prompt}] + messages
             logging.debug(messages)
 
-        # Letzte User‑Nachricht im Log festhalten
+        # Record the most recent user message in the log
         for m in reversed(messages):
             if m.get("role") == "user" and m.get("content"):
                 self._append_conversation_log("user", m["content"])
                 break
 
-        # LLM‑Options übernehmen
+        # Apply LLM options
         options: Dict[str, Any] = {}
         if self.persona_options:
             options = self.persona_options
@@ -202,7 +202,7 @@ class YulYenStreamingProvider:
 
             self._log_generation_start(messages, options)
 
-            # Delegation an den LLM‑Core
+            # Delegate to the LLM core
             stream_obj = self._llm_core.stream_chat(
                 model_name=self.model_name, messages=messages, options=options, keep_alive=600
             )
@@ -231,7 +231,7 @@ class YulYenStreamingProvider:
                                 break
                             to_send = pol["text"]
 
-                        # Batching heuristisch – Senden, wenn mindestens ein Separator
+                        # Batch heuristically — send once at least one separator appears
                         seps = [" ", "\n", "\t", "!", "?"]
                         count = sum(to_send.count(sep) for sep in seps)
                         logging.debug("Buffer:" + to_send + "###" + str(count))
@@ -239,7 +239,7 @@ class YulYenStreamingProvider:
                             yield to_send
                             buffer = ""
 
-                # Rest senden
+                # Send the remaining buffer
                 if buffer:
                     to_send = buffer
                     if self.guard:
@@ -252,7 +252,7 @@ class YulYenStreamingProvider:
                         yield to_send
 
             finally:
-                # Stream immer schließen, wenn möglich
+                # Always close the stream when possible
                 try:
                     close = getattr(stream_obj, "close", None)
                     if callable(close):
@@ -260,7 +260,7 @@ class YulYenStreamingProvider:
                 except Exception:
                     pass
 
-            # Performance loggen
+            # Log performance metrics
             t_end = time.time()
             if first_token_time is not None:
                 t_first_ms = int((first_token_time - t_start) * 1000)
@@ -274,7 +274,7 @@ class YulYenStreamingProvider:
                 int((t_end - t_start) * 1000),
             )
 
-            # Finale Assistant‑Antwort loggen
+            # Log the final assistant reply
             full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
@@ -307,28 +307,28 @@ class YulYenStreamingProvider:
         """
         messages: List[Dict[str, Any]] = []
 
-        # Wikipedia‑Snippet suchen
+        # Look up the Wikipedia snippet
         wiki_hint, topic_title, snippet = lookup_wiki_snippet(
             user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout
         )
 
-        # Kontext anhängen
+        # Attach context
         if snippet:
             inject_wiki_context(messages, topic_title, snippet)
 
-        # Nutzerfrage als letzte Nachricht
+        # Add the user question as the last message
         messages.append({"role": "user", "content": user_input})
 
-        # Guard‑Input prüfen
+        # Check guard input
         if self.guard:
             res_in = self.guard.check_input(user_input or "")
             if not res_in["ok"]:
                 return zeigefinger_message(res_in)
 
-        # LLM ausführen und Antwort sammeln
+        # Run the LLM and collect the answer
         full_reply = run_llm_collect(self, messages)
 
-        # Guard‑Output prüfen
+        # Check guard output
         if self.guard:
             res_out = self.guard.check_output(full_reply or "")
             if not res_out["ok"]:
@@ -386,7 +386,7 @@ def lookup_wiki_snippet(
                 exc_info=True,
             )
             wiki_hint = texts["wiki_hint_proxy_error"]
-        except Exception as err:  # pragma: no cover - unerwartete Fehler
+        except Exception as err:  # pragma: no cover - unexpected errors
             logging.exception("[WIKI EXC] Unerwarteter Fehler für topic='%s'", topic)
             wiki_hint = texts["wiki_hint_unknown_error"]
     return (wiki_hint, topic_title, snippet)

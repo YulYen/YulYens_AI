@@ -116,7 +116,7 @@ def start_api_in_background(api_cfg, provider):
     port = int(api_cfg["port"])
 
     def _run():
-        uvicorn.run(app, host=host, port=port, log_level="warning") # bei Info wird die TerminalUI gestört
+        uvicorn.run(app, host=host, port=port, log_level="warning") # info-level logs disrupt the terminal UI
 
     t = threading.Thread(target=_run, name="LeahAPI", daemon=True)
     t.start()
@@ -136,17 +136,17 @@ def _wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
 def start_wiki_proxy_thread() -> threading.Thread | None:
     proxy_port = int(Config().wiki["proxy_port"])
 
-    # Bereits laufend? (z. B. manuell gestartet)
+    # Already running? (e.g. started manually)
     if _wait_for_port("127.0.0.1", proxy_port, timeout=0.2):
         logging.info(f"Wiki-Proxy scheint schon zu laufen (Port {proxy_port} ist erreichbar).")
         return None
 
-    # Im selben Prozess als Thread starten
+    # Start in the same process as a thread
     import wiki.wikipedia_proxy as wiki_proxy  # nutzt die in wikipedia-proxy.py gesetzten Konfigwerte
     t = threading.Thread(target=wiki_proxy.run, name="WikiProxy", daemon=True)
     t.start()
 
-    # Kurz auf Readiness warten (best-effort)
+    # Briefly wait for readiness (best effort)
     if _wait_for_port("127.0.0.1", proxy_port, timeout=3.0):
         logging.info(f"Wiki-Proxy im Thread gestartet (Port {proxy_port}).")
     else:

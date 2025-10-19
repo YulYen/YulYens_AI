@@ -16,7 +16,7 @@ class WebUI:
                  wiki_snippet_limit, wiki_mode, proxy_base,
                  web_host, web_port,
                  wiki_timeout):
-        self.streamer = None  # wird später gesetzt
+        self.streamer = None  # assigned later
         self.keyword_finder = keyword_finder
         self.cfg = config
         self.factory = factory
@@ -26,7 +26,7 @@ class WebUI:
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
-        self.bot = None  # wird später gesetzt
+        self.bot = None  # assigned later
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         if self._t is None:
@@ -84,14 +84,14 @@ class WebUI:
         return True
 
 
-    # Streaming der Antwort (UI wird fortlaufend aktualisiert)
+    # Stream the response (UI updates continuously)
     def _stream_reply(self, message_history, chat_history):
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
             yield None, chat_history + [(None, reply)], message_history
 
-        # Abschluss: finalen Reply in den Verlauf übernehmen
+        # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
@@ -99,22 +99,22 @@ class WebUI:
 
     def respond_streaming(self, user_input, chat_history, history_state):
 
-        # Schutz: Persona noch nicht gewählt → UI verhindert das, aber doppelt hält besser
+        # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
             yield "", chat_history, history_state
             return
 
 
-        # 1) Eigener Verlauf für LLM ohne UI-Hinweise (und ggf. komprimiert, wenn nötig)
+        # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
 
-        # 2) Eingabefeld leeren und User-Input zeigen im Chatfenster
+        # 2) Clear the input field and show the user message in the chat window
         logging.debug("User input received (%d chars)", len(user_input))
         chat_history.append((user_input, None ))
         yield "", chat_history, llm_history
 
 
-        # 3) Wiki-Hinweis + Snippet (Top-Treffer)
+        # 3) Wiki hint and snippet (top hit)
         wiki_hint, title, snippet = lookup_wiki_snippet(
             user_input,
             self.bot,
@@ -126,23 +126,23 @@ class WebUI:
         )
 
         if wiki_hint:
-            # UI-Hinweis anzeigen (nicht ins LLM-Kontextfenster einfügen)
+            # Display the UI hint (do not add it to the LLM context window)
             chat_history.append((None, wiki_hint))
             yield None, chat_history, llm_history
 
-        # 4) Optional: Wiki-Kontext injizieren
+        # 4) Optional: inject wiki context
         if snippet:
             inject_wiki_context(llm_history, title, snippet)
 
-        # 5) Nutzerfrage ans LLM
+        # 5) Send the user question to the LLM
         user_message = {"role": "user", "content": user_input}
         llm_history.append(user_message)
 
-        # 6) Kontext-Komprimierung bei Bedarf inkl. Info in Chat-History
+        # 6) Compress the context if needed and record that in chat history
         if self._handle_context_warning(llm_history, chat_history):
             yield None, chat_history, llm_history
 
-        # 7) Antwort streamen
+        # 7) Stream the answer
         yield from self._stream_reply(llm_history, chat_history)
 
 
@@ -382,10 +382,9 @@ class WebUI:
             input_placeholder,
             new_chat_label,
         )
-        # Gradio 4.x verlangt, dass Events innerhalb eines Blocks-Kontexts
-        # gebunden werden. Durch das erneute Öffnen des Demos als Kontext
-        # können wir die bestehende Struktur beibehalten und trotzdem die
-        # Events korrekt registrieren.
+        # Gradio 4.x requires events to be bound within a Blocks context.
+        # Reopening the demo as a context lets us keep the existing structure
+        # while still registering the events correctly.
         with demo:
             self._bind_events(
                 components,

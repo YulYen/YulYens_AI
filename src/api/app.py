@@ -5,7 +5,7 @@ from .provider import AiApiProvider, UnknownPersonaError
 import logging
 import traceback
 
-# Globale, austauschbare Abhängigkeit:
+# Global, swappable dependency:
 _provider: Optional[AiApiProvider] = None
 
 def set_provider(p: AiApiProvider) -> None:
