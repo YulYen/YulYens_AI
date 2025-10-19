@@ -9,8 +9,8 @@ from datetime import datetime
 from config.logging_setup import init_logging
 from config.config_singleton import Config
 
-# --- Konfiguration --------------------------------------------------------------
-config = Config()  # Singleton-Instanz laden (lädt YAML beim ersten Aufruf)
+# --- Configuration --------------------------------------------------------------
+config = Config()  # Load singleton instance (loads YAML on first access)
  
 WIKI_CFG = config.wiki
 OFFLINE_CFG = config.wiki["offline"]
@@ -26,12 +26,12 @@ ZIM_PREFIX = OFFLINE_CFG["zim_prefix"]
 KIWIX_TIMEOUT = TIMEOUT
 ONLINE_TIMEOUT = TIMEOUT
 
-# --- Logging einrichten ---------------------------------------------------------
+# --- Configure logging ----------------------------------------------------------
 logger = logging.getLogger("wiki_proxy")
 logger.info("Wiki-Proxy startet…")
 
 
-# ---------- Helper für Antworten ------------------------------------------------
+# ---------- Helpers for responses -----------------------------------------------
 def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes):
     handler.send_response(status)
     handler.send_header("Content-type", f"{content_type}; charset=utf-8")
@@ -51,25 +51,25 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
     _send_bytes(handler, status, "application/json", encoded)
 
 
-# ---------- Helper für Request-Verarbeitung ------------------------------------
+# ---------- Helpers for request processing -------------------------------------
 def _build_kiwix_url(term: str) -> str:
     return f"http://{KIWIX_HOST}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
 def _build_online_url(term: str) -> str:
-    # Wikipedia akzeptiert Unterstriche als Leerzeichen
+    # Wikipedia accepts underscores as spaces
     return f"https://de.wikipedia.org/wiki/{term}"
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
     """
     Entfernt Fußnoten [1], Soft-Hyphen \xad, NBSP \xa0 und faltet Whitespace zu ' '.
     """
-    # Fußnoten wie [1], [ 23 ]
+    # Footnotes like [1], [ 23 ]
     text = re.sub(r"\[\s*\d+\s*\]", "", text)
-    # Soft-Hyphen (Silbentrennung) raus
+    # Remove soft hyphen (syllable breaks)
     text = text.replace("\xad", "")
-    # NBSP zu Leerzeichen
+    # Replace NBSP with a standard space
     text = text.replace("\xa0", " ")
-    # alles auf einfache Leerzeichen
+    # Collapse all whitespace to single spaces
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -80,12 +80,12 @@ def _find_infobox_table(soup):
     und ist case-insensitive.
     """
 
-    # 1) CSS-Selektor: direkte Treffer
+    # 1) CSS selector: direct matches
     tbl = soup.select_one("table.infobox")
     if tbl:
         return tbl
 
-    # 2) Enthält 'infobox' irgendwo in der class-Attributliste
+    # 2) Check whether 'infobox' appears anywhere in the class attribute list
     for t in soup.find_all("table"):
         classes = t.get("class") or []
         if any("infobox" in c.lower() for c in classes):
@@ -104,7 +104,7 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
         th = tr.find("th")
         tds = tr.find_all("td")
 
-        # Bild-/Medienzeilen überspringen
+        # Skip image/media rows
         if tds:
             td_classes_joined = " ".join(sum([td.get("class") or [] for td in tds], [])).lower()
             if "image" in td_classes_joined or "infobox-image" in td_classes_joined:
@@ -113,12 +113,12 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
         key = val = None
 
         if th and tds:
-            # klassischer Fall: <th>Key</th><td>Value</td>
+            # Classic case: <th>Key</th><td>Value</td>
             key = th.get_text(" ", strip=True)
             val = tds[0].get_text(" ", strip=True)
 
         elif len(tds) >= 2:
-            # neuer Fall: <td class="ibleft">Key</td><td class="ibright|ibdata">Value</td>
+            # Newer case: <td class="ibleft">Key</td><td class="ibright|ibdata">Value</td>
             left = right = None
             for td in tds:
                 classes = " ".join(td.get("class") or []).lower()
@@ -130,7 +130,7 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
                 key = left.get_text(" ", strip=True)
                 val = right.get_text(" ", strip=True)
             else:
-                # generischer Fallback: nimm die ersten beiden td
+            # Generic fallback: take the first two <td> elements
                 key = tds[0].get_text(" ", strip=True)
                 val = tds[1].get_text(" ", strip=True)
 
@@ -152,7 +152,7 @@ def _format_kv_line(pairs) -> str:
         return ""
     parts = []
     for k, v in pairs:
-        # zu lange Werte einkürzen (sauber am Wortende)
+        # Trim overly long values (cut cleanly at word boundaries)
         if len(v) > 120:
             v = (v[:120].rsplit(" ", 1)[0] + " …").strip()
         parts.append(f"{k}: {v}")
@@ -168,7 +168,7 @@ def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online:
     hostname = host_header.split(":")[0] if host_header else "localhost"
     if online:
         return _build_online_url(term)
-    # lokaler Kiwix-Link (gleicher Host wie Nutzer-Aufruf, aber Port 8080)
+    # Local Kiwix link (same host as the user request, but port 8080)
     return f"http://{hostname}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
 def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
@@ -176,7 +176,7 @@ def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
     Baut den Prefix aus config.yaml (online/offline) und fügt den Link an.
     """
     key = "wiki_lookup_prefix_online" if online else "wiki_lookup_prefix_offline"
-    tpl = config.texts[key]  # KeyError erwünscht, wenn in config.yaml fehlt
+    tpl = config.texts[key]  # Intentionally allow KeyError if config.yaml is missing the key
     prefix = tpl.format(persona_name=persona_name, project_name=cfg.texts["project_name"])
     return f"{prefix}\n{link}"
 
@@ -225,7 +225,7 @@ def _fetch_online(term: str):
 
 # ---------- HTTP-Handler --------------------------------------------------------
 class WikiRequestHandler(BaseHTTPRequestHandler):
-    # Standard-HTTPServer-Logs in unser logger leiten (optional, aber hübsch)
+    # Redirect standard HTTPServer logs into our logger (optional but nice)
     def log_message(self, format, *args):
         logger.info("%s - %s" % (self.address_string(), format % args))
 
@@ -258,49 +258,49 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                     _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
                 return
 
-            # Text gewinnen
+            # Extract content
             if online:
                 clean_text = _clean_whitespace_and_remove_refs(resp.text)
-                kv_line = ""  # Online-Summary hat keine HTML-Infobox
+                kv_line = ""  # Online summaries do not include an HTML infobox
             else:
                 html_bytes = resp.content   
                 soup = BeautifulSoup(html_bytes , "html.parser")
-                # 1) KV aus Original-HTML holen
+                # 1) Extract key/value pairs from the original HTML
                 kv_pairs = _extract_infobox_kv(resp.text)
                 kv_line = _format_kv_line(kv_pairs)
 
-                # 2) Infobox aus dem DOM entfernen, damit sie NICHT im Fließtext landet
+                # 2) Remove the infobox from the DOM so it does NOT appear in the body text
                 ibox = _find_infobox_table(soup)
                 if ibox:
                     ibox.decompose()
 
-                # 3) Jetzt den restlichen Text ziehen
+                # 3) Extract the remaining text
                 content_div = soup.find(id="content") or soup.body
                 raw_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
                 clean_text = _clean_whitespace_and_remove_refs(raw_text)
 
-            # --- EINMALIGE Limit-Logik: KV bleibt vollständig, nur Fließtext wird gekürzt ---
+            # --- One-off limiting logic: keep the key/value block intact, truncate only the body ---
             limit = _parse_limit(query)
 
             if kv_line:
-                # KV + Leerzeile + Fließtext
+                # Key/value block + blank line + body text
                 sep = "\n\n"
                 base = kv_line + sep
                 remaining = max(0, limit - len(base))
                 body = clean_text if remaining <= 0 else (clean_text[:remaining].rsplit(" ", 1)[0] + " …" if len(clean_text) > remaining else clean_text)
                 combined_text = base + body
             else:
-                # kein KV → normal limitieren
+                # No key/value block → apply the limit normally
                 combined_text = clean_text if len(clean_text) <= limit else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
 
             clean_text = combined_text
 
-            # Ziel-Link & UI-Hinweis
+            # Target link & UI hint
             link = _build_user_visible_link(self, suchbegriff, online)
             source = "online" if online else "local"
             wiki_hint = _build_wiki_hint(config, online, persona, link)
 
-            # JSON ausgeben
+            # Return JSON
             payload = {
             "title": suchbegriff.replace("_", " "),
             "text": clean_text,
@@ -310,7 +310,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             }
             _send_json(self, 200, payload)
         finally:
-        # Immer Gesamtdauer loggen
+        # Always log the total duration
             duration_total = (time.perf_counter() - start_total) * 1000
             logger.info(f'[WikiProxy] Anfrage "{query}" beantwortet in {duration_total:.1f} ms')
 

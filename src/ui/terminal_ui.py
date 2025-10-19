@@ -9,7 +9,7 @@ from core.utils import _greeting_text
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
 
-# Gemeinsame Core-Utilities & Streamer
+# Shared core utilities and streamer
 from core.streaming_provider import (
     lookup_wiki_snippet,
     inject_wiki_context,
@@ -32,14 +32,14 @@ class TerminalUI:
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.wiki_timeout = wiki_timeout
-        self.greeting = None # wird nach Auswahl gesetzt
-        self.bot = None # wird nach Auswahl gesetzt
-        self.streamer = None # wird nach Auswahl gesetzt
+        self.greeting = None # set after selection
+        self.bot = None # set after selection
+        self.streamer = None # set after selection
         self.texts = config.texts
         self._t = config.t
 
 
-        # Nur echte Konversation (User/Assistant) + ggf. System-Kontexte (Wiki)
+        # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: List[Dict[str, str]] = []
 
 
@@ -48,7 +48,7 @@ class TerminalUI:
         names = get_all_persona_names()
         print(self.texts["choose_persona"])
         for idx, name in enumerate(names, start=1):
-            # optional: kurze Beschreibung anzeigen
+            # Optional: show a brief description
             desc = next(p for p in system_prompts if p["name"] == name)["description"]
             persona_line = f"{idx}. {name} – {desc}"
             print(persona_line)
@@ -58,7 +58,7 @@ class TerminalUI:
                 choice = int(sel) - 1
                 if 0 <= choice < len(names):
                     persona_name = names[choice]
-                    # Streamer für gewählte Persona bauen
+                    # Build the streamer for the selected persona
                     self.streamer = self.factory.get_streamer_for_persona(persona_name)
                     self.bot = persona_name
                     self.greeting = _greeting_text(self.config, self.bot)
@@ -72,7 +72,7 @@ class TerminalUI:
                 pass
             print(self.texts["terminal_invalid_selection"])
 
-    # ---------- kleine UI‑Hilfen ----------
+    # ---------- Small UI helpers ----------
     def init_ui(self) -> None:
         init(autoreset=True)
 
@@ -96,30 +96,30 @@ class TerminalUI:
     def print_exit(self) -> None:
         print(self.texts["terminal_exit_message"])
 
-    # ---------- Haupt-Loop ----------
+    # ---------- Main loop ----------
     def launch(self) -> None:
         self.init_ui()
         logging.info(f"Launching TerminalUI")
 
         """Startet die Terminal-UI. Fragt zuerst nach der Persona-Auswahl."""
-        # 1. Persona wählen, falls noch kein Streamer gesetzt
+        # 1. Select a persona if no streamer is configured yet
         if self.streamer is None:
             self.choose_persona()
 
-        # 2. Begrüßung ausgeben inkl. Befehle exit und clear
+        # 2. Print the greeting plus the exit and clear hints
         self.print_welcome()
 
         while True:
             user_input = self.prompt_user()
             logging.debug("[Terminal] User input received (%d chars)", len(user_input))
-            print()  # kleine Leerzeile nach der Eingabe
+            print()  # add a small blank line after the input
 
             # Exit
             if user_input.lower() in ("exit", "quit"):
                 self.print_exit()
                 break
 
-            # Clear / neue Unterhaltung
+            # Clear / start a new conversation
             if user_input.lower() == "clear":
                 self.history.clear()
                 print(
@@ -127,7 +127,7 @@ class TerminalUI:
                 )
                 continue
 
-            # --- (1) Wiki‑Lookup: nur Top‑Treffer, Hinweis anzeigen, Snippet ggf. injizieren ---
+            # --- (1) Wiki lookup: only the top match, show the hint, inject snippet if available ---
             wiki_hint = None
             if self.keyword_finder:
                 wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -140,32 +140,32 @@ class TerminalUI:
                     self.wiki_timeout,
 )
 
-                # Hinweis (🕵️‍♀️ …) NUR anzeigen – nicht an das LLM schicken
+                # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
                 if wiki_hint:
                     print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
 
-                # Snippet als System-Kontext einfügen (Guardrail + Kontext)
+                # Insert the snippet as system context (guardrail plus context)
                 if snippet:
                     inject_wiki_context(self.history, title, snippet)
 
-            # --- (2) Nutzerfrage an die History hängen ---
+            # --- (2) Append the user question to history ---
             self.history.append({"role": "user", "content": user_input})
 
             self._ensure_context_headroom()
 
-            # --- (3) Streaming der Antwort (tokenweise) ---
+            # --- (3) Stream the answer token by token ---
             self.print_bot_prefix(self.bot)
             reply = ""
             for token in self.streamer.stream(messages=self.history):
                 reply += token
                 self.print_stream(token)
 
-            # --- (4) Antwort in History übernehmen, hübscher Abschluss ---
+            # --- (4) Add the answer to history with a clean finish ---
             logging.info(f"[Terminal] {self.bot}: {reply}")
 
             self.history.append({"role": "assistant", "content": reply})
-            # Immer ZWEI Leerzeilen nach der Antwort sicherstellen:
-            # (Falls das Streaming bereits \n ausgegeben hat, ergänzen wir nur die fehlenden.)
+            # Always ensure two trailing blank lines after the answer:
+            # (If streaming already emitted \n, add only the missing ones.)
             trailing_nl = len(reply) - len(reply.rstrip("\n"))
             for _ in range(max(0, 2 - trailing_nl)):
                 print()

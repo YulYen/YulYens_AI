@@ -42,24 +42,24 @@ def _should_use_ollama(request, cfg) -> bool:
 
 @pytest.fixture(scope="function")
 def client(request):
-    # Config-Singleton zurücksetzen und Test-Config laden
+    # Reset the config singleton and load the test configuration
     Config.reset_instance()
-    # eigene Test-Config erzeugen oder vorhandene config.yaml aus dem Projektstamm laden
+    # Create a dedicated test config or reuse the repository's config.yaml
     cfg = Config("config.yaml")
     use_ollama = _should_use_ollama(request, cfg)
-    # Schalter für dieses Test-Laufzeit-Flag überschreiben
+    # Override this test runtime flag
     core_updates = {"include_date": False}
     if not use_ollama:
         core_updates["backend"] = "dummy"
     cfg.override("core", core_updates)
     cfg.override("wiki", {"mode": False})
-    # Provider aus Factory erstellen und injizieren
+    # Build the provider from the factory and inject it
     factory = AppFactory()
     set_provider(factory.get_api_provider())
-    # TestClient bereitstellen
+    # Provide the TestClient
     client = TestClient(app)
     yield client
-    # Aufräumen: Provider zurücksetzen und Config löschen
+    # Cleanup: reset the provider and clear the config
     set_provider(None)
     Config.reset_instance()
 
@@ -67,7 +67,7 @@ def client(request):
 def client_with_date_and_wiki(request):
     if not has_spacy_model("de_core_news_lg"):
         pytest.skip("spaCy model de_core_news_lg not installed")
-    # Config-Singleton zurücksetzen und Test-Config laden
+    # Reset the config singleton and load the test configuration
     Config.reset_instance()
     cfg = Config("config.yaml")
 
@@ -75,17 +75,17 @@ def client_with_date_and_wiki(request):
     if not use_ollama:
         cfg.override("core", {"backend": "dummy"})
 
-    # Wiki starten
+    # Start the wiki proxy
     start_wiki_proxy_thread()
     ensure_kiwix_running_if_offlinemode_and_autostart(cfg)
 
-    # Provider aus Factory erstellen und injizieren
+    # Build the provider from the factory and inject it
     factory = AppFactory()
     set_provider(factory.get_api_provider())
 
-    # TestClient bereitstellen
+    # Provide the TestClient
     client = TestClient(app)
     yield client
-    # Aufräumen: Provider zurücksetzen und Config löschen
+    # Cleanup: reset the provider and clear the config
     set_provider(None)
     Config.reset_instance()

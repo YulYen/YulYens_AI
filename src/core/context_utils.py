@@ -1,4 +1,4 @@
-# --------- Utilities für die Prüfung und Kürzung des LLM-Context (ohne Seiteneffekte nach außen) ---------
+# --------- Utilities for checking and trimming the LLM context (no external side effects) ---------
 import logging
 import math
 import re
@@ -6,12 +6,12 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 Message = Dict[str, Any]
 
-chars_per_token: float = 3.25  # ~3,25 Zeichen pro Token (heuristisch, konservativ)
+chars_per_token: float = 3.25  # ~3.25 characters per token (heuristic, conservative)
 
-threshold: float = 0.75 # Kontext nur zu 75% Füllen
+threshold: float = 0.75 # Fill the context to only 75%
 
-headroom_tokens: int = 500 # 500 Token mindestens 'Luft' 
-headroom_ratio: float = 0.5 # oder 50% 'Luft lassen, wenn ohnehin gekürzt wird
+headroom_tokens: int = 500 # Keep at least 500 tokens of headroom
+headroom_ratio: float = 0.5 # Or leave 50% headroom when trimming anyway
 
 
 def _token_stats(messages: Sequence[Message]) -> Tuple[int, int, int]:
@@ -82,8 +82,8 @@ def karl_prepare_quick_and_dirty(
 def approx_token_count(
     messages: Sequence[Message],
     *,
-    per_message_overhead: int = 3,  # Format/Role-Overhead je Nachricht
-    per_request_overhead: int = 400,  # Einmaliger Zuschlag für System-Prompt/Meta
+    per_message_overhead: int = 3,  # Format/role overhead per message
+    per_request_overhead: int = 400,  # One-time surcharge for system prompt/meta
 ) -> int:
     """Schätzt grob die Anzahl Tokens für Chatnachrichten ohne externen Tokenizer."""
 

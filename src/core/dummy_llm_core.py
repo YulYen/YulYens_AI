@@ -42,5 +42,5 @@ class DummyLLMCore(LLMCore):
                 user_input = m.get("content", "") or ""
                 break
         response = f"ECHO: {user_input}"
-        # In Ollama‑Manier ein Dictionary mit message.content zurückliefern
+        # Return a dictionary with message.content in Ollama style
         yield {"message": {"content": response}}

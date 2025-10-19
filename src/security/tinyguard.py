@@ -7,7 +7,7 @@ from typing import Any, TypedDict, Optional, Dict, List
 class SecurityResult(TypedDict):
     ok: bool
     reason: str           # "ok" | "prompt_injection" | "pii_detected" | "blocked_keyword"
-    detail: Optional[str] # erster Match / Hinweis
+    detail: Optional[str] # first match / hint
 
 
 class BasicGuard:
@@ -35,7 +35,7 @@ class BasicGuard:
             "output_blocklist": output_blocklist,
         }
 
-        # Defaults (bewusst konservativ & klein halten)
+        # Defaults (deliberately conservative and compact)
         inj = [
             r"(?i)\bignore (?:all|previous) (?:instructions|messages)",
             r"(?i)\bact as\b",
@@ -48,19 +48,19 @@ class BasicGuard:
         ]
 
         de_inj = [
-            # "Bitte ignoriere alle bisherigen Anweisungen ..."
+            # "Please ignore all previous instructions ..."
             r"(?i)\bignoriere\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
             r"(?i)\bübergehe\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
 
-            # "Tu so, als wärst du root/admin/entwickler ..." / "Sei root ..."
+            # "Pretend you are root/admin/developer ..." / "Be root ..."
             r"(?i)\btu\s+so,\s*als\s+w(?:ä|ae)rst du\b.{0,30}\b(root|admin|entwickler|system)\b",
             r"(?i)\bsei\b.{0,20}\b(root|admin|entwickler|system)\b",
             r"(?i)\bagier(?:e)?\b.{0,20}\bals\b.{0,30}\b(root|admin|entwickler|system)\b",
 
-            # "… gib/zeige den Systemprompt aus/anzeigen"
+            # "... output/show the system prompt"
             r"(?i)\b(zeige|gib)\b.{0,40}\b(system\s?prompt|systemprompt|system\-?prompt)\b.{0,40}\b(aus|anzeigen)\b",
 
-            # typische Geheimnis-/Datei-Leak-Indikatoren
+            # Typical secret/file leak indicators
             r"(?i)/etc/passwd",
             r"(?i)\\windows\\system32\\config\\sam",
         ]
@@ -131,22 +131,22 @@ class BasicGuard:
         Policy-Entscheidung für Output (SRP: bleibt im Guard).
         Rückgabe:
         {
-            "blocked": bool,            # True => nichts anzeigen (z.B. Secret)
-            "reason": str|None,         # z.B. "blocked_keyword"
-            "text": str,                # ggf. maskierter Text
-            "masked": bool              # True, wenn PII maskiert wurde
+            "blocked": bool,            # True => show nothing (e.g. secret)
+            "reason": str|None,         # e.g. "blocked_keyword"
+            "text": str,                # masked text if applicable
+            "masked": bool              # True when PII was masked
         }
         """
         if not self.enabled or not text:
             return {"blocked": False, "reason": None, "text": text, "masked": False}
 
-        # 1) Secrets blockieren (nur wenn Flag aktiv)
+        # 1) Block secrets (only if the flag is active)
         if self.flags.get("output_blocklist"):
             for rx in self._block:
                 if rx.search(text):
                     return {"blocked": True, "reason": "blocked_keyword", "text": "", "masked": False}
 
-        # 2) PII maskieren (nur wenn Flag aktiv)
+        # 2) Mask PII (only if the flag is active)
         out = text
         masked = False
         if self.flags.get("pii_protection"):
@@ -163,7 +163,7 @@ class BasicGuard:
         for r in patterns:
             hit = r.search(text)
             if hit:
-                # kurze, harmlose Detailausgabe
+                # Brief, harmless detail output
                 frag = hit.group(0)
                 return frag[:120]
         return None
@@ -214,7 +214,7 @@ def create_guard(name: str, settings: Dict[str, Any]) -> BasicGuard:
     raise ValueError(f"Unbekannter Security-Guard: {name!r}")
 
 
-# -- Optional: menschliche Meldung mit "Yul Yens Zeigefinger"
+# -- Optional: human-friendly warning with "Yul Yen's wagging finger"
 def zeigefinger_message(res: SecurityResult) -> str:
     reason = (res.get("reason") or "ok").lower()
     detail = (res.get("detail") or "")[:80]

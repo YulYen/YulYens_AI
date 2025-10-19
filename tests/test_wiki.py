@@ -155,10 +155,10 @@ def test_lookup_wiki_snippet_for_germany():
     Integrationstest: prüft, ob der lokale Wiki-Proxy läuft und
     zu 'Deutschland' ein Snippet mit Hauptstadt 'Berlin' liefert.
     """
-    # KeywordFinder im Medium-Mode (findet 'Deutschland')
+    # KeywordFinder in medium mode (detects 'Deutschland')
     finder = SpacyKeywordFinder(ModelVariant.MEDIUM)
 
-    # Annahmen: wiki_mode=offline, Proxy läuft lokal auf 8042, Limit z. B. 1600
+    # Assumptions: wiki_mode=offline, proxy runs locally on 8042, limit e.g. 1600
     wiki_hint, topic_title, snippet = lookup_wiki_snippet(
         question="Was ist die Hauptstadt von Deutschland?",
         persona_name="PETER",
@@ -168,12 +168,12 @@ def test_lookup_wiki_snippet_for_germany():
         limit=1600,
         timeout = (3.0, 8.0))
 
-    # Wir erwarten, dass der Proxy erreichbar ist und 'Deutschland' erkannt wurde
+    # We expect the proxy to be reachable and to detect 'Deutschland'
     assert wiki_hint is not None, "Wiki-Proxy liefert keinen Hint → vermutlich nicht gestartet"
     assert topic_title == "Deutschland"
     assert snippet, "Wiki-Proxy liefert keinen Snippet-Text"
 
-    # Hauptstadt Berlin sollte im Snippet vorkommen (Groß-/Kleinschreibung egal)
+    # The capital Berlin should appear in the snippet (case-insensitive)
     assert "berlin" in snippet.lower()
 
 
