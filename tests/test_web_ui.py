@@ -1,4 +1,4 @@
-"""Tests für die WebUI-spezifische Server-Konfiguration."""
+"""Tests for the WebUI-specific server configuration."""
 
 import logging
 from types import SimpleNamespace
@@ -8,7 +8,7 @@ from ui.web_ui import WebUI
 
 
 def test_webui_start_server_uses_configured_host_and_port():
-    """`demo.launch` muss mit den konfigurierten Host/Port-Werten aufgerufen werden."""
+    """`demo.launch` must be called with the configured host/port values."""
 
     dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key)
 

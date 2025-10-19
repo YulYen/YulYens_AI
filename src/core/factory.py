@@ -19,9 +19,9 @@ import config.personas as personas
 
 class AppFactory:
     """
-    Baut zentrale Objekte auf Basis der globalen Config (Singleton).
-    SRP: KEIN Starten von Threads/Servern/Logging und KEIN launch() hier.
-    Lazy‑Erzeugung: Objekte werden in den Gettern erstellt und gecached.
+    Builds core objects based on the global config (singleton).
+    SRP: NO starting threads/servers/logging and NO launch() here.
+    Lazy creation: objects are created in the getters and cached.
     """
 
     def __init__(self) -> None:
@@ -52,7 +52,7 @@ class AppFactory:
         return self._keyword_finder
 
     def _resolve_spacy_model_variant(self) -> ModelVariant:
-        """Ermittelt die konfigurierte spaCy-Modellvariante mit sinnvollem Fallback."""
+        """Determines the configured spaCy model variant with a sensible fallback."""
 
         wiki_cfg = getattr(self._cfg, "wiki", {}) or {}
         raw_variant = wiki_cfg.get("spacy_model_variant")
@@ -82,7 +82,7 @@ class AppFactory:
         return ModelVariant.LARGE
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
-        """Erzeugt einen neuen LLM‑Streamer für die übergebene Persona."""
+        """Creates a new LLM streamer for the given persona."""
         core_cfg = self._cfg.core
         persona_prompt = _system_prompt_with_date(
             persona_name, core_cfg["include_date"]
@@ -119,7 +119,7 @@ class AppFactory:
         return streamer
 
     def _determine_backend(self, core_cfg: dict) -> str:
-        """Liest den gewünschten LLM-Backend-Typ aus der Config."""
+        """Reads the desired LLM backend type from the config."""
 
         raw_backend = core_cfg.get("backend", "ollama")
         if raw_backend is None:
@@ -142,7 +142,7 @@ class AppFactory:
         )
 
     def _create_llm_core(self, backend: str, base_url: Optional[str]) -> LLMCore:
-        """Erzeugt die konkrete LLM-Core-Implementierung basierend auf dem Backend."""
+        """Creates the concrete LLM core implementation based on the backend."""
 
         if backend == "dummy":
             return DummyLLMCore()
@@ -173,7 +173,7 @@ class AppFactory:
         raise ValueError(f"Unsupported backend: {backend!r}")
 
     def _load_ollama_core_class(self) -> Type[LLMCore]:
-        """Isolierter Import, um optionale Abhängigkeit sauber zu kapseln."""
+        """Isolated import to encapsulate the optional dependency cleanly."""
 
         from core.ollama_llm_core import OllamaLLMCore
 
@@ -203,7 +203,7 @@ class AppFactory:
             ) from exc
 
     def get_api_provider(self):
-        """Nur bauen, wenn in YAML aktiviert. Kein Serverstart hier."""
+        """Only build when enabled in YAML. No server start here."""
         if self._api_provider is None:
             if not bool(self._cfg.api["enabled"]):
                 return None
@@ -223,8 +223,8 @@ class AppFactory:
 
     def get_ui(self):
         """
-        Baut TerminalUI oder WebUI – ohne zu starten.
-        Wichtig: Kein Default für web_port → Zugriff direkt aus YAML.
+        Builds TerminalUI or WebUI—without starting it.
+        Important: no default for web_port → access directly from YAML.
         """
         if self._ui is not None:
             return self._ui

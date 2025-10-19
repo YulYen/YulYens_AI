@@ -46,7 +46,7 @@ system_prompts: List[Dict[str, Any]] = _load_system_prompts()
 
 
 def get_prompt_by_name(name: str) -> str:
-    """Gibt den Prompt-Text für eine Persona anhand des Namens zurück."""
+    """Returns the prompt text for a persona by name."""
     for persona in system_prompts:
         if persona["name"].lower() == name.lower():
             return persona["prompt"]
@@ -54,7 +54,7 @@ def get_prompt_by_name(name: str) -> str:
 
 
 def get_options(name: str) -> Optional[Dict[str, Any]]:
-    """Gibt die Options für eine Persona anhand des Namens zurück."""
+    """Returns the options for a persona by name."""
     for persona in system_prompts:
         if persona["name"].lower() == name.lower():
             return persona.get("llm_options") or None
@@ -62,12 +62,12 @@ def get_options(name: str) -> Optional[Dict[str, Any]]:
 
 
 def get_all_persona_names() -> List[str]:
-    """Gibt eine Liste aller Persona-Namen zurück."""
+    """Returns a list of all persona names."""
     return [p["name"] for p in system_prompts]
 
 
 def get_drink(name: str) -> str:
-    """Gibt das Lieblingsgetränk einer Persona zurück."""
+    """Returns a persona's favorite drink."""
     for persona in system_prompts:
         if persona["name"].lower() == name.lower():
             return persona.get("drink", "Kaffee")

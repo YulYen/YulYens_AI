@@ -61,7 +61,7 @@ def _build_online_url(term: str) -> str:
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
     """
-    Entfernt Fußnoten [1], Soft-Hyphen \xad, NBSP \xa0 und faltet Whitespace zu ' '.
+    Removes footnotes [1], soft hyphen \xad, NBSP \xa0, and folds whitespace into ' '.
     """
     # Footnotes like [1], [ 23 ]
     text = re.sub(r"\[\s*\d+\s*\]", "", text)
@@ -75,9 +75,9 @@ def _clean_whitespace_and_remove_refs(text: str) -> str:
 
 def _find_infobox_table(soup):
     """
-    Sucht robust nach einer Infobox-Tabelle.
-    Berücksichtigt unterschiedliche Class-Kombis ("infobox", "infobox vcard", ...)
-    und ist case-insensitive.
+    Robustly searches for an infobox table.
+    Handles different class combinations ("infobox", "infobox vcard", ...)
+    and is case-insensitive.
     """
 
     # 1) CSS selector: direct matches
@@ -146,7 +146,7 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
 
 def _format_kv_line(pairs) -> str:
     """
-    Baut 'Key: Value | Key: Value …'. Werte werden sanft gekürzt, damit die Zeile kurz bleibt.
+    Builds 'Key: Value | Key: Value …'. Values are gently shortened to keep the line brief.
     """
     if not pairs:
         return ""
@@ -160,9 +160,9 @@ def _format_kv_line(pairs) -> str:
 
 def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online: bool) -> str:
     """
-    Baut einen Link, der im Browser des Nutzers funktioniert.
-    Nimmt den Host aus dem aktuellen Request (z. B. 192.168.x.y oder localhost)
-    und setzt nur den Port passend (8042 -> 8080) für Kiwix.
+    Builds a link that works in the user's browser.
+    Takes the host from the current request (e.g. 192.168.x.y or localhost)
+    and only adjusts the port (8042 -> 8080) for Kiwix.
     """
     host_header = handler.headers.get("Host", "localhost")
     hostname = host_header.split(":")[0] if host_header else "localhost"
@@ -173,7 +173,7 @@ def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online:
 
 def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
     """
-    Baut den Prefix aus config.yaml (online/offline) und fügt den Link an.
+    Builds the prefix from config.yaml (online/offline) and appends the link.
     """
     key = "wiki_lookup_prefix_online" if online else "wiki_lookup_prefix_offline"
     tpl = config.texts[key]  # Intentionally allow KeyError if config.yaml is missing the key
@@ -203,7 +203,7 @@ def _fetch_kiwix(term: str):
         logger.info(f'[_fetch_kiwix] Anfrage "{term}" beantwortet in {duration_total:.1f} ms')
     
 def _fetch_online(term: str):
-    """Holt Kurztext aus echter deutscher Wikipedia (REST Summary API)."""
+    """Fetches a short text from live German Wikipedia (REST Summary API)."""
     url = f"https://de.wikipedia.org/api/rest_v1/page/summary/{term}"
     logger.info(f"[FetchOnline] {url}")
     try:

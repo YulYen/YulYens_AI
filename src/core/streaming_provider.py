@@ -1,10 +1,10 @@
 """
-Streaming‑Provider mit Persona‑Handling, Logging und Sicherheitschecks.
+Streaming provider with persona handling, logging, and safety checks.
 
-Alle direkten Aufrufe an das eigentliche LLM werden durch einen
-``LLMCore`` abstrahiert (z. B. ``OllamaLLMCore`` oder ``DummyLLMCore``).
-Diese Klasse kümmert sich um Prompt‑Einblendung, etc.,
-Logging (conversation.log) und optionale Output‑Moderation via SecurityGuard.
+All direct calls to the underlying LLM are abstracted through an
+``LLMCore`` (e.g. ``OllamaLLMCore`` or ``DummyLLMCore``).
+This class takes care of prompt injection, logging (conversation.log),
+and optional output moderation via SecurityGuard.
 """
 
 from __future__ import annotations
@@ -32,19 +32,19 @@ from config.config_singleton import Config
 
 
 def _get_config() -> Config:
-    """Gibt die aktuelle Config-Singleton-Instanz zurück."""
+    """Returns the current config singleton instance."""
     return Config()
 
 
 
 class YulYenStreamingProvider:
     """
-    Wrapper um das LLM mit Streaming‑Unterstützung.
+    Wrapper around the LLM with streaming support.
 
-    Der Streamer nimmt System‑Prompt, Persona‑Name, LLM‑Optionen und die
-    Host‑URL entgegen. Die Klasse kümmert sich um
-    Logging (conversation.log) und optional um Output‑Moderation via SecurityGuard.
-    Der eigentliche LLM‑Aufruf wird an ein ``LLMCore`` delegiert.
+    The streamer accepts the system prompt, persona name, LLM options,
+    and the host URL. The class handles logging (conversation.log) and
+    optionally output moderation via SecurityGuard. The actual LLM call
+    is delegated to an ``LLMCore``.
     """
 
     def __init__(
@@ -97,11 +97,11 @@ class YulYenStreamingProvider:
             self._warm_up()
 
     def set_guard(self, guard: BasicGuard) -> None:
-        """Setzt den Security‑Guard für spätere Checks."""
+        """Sets the security guard for later checks."""
         self.guard = guard
 
     def _warm_up(self) -> None:
-        """Ruft das LLM einmal auf, um es vorzuheizen."""
+        """Calls the LLM once to warm it up."""
         logging.info("Sende Dummy zur Modellaktivierung: %s", self.model_name)
         try:
             self._llm_core.warm_up(self.model_name)
@@ -110,7 +110,7 @@ class YulYenStreamingProvider:
             logging.error("Fehler beim Aufwärmen des Modells:\n%s", traceback.format_exc())
 
     def _append_conversation_log(self, role: str, content: str) -> None:
-        """Schreibt einen Eintrag in die conversation.log."""
+        """Writes an entry to conversation.log."""
         try:
             entry = {
                 "ts": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -126,8 +126,8 @@ class YulYenStreamingProvider:
             logging.error("Fehler beim Schreiben des conversation.log: %s", e)
 
     def _log_generation_start(self, messages: List[Dict[str, Any]], options: Dict[str, Any]) -> None:
-        """Loggt vor dem eigentlichen LLM-Aufruf Kontext- und Wiki-Informationen.
-            TODO: Refaktor: Diese Methode kann wesentlich schlanker mit weniger übertriebenem Fehlerhandling
+        """Logs context and wiki information before the actual LLM call.
+            TODO: Refactor: This method can be far leaner with less overblown error handling
         """
 
         # Hash and log the payload (messages plus options)
@@ -166,8 +166,8 @@ class YulYenStreamingProvider:
 
     def stream(self, messages: List[Dict[str, Any]]):
         """
-        Generator, der tokenweise Antworten aus dem LLM zurückliefert.
-        Logging und Security‑Checks.
+        Generator that yields the LLM response token by token.
+        Includes logging and security checks.
         """
         # Pre-check: validate the latest user message
         if self.guard:
@@ -302,8 +302,8 @@ class YulYenStreamingProvider:
         wiki_timeout: tuple[float, float],
     ) -> str:
         """
-        Convenience‑Methode für die API: Führt einen einzigen Prompt aus
-        und liefert die komplette Antwort als String zurück.
+        Convenience method for the API: runs a single prompt
+        and returns the complete answer as a string.
         """
         messages: List[Dict[str, Any]] = []
 
@@ -347,7 +347,7 @@ def lookup_wiki_snippet(
     timeout: tuple[float, float],
 ) -> tuple[str, str, str]:
     """
-    Hilfsfunktion: Holt ein Wikipedia‑Snippet über einen lokalen Proxy.
+    Helper function: fetches a Wikipedia snippet via a local proxy.
     """
     snippet: Optional[str] = None
     wiki_hint: Optional[str] = None
@@ -394,8 +394,8 @@ def lookup_wiki_snippet(
 
 def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
     """
-    Füge (falls ein Wikipedia‑Snippet vorhanden ist) zwei System‑Nachrichten an:
-    eine Guardrail‑Nachricht und eine Kontext‑Nachricht mit dem Wiki‑Text.
+    If a Wikipedia snippet is available, append two system messages:
+    a guardrail message and a context message with the wiki text.
     """
     if not snippet:
         return
@@ -413,7 +413,7 @@ def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
 
 def run_llm_collect(streamer: YulYenStreamingProvider, messages: List[Dict[str, Any]]) -> str:
     """
-    Führt das Streaming aus und sammelt alle Tokens zu einer Antwort.
+    Runs streaming and collects all tokens into a single response.
     """
     full_reply_parts = []
     for token in streamer.stream(messages=messages):

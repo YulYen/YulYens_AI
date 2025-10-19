@@ -109,7 +109,7 @@ def main():
 
 def start_api_in_background(api_cfg, provider):
     """
-    Startet Uvicorn in einem Daemon-Thread.
+    Starts Uvicorn in a daemon thread.
     """
     set_provider(provider)
     host = api_cfg["host"]
@@ -123,7 +123,7 @@ def start_api_in_background(api_cfg, provider):
     return t
 
 def _wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
-    """Wartet kurz, bis ein TCP-Port erreichbar ist (Best‑Effort)."""
+    """Briefly waits for a TCP port to become reachable (best effort)."""
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:

@@ -7,10 +7,10 @@ from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
 class WebUI:
     """
-    Web-Chat-Oberfläche mit Gradio.
-    Bietet grafische Persona-Auswahl (mit Avatar) und einen laufenden Chatverlauf im Browser.
-    Wiki-Hinweise und -Snippets werden analog zur Terminal-UI verarbeitet (Hinweis nur sichtbar, Snippet als Kontext).
-    Antworten des KI-Modells werden tokenweise gestreamt und direkt im UI aktualisiert.
+    Web chat interface built with Gradio.
+    Provides a graphical persona selector (with avatar) and a live chat history in the browser.
+    Wiki hints and snippets are handled like the terminal UI (hint only visible, snippet as context).
+    Responses from the AI model are streamed token by token and updated directly in the UI.
     """
     def __init__(self, factory, config, keyword_finder,
                  wiki_snippet_limit, wiki_mode, proxy_base,

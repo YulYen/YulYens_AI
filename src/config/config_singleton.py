@@ -20,13 +20,13 @@ class Config:
     @classmethod
     def reset_instance(cls) -> None:
         """
-        Setzt die Singleton-Instanz zurück.
-        Nur in Tests verwenden, um eine neue Config aus einem anderen Pfad zu laden.
+        Resets the singleton instance.
+        Use only in tests to load a new config from another path.
         """
         cls._instance = None
 
     def _load_config(self, path: str) -> None:
-        """Lädt die YAML-Datei, Texte und speichert die Daten als Attribute."""
+        """Loads the YAML file, texts, and stores the data as attributes."""
         config_path = Path(path)
         with config_path.open("r", encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
@@ -55,9 +55,9 @@ class Config:
 
     def override(self, section: str, updates: dict) -> None:
         """
-        Aktualisiert Konfigurationsschlüssel im angegebenen Abschnitt.
-        Nur für Tests gedacht, damit man einzelne Parameter anpassen kann, ohne
-        die ganze YAML zu verändern.
+        Updates configuration keys in the given section.
+        Intended for tests so individual parameters can be adjusted without
+        changing the entire YAML.
         """
         if hasattr(self, section):
             section_dict = getattr(self, section)

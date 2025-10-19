@@ -1,10 +1,10 @@
 """
-Core-Paket des YulYens_AI‑Projekts.
+Core package of the YulYens_AI project.
 
-Dieses Modul stellt zentrale Klassen und Interfaces für den Zugriff auf
-unterschiedliche Sprachmodelle bereit. Über das :class:`LLMCore`‑Interface
-können verschiedene Backends implementiert werden. Standardmäßig steht
-eine Ollama‑basierte Implementierung sowie ein Dummy für Tests zur Verfügung.
+This module provides key classes and interfaces for accessing different
+language models. Through the :class:`LLMCore` interface various backends
+can be implemented. By default an Ollama-based implementation and a
+dummy for tests are available.
 """
 
 from .llm_core import LLMCore # noqa: F401

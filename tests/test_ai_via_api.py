@@ -90,8 +90,8 @@ def test_persona_name_normalized(client, monkeypatch):
 ## TODO @pytest.mark.skipif(model =! "Leo13B", reason="Gleicher Witz Nur unter Leo stabil")
 def test_same_joke(client):
     """
-    Erwartung: zweimal gleiche Frage → exakt gleiche Antwort.
-    Voraussetzung: Persona-Optionen enthalten einen fixen Seed bzw. deterministische Settings.
+    Expectation: identical question twice → exactly the same answer.
+    Requirement: persona options include a fixed seed or deterministic settings.
     """
     prompt = "Erzähl bitte einen kurzen Nerd-Witz über Bytes."
     r1 = client.post("/ask", json={"question": prompt, "persona": "PETER"})
@@ -115,11 +115,11 @@ def test_same_joke(client):
 # ---- Normalization / matching -------------------------------------------------
 def _normalize(s: str) -> str:
     """
-    Kleines Normalisieren:
+    Light normalization:
     - Trim
-    - Kleinbuchstaben
-    - Umlaute/Akzente glätten (NFKD)
-    - Mehrfach-Leerzeichen reduzieren
+    - Lowercase
+    - Smooth umlauts/accents (NFKD)
+    - Collapse repeated whitespace
     """
     if s is None:
         return ""

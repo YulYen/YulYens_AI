@@ -85,7 +85,7 @@ def approx_token_count(
     per_message_overhead: int = 3,  # Format/role overhead per message
     per_request_overhead: int = 400,  # One-time surcharge for system prompt/meta
 ) -> int:
-    """Schätzt grob die Anzahl Tokens für Chatnachrichten ohne externen Tokenizer."""
+    """Roughly estimates the token count for chat messages without an external tokenizer."""
 
     message_count, total_chars, content_tokens = _token_stats(messages)
     overhead_tokens = per_request_overhead + message_count * per_message_overhead

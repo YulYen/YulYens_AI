@@ -8,7 +8,7 @@ from core.streaming_provider import YulYenStreamingProvider
 
 
 class AllowAllGuard:
-    """Minimaler Guard, der sämtliche Eingaben und Ausgaben durchwinkt."""
+    """Minimal guard that allows every input and output."""
 
     def check_input(self, text: str) -> Dict[str, Any]:
         return {"ok": True}
@@ -21,7 +21,7 @@ class AllowAllGuard:
 
 
 def create_streaming_provider(*, llm_core: DummyLLMCore | None = None, **overrides: Any) -> YulYenStreamingProvider:
-    """Hilfsfunktion, um konsistent konfigurierte Provider-Instanzen zu erstellen."""
+    """Helper to construct consistently configured provider instances."""
 
     params: Dict[str, Any] = {
         "base_url": "http://dummy",
@@ -42,7 +42,7 @@ def create_streaming_provider(*, llm_core: DummyLLMCore | None = None, **overrid
 
 
 def test_dummy_llm_core_echoes_input() -> None:
-    """Der DummyLLMCore soll den letzten User-Input deterministisch spiegeln."""
+    """The DummyLLMCore should deterministically echo the latest user input."""
 
     llm = DummyLLMCore()
     messages = [
@@ -57,7 +57,7 @@ def test_dummy_llm_core_echoes_input() -> None:
 
 
 def test_streaming_provider_with_dummy_llm() -> None:
-    """Der StreamingProvider soll mit einem injizierten DummyLLMCore funktionieren."""
+    """The StreamingProvider should work with an injected DummyLLMCore."""
 
     llm = DummyLLMCore()
     provider = create_streaming_provider(llm_core=llm)

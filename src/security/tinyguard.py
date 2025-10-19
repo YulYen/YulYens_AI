@@ -12,10 +12,10 @@ class SecurityResult(TypedDict):
 
 class BasicGuard:
     """
-    Winziger, deterministischer Guard für v0.
-    - check_input: Prompt-Injection + PII
-    - check_output: PII + Output-Blocklist (API-Keys etc.)
-    Keine Netz-Calls, keine externen Abhängigkeiten.
+    Tiny, deterministic guard for v0.
+    - check_input: prompt injection + PII
+    - check_output: PII + output blocklist (API keys etc.)
+    No network calls, no external dependencies.
     """
 
     MASK_TEXT = "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten oder geheimen Keys."
@@ -128,8 +128,8 @@ class BasicGuard:
 
     def process_output(self, text: str) -> dict:
         """
-        Policy-Entscheidung für Output (SRP: bleibt im Guard).
-        Rückgabe:
+        Output policy decision (SRP: stays inside the guard).
+        Returns:
         {
             "blocked": bool,            # True => show nothing (e.g. secret)
             "reason": str|None,         # e.g. "blocked_keyword"
@@ -178,7 +178,7 @@ class BasicGuard:
 
 
 class DisabledGuard(BasicGuard):
-    """Stub-Variante, die sämtliche Prüfungen deaktiviert."""
+    """Stub variant that disables every check."""
 
     def __init__(self) -> None:
         super().__init__(
@@ -193,7 +193,7 @@ DISABLED_GUARD_NAMES = {"disabledguard", "disabled", "none", "off"}
 
 
 def create_guard(name: str, settings: Dict[str, Any]) -> BasicGuard:
-    """Factory, die bekannte Guard-Klassen aus der Konfiguration instanziiert."""
+    """Factory that instantiates known guard classes from the configuration."""
 
     normalized = (name or "").strip().lower()
     if not normalized:
