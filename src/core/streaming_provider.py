@@ -31,7 +31,9 @@ from .llm_core import LLMCore
 from config.config_singleton import Config
 
 
-cfg = Config()
+def _get_config() -> Config:
+    """Gibt die aktuelle Config-Singleton-Instanz zurück."""
+    return Config()
 
 
 
@@ -350,6 +352,7 @@ def lookup_wiki_snippet(
     snippet: Optional[str] = None
     wiki_hint: Optional[str] = None
     topic_title: Optional[str] = None
+    cfg = _get_config()
     texts = cfg.texts
     proxy_base = "http://localhost:" + str(proxy_port)
 

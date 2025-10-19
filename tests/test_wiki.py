@@ -1,10 +1,13 @@
 # tests/test_wiki_proxy_lookup.py
 import logging
+import shutil
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 import requests
 
+from config.config_singleton import Config
 from tests.util import has_spacy_model
 from core.factory import AppFactory
 from core.streaming_provider import lookup_wiki_snippet
@@ -74,6 +77,54 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
     assert "[WIKI EXC]" in caplog.text
     assert "kaputt" in caplog.text
 
+
+def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
+    """Ein Config-Reset mit Sprachwechsel spiegelt sich in den Wiki-Hinweisen wider."""
+
+    def _raise_connection_error(*args, **kwargs):
+        raise requests.exceptions.ConnectionError("proxy down")
+
+    monkeypatch.setattr("core.streaming_provider.requests.get", _raise_connection_error)
+
+    Config.reset_instance()
+    Config("config.yaml")
+
+    german_hint, _, _ = lookup_wiki_snippet(
+        question="Frage?",
+        persona_name="TEST",
+        keyword_finder=_DummyKeywordFinder("Testthema"),
+        wiki_mode="offline",
+        proxy_port=9999,
+        limit=42,
+        timeout=(1.0, 1.0),
+    )
+
+    assert "Wikipedia-Proxy nicht erreichbar" in german_hint
+
+    Config.reset_instance()
+
+    custom_config_dir = tmp_path / "config"
+    custom_config_dir.mkdir()
+    shutil.copytree(Path(__file__).resolve().parent.parent / "locales", custom_config_dir / "locales")
+    english_config_path = custom_config_dir / "config.yaml"
+    english_config_path.write_text('language: "en"\n', encoding="utf-8")
+
+    Config(str(english_config_path))
+
+    english_hint, _, _ = lookup_wiki_snippet(
+        question="Question?",
+        persona_name="TEST",
+        keyword_finder=_DummyKeywordFinder("Testtopic"),
+        wiki_mode="offline",
+        proxy_port=9999,
+        limit=42,
+        timeout=(1.0, 1.0),
+    )
+
+    assert "Wikipedia proxy unreachable" in english_hint
+    assert "Please check your connection" in english_hint
+
+    Config.reset_instance()
 
 def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch, caplog):
     dummy_cfg = SimpleNamespace(wiki={"mode": "offline"})
