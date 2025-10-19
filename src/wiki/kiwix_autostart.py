@@ -1,7 +1,7 @@
 import subprocess, time, requests, logging
 
 logger = logging.getLogger("wiki_proxy")
-logger.info("Wiki-Autostart bereit …")
+logger.info("Wiki autostart initialized")
 
 def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
     """

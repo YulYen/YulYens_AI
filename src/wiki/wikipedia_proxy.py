@@ -28,7 +28,7 @@ ONLINE_TIMEOUT = TIMEOUT
 
 # --- Configure logging ----------------------------------------------------------
 logger = logging.getLogger("wiki_proxy")
-logger.info("Wiki-Proxy startet…")
+logger.info("Wiki proxy starting up…")
 
 
 # ---------- Helpers for responses -----------------------------------------------
@@ -200,7 +200,7 @@ def _fetch_kiwix(term: str):
     finally:
         # Immer Gesamtdauer loggen
         duration_total = (time.perf_counter() - start_kiwix) * 1000
-        logger.info(f'[_fetch_kiwix] Anfrage "{term}" beantwortet in {duration_total:.1f} ms')
+        logger.info(f'[_fetch_kiwix] Request "{term}" answered in {duration_total:.1f} ms')
     
 def _fetch_online(term: str):
     """Fetches a short text from live German Wikipedia (REST Summary API)."""
@@ -238,7 +238,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             online = query.get("online", ["0"])[0] == "1"
             persona = query.get("persona", ["0"])[0]
 
-            logger.info(f"[Anfrage] term='{suchbegriff}' path='{self.path}' online={online}")
+            logger.info(f"[Request] term='{suchbegriff}' path='{self.path}' online={online}")
 
             if not suchbegriff:
                 _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
@@ -251,10 +251,10 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
             if status != 200:
                 if status == 404:
-                    logger.info(f"[Nicht gefunden] 404 für '{suchbegriff}'")
+                    logger.info(f"[NotFound] 404 for '{suchbegriff}'")
                     _send_text(self, 404, "Artikel nicht gefunden.")
                 else:
-                    logger.error(f"[Fehler] HTTP-Code {status} für '{suchbegriff}'")
+                    logger.error(f"[Error] HTTP status {status} for '{suchbegriff}'")
                     _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
                 return
 
@@ -312,12 +312,12 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         finally:
         # Always log the total duration
             duration_total = (time.perf_counter() - start_total) * 1000
-            logger.info(f'[WikiProxy] Anfrage "{query}" beantwortet in {duration_total:.1f} ms')
+            logger.info(f'[WikiProxy] Request "{query}" answered in {duration_total:.1f} ms')
 
 
 
 def run():
-    logger.info(f"Starte lokalen Wikipedia-Text-Proxy auf http://localhost:{PROXY_PORT}")
+    logger.info(f"Starting local Wikipedia text proxy at http://localhost:{PROXY_PORT}")
     server = HTTPServer(("", PROXY_PORT), WikiRequestHandler)
     server.serve_forever()
 
