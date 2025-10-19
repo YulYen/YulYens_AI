@@ -44,7 +44,7 @@ def _should_use_ollama(request, cfg) -> bool:
 def client(request):
     # Config-Singleton zurücksetzen und Test-Config laden
     Config.reset_instance()
-    # eigene Test-Config erzeugen oder vorhandene tests/config.yaml laden
+    # eigene Test-Config erzeugen oder vorhandene config.yaml aus dem Projektstamm laden
     cfg = Config("config.yaml")
     use_ollama = _should_use_ollama(request, cfg)
     # Schalter für dieses Test-Laufzeit-Flag überschreiben
