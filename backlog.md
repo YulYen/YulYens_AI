@@ -1,7 +1,7 @@
 # Backlog
 
-| Nr. | Name                                   | Beschreibung                                                                   | Aufwand | Nutzen | Kategorie          |
-| ---:|----------------------------------------|---------------------------------------------------------------------------------|:-------:|:------:|--------------------|
+| Nr. | Name | Beschreibung | Aufwand | Nutzen | Kategorie |
+| --- | --- | --- | --- | --- | --- |
 | 18  | Terminal-UI Logging fix                | Logging ausschließlich in Dateien schreiben, Konsole sauber halten             |   S     |   M    | Bugfix              |
 | 19  | Web-UI "Neue Unterhaltung" im Stream   | ✅ Erledigt: Streaming sauber abbrechen, damit Button "Neue Unterhaltung" funktioniert |   M     |   L    | Bugfix              |
 | 20  | Personas internationalisieren          | ✅ Erledigt: Personas ebenso wie UI-Texte für Deutsch und Englisch bereitstellen |   M     |   L    | UX/Technik          |
