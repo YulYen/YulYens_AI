@@ -1,5 +1,5 @@
 """
-Streaming‑Provider mit Persona‑Handling Logging und Sicherheitschecks.
+Streaming‑Provider mit Persona‑Handling, Logging und Sicherheitschecks.
 
 Alle direkten Aufrufe an das eigentliche LLM werden durch einen
 ``LLMCore`` abstrahiert (z. B. ``OllamaLLMCore`` oder ``DummyLLMCore``).
@@ -121,7 +121,7 @@ class YulYenStreamingProvider:
             with open(self.conversation_log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
-            logging.error("Fehler beim Schreiben des Conversation_log: %s", e)
+            logging.error("Fehler beim Schreiben des conversation.log: %s", e)
 
     def _log_generation_start(self, messages: List[Dict[str, Any]], options: Dict[str, Any]) -> None:
         """Loggt vor dem eigentlichen LLM-Aufruf Kontext- und Wiki-Informationen.

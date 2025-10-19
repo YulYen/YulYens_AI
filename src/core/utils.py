@@ -2,7 +2,7 @@
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import  Union
+from typing import Union
 
 from config.personas import get_prompt_by_name
 
