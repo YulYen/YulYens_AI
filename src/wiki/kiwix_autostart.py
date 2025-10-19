@@ -7,7 +7,7 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
     """
     Startet kiwix-serve automatisch, wenn:
       - cfg["wiki"]["mode"] == "offline"
-      - cfg["wiki"]["offline"]["autostart"] == true
+      - cfg["wiki"]["offline"]["autostart"] == True
     Gibt True zurück, wenn der Dienst erreichbar ist (lief schon oder erfolgreich gestartet).
     """
     wiki = cfg.wiki
@@ -49,7 +49,7 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
         return False
 
     try:
-        #subprocess.Popen([exe, "--port", str(port), zim])
+        # subprocess.Popen([exe, "--port", str(port), zim])
         subprocess.Popen([exe, f"--port={port}", zim])
         if logger: logger.info("Starting kiwix-serve: %s --port %s %s", exe, port, zim)
     except Exception as e:
