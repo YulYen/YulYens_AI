@@ -141,7 +141,7 @@ def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch, caplog):
     finder = factory.get_keyword_finder()
 
     assert finder is None
-    assert "Wiki-Funktionen werden deaktiviert" in caplog.text
+    assert "Disabling wiki features" in caplog.text
 
 
 skip_without_medium_model = pytest.mark.skipif(

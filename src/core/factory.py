@@ -42,8 +42,8 @@ class AppFactory:
                     self._keyword_finder = SpacyKeywordFinder(variant)
                 except (OSError, ImportError) as exc:
                     logging.warning(
-                        "Konnte spaCy Keyword Finder nicht initialisieren: %s. "
-                        "Wiki-Funktionen werden deaktiviert.",
+                        "Could not initialize spaCy keyword finder: %s. "
+                        "Disabling wiki features.",
                         exc,
                     )
                     self._keyword_finder = None
@@ -67,14 +67,14 @@ class AppFactory:
                     return variant
 
             logging.warning(
-                "Unbekannte spaCy-Variante '%s' – fallback auf %s",
+                "Unknown spaCy variant '%s' – falling back to %s",
                 raw_variant,
                 ModelVariant.LARGE.value,
             )
 
         elif raw_variant is not None:
             logging.warning(
-                "Ungültiger Typ für spaCy-Variante (%s) – fallback auf %s",
+                "Invalid type for spaCy variant (%s) – falling back to %s",
                 type(raw_variant).__name__,
                 ModelVariant.LARGE.value,
             )
@@ -95,7 +95,7 @@ class AppFactory:
         backend = self._determine_backend(core_cfg)
         llm_core = self._create_llm_core(backend, base_url)
 
-        logging.debug("Erzeuge Streamer für %s mit Backend '%s'", persona_name, backend)
+        logging.debug("Creating streamer for %s with backend '%s'", persona_name, backend)
 
         streamer_base_url = base_url if base_url is not None else ""
 

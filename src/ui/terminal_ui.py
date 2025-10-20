@@ -190,7 +190,7 @@ class TerminalUI:
         num_ctx = persona_options.get("num_ctx")
         if not num_ctx:
             logging.info(
-                "TerminalUI: Kontextlimit erreicht, aber 'num_ctx' ist nicht gesetzt."
+                "TerminalUI: Context limit reached, but 'num_ctx' is not set."
             )
             return
 
@@ -198,7 +198,7 @@ class TerminalUI:
             ctx_limit = int(num_ctx)
         except (TypeError, ValueError):
             logging.warning(
-                "TerminalUI: Ungültiger 'num_ctx'-Wert (%r); Verlauf wird nicht gekürzt.",
+                "TerminalUI: Invalid 'num_ctx' value (%r); conversation will not be trimmed.",
                 num_ctx,
             )
             return
@@ -210,7 +210,7 @@ class TerminalUI:
 
         if removed > 0:
             logging.info(
-                "TerminalUI: %s ältere Nachrichten entfernt, um Kontext freizugeben.",
+                "TerminalUI: Removed %s older messages to free up context.",
                 removed,
             )
             notice = self.texts["terminal_context_trim_notice"]
