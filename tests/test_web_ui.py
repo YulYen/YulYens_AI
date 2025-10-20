@@ -95,7 +95,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
         list(web_ui.respond_streaming("Hallo", chat_history, history_state))
 
     mock_prepare.assert_not_called()
-    assert "Überspringe 'karl_prepare_quick_and_dirty'" in caplog.text
+    assert "Skipping 'karl_prepare_quick_and_dirty'" in caplog.text
     streamer.stream.assert_called_once()
 
 

@@ -38,9 +38,9 @@ def ask(req: AskRequest):
         ans = provider.answer(req.question, req.persona)
         return AskResponse(answer=ans.strip())
     except UnknownPersonaError as e:
-        logging.warning("Ungültige Persona angefragt: %s", req.persona)
+        logging.warning("Invalid persona requested: %s", req.persona)
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logging.error(e)
-        logging.error(f"Fehler in der API:\n{traceback.format_exc()}")
+        logging.error(f"API error:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))

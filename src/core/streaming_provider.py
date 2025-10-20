@@ -93,7 +93,7 @@ class YulYenStreamingProvider:
         self.guard: Optional[BasicGuard] = guard
 
         if warm_up:
-            logging.info("Starte Aufwärmen des Modells: %s", model_name)
+            logging.info("Starting model warm-up: %s", model_name)
             self._warm_up()
 
     def set_guard(self, guard: BasicGuard) -> None:
@@ -102,12 +102,12 @@ class YulYenStreamingProvider:
 
     def _warm_up(self) -> None:
         """Calls the LLM once to warm it up."""
-        logging.info("Sende Dummy zur Modellaktivierung: %s", self.model_name)
+        logging.info("Sending dummy request to activate the model: %s", self.model_name)
         try:
             self._llm_core.warm_up(self.model_name)
-            logging.info("Modell erfolgreich vorgewärmt.")
+            logging.info("Model warmed up successfully.")
         except Exception:
-            logging.error("Fehler beim Aufwärmen des Modells:\n%s", traceback.format_exc())
+            logging.error("Error while warming up the model:\n%s", traceback.format_exc())
 
     def _append_conversation_log(self, role: str, content: str) -> None:
         """Writes an entry to conversation.log."""
@@ -123,7 +123,7 @@ class YulYenStreamingProvider:
             with open(self.conversation_log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
-            logging.error("Fehler beim Schreiben des conversation.log: %s", e)
+            logging.error("Error while writing conversation.log: %s", e)
 
     def _log_generation_start(self, messages: List[Dict[str, Any]], options: Dict[str, Any]) -> None:
         """Logs context and wiki information before the actual LLM call.
@@ -144,7 +144,7 @@ class YulYenStreamingProvider:
         try:
             estimated_tokens = approx_token_count(messages)
         except Exception as exc:  # pragma: no cover - safety net
-            logging.warning("Konnte Token-Anzahl nicht schätzen: %s", exc)
+            logging.warning("Could not estimate token count: %s", exc)
             estimated_tokens = None
         persona_options = self.persona_options or {}
         num_ctx_raw = persona_options.get("num_ctx") if isinstance(persona_options, dict) else None
@@ -286,7 +286,7 @@ class YulYenStreamingProvider:
                     logging.warning("Unable to log LLM output: %s", exc)
 
         except Exception:
-            logging.error("Fehler bei stream():\n%s", traceback.format_exc())
+            logging.error("Error in stream():\n%s", traceback.format_exc())
             err = "[FEHLER] LLM antwortet nicht korrekt."
             self._append_conversation_log("assistant", err)
             yield err
@@ -380,14 +380,14 @@ def lookup_wiki_snippet(
                 wiki_hint = cfg.t("wiki_hint_unreachable", topic=topic)
         except requests.exceptions.RequestException as err:
             logging.error(
-                "[WIKI EXC] Netzwerkfehler beim Abruf von '%s': %s",
+                "[WIKI EXC] Network error while retrieving '%s': %s",
                 topic,
                 err,
                 exc_info=True,
             )
             wiki_hint = texts["wiki_hint_proxy_error"]
         except Exception as err:  # pragma: no cover - unexpected errors
-            logging.exception("[WIKI EXC] Unerwarteter Fehler für topic='%s'", topic)
+            logging.exception("[WIKI EXC] Unexpected error for topic='%s'", topic)
             wiki_hint = texts["wiki_hint_unknown_error"]
     return (wiki_hint, topic_title, snippet)
 

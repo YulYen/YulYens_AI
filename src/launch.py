@@ -68,7 +68,7 @@ def main():
         logfile=logfile,
         to_console=bool(cfg.logging["to_console"]),
     )
-    logging.info("BOOT OK – Logging initialisiert und aktiv.")
+    logging.info("BOOT OK – Logging initialised and active.")
 
 
     # Optional (extra sicher): httpx/urllib3 auf WARNING drehen
@@ -100,7 +100,7 @@ def main():
 
     # 5) UI starten oder (API-only) blockieren
     if cfg.ui["type"] is None:
-        print("[Yul Yens AI] API läuft. UI ist deaktiviert (ui.type = null).")
+        print("[Yul Yens AI] API is running. UI is disabled (ui.type = null).")
         threading.Event().wait()
         return
     else:
@@ -138,7 +138,7 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
 
     # Already running? (e.g. started manually)
     if _wait_for_port("127.0.0.1", proxy_port, timeout=0.2):
-        logging.info(f"Wiki-Proxy scheint schon zu laufen (Port {proxy_port} ist erreichbar).")
+        logging.info(f"Wiki proxy already seems to be running (port {proxy_port} is reachable).")
         return None
 
     # Start in the same process as a thread
@@ -148,9 +148,9 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
 
     # Briefly wait for readiness (best effort)
     if _wait_for_port("127.0.0.1", proxy_port, timeout=3.0):
-        logging.info(f"Wiki-Proxy im Thread gestartet (Port {proxy_port}).")
+        logging.info(f"Wiki proxy started in thread (port {proxy_port}).")
     else:
-        logging.warning(f"Wiki-Proxy (Port {proxy_port}) nach 3s noch nicht erreichbar.")
+        logging.warning(f"Wiki proxy (port {proxy_port}) still unreachable after 3s.")
 
     return t
 

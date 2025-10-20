@@ -24,7 +24,7 @@ class SpacyKeywordFinder:
 
     def __init__(self, variant):
         self.model_name = variant.value
-        logging.info(f"Lade spaCy-Modell: {self.model_name}")
+        logging.info(f"Loading spaCy model: {self.model_name}")
         self.nlp = spacy.load(self.model_name)
 
     def _normalize_keyword(self, text: str) -> str:
@@ -82,7 +82,7 @@ class SpacyKeywordFinder:
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
                 keyword = self._normalize_keyword(ent.text) 
-                logging.info(f"{ent.label_} Treffer: {keyword}")
+                logging.info(f"{ent.label_} match: {keyword}")
                 if keyword not in treffer:
                     treffer.append(keyword)
 

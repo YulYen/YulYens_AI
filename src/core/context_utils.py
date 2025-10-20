@@ -70,7 +70,7 @@ def karl_prepare_quick_and_dirty(
     result = head + core + tail
     used_after = _token_stats(result)[2]
     logging.info(
-        "[karl_prepare] used=%s→%s, target=%s, dropped=%s (Karl später geeignet ersetzen)",
+        "[karl_prepare] used=%s→%s, target=%s, dropped=%s (replace Karl with a better fit later)",
         used_before,
         used_after,
         target,

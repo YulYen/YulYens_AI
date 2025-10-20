@@ -65,7 +65,7 @@ class WebUI:
                 ctx_limit = int(num_ctx_value)
             except (TypeError, ValueError):
                 logging.warning(
-                    "Ungültiger 'num_ctx'-Wert für Persona %r: %r",
+                    "Invalid 'num_ctx' value for persona %r: %r",
                     self.bot,
                     num_ctx_value,
                 )
@@ -76,7 +76,7 @@ class WebUI:
             )
         else:
             logging.warning(
-                "Überspringe 'karl_prepare_quick_and_dirty' für Persona %r: num_ctx=%r",
+                "Skipping 'karl_prepare_quick_and_dirty' for persona %r: num_ctx=%r",
                 self.bot,
                 num_ctx_value,
             )
@@ -357,7 +357,7 @@ class WebUI:
                     })
                 else:
                     logging.warning(
-                        "Gradio-Share deaktiviert: Zugangsdaten fehlen trotz 'ui.web.share: true'."
+                        "Gradio share disabled: credentials missing despite 'ui.web.share: true'."
                     )
 
         demo.launch(**launch_kwargs)
