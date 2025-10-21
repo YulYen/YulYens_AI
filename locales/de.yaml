@@ -30,3 +30,5 @@ security_prompt_injection: "☝️ Yul Yen hebt mahnend den Zeigefinger: Prompt-
 security_pii_detected: "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten."
 security_blocked_keyword: "☝️ Yul Yen hebt mahnend den Zeigefinger: Geheime Schlüssel werden hier nie angezeigt. Netter Versuch."
 security_all_clear: "Alles sauber ✅"
+wiki_context_guardrail: "Nutze ausschließlich den folgenden Kontext aus Wikipedia. Wenn etwas dort nicht steht, sag kurz, dass du dir nicht sicher bist."
+wiki_context_message: "Kontext zum Thema {topic}: [Quelle: Wikipedia] {snippet}"

@@ -30,3 +30,5 @@ security_prompt_injection: "☝️ Yul Yen raises a warning finger: Prompt injec
 security_pii_detected: "☝️ Yul Yen raises a warning finger: Please keep private data to yourself."
 security_blocked_keyword: "☝️ Yul Yen raises a warning finger: Secret keys never show up here. Nice try."
 security_all_clear: "All clear ✅"
+wiki_context_guardrail: "Use only the following context from Wikipedia. If something is missing, briefly say you are not sure."
+wiki_context_message: "Context for the topic {topic}: [Source: Wikipedia] {snippet}"
