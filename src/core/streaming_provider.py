@@ -176,13 +176,14 @@ class YulYenStreamingProvider:
         Generator that yields the LLM response token by token.
         Includes logging and security checks.
         """
+        guard_texts = getattr(self.guard, "texts", None) if self.guard else None
         # Pre-check: validate the latest user message
         if self.guard:
             for m in reversed(messages):
                 if m.get("role") == "user":
                     res = self.guard.check_input(m.get("content") or "")
                     if not res["ok"]:
-                        yield zeigefinger_message(res)
+                        yield zeigefinger_message(res, texts=guard_texts)
                         return
                     break
 
@@ -240,7 +241,8 @@ class YulYenStreamingProvider:
                                         "reason": pol.get("reason")
                                         or "blocked_keyword",
                                         "detail": "",
-                                    }
+                                    },
+                                    texts=guard_texts,
                                 )
                                 break
                             to_send = pol["text"]
@@ -263,7 +265,8 @@ class YulYenStreamingProvider:
                                 {
                                     "reason": pol.get("reason") or "blocked_keyword",
                                     "detail": "",
-                                }
+                                },
+                                texts=guard_texts,
                             )
                         else:
                             yield pol["text"]
@@ -348,9 +351,10 @@ class YulYenStreamingProvider:
 
         # Check guard input
         if self.guard:
+            guard_texts = getattr(self.guard, "texts", None)
             res_in = self.guard.check_input(user_input or "")
             if not res_in["ok"]:
-                return zeigefinger_message(res_in)
+                return zeigefinger_message(res_in, texts=guard_texts)
 
         # Run the LLM and collect the answer
         full_reply = run_llm_collect(self, messages)
@@ -359,7 +363,7 @@ class YulYenStreamingProvider:
         if self.guard:
             res_out = self.guard.check_output(full_reply or "")
             if not res_out["ok"]:
-                return zeigefinger_message(res_out)
+                return zeigefinger_message(res_out, texts=guard_texts)
 
         return full_reply
 

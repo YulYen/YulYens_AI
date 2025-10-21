@@ -1,7 +1,7 @@
 import pytest
 from config.config_singleton import Config
 from core.factory import AppFactory
-from security.tinyguard import BasicGuard, DisabledGuard
+from security.tinyguard import BasicGuard, DisabledGuard, zeigefinger_message
 
 G = BasicGuard(True, True, True, True)
 
@@ -86,7 +86,7 @@ def test_process_output_masks_pii_and_blocks_secrets():
 
     masked_result = guard.process_output(f"Kontakt: {EMAIL}")
     assert masked_result["masked"] is True
-    assert BasicGuard.MASK_TEXT in masked_result["text"]
+    assert guard.mask_text in masked_result["text"]
 
     blocked_result = guard.process_output(
         "Hier ist dein Key: sk-SECRETTOBLOCK123456789"
@@ -170,3 +170,23 @@ def test_factory_returns_no_guard_when_security_disabled():
 def test_factory_unknown_guard_raises():
     with pytest.raises(ValueError):
         _streamer_with_security({"guard": "NopeGuard", "enabled": True})
+
+
+def test_security_texts_can_be_overridden():
+    custom_texts = {
+        "security_mask_text": "[mask]",
+        "security_prompt_injection": "Prompt blocked ({detail})",
+        "security_pii_detected": "PII blocked",
+        "security_blocked_keyword": "Secrets blocked",
+        "security_all_clear": "All clear",
+    }
+
+    guard = BasicGuard(True, True, True, True, texts=custom_texts)
+    masked = guard.process_output(f"Kontakt: {EMAIL}")
+    assert "[mask]" in masked["text"]
+
+    msg = zeigefinger_message(
+        {"ok": False, "reason": "prompt_injection", "detail": "details"},
+        texts=custom_texts,
+    )
+    assert msg == "Prompt blocked (details)"
