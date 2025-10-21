@@ -1,12 +1,11 @@
 import json
 import re
 import unicodedata
-from pathlib import Path
-
-import pytest
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pytest
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
 from core.streaming_provider import YulYenStreamingProvider
@@ -16,6 +15,7 @@ BERLIN = ZoneInfo("Europe/Berlin")
 _now = datetime.now(tz=BERLIN)
 current_year = str(_now.year)
 current_year_short = current_year[-2:]  # "25" when the year is 2025
+
 
 def test_empty_question_rejected(client):
     response = client.post("/ask", json={"question": "", "persona": "PETER"})
@@ -48,7 +48,16 @@ def test_persona_name_normalized(client, monkeypatch):
 
     captured: dict[str, str] = {}
 
-    def fake_respond(self, user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout):
+    def fake_respond(
+        self,
+        user_input,
+        persona,
+        keyword_finder,
+        wiki_mode,
+        wiki_proxy_port,
+        wiki_snippet_limit,
+        wiki_timeout,
+    ):
         captured["persona_arg"] = persona
         answer = f"Persona arg: {persona} | Bot attr: {self.persona}"
         self._append_conversation_log("user", user_input)
@@ -85,6 +94,7 @@ def test_persona_name_normalized(client, monkeypatch):
             except FileNotFoundError:
                 pass
 
+
 @pytest.mark.slow
 @pytest.mark.ollama
 ## TODO @pytest.mark.skipif(model =! "Leo13B", reason="Gleicher Witz Nur unter Leo stabil")
@@ -99,8 +109,8 @@ def test_same_joke(client):
     assert r1.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."' # LEO reference answer
-    anfang = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier' # LEO stable beginning
+    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."'  # LEO reference answer
+    anfang = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier'  # LEO stable beginning
 
     # Non-empty and not just whitespace
     assert a1.strip() and a2.strip()
@@ -111,6 +121,7 @@ def test_same_joke(client):
         "Prüfe seed/temperature/top_p/repeat_penalty in den Persona-Optionen "
         "und setze ggf. include_date=False für diesen Test."
     )
+
 
 # ---- Normalization / matching -------------------------------------------------
 def _normalize(s: str) -> str:
@@ -128,6 +139,7 @@ def _normalize(s: str) -> str:
     s = re.sub(r"\s+", " ", s).strip().lower()
     return s
 
+
 def _must_contain_all(ans_norm: str, items: list[str]) -> list[str]:
     missing = []
     for kw in items:
@@ -135,8 +147,10 @@ def _must_contain_all(ans_norm: str, items: list[str]) -> list[str]:
             missing.append(kw)
     return missing
 
+
 def _contains_any(ans_norm: str, items: list[str]) -> bool:
     return any(_normalize(kw) in ans_norm for kw in items)
+
 
 # ---- API Helper ---------------------------------------------------------------
 def ask(question: str, person: str, client) -> str:
@@ -145,10 +159,13 @@ def ask(question: str, person: str, client) -> str:
     try:
         data = r.json()
     except Exception:
-        pytest.fail(f"Antwort ist kein JSON. Status={r.status_code}, Body={r.text[:500]}")
+        pytest.fail(
+            f"Antwort ist kein JSON. Status={r.status_code}, Body={r.text[:500]}"
+        )
 
     # Typical contract: {"answer": "..."}; fallback to showing the full JSON
     return data.get("answer", str(data))
+
 
 # ---- Test cases ----------------------------------------------------------------
 @pytest.mark.slow
@@ -198,7 +215,11 @@ def test_api_contract(case, client_with_date_and_wiki):
             f"Case: {case.get('name')}",
             f"Persona: {case.get('person')}",
             f"Question: {case.get('question')}",
-            f"Missing (must_contain): {missing_all}" if missing_all else "Missing (must_contain): []",
+            (
+                f"Missing (must_contain): {missing_all}"
+                if missing_all
+                else "Missing (must_contain): []"
+            ),
             f"Matched any (must_contain_any): {ok_any} (candidates={case.get('must_contain_any', [])})",
             "",
             "---- RAW ANSWER ----",

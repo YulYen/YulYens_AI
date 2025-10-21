@@ -1,9 +1,11 @@
-import gradio as gr
 import logging
 from functools import partial
-from config.personas import system_prompts, get_drink
-from core.streaming_provider import lookup_wiki_snippet, inject_wiki_context
+
+import gradio as gr
+from config.personas import get_drink, system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
+from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
+
 
 class WebUI:
     """
@@ -12,10 +14,19 @@ class WebUI:
     Wiki hints and snippets are handled like the terminal UI (hint only visible, snippet as context).
     Responses from the AI model are streamed token by token and updated directly in the UI.
     """
-    def __init__(self, factory, config, keyword_finder,
-                 wiki_snippet_limit, wiki_mode, proxy_base,
-                 web_host, web_port,
-                 wiki_timeout):
+
+    def __init__(
+        self,
+        factory,
+        config,
+        keyword_finder,
+        wiki_snippet_limit,
+        wiki_mode,
+        proxy_base,
+        web_host,
+        web_port,
+        wiki_timeout,
+    ):
         self.streamer = None  # assigned later
         self.keyword_finder = keyword_finder
         self.cfg = config
@@ -42,16 +53,14 @@ class WebUI:
     @staticmethod
     def _persona_full_image_path(persona_name):
         return f"static/personas/{persona_name}/full.webp"
-    
+
     def _handle_context_warning(self, llm_history, chat_history):
 
         if not context_near_limit(llm_history, self.streamer.persona_options):
             return False
 
         drink = get_drink(self.bot)
-        warn = self._t(
-            "context_wait_message", persona_name=self.bot, drink=drink
-        )
+        warn = self._t("context_wait_message", persona_name=self.bot, drink=drink)
 
         chat_history.append((None, warn))
 
@@ -71,9 +80,7 @@ class WebUI:
                 )
 
         if ctx_limit and ctx_limit > 0:
-            llm_history[:] = karl_prepare_quick_and_dirty(
-                llm_history, ctx_limit
-            )
+            llm_history[:] = karl_prepare_quick_and_dirty(llm_history, ctx_limit)
         else:
             logging.warning(
                 "Skipping 'karl_prepare_quick_and_dirty' for persona %r: num_ctx=%r",
@@ -82,7 +89,6 @@ class WebUI:
             )
 
         return True
-
 
     # Stream the response (UI updates continuously)
     def _stream_reply(self, message_history, chat_history):
@@ -96,7 +102,6 @@ class WebUI:
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
-
     def respond_streaming(self, user_input, chat_history, history_state):
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
@@ -104,15 +109,13 @@ class WebUI:
             yield "", chat_history, history_state
             return
 
-
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
 
         # 2) Clear the input field and show the user message in the chat window
         logging.debug("User input received (%d chars)", len(user_input))
-        chat_history.append((user_input, None ))
+        chat_history.append((user_input, None))
         yield "", chat_history, llm_history
-
 
         # 3) Wiki hint and snippet (top hit)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -145,13 +148,20 @@ class WebUI:
         # 7) Stream the answer
         yield from self._stream_reply(llm_history, chat_history)
 
-
-    def _build_ui(self, project_title, choose_persona_txt, persona_info,
-                  persona_btn_suffix, input_placeholder, new_chat_label):
+    def _build_ui(
+        self,
+        project_title,
+        choose_persona_txt,
+        persona_info,
+        persona_btn_suffix,
+        input_placeholder,
+        new_chat_label,
+    ):
         with gr.Blocks() as demo:
             selected_persona_state = gr.Textbox(value="", visible=False)
 
-            gr.HTML("""
+            gr.HTML(
+                """
                 <style>
                 .persona-row { gap:24px; }
                 .persona-card {
@@ -168,7 +178,8 @@ class WebUI:
                 .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
                 .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
                 </style>
-            """)
+            """
+            )
             gr.Markdown(f"# {project_title}")
 
             with gr.Group(visible=True) as grid_group:
@@ -182,12 +193,16 @@ class WebUI:
                                     self._persona_thumbnail_path(p["name"]),
                                     show_label=False,
                                     container=False,
-                                    elem_classes="persona-img"
+                                    elem_classes="persona-img",
                                 )
                                 gr.Markdown(
                                     f"<div class='name'>{p['name']}</div>"
-                                    f"<div class='desc'>{p['description']}</div>")
-                                btn = gr.Button(f"{p['name']}{persona_btn_suffix}", variant="secondary")
+                                    f"<div class='desc'>{p['description']}</div>"
+                                )
+                                btn = gr.Button(
+                                    f"{p['name']}{persona_btn_suffix}",
+                                    variant="secondary",
+                                )
                                 persona_buttons.append((key, btn))
 
             with gr.Group(visible=False) as focus_group:
@@ -200,8 +215,12 @@ class WebUI:
 
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
-            txt = gr.Textbox(show_label=False, placeholder=input_placeholder,
-                             visible=False, interactive=False)
+            txt = gr.Textbox(
+                show_label=False,
+                placeholder=input_placeholder,
+                visible=False,
+                interactive=False,
+            )
             clear = gr.Button(new_chat_label, visible=False)
             history_state = gr.State(self._reset_conversation_state())
 
@@ -221,7 +240,9 @@ class WebUI:
         }
         return demo, components
 
-    def _persona_selected_updates(self, persona_key, persona, greeting_template, model_name, input_placeholder):
+    def _persona_selected_updates(
+        self, persona_key, persona, greeting_template, model_name, input_placeholder
+    ):
         display_name = persona["name"].title()
         greeting = greeting_template.format(
             persona_name=display_name, model_name=model_name
@@ -237,8 +258,7 @@ class WebUI:
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
             gr.update(
-                value="", visible=True, interactive=True,
-                placeholder=input_placeholder
+                value="", visible=True, interactive=True, placeholder=input_placeholder
             ),
             gr.update(visible=True),
             self._reset_conversation_state(),
@@ -258,7 +278,9 @@ class WebUI:
             self._reset_conversation_state(),
         )
 
-    def _on_persona_selected(self, key, persona_info, greeting_template, model_name, input_placeholder):
+    def _on_persona_selected(
+        self, key, persona_info, greeting_template, model_name, input_placeholder
+    ):
         persona = persona_info.get(key)
         if not persona:
             self.bot = None
@@ -276,8 +298,9 @@ class WebUI:
         self.streamer = None
         return self._reset_ui_updates()
 
-    def _bind_events(self, components, persona_info, model_name,
-                     greeting_template, input_placeholder):
+    def _bind_events(
+        self, components, persona_info, model_name, greeting_template, input_placeholder
+    ):
         selected_persona_state = components["selected_persona_state"]
         grid_group = components["grid_group"]
         focus_group = components["focus_group"]
@@ -351,10 +374,12 @@ class WebUI:
                 password = auth_cfg.get("password") or ""
 
                 if username and password:
-                    launch_kwargs.update({
-                        "share": True,
-                        "auth": (username, password),
-                    })
+                    launch_kwargs.update(
+                        {
+                            "share": True,
+                            "auth": (username, password),
+                        }
+                    )
                 else:
                     logging.warning(
                         "Gradio share disabled: credentials missing despite 'ui.web.share: true'."

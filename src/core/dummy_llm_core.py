@@ -7,7 +7,8 @@ no real LLM is required.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 from .llm_core import LLMCore
 
@@ -22,10 +23,10 @@ class DummyLLMCore(LLMCore):
     def stream_chat(
         self,
         model_name: str,
-        messages: List[Dict[str, Any]],
-        options: Dict[str, Any] | None = None,
+        messages: list[dict[str, Any]],
+        options: dict[str, Any] | None = None,
         keep_alive: int = 600,
-    ) -> Iterable[Dict[str, Any]]:
+    ) -> Iterable[dict[str, Any]]:
         """
         Returns exactly one response chunk that mirrors the user input.
 

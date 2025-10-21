@@ -10,16 +10,15 @@ console).
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
 
 def init_logging(
     *,
     loglevel: str = "INFO",
-    logfile: Optional[str] = None,
-    wiki_proxy_logfile: Optional[str] = None,
+    logfile: str | None = None,
+    wiki_proxy_logfile: str | None = None,
     to_console: bool,
 ) -> None:
     """Initialise application-wide logging.
@@ -46,7 +45,7 @@ def init_logging(
     now_str = datetime.now().strftime("%Y-%m-%d_%H-%M")
     if logfile is None:
         logfile = f"logs/yulyen_ai_{now_str}.log"
-        
+
     if wiki_proxy_logfile is None:
         wiki_proxy_logfile = f"logs/wiki_proxy_{now_str}.log"
 

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import re
-from typing import Any, TypedDict, Optional, Dict, List
+from typing import Any, TypedDict
 
 
 class SecurityResult(TypedDict):
     ok: bool
-    reason: str           # "ok" | "prompt_injection" | "pii_detected" | "blocked_keyword"
-    detail: Optional[str] # first match / hint
+    reason: str  # "ok" | "prompt_injection" | "pii_detected" | "blocked_keyword"
+    detail: str | None  # first match / hint
 
 
 class BasicGuard:
@@ -26,7 +26,7 @@ class BasicGuard:
         prompt_injection_protection: bool,
         pii_protection: bool,
         output_blocklist: bool,
-        custom_patterns: Optional[Dict[str, List[str]]] = None,
+        custom_patterns: dict[str, list[str]] | None = None,
     ):
         self.enabled = enabled
         self.flags = {
@@ -43,7 +43,7 @@ class BasicGuard:
             r"(?i)\byou are chatgpt\b",
             r"(?i)\bbegin system prompt\b",
             r"(?i)\bdeveloper mode\b",
-            r"(?i)\b%?\{.*?\}%?",         # templating braces used in jailbreaks
+            r"(?i)\b%?\{.*?\}%?",  # templating braces used in jailbreaks
             r"(?i)\bfile://|http://127\.0\.0\.1|localhost",
         ]
 
@@ -51,15 +51,12 @@ class BasicGuard:
             # "Please ignore all previous instructions ..."
             r"(?i)\bignoriere\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
             r"(?i)\bübergehe\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
-
             # "Pretend you are root/admin/developer ..." / "Be root ..."
             r"(?i)\btu\s+so,\s*als\s+w(?:ä|ae)rst du\b.{0,30}\b(root|admin|entwickler|system)\b",
             r"(?i)\bsei\b.{0,20}\b(root|admin|entwickler|system)\b",
             r"(?i)\bagier(?:e)?\b.{0,20}\bals\b.{0,30}\b(root|admin|entwickler|system)\b",
-
             # "... output/show the system prompt"
             r"(?i)\b(zeige|gib)\b.{0,40}\b(system\s?prompt|systemprompt|system\-?prompt)\b.{0,40}\b(aus|anzeigen)\b",
-
             # Typical secret/file leak indicators
             r"(?i)/etc/passwd",
             r"(?i)\\windows\\system32\\config\\sam",
@@ -67,16 +64,16 @@ class BasicGuard:
         inj += de_inj
 
         pii = [
-            r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",                # E-Mail
-            r"(?i)\b(?:\+?49|0)\s?(?:\d[\s\-()]{0,2}){7,}\d\b",              # DE-Telefon (grob)
-            r"(?i)\bDE\d{20}\b",                                             # IBAN DE
+            r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",  # E-Mail
+            r"(?i)\b(?:\+?49|0)\s?(?:\d[\s\-()]{0,2}){7,}\d\b",  # DE-Telefon (grob)
+            r"(?i)\bDE\d{20}\b",  # IBAN DE
         ]
 
         block = [
-            r"(?i)\bsk-[A-Za-z0-9]{20,}\b",                                  # OpenAI style key
-            r"(?i)\bghp_[A-Za-z0-9]{20,}\b",                                 # GitHub PAT
-            r"(?i)\bAKIA[0-9A-Z]{16}\b",                                     # AWS Access Key
-            r"(?i)\baws_secret_access_key\b.*?[A-Za-z0-9/+]{30,}",           # AWS Secret (heur.)
+            r"(?i)\bsk-[A-Za-z0-9]{20,}\b",  # OpenAI style key
+            r"(?i)\bghp_[A-Za-z0-9]{20,}\b",  # GitHub PAT
+            r"(?i)\bAKIA[0-9A-Z]{16}\b",  # AWS Access Key
+            r"(?i)\baws_secret_access_key\b.*?[A-Za-z0-9/+]{30,}",  # AWS Secret (heur.)
         ]
 
         if custom_patterns:
@@ -125,7 +122,6 @@ class BasicGuard:
 
         return self._ok()
 
-
     def process_output(self, text: str) -> dict:
         """
         Output policy decision (SRP: stays inside the guard).
@@ -144,7 +140,12 @@ class BasicGuard:
         if self.flags.get("output_blocklist"):
             for rx in self._block:
                 if rx.search(text):
-                    return {"blocked": True, "reason": "blocked_keyword", "text": "", "masked": False}
+                    return {
+                        "blocked": True,
+                        "reason": "blocked_keyword",
+                        "text": "",
+                        "masked": False,
+                    }
 
         # 2) Mask PII (only if the flag is active)
         out = text
@@ -157,9 +158,10 @@ class BasicGuard:
                 out = new_out
 
         return {"blocked": False, "reason": None, "text": out, "masked": masked}
+
     # ---- Helpers ----------------------------------------------------------
 
-    def _first_match(self, patterns: List[re.Pattern], text: str) -> Optional[str]:
+    def _first_match(self, patterns: list[re.Pattern], text: str) -> str | None:
         for r in patterns:
             hit = r.search(text)
             if hit:
@@ -173,6 +175,7 @@ class BasicGuard:
 
     def _bad(self, reason: str, detail: str) -> SecurityResult:
         return {"ok": False, "reason": reason, "detail": detail}
+
 
 # ---------------------------------------------------------------------------
 
@@ -192,7 +195,7 @@ class DisabledGuard(BasicGuard):
 DISABLED_GUARD_NAMES = {"disabledguard", "disabled", "none", "off"}
 
 
-def create_guard(name: str, settings: Dict[str, Any]) -> BasicGuard:
+def create_guard(name: str, settings: dict[str, Any]) -> BasicGuard:
     """Factory that instantiates known guard classes from the configuration."""
 
     normalized = (name or "").strip().lower()
@@ -202,7 +205,9 @@ def create_guard(name: str, settings: Dict[str, Any]) -> BasicGuard:
     if normalized == "basicguard":
         return BasicGuard(
             enabled=bool(settings.get("enabled", True)),
-            prompt_injection_protection=bool(settings.get("prompt_injection_protection", True)),
+            prompt_injection_protection=bool(
+                settings.get("prompt_injection_protection", True)
+            ),
             pii_protection=bool(settings.get("pii_protection", True)),
             output_blocklist=bool(settings.get("output_blocklist", True)),
             custom_patterns=settings.get("custom_patterns"),
@@ -221,7 +226,7 @@ def zeigefinger_message(res: SecurityResult) -> str:
     if reason == "prompt_injection":
         return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Prompt-Injection geblockt. Netter Versuch ({detail})"
     if reason == "pii_detected":
-        return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten."
+        return "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten."
     if reason == "blocked_keyword":
-        return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Geheime Schlüssel werden hier nie angezeigt. Netter Versuch."
+        return "☝️ Yul Yen hebt mahnend den Zeigefinger: Geheime Schlüssel werden hier nie angezeigt. Netter Versuch."
     return "Alles sauber ✅"

@@ -1,19 +1,19 @@
 # terminal_ui.py
 from __future__ import annotations
 
-from colorama import Fore, Style, init
-from typing import List, Dict
-from config.personas import get_all_persona_names, system_prompts, get_drink
 import logging
-from core.utils import _greeting_text
-from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
+from colorama import Fore, Style, init
+from config.personas import get_all_persona_names, get_drink, system_prompts
+from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
 # Shared core utilities and streamer
 from core.streaming_provider import (
-    lookup_wiki_snippet,
     inject_wiki_context,
+    lookup_wiki_snippet,
 )
+from core.utils import _greeting_text
+
 
 class TerminalUI:
     """
@@ -22,9 +22,17 @@ class TerminalUI:
     - Wiki snippet (if available) is injected as system context
     - Token-by-token streaming of the LLM response stays unchanged
     """
-    def __init__(self, factory, config, keyword_finder,
-                 wiki_snippet_limit, wiki_mode, proxy_base,
-                 wiki_timeout):
+
+    def __init__(
+        self,
+        factory,
+        config,
+        keyword_finder,
+        wiki_snippet_limit,
+        wiki_mode,
+        proxy_base,
+        wiki_timeout,
+    ):
         self.factory = factory
         self.config = config
         self.keyword_finder = keyword_finder
@@ -32,16 +40,14 @@ class TerminalUI:
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.wiki_timeout = wiki_timeout
-        self.greeting = None # set after selection
-        self.bot = None # set after selection
-        self.streamer = None # set after selection
+        self.greeting = None  # set after selection
+        self.bot = None  # set after selection
+        self.streamer = None  # set after selection
         self.texts = config.texts
         self._t = config.t
 
-
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
-        self.history: List[Dict[str, str]] = []
-
+        self.history: list[dict[str, str]] = []
 
     def choose_persona(self) -> None:
         """Asks the user for the desired persona and configures the streamer."""
@@ -99,7 +105,7 @@ class TerminalUI:
     # ---------- Main loop ----------
     def launch(self) -> None:
         self.init_ui()
-        logging.info(f"Launching TerminalUI")
+        logging.info("Launching TerminalUI")
 
         """Starts the terminal UI. Prompts for persona selection first."""
         # 1. Select a persona if no streamer is configured yet
@@ -138,7 +144,7 @@ class TerminalUI:
                     self.proxy_base,
                     self.wiki_snippet_limit,
                     self.wiki_timeout,
-)
+                )
 
                 # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
                 if wiki_hint:
@@ -182,16 +188,12 @@ class TerminalUI:
             return
 
         drink = get_drink(self.bot)
-        wait_msg = self._t(
-            "context_wait_message", persona_name=self.bot, drink=drink
-        )
+        wait_msg = self._t("context_wait_message", persona_name=self.bot, drink=drink)
         print(wait_msg)
 
         num_ctx = persona_options.get("num_ctx")
         if not num_ctx:
-            logging.info(
-                "TerminalUI: Context limit reached, but 'num_ctx' is not set."
-            )
+            logging.info("TerminalUI: Context limit reached, but 'num_ctx' is not set.")
             return
 
         try:

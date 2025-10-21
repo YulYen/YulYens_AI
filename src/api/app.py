@@ -1,16 +1,19 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
-from typing import Optional
-from .provider import AiApiProvider, UnknownPersonaError
 import logging
 import traceback
 
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+from .provider import AiApiProvider, UnknownPersonaError
+
 # Global, swappable dependency:
-_provider: Optional[AiApiProvider] = None
+_provider: AiApiProvider | None = None
+
 
 def set_provider(p: AiApiProvider) -> None:
     global _provider
     _provider = p
+
 
 def get_provider() -> AiApiProvider:
     global _provider
@@ -18,18 +21,23 @@ def get_provider() -> AiApiProvider:
         raise RuntimeError("AiApiProvider not set; call set_provider() first")
     return _provider
 
+
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=0)
     persona: str = Field(..., min_length=0)
 
+
 class AskResponse(BaseModel):
     answer: str
 
+
 app = FastAPI(title="Leah One‑Shot API", version="1.0.0")
+
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/ask", response_model=AskResponse)
 def ask(req: AskRequest):

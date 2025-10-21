@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
 
@@ -8,11 +9,20 @@ class UnknownPersonaError(ValueError):
 
     pass
 
+
 class AiApiProvider:
     """Provides AI answers through the API (one-shot)."""
 
-    def __init__(self, *, keyword_finder, wiki_mode,
-                 wiki_proxy_port, wiki_snippet_limit, wiki_timeout, factory):
+    def __init__(
+        self,
+        *,
+        keyword_finder,
+        wiki_mode,
+        wiki_proxy_port,
+        wiki_snippet_limit,
+        wiki_timeout,
+        factory,
+    ):
         self.keyword_finder = keyword_finder
         self.wiki_mode = wiki_mode
         self.wiki_proxy_port = wiki_proxy_port
@@ -23,16 +33,14 @@ class AiApiProvider:
         self._known_personas = tuple(get_all_persona_names())
         self._persona_lookup = {name.lower(): name for name in self._known_personas}
 
-
-
     def answer(self, question: str, persona: str) -> str:
         """Handles a question for the given persona and returns the answer as text."""
 
         frage = (question or "").strip()
-       
+
         if len(frage) == 0:
             return self.cfg.texts["empty_question"]
-        
+
         persona_name = (persona or "").strip()
         persona_key = persona_name.lower()
         if persona_key not in self._persona_lookup:
@@ -53,5 +61,4 @@ class AiApiProvider:
             wiki_snippet_limit=self.wiki_snippet_limit,
             wiki_timeout=self.wiki_timeout,
             persona=canonical_persona,
-
         ).strip()

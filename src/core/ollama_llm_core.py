@@ -1,18 +1,13 @@
+"""Thin wrapper around the Ollama client."""
+
 from __future__ import annotations
 
-"""
-Thin wrapper around the Ollama client.
+from typing import Any
 
-This class encapsulates all direct calls to the Ollama backend so the
-rest of the system stays decoupled from the concrete LLM. If Ollama is
-replaced, only this class needs to change.
-"""
-
-from typing import Any, Dict, List
+from ollama import Client
 
 # LLM‑Interface importieren
 from .llm_core import LLMCore
-from ollama import Client
 
 
 class OllamaLLMCore(LLMCore):
@@ -32,13 +27,15 @@ class OllamaLLMCore(LLMCore):
 
         :param model_name: Name of the model to warm up
         """
-        self._client.chat(model=model_name, messages=[{"role": "user", "content": "..."}])
+        self._client.chat(
+            model=model_name, messages=[{"role": "user", "content": "..."}]
+        )
 
     def stream_chat(
         self,
         model_name: str,
-        messages: List[Dict[str, Any]],
-        options: Dict[str, Any] | None = None,
+        messages: list[dict[str, Any]],
+        options: dict[str, Any] | None = None,
         keep_alive: int = 600,
     ):
         """

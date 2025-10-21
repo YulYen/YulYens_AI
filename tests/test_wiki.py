@@ -6,12 +6,12 @@ from types import SimpleNamespace
 
 import pytest
 import requests
-
 from config.config_singleton import Config
-from tests.util import has_spacy_model
 from core.factory import AppFactory
 from core.streaming_provider import lookup_wiki_snippet
-from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
+from wiki.spacy_keyword_finder import ModelVariant, SpacyKeywordFinder
+
+from tests.util import has_spacy_model
 
 
 class _DummyKeywordFinder:
@@ -105,7 +105,10 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
 
     custom_config_dir = tmp_path / "config"
     custom_config_dir.mkdir()
-    shutil.copytree(Path(__file__).resolve().parent.parent / "locales", custom_config_dir / "locales")
+    shutil.copytree(
+        Path(__file__).resolve().parent.parent / "locales",
+        custom_config_dir / "locales",
+    )
     english_config_path = custom_config_dir / "config.yaml"
     english_config_path.write_text('language: "en"\n', encoding="utf-8")
 
@@ -125,6 +128,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     assert "Please check your connection" in english_hint
 
     Config.reset_instance()
+
 
 def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch, caplog):
     dummy_cfg = SimpleNamespace(wiki={"mode": "offline"})
@@ -149,6 +153,7 @@ skip_without_medium_model = pytest.mark.skipif(
     reason="spaCy model de_core_news_md not installed",
 )
 
+
 @skip_without_medium_model
 def test_lookup_wiki_snippet_for_germany():
     """
@@ -166,10 +171,13 @@ def test_lookup_wiki_snippet_for_germany():
         wiki_mode="offline",
         proxy_port=8042,
         limit=1600,
-        timeout = (3.0, 8.0))
+        timeout=(3.0, 8.0),
+    )
 
     # We expect the proxy to be reachable and to detect 'Deutschland'
-    assert wiki_hint is not None, "Wiki-Proxy liefert keinen Hint → vermutlich nicht gestartet"
+    assert (
+        wiki_hint is not None
+    ), "Wiki-Proxy liefert keinen Hint → vermutlich nicht gestartet"
     assert topic_title == "Deutschland"
     assert snippet, "Wiki-Proxy liefert keinen Snippet-Text"
 

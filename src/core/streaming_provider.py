@@ -16,25 +16,22 @@ import logging
 import os
 import time
 import traceback
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import requests
-
-from core.utils import clean_token, ensure_dir_exists
-from core.context_utils import approx_token_count
-
+from config.config_singleton import Config
 from security.tinyguard import BasicGuard, zeigefinger_message
+
+from core.context_utils import approx_token_count
+from core.utils import clean_token, ensure_dir_exists
 
 # Import the LLM interface
 from .llm_core import LLMCore
-
-from config.config_singleton import Config
 
 
 def _get_config() -> Config:
     """Returns the current config singleton instance."""
     return Config()
-
 
 
 class YulYenStreamingProvider:
@@ -52,13 +49,13 @@ class YulYenStreamingProvider:
         base_url: str,
         persona: str,
         persona_prompt: str,
-        persona_options: Dict[str, Any],
+        persona_options: dict[str, Any],
         model_name: str = "plain",
         warm_up: bool = False,
         log_file: str = "conversation.json",
-        guard: Optional[BasicGuard] = None,
+        guard: BasicGuard | None = None,
         *,
-        llm_core: Optional[LLMCore] = None,
+        llm_core: LLMCore | None = None,
     ) -> None:
         self.model_name = model_name
         self.persona = persona
@@ -90,7 +87,7 @@ class YulYenStreamingProvider:
         self._logs_dir = "logs"
         ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
-        self.guard: Optional[BasicGuard] = guard
+        self.guard: BasicGuard | None = guard
 
         if warm_up:
             logging.info("Starting model warm-up: %s", model_name)
@@ -107,13 +104,17 @@ class YulYenStreamingProvider:
             self._llm_core.warm_up(self.model_name)
             logging.info("Model warmed up successfully.")
         except Exception:
-            logging.error("Error while warming up the model:\n%s", traceback.format_exc())
+            logging.error(
+                "Error while warming up the model:\n%s", traceback.format_exc()
+            )
 
     def _append_conversation_log(self, role: str, content: str) -> None:
         """Writes an entry to conversation.log."""
         try:
             entry = {
-                "ts": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
+                "ts": datetime.datetime.now()
+                .astimezone()
+                .isoformat(timespec="seconds"),
                 "model": self.model_name,
                 "bot": self.persona,
                 "options": self.persona_options,
@@ -125,20 +126,23 @@ class YulYenStreamingProvider:
         except Exception as e:
             logging.error("Error while writing conversation.log: %s", e)
 
-    def _log_generation_start(self, messages: List[Dict[str, Any]], options: Dict[str, Any]) -> None:
+    def _log_generation_start(
+        self, messages: list[dict[str, Any]], options: dict[str, Any]
+    ) -> None:
         """Logs context and wiki information before the actual LLM call.
-            TODO: Refactor: This method can be far leaner with less overblown error handling
+        TODO: Refactor: This method can be far leaner with less overblown error handling
         """
 
         # Hash and log the payload (messages plus options)
         try:
             _payload = {"messages": messages, "options": options}
-            _canon = json.dumps(_payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            _canon = json.dumps(
+                _payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+            )
             _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
             logging.debug("[LLM INPUT] sha256=%s payload=%s", _hash, _canon)
         except Exception as exc:
             logging.warning("Unable to log LLM input: %s", exc)
-
 
         timestamp = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
         try:
@@ -147,7 +151,11 @@ class YulYenStreamingProvider:
             logging.warning("Could not estimate token count: %s", exc)
             estimated_tokens = None
         persona_options = self.persona_options or {}
-        num_ctx_raw = persona_options.get("num_ctx") if isinstance(persona_options, dict) else None
+        num_ctx_raw = (
+            persona_options.get("num_ctx")
+            if isinstance(persona_options, dict)
+            else None
+        )
         num_ctx_value: Any
         if num_ctx_raw is None:
             num_ctx_value = None
@@ -163,8 +171,7 @@ class YulYenStreamingProvider:
         }
         logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
 
-
-    def stream(self, messages: List[Dict[str, Any]]):
+    def stream(self, messages: list[dict[str, Any]]):
         """
         Generator that yields the LLM response token by token.
         Includes logging and security checks.
@@ -191,26 +198,29 @@ class YulYenStreamingProvider:
                 break
 
         # Apply LLM options
-        options: Dict[str, Any] = {}
+        options: dict[str, Any] = {}
         if self.persona_options:
             options = self.persona_options
 
         full_reply_parts = []
         try:
             t_start = time.time()
-            first_token_time: Optional[float] = None
+            first_token_time: float | None = None
 
             self._log_generation_start(messages, options)
 
             # Delegate to the LLM core
             stream_obj = self._llm_core.stream_chat(
-                model_name=self.model_name, messages=messages, options=options, keep_alive=600
+                model_name=self.model_name,
+                messages=messages,
+                options=options,
+                keep_alive=600,
             )
 
             try:
                 buffer = ""
                 for chunk in stream_obj:
-                    logging.debug("[RAW CHUNK] %r", chunk) 
+                    logging.debug("[RAW CHUNK] %r", chunk)
                     if first_token_time is None:
                         first_token_time = time.time()
                     token = chunk.get("message", {}).get("content", "")
@@ -226,7 +236,11 @@ class YulYenStreamingProvider:
                             pol = self.guard.process_output(to_send)
                             if pol["blocked"]:
                                 yield zeigefinger_message(
-                                    {"reason": pol.get("reason") or "blocked_keyword", "detail": ""}
+                                    {
+                                        "reason": pol.get("reason")
+                                        or "blocked_keyword",
+                                        "detail": "",
+                                    }
                                 )
                                 break
                             to_send = pol["text"]
@@ -245,7 +259,12 @@ class YulYenStreamingProvider:
                     if self.guard:
                         pol = self.guard.process_output(to_send)
                         if pol["blocked"]:
-                            yield zeigefinger_message({"reason": pol.get("reason") or "blocked_keyword", "detail": ""})
+                            yield zeigefinger_message(
+                                {
+                                    "reason": pol.get("reason") or "blocked_keyword",
+                                    "detail": "",
+                                }
+                            )
                         else:
                             yield pol["text"]
                     else:
@@ -281,7 +300,9 @@ class YulYenStreamingProvider:
                 try:
                     _canon_out = full_reply
                     _hash_out = hashlib.sha256(_canon_out.encode("utf-8")).hexdigest()
-                    logging.debug("[LLM OUTPUT] sha256=%s content=%s", _hash_out, _canon_out)
+                    logging.debug(
+                        "[LLM OUTPUT] sha256=%s content=%s", _hash_out, _canon_out
+                    )
                 except Exception as exc:
                     logging.warning("Unable to log LLM output: %s", exc)
 
@@ -305,11 +326,17 @@ class YulYenStreamingProvider:
         Convenience method for the API: runs a single prompt
         and returns the complete answer as a string.
         """
-        messages: List[Dict[str, Any]] = []
+        messages: list[dict[str, Any]] = []
 
         # Look up the Wikipedia snippet
         wiki_hint, topic_title, snippet = lookup_wiki_snippet(
-            user_input, persona, keyword_finder, wiki_mode, wiki_proxy_port, wiki_snippet_limit, wiki_timeout
+            user_input,
+            persona,
+            keyword_finder,
+            wiki_mode,
+            wiki_proxy_port,
+            wiki_snippet_limit,
+            wiki_timeout,
         )
 
         # Attach context
@@ -349,14 +376,12 @@ def lookup_wiki_snippet(
     """
     Helper function: fetches a Wikipedia snippet via a local proxy.
     """
-    snippet: Optional[str] = None
-    wiki_hint: Optional[str] = None
-    topic_title: Optional[str] = None
+    snippet: str | None = None
+    wiki_hint: str | None = None
+    topic_title: str | None = None
     cfg = _get_config()
     texts = cfg.texts
     proxy_base = "http://localhost:" + str(proxy_port)
-
-
 
     if not keyword_finder:
         return (None, None, None)
@@ -386,7 +411,7 @@ def lookup_wiki_snippet(
                 exc_info=True,
             )
             wiki_hint = texts["wiki_hint_proxy_error"]
-        except Exception as err:  # pragma: no cover - unexpected errors
+        except Exception:  # pragma: no cover - unexpected errors
             logging.exception("[WIKI EXC] Unexpected error for topic='%s'", topic)
             wiki_hint = texts["wiki_hint_unknown_error"]
     return (wiki_hint, topic_title, snippet)
@@ -411,7 +436,9 @@ def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
     history.append({"role": "system", "content": context_message})
 
 
-def run_llm_collect(streamer: YulYenStreamingProvider, messages: List[Dict[str, Any]]) -> str:
+def run_llm_collect(
+    streamer: YulYenStreamingProvider, messages: list[dict[str, Any]]
+) -> str:
     """
     Runs streaming and collects all tokens into a single response.
     """
@@ -419,6 +446,3 @@ def run_llm_collect(streamer: YulYenStreamingProvider, messages: List[Dict[str, 
     for token in streamer.stream(messages=messages):
         full_reply_parts.append(token)
     return "".join(full_reply_parts).strip()
-
-
-    

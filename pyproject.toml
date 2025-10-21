@@ -1,0 +1,11 @@
+[tool.black]
+line-length = 88
+target-version = ["py310"]
+
+[tool.ruff]
+src = ["."]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "ISC"]
+ignore = ["E203", "E501"]

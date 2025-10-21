@@ -1,4 +1,3 @@
-
 """Abstract base class for all LLM cores.
 
 This interface defines the minimal methods an LLM core must provide.
@@ -9,7 +8,8 @@ a dummy used in tests) can be swapped seamlessly.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 
 class LLMCore(ABC):
@@ -28,10 +28,10 @@ class LLMCore(ABC):
     def stream_chat(
         self,
         model_name: str,
-        messages: List[Dict[str, Any]],
-        options: Dict[str, Any] | None = None,
+        messages: list[dict[str, Any]],
+        options: dict[str, Any] | None = None,
         keep_alive: int = 600,
-    ) -> Iterable[Dict[str, Any]]:
+    ) -> Iterable[dict[str, Any]]:
         """
         Starts a chat in streaming mode.
 
