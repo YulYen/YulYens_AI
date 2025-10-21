@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import re
 from typing import Any, TypedDict
 
@@ -10,6 +11,42 @@ class SecurityResult(TypedDict):
     detail: str | None  # first match / hint
 
 
+_SECURITY_TEXT_KEYS = {
+    "mask_text": "security_mask_text",
+    "prompt_injection": "security_prompt_injection",
+    "pii_detected": "security_pii_detected",
+    "blocked_keyword": "security_blocked_keyword",
+    "all_clear": "security_all_clear",
+}
+
+
+def _resolve_texts(texts: Mapping[str, str] | None) -> Mapping[str, str]:
+    if texts is not None:
+        if not isinstance(texts, Mapping):
+            raise TypeError("security texts must be provided as a mapping")
+        return texts
+
+    from config.config_singleton import Config  # lazy import to avoid cycles
+
+    config_texts = Config().texts
+    if not isinstance(config_texts, Mapping):  # pragma: no cover - defensive
+        raise TypeError("config texts must behave like a mapping")
+    return config_texts
+
+
+def _require_security_text(key: str, texts: Mapping[str, str]) -> str:
+    locale_key = _SECURITY_TEXT_KEYS[key]
+    try:
+        value = texts[locale_key]
+    except KeyError as exc:
+        raise KeyError(
+            f"Missing security text '{locale_key}'. Please add it to the locale catalog."
+        ) from exc
+    if not isinstance(value, str):  # pragma: no cover - defensive
+        raise TypeError(f"Security text '{locale_key}' must be a string")
+    return value
+
+
 class BasicGuard:
     """
     Tiny, deterministic guard for v0.
@@ -18,8 +55,6 @@ class BasicGuard:
     No network calls, no external dependencies.
     """
 
-    MASK_TEXT = "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten oder geheimen Keys."
-
     def __init__(
         self,
         enabled: bool,
@@ -27,6 +62,7 @@ class BasicGuard:
         pii_protection: bool,
         output_blocklist: bool,
         custom_patterns: dict[str, list[str]] | None = None,
+        texts: Mapping[str, str] | None = None,
     ):
         self.enabled = enabled
         self.flags = {
@@ -34,6 +70,9 @@ class BasicGuard:
             "pii_protection": pii_protection,
             "output_blocklist": output_blocklist,
         }
+
+        self.texts = _resolve_texts(texts)
+        self.mask_text = _require_security_text("mask_text", self.texts)
 
         # Defaults (deliberately conservative and compact)
         inj = [
@@ -152,7 +191,7 @@ class BasicGuard:
         masked = False
         if self.flags.get("pii_protection"):
             for rx in self._pii:
-                new_out = rx.sub(self.MASK_TEXT, out)
+                new_out = rx.sub(self.mask_text, out)
                 if new_out != out:
                     masked = True
                 out = new_out
@@ -220,13 +259,17 @@ def create_guard(name: str, settings: dict[str, Any]) -> BasicGuard:
 
 
 # -- Optional: human-friendly warning with "Yul Yen's wagging finger"
-def zeigefinger_message(res: SecurityResult) -> str:
+def zeigefinger_message(
+    res: SecurityResult, *, texts: Mapping[str, str] | None = None
+) -> str:
+    catalog = _resolve_texts(texts)
     reason = (res.get("reason") or "ok").lower()
     detail = (res.get("detail") or "")[:80]
     if reason == "prompt_injection":
-        return f"☝️ Yul Yen hebt mahnend den Zeigefinger: Prompt-Injection geblockt. Netter Versuch ({detail})"
+        template = _require_security_text("prompt_injection", catalog)
+        return template.format(detail=detail)
     if reason == "pii_detected":
-        return "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten."
+        return _require_security_text("pii_detected", catalog)
     if reason == "blocked_keyword":
-        return "☝️ Yul Yen hebt mahnend den Zeigefinger: Geheime Schlüssel werden hier nie angezeigt. Netter Versuch."
-    return "Alles sauber ✅"
+        return _require_security_text("blocked_keyword", catalog)
+    return _require_security_text("all_clear", catalog)
