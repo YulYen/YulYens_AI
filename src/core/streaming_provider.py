@@ -76,8 +76,8 @@ class YulYenStreamingProvider:
                     missing_name is None and "ollama" in message.lower()
                 ):
                     raise RuntimeError(
-                        "Es wurde kein LLM-Core injiziert und das Python-Paket 'ollama' fehlt. "
-                        "Installiere 'ollama' oder übergib eine Dummy-Implementierung."
+                        "No LLM core was injected and the Python package 'ollama' is missing. "
+                        "Install 'ollama' or provide a dummy implementation."
                     ) from exc
                 raise
 
@@ -308,7 +308,7 @@ class YulYenStreamingProvider:
 
         except Exception:
             logging.error("Error in stream():\n%s", traceback.format_exc())
-            err = "[FEHLER] LLM antwortet nicht korrekt."
+            err = "[ERROR] LLM is not responding correctly."
             self._append_conversation_log("assistant", err)
             yield err
 
@@ -430,8 +430,8 @@ def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
     )
     history.append({"role": "system", "content": guardrail})
     context_message = (
-        f"Kontext zum Thema {topic.replace('_', ' ')}: "
-        f"[Quelle: Wikipedia] {snippet}"
+        f"Context for the topic {topic.replace('_', ' ')}: "
+        f"[Source: Wikipedia] {snippet}"
     )
     history.append({"role": "system", "content": context_message})
 

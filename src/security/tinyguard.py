@@ -216,7 +216,7 @@ def create_guard(name: str, settings: dict[str, Any]) -> BasicGuard:
     if normalized in DISABLED_GUARD_NAMES:
         return DisabledGuard()
 
-    raise ValueError(f"Unbekannter Security-Guard: {name!r}")
+    raise ValueError(f"Unknown security guard: {name!r}")
 
 
 # -- Optional: human-friendly warning with "Yul Yen's wagging finger"

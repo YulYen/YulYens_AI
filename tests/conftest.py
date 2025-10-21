@@ -23,12 +23,12 @@ def _should_use_ollama(request, cfg) -> bool:
 
     backend = str(cfg.core.get("backend", "ollama")).strip().lower()
     if backend != "ollama":
-        pytest.skip("Test benötigt core.backend='ollama'")
+        pytest.skip("Test requires core.backend='ollama'")
 
     try:
         importlib.import_module("ollama")
     except ModuleNotFoundError:
-        pytest.skip("Python-Paket 'ollama' nicht installiert")
+        pytest.skip("Python package 'ollama' is not installed")
 
     base_url = cfg.core.get("ollama_url")
     if base_url:
@@ -39,7 +39,7 @@ def _should_use_ollama(request, cfg) -> bool:
             with socket.create_connection((host, port), timeout=1):
                 pass
         except OSError:
-            pytest.skip(f"Ollama-Server unter {base_url} nicht erreichbar")
+            pytest.skip(f"Ollama server at {base_url} is not reachable")
 
     return True
 
