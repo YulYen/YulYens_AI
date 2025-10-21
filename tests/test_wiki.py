@@ -177,9 +177,9 @@ def test_lookup_wiki_snippet_for_germany():
     # We expect the proxy to be reachable and to detect 'Deutschland'
     assert (
         wiki_hint is not None
-    ), "Wiki-Proxy liefert keinen Hint → vermutlich nicht gestartet"
+    ), "Wiki proxy did not return a hint → it is probably not running"
     assert topic_title == "Deutschland"
-    assert snippet, "Wiki-Proxy liefert keinen Snippet-Text"
+    assert snippet, "Wiki proxy did not return any snippet text"
 
     # The capital Berlin should appear in the snippet (case-insensitive)
     assert "berlin" in snippet.lower()

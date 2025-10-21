@@ -30,8 +30,8 @@ def test_invalid_persona_rejected(client):
     assert response.status_code == 400
     payload = response.json()
     detail = payload.get("detail", "")
-    assert "Unbekannte Persona" in detail
-    assert "Verfügbare Personas" in detail
+    assert "Unknown persona" in detail
+    assert "Available personas" in detail
     for name in get_all_persona_names():
         assert name in detail
 
@@ -79,12 +79,12 @@ def test_persona_name_normalized(client, monkeypatch):
         after_files = set()
 
     new_files = list(after_files - before_files)
-    assert new_files, "Es wurde keine neue Conversation-Logdatei erzeugt."
+    assert new_files, "No new conversation log file was created."
     target = max(new_files, key=lambda path: path.stat().st_mtime)
 
     try:
         lines = target.read_text(encoding="utf-8").strip().splitlines()
-        assert lines, "Conversation-Logdatei enthält keine Einträge."
+        assert lines, "Conversation log file contains no entries."
         last_entry = json.loads(lines[-1])
         assert last_entry.get("bot") == "LEAH"
     finally:
@@ -97,7 +97,7 @@ def test_persona_name_normalized(client, monkeypatch):
 
 @pytest.mark.slow
 @pytest.mark.ollama
-## TODO @pytest.mark.skipif(model =! "Leo13B", reason="Gleicher Witz Nur unter Leo stabil")
+## TODO @pytest.mark.skipif(model =! "Leo13B", reason="Same joke is only stable under Leo")
 def test_same_joke(client):
     """
     Expectation: identical question twice → exactly the same answer.
@@ -117,9 +117,9 @@ def test_same_joke(client):
 
     # Core requirement: deterministic match
     assert anfang in a1, (
-        "Antworten unterscheiden sich trotz identischem Prompt. "
-        "Prüfe seed/temperature/top_p/repeat_penalty in den Persona-Optionen "
-        "und setze ggf. include_date=False für diesen Test."
+        "Responses differ despite an identical prompt. "
+        "Check seed/temperature/top_p/repeat_penalty in the persona options "
+        "and set include_date=False for this test if needed."
     )
 
 
@@ -160,7 +160,7 @@ def ask(question: str, person: str, client) -> str:
         data = r.json()
     except Exception:
         pytest.fail(
-            f"Antwort ist kein JSON. Status={r.status_code}, Body={r.text[:500]}"
+            f"Response is not JSON. Status={r.status_code}, Body={r.text[:500]}"
         )
 
     # Typical contract: {"answer": "..."}; fallback to showing the full JSON

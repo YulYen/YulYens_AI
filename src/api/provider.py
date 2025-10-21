@@ -46,7 +46,7 @@ class AiApiProvider:
         if persona_key not in self._persona_lookup:
             known = ", ".join(self._known_personas)
             raise UnknownPersonaError(
-                f"Unbekannte Persona '{persona_name}'. Verfügbare Personas: {known}."
+                f"Unknown persona '{persona_name}'. Available personas: {known}."
             )
 
         canonical_persona = self._persona_lookup[persona_key]

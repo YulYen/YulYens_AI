@@ -136,7 +136,7 @@ class SpacyKeywordFinder:
         if not candidates:
             return None
 
-        # Bester Score zuerst
+        # Highest score first
         candidates.sort(key=lambda x: x[0], reverse=True)
         best_ent = candidates[0][1]
         return self._normalize_keyword(best_ent.text)

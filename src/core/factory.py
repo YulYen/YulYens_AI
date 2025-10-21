@@ -27,7 +27,7 @@ class AppFactory:
         self._cfg = Config()
         self._keyword_finder: SpacyKeywordFinder | None = None
         self._api_provider = None
-        self._ui = None  # TerminalUI oder WebUI
+        self._ui = None  # TerminalUI or WebUI
 
     # --------- Lazy‑Singleton Getter ---------
     def get_config(self) -> Config:
@@ -108,10 +108,10 @@ class AppFactory:
             persona_prompt=persona_prompt,
             persona_options=options,
             log_file=conv_log_file,
-            llm_core=llm_core,  # injizieren
+            llm_core=llm_core,  # inject
         )
 
-        # Security-Guard aus YAML
+        # Security guard configured via YAML
         sec_cfg = getattr(self._cfg, "security", None)
         guard = self._build_guard(sec_cfg)
         if guard:
@@ -138,8 +138,8 @@ class AppFactory:
             return backend
 
         raise ValueError(
-            "Unbekannter Wert für core.backend: "
-            f"{raw_backend!r}. Unterstützt werden 'ollama' und 'dummy'."
+            "Unknown value for core.backend: "
+            f"{raw_backend!r}. Supported options are 'ollama' and 'dummy'."
         )
 
     def _create_llm_core(self, backend: str, base_url: str | None) -> LLMCore:
@@ -151,7 +151,7 @@ class AppFactory:
         if backend == "ollama":
             if not base_url:
                 raise KeyError(
-                    "core.ollama_url muss gesetzt sein, wenn core.backend auf 'ollama' steht."
+                    "core.ollama_url must be set when core.backend is configured as 'ollama'."
                 )
 
             try:
@@ -163,9 +163,9 @@ class AppFactory:
                     missing_name is None and "ollama" in message.lower()
                 ):
                     raise RuntimeError(
-                        "Das Ollama-Backend ist aktiviert (core.backend: 'ollama'), "
-                        "aber das Python-Paket 'ollama' ist nicht installiert. "
-                        "Installiere es mit 'pip install ollama' oder stelle core.backend auf 'dummy'."
+                        "The Ollama backend is enabled (core.backend: 'ollama'), "
+                        "but the Python package 'ollama' is not installed. "
+                        "Install it with 'pip install ollama' or set core.backend to 'dummy'."
                     ) from exc
                 raise
 
@@ -202,7 +202,7 @@ class AppFactory:
             return create_guard(guard_name, guard_settings)
         except ValueError as exc:
             raise ValueError(
-                f"Unbekannter Security-Guard in security.guard: {raw_guard_name!r}"
+                f"Unknown security guard in security.guard: {raw_guard_name!r}"
             ) from exc
 
     def get_api_provider(self):
@@ -274,7 +274,7 @@ class AppFactory:
             )
         else:
             raise ValueError(
-                f"Unbekannter UI-Typ: {ui_type!r} (erwarte 'web' oder 'terminal')"
+                f"Unknown UI type: {ui_type!r} (expected 'web' or 'terminal')"
             )
 
         return self._ui
