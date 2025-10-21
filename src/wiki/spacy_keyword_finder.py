@@ -1,23 +1,56 @@
-import spacy
 import logging
+from enum import Enum
+
+import spacy
 
 RELEVANT_LABELS = ["PER", "ORG", "LOC", "EVENT", "GPE"]
 
 
 BLOCKWORDS = {
-    "hallo", "hübsche", "hi", "na", "servus", "moin", "schatz",
-    "liebling", "guten", "grüß", "tag", "huhu", "toll", "danke", "bitte",
-    "super", "cool", "prima", "jo", "gern", "okay", "schreib", "hey"
+    "hallo",
+    "hübsche",
+    "hi",
+    "na",
+    "servus",
+    "moin",
+    "schatz",
+    "liebling",
+    "guten",
+    "grüß",
+    "tag",
+    "huhu",
+    "toll",
+    "danke",
+    "bitte",
+    "super",
+    "cool",
+    "prima",
+    "jo",
+    "gern",
+    "okay",
+    "schreib",
+    "hey",
 }
 
-W_TOKENS = {"wer", "was", "welches", "welcher", "welche", "wann", "wo", "wie", "warum", "wieso"}
+W_TOKENS = {
+    "wer",
+    "was",
+    "welches",
+    "welcher",
+    "welche",
+    "wann",
+    "wo",
+    "wie",
+    "warum",
+    "wieso",
+}
 GENERIC_NOUNS = {"amt", "funktion", "rolle", "posten", "thema", "frage"}
 
-from enum import Enum
 
 class ModelVariant(str, Enum):
     MEDIUM = "de_core_news_md"
     LARGE = "de_core_news_lg"
+
 
 class SpacyKeywordFinder:
     """Finds relevant keywords in German text for the Wikipedia search."""
@@ -61,14 +94,14 @@ class SpacyKeywordFinder:
         # No trailing exclamation marks
         if keyword.endswith("!"):
             return False
-        
-         # New heuristic 1: drop entities containing W-question words
+
+        # New heuristic 1: drop entities containing W-question words
         ent_lemmas = [t.lemma_.lower() for t in ent]
-        if any(l in W_TOKENS for l in ent_lemmas):
+        if any(lemma in W_TOKENS for lemma in ent_lemmas):
             return False
 
         # New heuristic 2: allow generic nouns only when paired with a proper noun
-        if any(l in GENERIC_NOUNS for l in ent_lemmas):
+        if any(lemma in GENERIC_NOUNS for lemma in ent_lemmas):
             if not any(t.pos_ == "PROPN" for t in ent):
                 return False
 
@@ -81,13 +114,12 @@ class SpacyKeywordFinder:
         # (1) Standard spaCy entities
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
-                keyword = self._normalize_keyword(ent.text) 
+                keyword = self._normalize_keyword(ent.text)
                 logging.info(f"{ent.label_} match: {keyword}")
                 if keyword not in treffer:
                     treffer.append(keyword)
 
         return treffer
-    
 
     def find_top_keyword(self, text: str):
         doc = self.nlp(text)
@@ -97,7 +129,7 @@ class SpacyKeywordFinder:
             if self.is_valid_keyword(ent):
                 # Score: earlier in the text plus span length
                 pos_score = 1.0 - (ent.start_char / max(1, len(text)))  # 0..1
-                len_score = min(len(ent.text) / 10.0, 1.0)              # max 1.0
+                len_score = min(len(ent.text) / 10.0, 1.0)  # max 1.0
                 score = pos_score + len_score
                 candidates.append((score, ent))
 

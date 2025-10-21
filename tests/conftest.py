@@ -4,12 +4,15 @@ import socket
 from urllib.parse import urlparse
 
 import pytest
-from fastapi.testclient import TestClient
-
-from config.config_singleton import Config
 from api.app import app, set_provider
+from config.config_singleton import Config
 from core.factory import AppFactory
-from launch import start_wiki_proxy_thread, ensure_kiwix_running_if_offlinemode_and_autostart
+from fastapi.testclient import TestClient
+from launch import (
+    ensure_kiwix_running_if_offlinemode_and_autostart,
+    start_wiki_proxy_thread,
+)
+
 from tests.util import has_spacy_model
 
 
@@ -40,6 +43,7 @@ def _should_use_ollama(request, cfg) -> bool:
 
     return True
 
+
 @pytest.fixture(scope="function")
 def client(request):
     # Reset the config singleton and load the test configuration
@@ -62,6 +66,7 @@ def client(request):
     # Cleanup: reset the provider and clear the config
     set_provider(None)
     Config.reset_instance()
+
 
 @pytest.fixture(scope="function")
 def client_with_date_and_wiki(request):

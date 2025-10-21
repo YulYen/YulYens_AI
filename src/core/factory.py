@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Optional, Type
 
+import config.personas as personas
 from config.config_singleton import Config
-from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
-from core.streaming_provider import YulYenStreamingProvider
 from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
-from core.utils import _wiki_mode_enabled, _system_prompt_with_date
+from wiki.spacy_keyword_finder import ModelVariant, SpacyKeywordFinder
+
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
-
-import config.personas as personas
+from core.streaming_provider import YulYenStreamingProvider
+from core.utils import _system_prompt_with_date, _wiki_mode_enabled
 
 
 class AppFactory:
@@ -26,7 +25,7 @@ class AppFactory:
 
     def __init__(self) -> None:
         self._cfg = Config()
-        self._keyword_finder: Optional[SpacyKeywordFinder] = None
+        self._keyword_finder: SpacyKeywordFinder | None = None
         self._api_provider = None
         self._ui = None  # TerminalUI oder WebUI
 
@@ -34,7 +33,7 @@ class AppFactory:
     def get_config(self) -> Config:
         return self._cfg
 
-    def get_keyword_finder(self) -> Optional[SpacyKeywordFinder]:
+    def get_keyword_finder(self) -> SpacyKeywordFinder | None:
         if self._keyword_finder is None:
             if _wiki_mode_enabled(self._cfg.wiki["mode"]):
                 variant = self._resolve_spacy_model_variant()
@@ -95,7 +94,9 @@ class AppFactory:
         backend = self._determine_backend(core_cfg)
         llm_core = self._create_llm_core(backend, base_url)
 
-        logging.debug("Creating streamer for %s with backend '%s'", persona_name, backend)
+        logging.debug(
+            "Creating streamer for %s with backend '%s'", persona_name, backend
+        )
 
         streamer_base_url = base_url if base_url is not None else ""
 
@@ -141,7 +142,7 @@ class AppFactory:
             f"{raw_backend!r}. Unterstützt werden 'ollama' und 'dummy'."
         )
 
-    def _create_llm_core(self, backend: str, base_url: Optional[str]) -> LLMCore:
+    def _create_llm_core(self, backend: str, base_url: str | None) -> LLMCore:
         """Creates the concrete LLM core implementation based on the backend."""
 
         if backend == "dummy":
@@ -172,14 +173,14 @@ class AppFactory:
 
         raise ValueError(f"Unsupported backend: {backend!r}")
 
-    def _load_ollama_core_class(self) -> Type[LLMCore]:
+    def _load_ollama_core_class(self) -> type[LLMCore]:
         """Isolated import to encapsulate the optional dependency cleanly."""
 
         from core.ollama_llm_core import OllamaLLMCore
 
         return OllamaLLMCore
 
-    def _build_guard(self, sec_cfg: Optional[dict]) -> Optional[BasicGuard]:
+    def _build_guard(self, sec_cfg: dict | None) -> BasicGuard | None:
         if not isinstance(sec_cfg, dict):
             return None
 
@@ -188,7 +189,9 @@ class AppFactory:
             return None
 
         raw_guard_name = sec_cfg.get("guard", "BasicGuard")
-        guard_name = "BasicGuard" if raw_guard_name is None else str(raw_guard_name).strip()
+        guard_name = (
+            "BasicGuard" if raw_guard_name is None else str(raw_guard_name).strip()
+        )
         if not guard_name:
             guard_name = "BasicGuard"
 
@@ -208,6 +211,7 @@ class AppFactory:
             if not bool(self._cfg.api["enabled"]):
                 return None
             from api.provider import AiApiProvider
+
             self._api_provider = AiApiProvider(
                 keyword_finder=self.get_keyword_finder(),
                 wiki_mode=self._cfg.wiki["mode"],
@@ -239,8 +243,12 @@ class AppFactory:
 
         if ui_type == "terminal":
             self._ui = TerminalUI(
-                self, self._cfg, finder,
-                int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
+                self,
+                self._cfg,
+                finder,
+                int(wiki["snippet_limit"]),
+                wiki["mode"],
+                int(wiki["proxy_port"]),
                 wiki_timeout=(
                     float(wiki["timeout_connect"]),
                     float(wiki["timeout_read"]),
@@ -251,9 +259,14 @@ class AppFactory:
             host = web_cfg["host"]
             port = int(web_cfg["port"])
             self._ui = WebUI(
-                self, self._cfg, finder,
-                int(wiki["snippet_limit"]), wiki["mode"], int(wiki["proxy_port"]),
-                web_host=host, web_port=port,
+                self,
+                self._cfg,
+                finder,
+                int(wiki["snippet_limit"]),
+                wiki["mode"],
+                int(wiki["proxy_port"]),
+                web_host=host,
+                web_port=port,
                 wiki_timeout=(
                     float(wiki["timeout_connect"]),
                     float(wiki["timeout_read"]),

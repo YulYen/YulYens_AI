@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any
 
 from core.dummy_llm_core import DummyLLMCore
 from core.streaming_provider import YulYenStreamingProvider
@@ -10,20 +10,22 @@ from core.streaming_provider import YulYenStreamingProvider
 class AllowAllGuard:
     """Minimal guard that allows every input and output."""
 
-    def check_input(self, text: str) -> Dict[str, Any]:
+    def check_input(self, text: str) -> dict[str, Any]:
         return {"ok": True}
 
-    def process_output(self, text: str) -> Dict[str, Any]:
+    def process_output(self, text: str) -> dict[str, Any]:
         return {"blocked": False, "text": text}
 
-    def check_output(self, text: str) -> Dict[str, Any]:
+    def check_output(self, text: str) -> dict[str, Any]:
         return {"ok": True}
 
 
-def create_streaming_provider(*, llm_core: DummyLLMCore | None = None, **overrides: Any) -> YulYenStreamingProvider:
+def create_streaming_provider(
+    *, llm_core: DummyLLMCore | None = None, **overrides: Any
+) -> YulYenStreamingProvider:
     """Helper to construct consistently configured provider instances."""
 
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "base_url": "http://dummy",
         "persona": "TEST",
         "persona_prompt": "Dies ist ein System-Prompt.",
@@ -92,8 +94,13 @@ def test_streaming_writes_conversation_log(tmp_path) -> None:
     assert out == "ECHO: Sag etwas Nettes."
     assert os.path.exists(provider.conversation_log_path)
 
-    rows = [json.loads(line) for line in open(provider.conversation_log_path, encoding="utf-8")]
+    rows = [
+        json.loads(line)
+        for line in open(provider.conversation_log_path, encoding="utf-8")
+    ]
     roles = [row["role"] for row in rows]
 
     assert "user" in roles and "assistant" in roles
-    assert any(row.get("bot") == "DORIS" and row.get("model") == "LEAH13B" for row in rows)
+    assert any(
+        row.get("bot") == "DORIS" and row.get("model") == "LEAH13B" for row in rows
+    )

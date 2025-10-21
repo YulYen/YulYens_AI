@@ -4,7 +4,6 @@ import shutil
 from pathlib import Path
 
 import pytest
-
 from config.config_singleton import Config
 from config.texts import Texts
 

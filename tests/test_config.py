@@ -1,15 +1,13 @@
 # tests/test_config.py
-import pytest
-
-from core.utils import _greeting_text, _wiki_mode_enabled
-from config.personas import system_prompts
-from config.config_singleton import Config
-
 import importlib
 
+import pytest
+from config.config_singleton import Config
+from config.personas import system_prompts
 from core.dummy_llm_core import DummyLLMCore
 from core.factory import AppFactory
 from core.streaming_provider import YulYenStreamingProvider
+from core.utils import _greeting_text, _wiki_mode_enabled
 
 
 def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
@@ -29,6 +27,7 @@ def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
     assert str(expected_path) in captured.err
 
     Config.reset_instance()
+
 
 def _build_test_cfg(backend: str = "dummy", core_updates: dict | None = None):
     class DummyCfg:
@@ -58,7 +57,9 @@ def _build_test_cfg(backend: str = "dummy", core_updates: dict | None = None):
     return cfg
 
 
-def _prepare_factory(monkeypatch, backend: str = "dummy", core_updates: dict | None = None):
+def _prepare_factory(
+    monkeypatch, backend: str = "dummy", core_updates: dict | None = None
+):
     cfg = _build_test_cfg(backend, core_updates)
 
     from config import config_singleton
@@ -104,7 +105,9 @@ def test_factory_builds_streamer_with_ollama_core(monkeypatch):
         def __init__(self, base_url: str) -> None:
             self.base_url = base_url
 
-    monkeypatch.setattr(AppFactory, "_load_ollama_core_class", lambda self: FakeOllamaCore)
+    monkeypatch.setattr(
+        AppFactory, "_load_ollama_core_class", lambda self: FakeOllamaCore
+    )
 
     fac = AppFactory()
     streamer = fac.get_streamer_for_persona("DORIS")
@@ -131,14 +134,17 @@ def test_factory_ollama_backend_missing_dependency(monkeypatch):
     assert "core.backend" in message
     assert "pip install ollama" in message
 
+
 def _opts(name: str):
     personas = importlib.import_module("config.personas")
     return personas.get_options(name)
+
 
 def test_peter_has_seed_42():
     opts = _opts("PETER")
     assert isinstance(opts, dict)
     assert opts.get("seed") == 42
+
 
 def test_others_have_no_seed_by_default():
     for name in ("LEAH", "DORIS", "POPCORN"):
@@ -165,10 +171,10 @@ def test_greeting_replaces_placeholders(tmp_path):
     "mode, expected",
     [
         ("offline", True),
-        ("false",   False),
-        ("online",  True),
-        (False,     False),  # falls mal bool in YAML verwendet wird
-        (None,      False),
+        ("false", False),
+        ("online", True),
+        (False, False),  # falls mal bool in YAML verwendet wird
+        (None, False),
     ],
 )
 def test_wiki_mode_enabled(mode, expected):

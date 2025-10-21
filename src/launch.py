@@ -13,6 +13,7 @@ import uvicorn
 
 # API-Import
 from api.app import app, set_provider
+from config.config_singleton import Config
 
 # Logging
 from config.logging_setup import init_logging
@@ -20,11 +21,8 @@ from config.logging_setup import init_logging
 # Core und Konfiguration
 from core.factory import AppFactory
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
-from config.config_singleton import Config
-from yaml import YAMLError
-
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
-
+from yaml import YAMLError
 
 
 def main():
@@ -34,7 +32,9 @@ def main():
     try:
         cfg = Config(config_path)  # einmalig laden
     except OSError as exc:
-        config_location = os.path.abspath(getattr(exc, "filename", config_path) or config_path)
+        config_location = os.path.abspath(
+            getattr(exc, "filename", config_path) or config_path
+        )
         details = exc.strerror or str(exc)
         print(
             (
@@ -60,8 +60,7 @@ def main():
     # 1) Logging ZUERST initialisieren
     ensure_dir_exists(cfg.logging["dir"])
     logfile = os.path.join(
-        cfg.logging["dir"],
-        f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
+        cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
     )
     init_logging(
         loglevel=str(cfg.logging["level"]),
@@ -69,7 +68,6 @@ def main():
         to_console=bool(cfg.logging["to_console"]),
     )
     logging.info("BOOT OK – Logging initialised and active.")
-
 
     # Optional (extra sicher): httpx/urllib3 auf WARNING drehen
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -83,7 +81,9 @@ def main():
         try:
             ok = ensure_kiwix_running_if_offlinemode_and_autostart(cfg)
             if not ok:
-                logging.warning("Offline-Wiki autostart requested but not available. Continuing without it.")
+                logging.warning(
+                    "Offline-Wiki autostart requested but not available. Continuing without it."
+                )
         except Exception as e:
             logging.error(f"Unexpected error during kiwix autostart. Continuing. {e}")
 
@@ -92,7 +92,9 @@ def main():
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
 
-    logging.info(f"ui.type={cfg.ui['type']} wiki.mode={wiki_mode} snippet_limit={cfg.wiki['snippet_limit']}")
+    logging.info(
+        f"ui.type={cfg.ui['type']} wiki.mode={wiki_mode} snippet_limit={cfg.wiki['snippet_limit']}"
+    )
 
     # 4) API optional starten
     if api_provider:
@@ -116,11 +118,14 @@ def start_api_in_background(api_cfg, provider):
     port = int(api_cfg["port"])
 
     def _run():
-        uvicorn.run(app, host=host, port=port, log_level="warning") # info-level logs disrupt the terminal UI
+        uvicorn.run(
+            app, host=host, port=port, log_level="warning"
+        )  # info-level logs disrupt the terminal UI
 
     t = threading.Thread(target=_run, name="LeahAPI", daemon=True)
     t.start()
     return t
+
 
 def _wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
     """Briefly waits for a TCP port to become reachable (best effort)."""
@@ -133,16 +138,20 @@ def _wait_for_port(host: str, port: int, timeout: float = 5.0) -> bool:
             time.sleep(0.1)
     return False
 
+
 def start_wiki_proxy_thread() -> threading.Thread | None:
     proxy_port = int(Config().wiki["proxy_port"])
 
     # Already running? (e.g. started manually)
     if _wait_for_port("127.0.0.1", proxy_port, timeout=0.2):
-        logging.info(f"Wiki proxy already seems to be running (port {proxy_port} is reachable).")
+        logging.info(
+            f"Wiki proxy already seems to be running (port {proxy_port} is reachable)."
+        )
         return None
 
     # Start in the same process as a thread
     import wiki.wikipedia_proxy as wiki_proxy  # nutzt die in wikipedia-proxy.py gesetzten Konfigwerte
+
     t = threading.Thread(target=wiki_proxy.run, name="WikiProxy", daemon=True)
     t.start()
 
@@ -153,6 +162,7 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
         logging.warning(f"Wiki proxy (port {proxy_port}) still unreachable after 3s.")
 
     return t
+
 
 if __name__ == "__main__":
     main()

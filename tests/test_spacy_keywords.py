@@ -1,7 +1,7 @@
 import pytest
+from wiki.spacy_keyword_finder import ModelVariant, SpacyKeywordFinder
 
 from tests.util import has_spacy_model
-from wiki.spacy_keyword_finder import SpacyKeywordFinder, ModelVariant
 
 pytestmark = pytest.mark.skipif(
     not has_spacy_model("de_core_news_lg"),
@@ -18,8 +18,8 @@ easy_positive = [
     ("Was weißt du über Madeira?", ["Madeira"]),
     ("Wer gründete Apple?", ["Apple"]),
     ("Schreib bitte über Napoleon.", ["Napoleon"]),
-    #("Was war der Zweite Weltkrieg?", ["Zweiter_Weltkrieg"]),
-    #("Kennst du Leonardo da Vinci?", ["Leonardo_da_Vinci"]),
+    # ("Was war der Zweite Weltkrieg?", ["Zweiter_Weltkrieg"]),
+    # ("Kennst du Leonardo da Vinci?", ["Leonardo_da_Vinci"]),
 ]
 
 # (2) Simple negative cases
@@ -35,7 +35,7 @@ easy_negative = [
     ("Wie ist das Wetter heute?", []),
     ("Was soll ich morgen kochen?", []),
     ("Wo bist du gerade?", []),
-    #("Treibst du Sport?", []),
+    # ("Treibst du Sport?", []),
     ("Wie funktioniert ein Motor?", []),
     ("Lass uns ein Spiel spielen.", []),
     ("Bist du ein Bot?", []),
@@ -45,59 +45,79 @@ easy_negative = [
 tricky_positive = [
     ("Was weißt du über die RAF?", ["RAF"]),
     ("Erzähl mir etwas über Saturn.", ["Saturn"]),
-    #("What do you know about Merkel?", ["Merkel"]),
+    # ("What do you know about Merkel?", ["Merkel"]),
     ("Kennst Ludwig van Beethoven?", ["Ludwig_van_Beethoven"]),
     ("Was weißt du über NASA?", ["NASA"]),
     ("Erzähl mir etwas über Amazon.", ["Amazon"]),
-    #("Kennst du den Film Inception?", ["Inception"]),
+    # ("Kennst du den Film Inception?", ["Inception"]),
     ("Was weißt du über die Olympischen Spiele 2012 in London?", ["London"]),
-    #("Tell me about the Titanic.", ["Titanic"]),
-    ("Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025??", ["Friedrich_Merz"]),
+    # ("Tell me about the Titanic.", ["Titanic"]),
+    (
+        "Antworte bitte kurz: Welches Amt bekleidet Friedrich Merz ab Mai 2025??",
+        ["Friedrich_Merz"],
+    ),
 ]
 
 top_pick_cases = [
     # 1
     ("Seit wann ist Donald Trump Präsident der USA?", ["Donald_Trump", "USA"]),
     # 2 – two ORGs, earlier position wins
-     ("Erzähl mir etwas über Bundesbank und die Amazon.", ["Bundesbank", "Amazon"]),
+    ("Erzähl mir etwas über Bundesbank und die Amazon.", ["Bundesbank", "Amazon"]),
     # 3 – two LOCs
     ("Ist Paris größer als Berlin?", ["Paris", "Berlin"]),
     # 4 – two football ORGs, prefer the longer early span
-    ("Wie erfolgreich ist der FC Bayern München gegen Borussia Dortmund?", ["FC_Bayern_München", "Borussia_Dortmund"]),
+    (
+        "Wie erfolgreich ist der FC Bayern München gegen Borussia Dortmund?",
+        ["FC_Bayern_München", "Borussia_Dortmund"],
+    ),
     # 5 – two ORGs
     ("Hat die NASA mit SpaceX zusammengearbeitet?", ["NASA", "SpaceX"]),
     # 6 – LOC vs. LOC
     ("Wo liegt der Grand Canyon in den USA?", ["Grand_Canyon", "USA"]),
     # 7 – two ORGs, longer early span
-    ("Was macht die Europäische Union im Vergleich zur NATO?", ["Europäische_Union", "NATO"]),
+    (
+        "Was macht die Europäische Union im Vergleich zur NATO?",
+        ["Europäische_Union", "NATO"],
+    ),
     # 8 – PER vs. LOC
     ("Wer war Kaiser Wilhelm II in Deutschland?", ["Kaiser_Wilhelm_II", "Deutschland"]),
     # 9 – multiple celestial bodies (LOC)
-    ("Ist Saturn weiter von der Erde entfernt als Jupiter?", ["Saturn", "Erde", "Jupiter"]),
+    (
+        "Ist Saturn weiter von der Erde entfernt als Jupiter?",
+        ["Saturn", "Erde", "Jupiter"],
+    ),
     # 10 – PER first, then ORG
-    ("Welche Strategie verfolgt Satya Nadella bei Microsoft?", ["Satya_Nadella", "Microsoft"]),
-
+    (
+        "Welche Strategie verfolgt Satya Nadella bei Microsoft?",
+        ["Satya_Nadella", "Microsoft"],
+    ),
 ]
 
 # (4) Challenging negative cases (realistically achievable)
 tricky_negative = [
     ("Hallo meine Liebe!", []),
     ("Guten Morgen, Siri!", []),
-
 ]
 
 
 @pytest.fixture(scope="module")
 def keyword_finder():
-    return SpacyKeywordFinder(variant = ModelVariant.LARGE)
+    return SpacyKeywordFinder(variant=ModelVariant.LARGE)
 
-@pytest.mark.parametrize("text,expected", easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases)
+
+@pytest.mark.parametrize(
+    "text,expected",
+    easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases,
+)
 def test_keyword_detection(keyword_finder, text, expected):
     result = keyword_finder.find_keywords(text)
     assert sorted(result) == sorted(expected)
 
 
-@pytest.mark.parametrize( "text,expected_list", easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases)
+@pytest.mark.parametrize(
+    "text,expected_list",
+    easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases,
+)
 def test_top_keyword_selection(keyword_finder, text, expected_list):
     top = keyword_finder.find_top_keyword(text)
 
@@ -106,4 +126,3 @@ def test_top_keyword_selection(keyword_finder, text, expected_list):
         assert top == expected_list[0]
     else:
         assert top is None
-

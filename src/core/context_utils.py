@@ -2,19 +2,20 @@
 import logging
 import math
 import re
-from typing import Any, Dict, List, Sequence, Tuple
+from collections.abc import Sequence
+from typing import Any
 
-Message = Dict[str, Any]
+Message = dict[str, Any]
 
 chars_per_token: float = 3.25  # ~3.25 characters per token (heuristic, conservative)
 
-threshold: float = 0.75 # Fill the context to only 75%
+threshold: float = 0.75  # Fill the context to only 75%
 
-headroom_tokens: int = 500 # Keep at least 500 tokens of headroom
-headroom_ratio: float = 0.5 # Or leave 50% headroom when trimming anyway
+headroom_tokens: int = 500  # Keep at least 500 tokens of headroom
+headroom_ratio: float = 0.5  # Or leave 50% headroom when trimming anyway
 
 
-def _token_stats(messages: Sequence[Message]) -> Tuple[int, int, int]:
+def _token_stats(messages: Sequence[Message]) -> tuple[int, int, int]:
     """Return (message_count, total_chars, content_tokens)."""
 
     total_chars = 0
@@ -45,7 +46,7 @@ def karl_prepare_quick_and_dirty(
     num_ctx: int,
     *,
     min_keep_tail: int = 2,
-) -> List[Message]:
+) -> list[Message]:
     """Trim conversation history to leave space for the upcoming response."""
 
     items = list(messages)
@@ -107,7 +108,7 @@ def approx_token_count(
 
 def context_near_limit(
     history: Sequence[Message],
-    persona_options: Dict[str, Any],
+    persona_options: dict[str, Any],
 ) -> bool:
     """Return True if the conversation is close to the persona's context limit."""
 

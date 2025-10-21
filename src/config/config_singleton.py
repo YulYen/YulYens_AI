@@ -7,8 +7,9 @@ import yaml
 
 from .texts import Texts
 
+
 class Config:
-    _instance: 'Config | None' = None
+    _instance: Config | None = None
 
     def __new__(cls, path: str = "config.yaml"):
         # Singleton-Instanz erzeugen, falls noch nicht vorhanden
@@ -16,7 +17,7 @@ class Config:
             cls._instance = super().__new__(cls)
             cls._instance._load_config(path)
         return cls._instance
-    
+
     @classmethod
     def reset_instance(cls) -> None:
         """
@@ -32,15 +33,21 @@ class Config:
             data = yaml.safe_load(fh) or {}
 
         if not isinstance(data, dict):
-            raise ValueError(f"Configuration file '{config_path}' must contain a mapping of settings.")
+            raise ValueError(
+                f"Configuration file '{config_path}' must contain a mapping of settings."
+            )
 
         try:
             language = data.pop("language")
         except KeyError as exc:
-            raise KeyError(f"Configuration file '{config_path}' is missing required key 'language'.") from exc
+            raise KeyError(
+                f"Configuration file '{config_path}' is missing required key 'language'."
+            ) from exc
 
         if not isinstance(language, str) or not language.strip():
-            raise ValueError("Config value 'language' must be a non-empty string like 'de' or 'en'.")
+            raise ValueError(
+                "Config value 'language' must be a non-empty string like 'de' or 'en'."
+            )
 
         self.language = language
         locales_dir = config_path.parent / "locales"
@@ -68,4 +75,6 @@ class Config:
                 try:
                     section_dict.update(updates)
                 except AttributeError as exc:
-                    raise TypeError(f"Section '{section}' does not support updates.") from exc
+                    raise TypeError(
+                        f"Section '{section}' does not support updates."
+                    ) from exc

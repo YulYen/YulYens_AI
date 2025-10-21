@@ -1,8 +1,9 @@
 """Persona configuration loader."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -12,7 +13,7 @@ _BASE_PATH = Path(__file__).with_name("personas_base.yaml")
 _LOCALES_DIR = Path(__file__).resolve().parents[2] / "locales"
 
 
-def _load_system_prompts() -> List[Dict[str, Any]]:
+def _load_system_prompts() -> list[dict[str, Any]]:
     """Loads persona data from the base and locale YAML files."""
 
     cfg = Config()
@@ -20,12 +21,12 @@ def _load_system_prompts() -> List[Dict[str, Any]]:
     locale_path = _LOCALES_DIR / cfg.language / "personas.yaml"
     locale_data = yaml.safe_load(locale_path.read_text(encoding="utf-8"))
 
-    personas: List[Dict[str, Any]] = []
+    personas: list[dict[str, Any]] = []
     for base_persona in base_data["personas"]:
         persona_name = base_persona["name"]
         localized = locale_data["personas"][persona_name]
 
-        entry: Dict[str, Any] = {
+        entry: dict[str, Any] = {
             "name": localized.get("name", persona_name),
             "prompt": localized["prompt"],
             "description": localized.get("description", ""),
@@ -42,7 +43,7 @@ def _load_system_prompts() -> List[Dict[str, Any]]:
     return personas
 
 
-system_prompts: List[Dict[str, Any]] = _load_system_prompts()
+system_prompts: list[dict[str, Any]] = _load_system_prompts()
 
 
 def get_prompt_by_name(name: str) -> str:
@@ -53,7 +54,7 @@ def get_prompt_by_name(name: str) -> str:
     raise ValueError(f"Persona '{name}' nicht gefunden.")
 
 
-def get_options(name: str) -> Optional[Dict[str, Any]]:
+def get_options(name: str) -> dict[str, Any] | None:
     """Returns the options for a persona by name."""
     for persona in system_prompts:
         if persona["name"].lower() == name.lower():
@@ -61,7 +62,7 @@ def get_options(name: str) -> Optional[Dict[str, Any]]:
     raise ValueError(f"Persona '{name}' nicht gefunden.")
 
 
-def get_all_persona_names() -> List[str]:
+def get_all_persona_names() -> list[str]:
     """Returns a list of all persona names."""
     return [p["name"] for p in system_prompts]
 

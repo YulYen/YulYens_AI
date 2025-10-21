@@ -1,17 +1,18 @@
 # wikipedia-proxy.py
+import json
+import logging
+import re
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import unquote, urlparse, parse_qs
+from urllib.parse import parse_qs, unquote, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-import json, re
-import logging, time
-from datetime import datetime
-from config.logging_setup import init_logging
 from config.config_singleton import Config
 
 # --- Configuration --------------------------------------------------------------
 config = Config()  # Load singleton instance (loads YAML on first access)
- 
+
 WIKI_CFG = config.wiki
 OFFLINE_CFG = config.wiki["offline"]
 
@@ -32,7 +33,9 @@ logger.info("Wiki proxy starting up…")
 
 
 # ---------- Helpers for responses -----------------------------------------------
-def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes):
+def _send_bytes(
+    handler: BaseHTTPRequestHandler, status: int, content_type: str, body: bytes
+):
     handler.send_response(status)
     handler.send_header("Content-type", f"{content_type}; charset=utf-8")
     handler.send_header("Content-Length", str(len(body)))
@@ -43,8 +46,10 @@ def _send_bytes(handler: BaseHTTPRequestHandler, status: int, content_type: str,
     except (ConnectionAbortedError, BrokenPipeError) as e:
         logger.warning(f"[ClientAborted] write aborted: {e}")
 
+
 def _send_text(handler: BaseHTTPRequestHandler, status: int, text: str):
     _send_bytes(handler, status, "text/plain", text.encode("utf-8"))
+
 
 def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
     encoded = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -55,9 +60,11 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
 def _build_kiwix_url(term: str) -> str:
     return f"http://{KIWIX_HOST}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
+
 def _build_online_url(term: str) -> str:
     # Wikipedia accepts underscores as spaces
     return f"https://de.wikipedia.org/wiki/{term}"
+
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
     """
@@ -72,6 +79,7 @@ def _clean_whitespace_and_remove_refs(text: str) -> str:
     # Collapse all whitespace to single spaces
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
 
 def _find_infobox_table(soup):
     """
@@ -92,6 +100,7 @@ def _find_infobox_table(soup):
             return t
     return None
 
+
 def _extract_infobox_kv(html: str, max_items: int = 30):
     soup = BeautifulSoup(html, "html.parser")
 
@@ -106,7 +115,9 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
 
         # Skip image/media rows
         if tds:
-            td_classes_joined = " ".join(sum([td.get("class") or [] for td in tds], [])).lower()
+            td_classes_joined = " ".join(
+                sum([td.get("class") or [] for td in tds], [])
+            ).lower()
             if "image" in td_classes_joined or "infobox-image" in td_classes_joined:
                 continue
 
@@ -124,13 +135,15 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
                 classes = " ".join(td.get("class") or []).lower()
                 if "ibleft" in classes and left is None:
                     left = td
-                elif (("ibright" in classes) or ("ibdata" in classes)) and right is None:
+                elif (
+                    ("ibright" in classes) or ("ibdata" in classes)
+                ) and right is None:
                     right = td
             if left and right:
                 key = left.get_text(" ", strip=True)
                 val = right.get_text(" ", strip=True)
             else:
-            # Generic fallback: take the first two <td> elements
+                # Generic fallback: take the first two <td> elements
                 key = tds[0].get_text(" ", strip=True)
                 val = tds[1].get_text(" ", strip=True)
 
@@ -143,6 +156,7 @@ def _extract_infobox_kv(html: str, max_items: int = 30):
                     break
 
     return pairs
+
 
 def _format_kv_line(pairs) -> str:
     """
@@ -158,7 +172,10 @@ def _format_kv_line(pairs) -> str:
         parts.append(f"{k}: {v}")
     return " | ".join(parts)
 
-def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online: bool) -> str:
+
+def _build_user_visible_link(
+    handler: BaseHTTPRequestHandler, term: str, online: bool
+) -> str:
     """
     Builds a link that works in the user's browser.
     Takes the host from the current request (e.g. 192.168.x.y or localhost)
@@ -171,14 +188,20 @@ def _build_user_visible_link(handler: BaseHTTPRequestHandler, term: str, online:
     # Local Kiwix link (same host as the user request, but port 8080)
     return f"http://{hostname}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
 
+
 def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
     """
     Builds the prefix from config.yaml (online/offline) and appends the link.
     """
     key = "wiki_lookup_prefix_online" if online else "wiki_lookup_prefix_offline"
-    tpl = config.texts[key]  # Intentionally allow KeyError if config.yaml is missing the key
-    prefix = tpl.format(persona_name=persona_name, project_name=cfg.texts["project_name"])
+    tpl = config.texts[
+        key
+    ]  # Intentionally allow KeyError if config.yaml is missing the key
+    prefix = tpl.format(
+        persona_name=persona_name, project_name=cfg.texts["project_name"]
+    )
     return f"{prefix}\n{link}"
+
 
 def _parse_limit(query: dict) -> int:
     try:
@@ -186,6 +209,7 @@ def _parse_limit(query: dict) -> int:
     except (ValueError, TypeError):
         val = SNIPPET_LIMIT
     return max(0, min(val, SNIPPET_LIMIT))
+
 
 def _fetch_kiwix(term: str):
     url = _build_kiwix_url(term)
@@ -200,23 +224,30 @@ def _fetch_kiwix(term: str):
     finally:
         # Immer Gesamtdauer loggen
         duration_total = (time.perf_counter() - start_kiwix) * 1000
-        logger.info(f'[_fetch_kiwix] Request "{term}" answered in {duration_total:.1f} ms')
-    
+        logger.info(
+            f'[_fetch_kiwix] Request "{term}" answered in {duration_total:.1f} ms'
+        )
+
+
 def _fetch_online(term: str):
     """Fetches a short text from live German Wikipedia (REST Summary API)."""
     url = f"https://de.wikipedia.org/api/rest_v1/page/summary/{term}"
     logger.info(f"[FetchOnline] {url}")
     try:
-        r = requests.get(url, timeout=ONLINE_TIMEOUT, headers={"User-Agent": "LeahWikiProxy/1.0"})
+        r = requests.get(
+            url, timeout=ONLINE_TIMEOUT, headers={"User-Agent": "LeahWikiProxy/1.0"}
+        )
         if r.status_code != 200:
             return r.status_code, None
         data = r.json()
         extract = (data.get("extract") or "").strip()
         if not extract:
             return 404, None
+
         class Resp:
             text = extract
             apparent_encoding = "utf-8"
+
         return 200, Resp()
     except Exception as e:
         logger.error(f"[FetchOnlineError] {e}")
@@ -227,7 +258,7 @@ def _fetch_online(term: str):
 class WikiRequestHandler(BaseHTTPRequestHandler):
     # Redirect standard HTTPServer logs into our logger (optional but nice)
     def log_message(self, format, *args):
-        logger.info("%s - %s" % (self.address_string(), format % args))
+        logger.info("%s - %s", self.address_string(), format % args)
 
     def do_GET(self):
         start_total = time.perf_counter()
@@ -238,7 +269,9 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             online = query.get("online", ["0"])[0] == "1"
             persona = query.get("persona", ["0"])[0]
 
-            logger.info(f"[Request] term='{suchbegriff}' path='{self.path}' online={online}")
+            logger.info(
+                f"[Request] term='{suchbegriff}' path='{self.path}' online={online}"
+            )
 
             if not suchbegriff:
                 _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
@@ -263,8 +296,8 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 clean_text = _clean_whitespace_and_remove_refs(resp.text)
                 kv_line = ""  # Online summaries do not include an HTML infobox
             else:
-                html_bytes = resp.content   
-                soup = BeautifulSoup(html_bytes , "html.parser")
+                html_bytes = resp.content
+                soup = BeautifulSoup(html_bytes, "html.parser")
                 # 1) Extract key/value pairs from the original HTML
                 kv_pairs = _extract_infobox_kv(resp.text)
                 kv_line = _format_kv_line(kv_pairs)
@@ -276,7 +309,11 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
                 # 3) Extract the remaining text
                 content_div = soup.find(id="content") or soup.body
-                raw_text = content_div.get_text(separator="\n", strip=True) if content_div else ""
+                raw_text = (
+                    content_div.get_text(separator="\n", strip=True)
+                    if content_div
+                    else ""
+                )
                 clean_text = _clean_whitespace_and_remove_refs(raw_text)
 
             # --- One-off limiting logic: keep the key/value block intact, truncate only the body ---
@@ -287,11 +324,23 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 sep = "\n\n"
                 base = kv_line + sep
                 remaining = max(0, limit - len(base))
-                body = clean_text if remaining <= 0 else (clean_text[:remaining].rsplit(" ", 1)[0] + " …" if len(clean_text) > remaining else clean_text)
+                body = (
+                    clean_text
+                    if remaining <= 0
+                    else (
+                        clean_text[:remaining].rsplit(" ", 1)[0] + " …"
+                        if len(clean_text) > remaining
+                        else clean_text
+                    )
+                )
                 combined_text = base + body
             else:
                 # No key/value block → apply the limit normally
-                combined_text = clean_text if len(clean_text) <= limit else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
+                combined_text = (
+                    clean_text
+                    if len(clean_text) <= limit
+                    else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
+                )
 
             clean_text = combined_text
 
@@ -302,18 +351,19 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
             # Return JSON
             payload = {
-            "title": suchbegriff.replace("_", " "),
-            "text": clean_text,
-            "link": link,
-            "source": source,
-            "wiki_hint": wiki_hint
+                "title": suchbegriff.replace("_", " "),
+                "text": clean_text,
+                "link": link,
+                "source": source,
+                "wiki_hint": wiki_hint,
             }
             _send_json(self, 200, payload)
         finally:
-        # Always log the total duration
+            # Always log the total duration
             duration_total = (time.perf_counter() - start_total) * 1000
-            logger.info(f'[WikiProxy] Request "{query}" answered in {duration_total:.1f} ms')
-
+            logger.info(
+                f'[WikiProxy] Request "{query}" answered in {duration_total:.1f} ms'
+            )
 
 
 def run():
