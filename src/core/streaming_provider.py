@@ -424,14 +424,13 @@ def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
     """
     if not snippet:
         return
-    guardrail = (
-        "Nutze ausschließlich den folgenden Kontext aus Wikipedia. "
-        "Wenn etwas dort nicht steht, sag knapp, dass du es nicht sicher weißt."
-    )
+    cfg = _get_config()
+    guardrail = cfg.t("wiki_context_guardrail")
     history.append({"role": "system", "content": guardrail})
-    context_message = (
-        f"Context for the topic {topic.replace('_', ' ')}: "
-        f"[Source: Wikipedia] {snippet}"
+    context_message = cfg.t(
+        "wiki_context_message",
+        topic=topic.replace("_", " "),
+        snippet=snippet,
     )
     history.append({"role": "system", "content": context_message})
 
