@@ -11,16 +11,15 @@ class SecurityResult(TypedDict):
     detail: str | None  # first match / hint
 
 
-_SECURITY_TEXT_KEYS = {
-    "mask_text": "security_mask_text",
-    "prompt_injection": "security_prompt_injection",
-    "pii_detected": "security_pii_detected",
-    "blocked_keyword": "security_blocked_keyword",
-    "all_clear": "security_all_clear",
-}
+_SECURITY_KEYS = (
+    "security_prompt_injection",
+    "security_pii_detected",
+    "security_blocked_keyword",
+    "security_all_clear",
+)
 
 
-def _resolve_texts(texts: Mapping[str, str] | None) -> Mapping[str, str]:
+def _load_texts(texts: Mapping[str, str] | None) -> Mapping[str, str]:
     if texts is not None:
         if not isinstance(texts, Mapping):
             raise TypeError("security texts must be provided as a mapping")
@@ -28,14 +27,10 @@ def _resolve_texts(texts: Mapping[str, str] | None) -> Mapping[str, str]:
 
     from config.config_singleton import Config  # lazy import to avoid cycles
 
-    config_texts = Config().texts
-    if not isinstance(config_texts, Mapping):  # pragma: no cover - defensive
-        raise TypeError("config texts must behave like a mapping")
-    return config_texts
+    return Config().texts
 
 
-def _require_security_text(key: str, texts: Mapping[str, str]) -> str:
-    locale_key = _SECURITY_TEXT_KEYS[key]
+def _require_security_text(locale_key: str, texts: Mapping[str, str]) -> str:
     try:
         value = texts[locale_key]
     except KeyError as exc:
@@ -71,8 +66,10 @@ class BasicGuard:
             "output_blocklist": output_blocklist,
         }
 
-        self.texts = _resolve_texts(texts)
-        self.mask_text = _require_security_text("mask_text", self.texts)
+        self.texts = _load_texts(texts)
+        for key in _SECURITY_KEYS:
+            _require_security_text(key, self.texts)
+        self.mask_text = _require_security_text("security_mask_text", self.texts)
 
         # Defaults (deliberately conservative and compact)
         inj = [
@@ -262,14 +259,14 @@ def create_guard(name: str, settings: dict[str, Any]) -> BasicGuard:
 def zeigefinger_message(
     res: SecurityResult, *, texts: Mapping[str, str] | None = None
 ) -> str:
-    catalog = _resolve_texts(texts)
+    catalog = _load_texts(texts)
     reason = (res.get("reason") or "ok").lower()
     detail = (res.get("detail") or "")[:80]
     if reason == "prompt_injection":
-        template = _require_security_text("prompt_injection", catalog)
+        template = _require_security_text("security_prompt_injection", catalog)
         return template.format(detail=detail)
     if reason == "pii_detected":
-        return _require_security_text("pii_detected", catalog)
+        return _require_security_text("security_pii_detected", catalog)
     if reason == "blocked_keyword":
-        return _require_security_text("blocked_keyword", catalog)
-    return _require_security_text("all_clear", catalog)
+        return _require_security_text("security_blocked_keyword", catalog)
+    return _require_security_text("security_all_clear", catalog)
