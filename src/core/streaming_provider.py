@@ -3,7 +3,7 @@ Streaming provider with persona handling, logging, and safety checks.
 
 All direct calls to the underlying LLM are abstracted through an
 ``LLMCore`` (e.g. ``OllamaLLMCore`` or ``DummyLLMCore``).
-This class takes care of prompt injection, logging (conversation.log),
+This class takes care of prompt injection, logging (conversation JSON log),
 and optional output moderation via SecurityGuard.
 """
 
@@ -39,8 +39,8 @@ class YulYenStreamingProvider:
     Wrapper around the LLM with streaming support.
 
     The streamer accepts the system prompt, persona name, LLM options,
-    and the host URL. The class handles logging (conversation.log) and
-    optionally output moderation via SecurityGuard. The actual LLM call
+    and the host URL. The class handles logging (conversation JSON log)
+    and optionally output moderation via SecurityGuard. The actual LLM call
     is delegated to an ``LLMCore``.
     """
 
@@ -109,7 +109,7 @@ class YulYenStreamingProvider:
             )
 
     def _append_conversation_log(self, role: str, content: str) -> None:
-        """Writes an entry to conversation.log."""
+        """Writes an entry to the conversation JSON log."""
         try:
             entry = {
                 "ts": datetime.datetime.now()
@@ -124,7 +124,7 @@ class YulYenStreamingProvider:
             with open(self.conversation_log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
-            logging.error("Error while writing conversation.log: %s", e)
+            logging.error("Error while writing the conversation JSON log: %s", e)
 
     def _log_generation_start(
         self, messages: list[dict[str, Any]], options: dict[str, Any]
