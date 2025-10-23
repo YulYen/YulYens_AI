@@ -71,7 +71,7 @@ def test_streaming_provider_with_dummy_llm() -> None:
     assert "ECHO: Ping" in out[0]
 
 
-def test_streaming_writes_conversation_log(tmp_path) -> None:
+def test_streaming_writes_conversation_json_log(tmp_path) -> None:
     log_file = tmp_path / f"conv_{datetime.now().strftime('%H%M%S')}.json"
 
     core = DummyLLMCore()

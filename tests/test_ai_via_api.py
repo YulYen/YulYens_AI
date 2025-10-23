@@ -79,12 +79,12 @@ def test_persona_name_normalized(client, monkeypatch):
         after_files = set()
 
     new_files = list(after_files - before_files)
-    assert new_files, "No new conversation log file was created."
+    assert new_files, "No new conversation JSON log file was created."
     target = max(new_files, key=lambda path: path.stat().st_mtime)
 
     try:
         lines = target.read_text(encoding="utf-8").strip().splitlines()
-        assert lines, "Conversation log file contains no entries."
+        assert lines, "Conversation JSON log file contains no entries."
         last_entry = json.loads(lines[-1])
         assert last_entry.get("bot") == "LEAH"
     finally:
