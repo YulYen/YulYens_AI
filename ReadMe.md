@@ -6,54 +6,7 @@ This is a private project and repository. The short introduction is written in E
 *Yul Yen’s AI Orchestra is a local AI project with multiple personas, designed for private use and experimentation.*
 
 **Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter, Popcorn) vereint.  
-Sie alle basieren auf einem lokalen LLM (über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.  
-
-```mermaid
-flowchart TD
-  A[Dirigent: Julian / Yul Yen]
-
-  subgraph Stimmen
-    L[Leah - empathisch]
-    D[Doris - sarkastisch]
-    P[Peter - nerdig]
-    Po[Popcorn - verspielt]
-  end
-
-  subgraph Core
-    O[Ollama Runtime]
-    W[WebUI Gradio]
-    T[Terminal UI]
-    M[LLM-Modelle: Leo13B, GPT-OSS-20B]
-  end
-
-  subgraph Wissen_und_Struktur
-    K[Wiki-Proxy / Kiwix]
-    CFG[Config yaml/json]
-    LOG[Logging]
-  end
-
-  subgraph Zukunft
-    R[RAG / Kontextkompression Karl]
-    S[Tool-Use / TTS-STT]
-  end
-
-  A --> Stimmen
-  A --> Core
-  A --> Wissen_und_Struktur
-  A --> Zukunft
-
-  O --> M
-  W -->|Nutzerinteraktion| X[Publikum]
-  T -->|Nutzerinteraktion| X
-
-  K -.->|Kontext-Snippets| L
-  CFG -.->|Einstellungen| W
-  CFG -.-> T
-  LOG -.->|Analyse| A
-
-  R -.-> L
-  S -.-> W
-```
+Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.  
 
 Das Projekt unterstützt:  
 - **Terminal-UI** mit farbiger Konsolenausgabe & Streaming  
@@ -73,7 +26,7 @@ siehe auch: [Features.md](Features.md)
 - Bereitstellung einer **privaten, lokal laufenden KI** für deutschsprachige Interaktion  
 - Mehrere **Charaktere mit unterschiedlichem Stil**:  
   - **Leah**: empathisch, freundlich  
-  - **Doris**: sarkastisch, humorvoll  
+  - **Doris**: sarkastisch, humorvoll, frech  
   - **Peter**: faktenorientiert, analytisch  
   - **Popcorn**: verspielt, kindgerecht  
 - **Erweiterbares Fundament** für zukünftige Features (z. B. LoRA-Finetuning, Tool-Use, RAG)  
