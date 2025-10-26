@@ -4,7 +4,7 @@
 import logging
 import os
 import socket
-import sys
+import sys, platform
 import threading
 import time
 from datetime import datetime
@@ -68,6 +68,8 @@ def main():
         to_console=bool(cfg.logging["to_console"]),
     )
     logging.info("BOOT OK – Logging initialised and active.")
+    logging.info(f"Python exe: {sys.executable}  version: {platform.python_version()}")
+
 
     # Optional (extra sicher): httpx/urllib3 auf WARNING drehen
     logging.getLogger("httpx").setLevel(logging.WARNING)
