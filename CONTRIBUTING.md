@@ -1,29 +1,29 @@
 # CONTRIBUTING
 
-## Voraussetzungen
-- Python 3.10 oder neuer
+## Voraussetzungen / Requirements
+- Python 3.10 oder neuer (Python 3.10 or newer)
 
 ## Setup
-1. Virtuelle Umgebung erstellen:
+1. Create a virtual environment:
    ```bash
    python -m venv .venv
    source .venv/bin/activate
    ```
-2. Abhängigkeiten installieren:
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-## Code-Style
-- Formatierung und Linting mit **Black** und **Ruff**
-- Maximale Zeilenlänge: **88 Zeichen**
+## Code Style
+- Use **Black** and **Ruff** for formatting and linting.
+- Maximum line length: **88 characters**.
 
 ## Tests
-- Test-Suite ausführen mit:
+- Test-Suite ausführen mit (Run the test suite with):
   ```bash
   pytest -q
   ```
 
-## PR-Flow
-- Kleine, fokussierte Pull Requests einreichen
-- Relevantes Issue im PR-Beschreibungstext referenzieren
+## PR Flow
+- Submit small, focused pull requests.
+- Reference the relevant issue in the PR description.
