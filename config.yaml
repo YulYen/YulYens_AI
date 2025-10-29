@@ -1,57 +1,57 @@
-# Sprache: Deutsch (de) oder Englisch (en)
+# Language: German (de) or English (en)
 language: "de"
 
-# --- Core-Einstellungen ----------------------------------------------------------
+# --- Core settings ---------------------------------------------------------------
 core:
-  # Backend-Auswahl: "ollama" für echte LLMs, "dummy" für schnelle Echo-Tests
+  # Backend selection: use "ollama" for real LLMs, "dummy" for quick echo tests
   backend: "ollama"
-  # Standard-Modelname für den Start
-  model_name: "leo-hessianai-13b-chat.Q5" # z.B. "gptoss20b-q4ks"  "mistral7b-local" oder "leo-hessianai-13b-chat.Q5" wie lokal in ollama erzeugt
+  # Default model name at startup
+  model_name: "leo-hessianai-13b-chat.Q5" # e.g. "gptoss20b-q4ks", "mistral7b-local", or locally built "leo-hessianai-13b-chat.Q5"
   warm_up: false
-  # Base URL für Ollama (protokoll + host + port) z.B. http://127.0.0.1:11434
+  # Base URL for Ollama (protocol + host + port), e.g. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"
-  include_date: true  # <— DER Schalter fürs aktuelle Datum im System-Prompt der personas
-  
-# --- UI-Einstellungen ----------------------------------------------------------
+  include_date: true  # master switch to add the current date to persona system prompts
+
+# --- UI settings ---------------------------------------------------------------
 ui:
-  type: web   # Optionen: "web", "terminal", null (= nur API)
+  type: web   # options: "web", "terminal", or null (= API only)
   web:
     host: "0.0.0.0"
     port: 7860
-    share: false  # Bei true wird der öffentliche Gradio-Share-Link aktiviert
+    share: false  # enable to publish a public Gradio share link
     share_auth:
       username: ""
       password: ""
 
-# --- Wiki-Einstellungen --------------------------------------------------------
+# --- Wiki settings -------------------------------------------------------------
 wiki:
-# offline = Kiwix, online = Wikipedia, false keine Wiki-Snippets
+  # offline uses Kiwix, online calls Wikipedia, false disables wiki snippets
   mode: offline
-  # spaCy-Modell-Variante für Keyword-Erkennung: "medium" oder "large"
+  # spaCy model variant for keyword extraction: "medium" or "large"
   spacy_model_variant: "large"
-  # Port des lokalen Proxy (immer nötig)
+  # Port of the local proxy (always required)
   proxy_port: 8042
-  # Maximale Länge der Wiki-Snippets (Zeichen): 1200 bis 1600 empfohlen
+  # Maximum wiki snippet length in characters (recommend 1200–1600)
   snippet_limit: 1200
-  timeout_connect: 5.0 
+  timeout_connect: 5.0
   timeout_read: 8.0
-  offline:  # ---- nur relevant, wenn mode == "offline", d.h. nur für offline Wiki  ----
-    host: "127.0.0.1"  # Host für kiwix-serve  127.0.0.1 wesentlich performanter als localhost      
+  offline:  # only relevant when mode == "offline" (Kiwix-based wiki mode)
+    host: "127.0.0.1"  # preferred host for kiwix-serve; faster than localhost
     kiwix_port: 8080 #
-    zim_prefix: "wikipedia_de_all_nopic_2025-06" 
+    zim_prefix: "wikipedia_de_all_nopic_2025-06"
     autostart: true
-    kiwix_exe: "C:/wikipedia-de-offline/kiwix-serve.exe"   # Pfad zu kiwix-serve (Windows-Beispiel)
-    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2025-06.zim"  
-    startup_timeout_s: 7        
+    kiwix_exe: "C:/wikipedia-de-offline/kiwix-serve.exe"   # path to kiwix-serve (Windows example)
+    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2025-06.zim"
+    startup_timeout_s: 7
 
 # --- Logging -------------------------------------------------------------------
 logging:
-  level: "INFO"   # DEBUG, INFO, WARNING, ERROR
+  level: "INFO"   # valid levels: DEBUG, INFO, WARNING, ERROR
   to_console: true
   dir: "logs"
-  conversation_prefix: "conversation" 
+  conversation_prefix: "conversation"
 
-# --- One-Shot-API z.B. für Tests  -------------------------------------------------------------------
+# --- One-shot API (e.g. for tests) ----------------------------------------------
 api:
   enabled: true
   host: "127.0.0.1"
@@ -63,4 +63,4 @@ security:
   prompt_injection_protection: true
   pii_protection: false
   output_blocklist: true
-  # Input → block (Injection/PII). Output → PII maskieren, Secrets blocken.
+  # Input: block injections/PII. Output: mask PII, block secrets.
