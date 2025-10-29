@@ -10,7 +10,7 @@ dummy for tests are available.
 from .llm_core import LLMCore  # noqa: F401
 
 try:
-    # Optionaler Import: Nur laden, wenn die ollama‑Bibliothek vorhanden ist
+    # Optional import: only load when the ollama package is available
     from .ollama_llm_core import OllamaLLMCore  # type: ignore[assignment]
 except Exception:
     OllamaLLMCore = None  # type: ignore[assignment]
