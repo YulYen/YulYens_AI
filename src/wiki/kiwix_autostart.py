@@ -17,11 +17,11 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
     """
     wiki = cfg.wiki
     if wiki["mode"] != "offline":
-        return True  # nicht offline → nichts tun
+        return True  # Mode is not offline, so there is nothing to do.
 
     offline = wiki.get("offline", {})
     if not offline.get("autostart", False):
-        return True  # Autostart aus → nichts tun
+        return True  # Autostart is disabled, so there is nothing to do.
 
     host = offline.get("host")
     port = offline.get("kiwix_port")
