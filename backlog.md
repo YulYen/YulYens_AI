@@ -1,23 +1,23 @@
 # Backlog
 
-| Nr. | Name | Beschreibung | Aufwand | Nutzen | Kategorie |
+| No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
-| 18  | Terminal-UI Logging fix                | Logging ausschließlich in Dateien schreiben, Konsole sauber halten |   S     |   M    | Bugfix              |
-| 19  | Web-UI "Neue Unterhaltung" im Stream   | ✅ Erledigt: Streaming sauber abbrechen, damit Button "Neue Unterhaltung" funktioniert |   M     |   L    | Bugfix              |
-| 20  | Personas internationalisieren          | ✅ Erledigt: Personas ebenso wie UI-Texte für Deutsch und Englisch bereitstellen |   M     |   L    | UX/Technik          |
-| 21  | spaCy-Internationalisierung            | Bei englischer Konfiguration automatisch das passende englische spaCy-Modell nutzen |   M     |   M    | Technische Basis    |
-| 22  | Doku zweisprachig strukturieren        | ReadMe, Features und Backlog sinnvoll auf Deutsch und Englisch anbieten |   M     |   M    | Dokumentation       |
-| 3   | Healthchecks/Monitoring                | Statusseite (Ollama/VRAM), simple `/healthz` + VRAM-Probe                      |   S     |   M    | Technische Basis    |
-| 4   | Gradio-Share + Basic Auth              | ✅ Erledigt: Extern testen, geschützt                                          |   S     |   M    | Technische Basis    |
-| 5   | Modellauswahl in der UI                | Dropdown/Radio für verfügbare Modelle, explizit wählbar je Persona & Run       |   S     |   S    | UX/Technik          |
-| 6   | LoRA-Feintuning-Pipeline               | IN ARBEIT → LoRA-Adapter für LeoLM13B                                          |   L     |   XL   | Forschung/Qualität  |
-| 7   | Chatverläufe speichern/laden           | Sessions persistent (JSON/DB)                                                  |   M     |   L    | Technische Basis    |
-| 8   | Ask-All (Broadcast)                    | Gleiche Frage nacheinander an Leah, Doris, Peter, Popcorn, getrennte Kontexte  |   S     |   M    | Orchestrierung      |
-| 9   | Stage-Mode (Self-Talk)                 | Zwei+ Personas führen n Runden Dialog, Start nur mit 1 Auftaktsatz             |   M     |   L    | Orchestrierung      |
-| 10  | Easter-Egg Logik                       | Stichwort → Nachsatz                                                           |   M     |   M    | Cooles Feature      |
-| 12  | Karl (Kontextzusammenfasser)           | Verlauf komprimieren bei Bedarf durch LLM-Summary statt aktuelle Lösung        |   L     |   L    | Technische Basis    |
-| 13  | STT/TTS (Sprache ↔ Text) MVP           | Einfache Sprach-I/O                                                            |   M     |   M    | Cooles Feature      |
-| 14  | E-Mail an/von AI                       | Mail lesen/schreiben/versenden                                                 |   M     |   M    | Integration         |
-| 15  | Tagesbrief (IoT + RSS)                 | Tägliche Kurzupdates                                                           |   M     |   M    | Cooles Feature      |
-| 16  | Sandbox-/PDF-Funktionen                | Lokale Doku-Spielwiese                                                         |   L     |   M    | Cooles Feature      |
-| 17  | First-Token schneller                  | Warm-up, Prompt-Diät, Stream-Puffer                                            |   M     |   L    | Performance         |
+| 18 | Terminal-UI logging fix | Write logs exclusively to files to keep the console clean | S | M | Bugfix |
+| 19 | Web-UI "New conversation" in stream | ✅ Done: End streaming cleanly so that the "New conversation" button works | M | L | Bugfix |
+| 20 | Internationalize personas | ✅ Done: Provide personas as well as UI text for German and English | M | L | UX/Technology |
+| 21 | spaCy internationalization | Automatically use the corresponding English spaCy model when English is configured | M | M | Technical foundation |
+| 22 | Structure documentation bilingually | Offer README, Features, and Backlog in both German and English | M | M | Documentation |
+| 3 | Health checks/monitoring | Status page (Ollama/VRAM), simple `/healthz` endpoint plus VRAM probe | S | M | Technical foundation |
+| 4 | Gradio share + basic auth | ✅ Done: Enable external testing with protection | S | M | Technical foundation |
+| 5 | Model selection in the UI | Dropdown/radio for available models, explicitly selectable per persona and run | S | S | UX/Technology |
+| 6 | LoRA fine-tuning pipeline | IN PROGRESS → LoRA adapter for LeoLM13B | L | XL | Research/Quality |
+| 7 | Save/load chat histories | Persist sessions (JSON/DB) | M | L | Technical foundation |
+| 8 | Ask-all (broadcast) | Ask the same question sequentially to Leah, Doris, Peter, and Popcorn with separate contexts | S | M | Orchestration |
+| 9 | Stage mode (self-talk) | Two or more personas run n rounds of dialogue, starting with a single opening sentence | M | L | Orchestration |
+| 10 | Easter egg logic | Keyword triggers an extra tagline | M | M | Cool feature |
+| 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach | L | L | Technical foundation |
+| 13 | STT/TTS (speech ↔ text) MVP | Simple speech I/O | M | M | Cool feature |
+| 14 | Email to/from AI | Read, compose, and send email | M | M | Integration |
+| 15 | Daily briefing (IoT + RSS) | Daily short updates | M | M | Cool feature |
+| 16 | Sandbox/PDF functions | Local documentation sandbox | L | M | Cool feature |
+| 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
