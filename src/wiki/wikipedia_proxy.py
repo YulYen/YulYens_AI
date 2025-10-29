@@ -264,31 +264,31 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
         start_total = time.perf_counter()
         try:
             parsed_path = urlparse(self.path)
-            suchbegriff = unquote(parsed_path.path[1:])
+            search_term = unquote(parsed_path.path[1:])
             query = parse_qs(parsed_path.query)
             online = query.get("online", ["0"])[0] == "1"
             persona = query.get("persona", ["0"])[0]
 
             logger.info(
-                f"[Request] term='{suchbegriff}' path='{self.path}' online={online}"
+                f"[Request] term='{search_term}' path='{self.path}' online={online}"
             )
 
-            if not suchbegriff:
-                _send_text(self, 400, "Suchbegriff fehlt. Beispiel: /Albert_Einstein")
+            if not search_term:
+                _send_text(self, 400, "Search term missing. Example: /Albert_Einstein")
                 return
 
             if online:
-                status, resp = _fetch_online(suchbegriff)
+                status, resp = _fetch_online(search_term)
             else:
-                status, resp = _fetch_kiwix(suchbegriff)
+                status, resp = _fetch_kiwix(search_term)
 
             if status != 200:
                 if status == 404:
-                    logger.info(f"[NotFound] 404 for '{suchbegriff}'")
-                    _send_text(self, 404, "Artikel nicht gefunden.")
+                    logger.info(f"[NotFound] 404 for '{search_term}'")
+                    _send_text(self, 404, "Article not found.")
                 else:
-                    logger.error(f"[Error] HTTP status {status} for '{suchbegriff}'")
-                    _send_text(self, 500, f"Unerwarteter Fehler – HTTP-Code: {status}")
+                    logger.error(f"[Error] HTTP status {status} for '{search_term}'")
+                    _send_text(self, 500, f"Unexpected error – HTTP status: {status}")
                 return
 
             # Extract content
@@ -345,13 +345,13 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             clean_text = combined_text
 
             # Target link & UI hint
-            link = _build_user_visible_link(self, suchbegriff, online)
+            link = _build_user_visible_link(self, search_term, online)
             source = "online" if online else "local"
             wiki_hint = _build_wiki_hint(config, online, persona, link)
 
             # Return JSON
             payload = {
-                "title": suchbegriff.replace("_", " "),
+                "title": search_term.replace("_", " "),
                 "text": clean_text,
                 "link": link,
                 "source": source,
