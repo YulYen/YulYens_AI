@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
+from config.config_singleton import Config
 from config.personas import get_prompt_by_name
 
 
@@ -15,9 +16,11 @@ def _wiki_mode_enabled(mode_val) -> bool:
 
 def _system_prompt_with_date(name, include_date) -> str:
     base = get_prompt_by_name(name)
-    today = datetime.now().strftime("%Y-%m-%d")
     if include_date:
-        base = f"{base} | Heute ist der {today}."
+        today = datetime.now().strftime("%Y-%m-%d")
+        cfg = Config()
+        suffix = cfg.t("persona_prompt_date_suffix", date=today)
+        base = f"{base} | {suffix}"
     return base
 
 

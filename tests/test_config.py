@@ -1,13 +1,19 @@
 # tests/test_config.py
 import importlib
+from datetime import datetime
 
 import pytest
 from config.config_singleton import Config
 from config.personas import system_prompts
+from core import utils as utils_module
 from core.dummy_llm_core import DummyLLMCore
 from core.factory import AppFactory
 from core.streaming_provider import YulYenStreamingProvider
-from core.utils import _greeting_text, _wiki_mode_enabled
+from core.utils import (
+    _greeting_text,
+    _system_prompt_with_date,
+    _wiki_mode_enabled,
+)
 
 
 def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
@@ -183,3 +189,24 @@ def test_wiki_mode_enabled(mode, expected):
     Everything else (false/None) → off.
     """
     assert _wiki_mode_enabled(mode) is expected
+
+
+def test_system_prompt_with_date_uses_localized_suffix(monkeypatch):
+    class _FixedDatetime(datetime):
+        @classmethod
+        def now(cls):
+            return cls(2024, 1, 2)
+
+    Config.reset_instance()
+    cfg = Config()
+    persona_name = system_prompts[0]["name"]
+
+    monkeypatch.setattr(utils_module, "get_prompt_by_name", lambda name: "BASE")
+    monkeypatch.setattr(utils_module, "datetime", _FixedDatetime)
+
+    try:
+        result = _system_prompt_with_date(persona_name, True)
+        expected_suffix = cfg.t("persona_prompt_date_suffix", date="2024-01-02")
+        assert result == f"BASE | {expected_suffix}"
+    finally:
+        Config.reset_instance()
