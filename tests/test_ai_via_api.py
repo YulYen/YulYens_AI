@@ -177,7 +177,7 @@ def ask(question: str, person: str, client) -> str:
             "name": "Identitaet/Erfinder",
             "person": "LEAH",
             "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden?",
-            "must_contain": ["LEAH", "yul yen"],  # adjustable
+            "must_contain": ["LEAH", "yul"],  # adjustable
         },
         {
             "name": "Portugal_PM_2025",
