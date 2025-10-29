@@ -1,5 +1,6 @@
 project_name: "Yul Yen’s AI Orchestra"
 greeting: "Chat with {persona_name} using model version {model_name}:"
+persona_prompt_date_suffix: "Today is {date}."
 choose_persona: "Choose a persona first:"
 new_chat: "🔄 New conversation"
 input_placeholder: "Type something…"
