@@ -109,17 +109,17 @@ class SpacyKeywordFinder:
 
     def find_keywords(self, text):
         doc = self.nlp(text)
-        treffer = []
+        matches = []
 
         # (1) Standard spaCy entities
         for ent in doc.ents:
             if self.is_valid_keyword(ent):
                 keyword = self._normalize_keyword(ent.text)
                 logging.info(f"{ent.label_} match: {keyword}")
-                if keyword not in treffer:
-                    treffer.append(keyword)
+                if keyword not in matches:
+                    matches.append(keyword)
 
-        return treffer
+        return matches
 
     def find_top_keyword(self, text: str):
         doc = self.nlp(text)
