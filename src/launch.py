@@ -1,6 +1,6 @@
 # launch.py
 
-# Allgemeine Imports
+# General imports
 import logging
 import os
 import socket
@@ -11,14 +11,14 @@ from datetime import datetime
 
 import uvicorn
 
-# API-Import
+# API imports
 from api.app import app, set_provider
 from config.config_singleton import Config
 
-# Logging
+# Logging setup
 from config.logging_setup import init_logging
 
-# Core und Konfiguration
+# Core and configuration
 from core.factory import AppFactory
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
@@ -30,7 +30,7 @@ def main():
     config_path = "config.yaml"
 
     try:
-        cfg = Config(config_path)  # einmalig laden
+        cfg = Config(config_path)  # load once
     except OSError as exc:
         config_location = os.path.abspath(
             getattr(exc, "filename", config_path) or config_path
@@ -57,7 +57,7 @@ def main():
         )
         sys.exit(3)
 
-    # 1) Logging ZUERST initialisieren
+    # 1) Initialize logging first
     ensure_dir_exists(cfg.logging["dir"])
     logfile = os.path.join(
         cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
@@ -71,15 +71,15 @@ def main():
     logging.info(f"Python exe: {sys.executable}  version: {platform.python_version()}")
 
 
-    # Optional (extra sicher): httpx/urllib3 auf WARNING drehen
+    # Optional: set httpx/urllib3 to WARNING for extra safety
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-    # 2) Wiki-Proxy nur starten, wenn Modus aktiv
+    # 2) Start the wiki proxy only if the mode is active
     wiki_mode = cfg.wiki["mode"]
     if _wiki_mode_enabled(wiki_mode):
         start_wiki_proxy_thread()
-        # Neu: Offline-Wiki bei Bedarf starten
+        # New: start the offline wiki if requested
         try:
             ok = ensure_kiwix_running_if_offlinemode_and_autostart(cfg)
             if not ok:
@@ -89,7 +89,7 @@ def main():
         except Exception as e:
             logging.error(f"Unexpected error during kiwix autostart. Continuing. {e}")
 
-    # 3) Objekte bauen (Factory) – ohne zu starten
+    # 3) Build objects (Factory) without starting them
     factory = AppFactory()
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
@@ -98,17 +98,17 @@ def main():
         f"ui.type={cfg.ui['type']} wiki.mode={wiki_mode} snippet_limit={cfg.wiki['snippet_limit']}"
     )
 
-    # 4) API optional starten
+    # 4) Optionally start the API
     if api_provider:
         start_api_in_background(cfg.api, api_provider)
 
-    # 5) UI starten oder (API-only) blockieren
+    # 5) Start the UI or block if API-only
     if cfg.ui["type"] is None:
         print("[Yul Yens AI] API is running. UI is disabled (ui.type = null).")
         threading.Event().wait()
         return
     else:
-        ui.launch()  # TerminalUI oder WebUI
+        ui.launch()  # Terminal UI or Web UI
 
 
 def start_api_in_background(api_cfg, provider):
@@ -152,7 +152,7 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
         return None
 
     # Start in the same process as a thread
-    import wiki.wikipedia_proxy as wiki_proxy  # nutzt die in wikipedia-proxy.py gesetzten Konfigwerte
+    import wiki.wikipedia_proxy as wiki_proxy  # uses the configuration set in wikipedia-proxy.py
 
     t = threading.Thread(target=wiki_proxy.run, name="WikiProxy", daemon=True)
     t.start()
