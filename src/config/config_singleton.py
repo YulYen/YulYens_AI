@@ -1,4 +1,4 @@
-# src/config/config_singleton.py
+"""Singleton-backed configuration loader used throughout the application."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,7 +12,7 @@ class Config:
     _instance: Config | None = None
 
     def __new__(cls, path: str = "config.yaml"):
-        # Singleton-Instanz erzeugen, falls noch nicht vorhanden
+        # Create the singleton instance on first access
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._load_config(path)
@@ -55,8 +55,8 @@ class Config:
         self.texts = text_catalog
         self.t = text_catalog.format
 
-        # Jede weitere Top-Level-Sektion (core, ui, wiki, logging, api, security, ...)
-        # als Attribut speichern.
+        # Store every remaining top-level section (core, ui, wiki, logging, api, security, ...)
+        # as an attribute on the configuration instance.
         for section, settings in data.items():
             setattr(self, section, settings)
 
@@ -71,7 +71,7 @@ class Config:
             if isinstance(section_dict, dict):
                 section_dict.update(updates)
             else:
-                # Text-Kataloge implementieren eine Mapping-Schnittstelle.
+                # Text catalogs implement a mapping interface.
                 try:
                     section_dict.update(updates)
                 except AttributeError as exc:
