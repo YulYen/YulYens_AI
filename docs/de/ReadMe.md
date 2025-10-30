@@ -1,10 +1,5 @@
 # Yul Yen’s AI Orchestra
 
-**Note (English):**  
-This is a private project and repository. The short introduction is written in English in case someone outside Germany stumbles upon it – but from here on the documentation continues in German, since the AI personas (Leah, Doris, Peter, Popcorn) are primarily designed to operate in German.  
-
-*Yul Yen’s AI Orchestra is a local AI project with multiple personas, designed for private use and experimentation.*
-
 **Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter, Popcorn) vereint.  
 Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.  
 
