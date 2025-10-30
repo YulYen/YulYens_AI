@@ -12,7 +12,7 @@ Ziel ist eine charmante, lokal laufende KI-Umgebung für Alltag, Kreativität un
 - `src/` – Anwendungscode (WebUI, Terminal-Interface, Core-Logik)  
 - `locales/` – System-Prompts & Persona-Definitionen  
 - `docs/` – Projektdokumentation (de/en)  
-- `logs/`, `tests/`, `timelines/` – Laufzeit-, Test- und Verlaufdaten  
+- `logs/`, `tests/` – Laufzeit-, Test- und Verlaufdaten  
 
 🧠 **Lizenz & Beiträge:**  
 Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).  
