@@ -62,10 +62,11 @@ def main():
     logfile = os.path.join(
         cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
     )
+    to_console = cfg.logging["to_console"] == "true" or (cfg.logging["to_console"] == "auto" and cfg.ui["type"] != "terminal")
     init_logging(
         loglevel=str(cfg.logging["level"]),
         logfile=logfile,
-        to_console=bool(cfg.logging["to_console"]),
+        to_console=to_console,
     )
     logging.info("BOOT OK – Logging initialised and active.")
     logging.info(f"Python exe: {sys.executable}  version: {platform.python_version()}")

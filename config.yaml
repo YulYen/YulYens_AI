@@ -54,7 +54,7 @@ wiki:
 # --- Logging -------------------------------------------------------------------
 logging:
   level: "INFO"   # valid levels: DEBUG, INFO, WARNING, ERROR
-  to_console: true
+  to_console: "auto" # "true", "false" or "auto" (auto: false if terminal-ui, otherweise true)
   dir: "logs"
   conversation_prefix: "conversation"
 
