@@ -78,16 +78,28 @@ pip install -r requirements.txt
 
 ### Language model for spaCy
 
-The Wikipedia integration requires a German language model. You control which variant is loaded via `wiki.spacy_model_variant` in the configuration (`config.yaml`). Currently supported values are `medium` (`de_core_news_md`) and `large` (`de_core_news_lg`).
+The Wikipedia integration requires a spaCy model that matches your configured language. The keyword finder now looks up the correct package via the combination of `language` and `wiki.spacy_model_variant`, using the mapping in `wiki.spacy_modell_map` inside `config.yaml`. This keeps the model choice entirely in configuration, without hard-coded defaults.
+
+Example:
+
+```yaml
+language: "en"
+wiki:
+  spacy_model_variant: "medium"
+  spacy_modell_map:
+    en:
+      medium: "en_core_web_md"
+      large:  "en_core_web_lg"
+```
 
 Additionally, you have to install the corresponding model manually:
 
 ```bash
 # Medium model (balance between size and accuracy)
-python -m spacy download de_core_news_md
+python -m spacy download en_core_web_md
 
 # Large model (more accurate, but slower and uses more memory)
-python -m spacy download de_core_news_lg
+python -m spacy download en_core_web_lg
 ```
 
 ---
