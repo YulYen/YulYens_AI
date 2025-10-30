@@ -1,11 +1,9 @@
-# Backlog
+# backlog.md
 
 | No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
 | 1 | Terminal-UI logging fix | Write logs exclusively to files to keep the console clean | S | M | Bugfix |
 | 2 | Web-UI "New conversation" in stream | Done? End streaming cleanly so that the "New conversation" button works | M | L | Bugfix |
-| 3 | spaCy internationalization | Automatically use the corresponding English spaCy model when English is configured | M | M | Technical foundation |
-| 4 | Structure documentation bilingually | Offer README, Features, and Backlog in both German and English | M | M | Documentation |
 | 5 | Health checks/monitoring | Status page (Ollama/VRAM), simple `/healthz` endpoint plus VRAM probe | S | M | Technical foundation |
 | 6 | Model selection in the UI | Dropdown/radio for available models, explicitly selectable per persona and run | S | S | UX/Technology |
 | 7 | LoRA fine-tuning pipeline | IN PROGRESS → LoRA adapter for LeoLM13B | L | XL | Research/Quality |
