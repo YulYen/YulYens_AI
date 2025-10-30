@@ -129,47 +129,46 @@ class YulYenStreamingProvider:
     def _log_generation_start(
         self, messages: list[dict[str, Any]], options: dict[str, Any]
     ) -> None:
-        """Logs context and wiki information before the actual LLM call.
-        TODO: Refactor: This method can be far leaner with less overblown error handling
+        """
+        Logs compact metadata before the LLM call.
+        KISS principle: minimal error handling — logging must never disrupt execution.
         """
 
-        # Hash and log the payload (messages plus options)
+        # 1) Compute a deterministic hash / preview of the payload (best effort)
+        payload = {"messages": messages, "options": options}
         try:
-            _payload = {"messages": messages, "options": options}
-            _canon = json.dumps(
-                _payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-            )
-            _hash = hashlib.sha256(_canon.encode("utf-8")).hexdigest()
-            logging.debug("[LLM INPUT] sha256=%s payload=%s", _hash, _canon)
-        except Exception as exc:
-            logging.warning("Unable to log LLM input: %s", exc)
+            canon = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        except Exception:
+            # Fallback if serialization fails due to non-JSON types
+            canon = f"<unserializable payload: messages={type(messages)!r}, options={type(options)!r}>"
+        sha = hashlib.sha256(canon.encode("utf-8")).hexdigest()
+        logging.debug("[LLM INPUT] sha256=%s payload=%s", sha, canon)
 
-        timestamp = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
+        # 2) Estimate token count (non-critical)
         try:
             estimated_tokens = approx_token_count(messages)
-        except Exception as exc:  # pragma: no cover - safety net
-            logging.warning("Could not estimate token count: %s", exc)
-            estimated_tokens = None
-        persona_options = self.persona_options or {}
-        num_ctx_raw = (
-            persona_options.get("num_ctx")
-            if isinstance(persona_options, dict)
-            else None
-        )
-        num_ctx_value: Any
-        if num_ctx_raw is None:
-            num_ctx_value = None
-        else:
+        except Exception:
+            estimated_tokens = None  # best effort; do not warn
+
+        # 3) Extract num_ctx from persona options (try to cast to int if possible)
+        num_ctx_raw = getattr(self, "persona_options", {}) or {}
+        num_ctx_val: Any = None
+        if isinstance(num_ctx_raw, dict) and "num_ctx" in num_ctx_raw:
+            val = num_ctx_raw["num_ctx"]
             try:
-                num_ctx_value = int(num_ctx_raw)
+                num_ctx_val = int(val)
             except (TypeError, ValueError):
-                num_ctx_value = num_ctx_raw
+                num_ctx_val = val  # keep raw value if conversion fails
+
+        # 4) Final concise log entry for this LLM turn
+        ts = datetime.datetime.now().astimezone().isoformat(timespec="seconds")
         log_payload = {
-            "ts": timestamp,
+            "ts": ts,
             "estimated_tokens": estimated_tokens,
-            "num_ctx": num_ctx_value,
+            "num_ctx": num_ctx_val,
         }
         logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
+
 
     def stream(self, messages: list[dict[str, Any]]):
         """
