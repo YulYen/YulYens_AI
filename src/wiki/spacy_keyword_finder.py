@@ -47,16 +47,42 @@ W_TOKENS = {
 GENERIC_NOUNS = {"amt", "funktion", "rolle", "posten", "thema", "frage"}
 
 
-class ModelVariant(str, Enum):
-    MEDIUM = "de_core_news_md"
-    LARGE = "de_core_news_lg"
+
+def resolve_spacy_model(cfg: dict) -> str:
+    """
+    Determine the correct spaCy model name based on language and variant
+    defined in config.yaml. Raises a clear error if configuration is incomplete.
+    """
+    wiki_cfg = cfg.wiki
+    if not wiki_cfg:
+        raise ValueError("Missing 'wiki' section in configuration.")
+
+    if not cfg.language:
+        raise ValueError("Missing top-level key 'language' in configuration.")
+
+    if "spacy_model_variant" not in wiki_cfg:
+        raise ValueError("Missing 'spacy_model_variant' in wiki section.")
+
+    if "spacy_modell_map" not in wiki_cfg:
+        raise ValueError("Missing 'spacy_modell_map' in wiki section.")
+
+    lang = cfg.language
+    variant = wiki_cfg["spacy_model_variant"]
+    model_map = wiki_cfg["spacy_modell_map"]
+
+    try:
+        return model_map[lang][variant]
+    except KeyError as e:
+        raise ValueError(
+            f"No spaCy model mapping for language='{lang}', variant='{variant}'."
+        ) from e
 
 
 class SpacyKeywordFinder:
     """Finds relevant keywords in German text for the Wikipedia search."""
 
     def __init__(self, variant):
-        self.model_name = variant.value
+        self.model_name = variant
         logging.info(f"Loading spaCy model: {self.model_name}")
         self.nlp = spacy.load(self.model_name)
 

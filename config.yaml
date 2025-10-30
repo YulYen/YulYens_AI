@@ -23,12 +23,19 @@ ui:
       username: ""
       password: ""
 
-# --- Wiki settings -------------------------------------------------------------
+# --- Wiki settings (including spacey-Keyword-Finder) -------------------------------------------------------------
 wiki:
   # offline uses Kiwix, online calls Wikipedia, false disables wiki snippets
   mode: offline
   # spaCy model variant for keyword extraction: "medium" or "large"
   spacy_model_variant: "large"
+  spacy_modell_map:
+    de:
+      medium: "de_core_news_md"
+      large:  "de_core_news_lg"
+    en:
+      medium: "en_core_web_md"
+      large:  "en_core_web_lg"
   # Port of the local proxy (always required)
   proxy_port: 8042
   # Maximum wiki snippet length in characters (recommend 1200–1600)

@@ -8,7 +8,7 @@ from config.config_singleton import Config
 from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
-from wiki.spacy_keyword_finder import ModelVariant, SpacyKeywordFinder
+from wiki.spacy_keyword_finder import  SpacyKeywordFinder, resolve_spacy_model
 
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
@@ -36,7 +36,7 @@ class AppFactory:
     def get_keyword_finder(self) -> SpacyKeywordFinder | None:
         if self._keyword_finder is None:
             if _wiki_mode_enabled(self._cfg.wiki["mode"]):
-                variant = self._resolve_spacy_model_variant()
+                variant = resolve_spacy_model(self._cfg)
                 try:
                     self._keyword_finder = SpacyKeywordFinder(variant)
                 except (OSError, ImportError) as exc:
@@ -50,35 +50,6 @@ class AppFactory:
                 self._keyword_finder = None
         return self._keyword_finder
 
-    def _resolve_spacy_model_variant(self) -> ModelVariant:
-        """Determines the configured spaCy model variant with a sensible fallback."""
-
-        wiki_cfg = getattr(self._cfg, "wiki", {}) or {}
-        raw_variant = wiki_cfg.get("spacy_model_variant")
-
-        if isinstance(raw_variant, ModelVariant):
-            return raw_variant
-
-        if isinstance(raw_variant, str):
-            normalized = raw_variant.strip().lower()
-            for variant in ModelVariant:
-                if normalized in {variant.name.lower(), variant.value.lower()}:
-                    return variant
-
-            logging.warning(
-                "Unknown spaCy variant '%s' – falling back to %s",
-                raw_variant,
-                ModelVariant.LARGE.value,
-            )
-
-        elif raw_variant is not None:
-            logging.warning(
-                "Invalid type for spaCy variant (%s) – falling back to %s",
-                type(raw_variant).__name__,
-                ModelVariant.LARGE.value,
-            )
-
-        return ModelVariant.LARGE
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Creates a new LLM streamer for the given persona."""
