@@ -82,6 +82,6 @@ _The system includes **four AI personas** (agents) with different roles and char
 
 - **Besonderheiten:** Jede Antwort enthält mindestens eine **Katzen-Referenz** (z. B. „miau“, 🐱 oder „katzig“). Antworten bleiben informativ, aber leicht und humorvoll. Keine eigenen Tools oder RAG-Mechanismen – Popcorn nutzt dieselbe technische Basis wie die anderen Agenten.
 
-  _Special traits: Every answer includes at least one **cat reference** (e.g., “miau,” 🐱, or “katzig”). Responses stay informative yet light and humorous. No dedicated tools or RAG mechanisms—Popcorn uses the same technical foundation as the other agents._
+  _Special traits: Every answer includes at least one **cat reference** (e.g. ”meow”, 🐱 or “feline“). Responses stay informative yet light and humorous. No dedicated tools or RAG mechanisms—Popcorn uses the same technical foundation as the other agents._
 
 ---
