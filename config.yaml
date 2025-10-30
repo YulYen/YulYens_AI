@@ -6,7 +6,7 @@ core:
   # Backend selection: use "ollama" for real LLMs, "dummy" for quick echo tests
   backend: "ollama"
   # Default model name at startup
-  model_name: "leo-hessianai-13b-chat.Q5" # e.g. "gptoss20b-q4ks", "mistral7b-local", or locally built "leo-hessianai-13b-chat.Q5"
+  model_name: "leo-hessianai-13b-chat.Q5" # e.g. "gptoss20b-q4ks", "mistral7b-local", or "leo-hessianai-13b-chat.Q5"
   warm_up: false
   # Base URL for Ollama (protocol + host + port), e.g. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"

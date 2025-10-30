@@ -9,6 +9,8 @@ import pytest
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
 from core.streaming_provider import YulYenStreamingProvider
+from tests.util import is_model
+
 
 # ---- Deterministic time in Europe/Berlin ------------------------------------
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -97,7 +99,10 @@ def test_persona_name_normalized(client, monkeypatch):
 
 @pytest.mark.slow
 @pytest.mark.ollama
-## TODO @pytest.mark.skipif(model =! "Leo13B", reason="Same joke is only stable under Leo")
+@pytest.mark.skipif(
+    not is_model("leo-hessianai-13b-chat.Q5"),
+    reason="Same joke is only stable under leo-hessianai-13b-chat.Q5"
+)
 def test_same_joke(client):
     """
     Expectation: identical question twice → exactly the same answer.
@@ -109,11 +114,11 @@ def test_same_joke(client):
     assert r1.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."'  # LEO reference answer
+    # a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."'  # LEO reference answer
     anfang = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier'  # LEO stable beginning
 
     # Non-empty and not just whitespace
-    assert a1.strip() and a2.strip()
+    assert a1.strip()
 
     # Core requirement: deterministic match
     assert anfang in a1, (
