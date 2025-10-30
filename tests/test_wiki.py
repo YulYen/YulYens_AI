@@ -9,7 +9,7 @@ import requests
 from config.config_singleton import Config
 from core.factory import AppFactory
 from core.streaming_provider import lookup_wiki_snippet
-from wiki.spacy_keyword_finder import ModelVariant, SpacyKeywordFinder
+from wiki.spacy_keyword_finder import SpacyKeywordFinder
 
 from tests.util import has_spacy_model
 
@@ -130,22 +130,16 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     Config.reset_instance()
 
 
-def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch, caplog):
-    dummy_cfg = SimpleNamespace(wiki={"mode": "offline"})
+def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch):
+    dummy_cfg = SimpleNamespace(wiki={"mode": "offline", "spacy_model_variant": "large", "spacy_modell_map": {}}, language="de")
     monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
 
-    def _raise_missing_model(*args, **kwargs):
-        raise OSError("model not found")
-
-    monkeypatch.setattr("core.factory.SpacyKeywordFinder", _raise_missing_model)
-
-    caplog.set_level(logging.WARNING)
-
-    factory = AppFactory()
-    finder = factory.get_keyword_finder()
-
-    assert finder is None
-    assert "Disabling wiki features" in caplog.text
+    try:
+        factory = AppFactory()
+        factory.get_keyword_finder()
+        assert False # Fail if no Exception
+    except ValueError as ve:
+        assert "No spaCy model mapping for language='de', variant='large" in str(ve)
 
 
 skip_without_medium_model = pytest.mark.skipif(
@@ -161,7 +155,7 @@ def test_lookup_wiki_snippet_for_germany():
     returns a snippet for 'Deutschland' containing the capital 'Berlin'.
     """
     # KeywordFinder in medium mode (detects 'Deutschland')
-    finder = SpacyKeywordFinder(ModelVariant.MEDIUM)
+    finder = SpacyKeywordFinder("de_core_news_md")
 
     # Assumptions: wiki_mode=offline, proxy runs locally on 8042, limit e.g. 1600
     wiki_hint, topic_title, snippet = lookup_wiki_snippet(
@@ -176,7 +170,7 @@ def test_lookup_wiki_snippet_for_germany():
 
     # We expect the proxy to be reachable and to detect 'Deutschland'
     assert (
-        wiki_hint is not None
+        wiki_hint is not None and topic_title is not None # Hint could be an error-Message
     ), "Wiki proxy did not return a hint → it is probably not running"
     assert topic_title == "Deutschland"
     assert snippet, "Wiki proxy did not return any snippet text"
@@ -184,67 +178,3 @@ def test_lookup_wiki_snippet_for_germany():
     # The capital Berlin should appear in the snippet (case-insensitive)
     assert "berlin" in snippet.lower()
 
-
-def _capture_variant(monkeypatch, wiki_config):
-    dummy_cfg = SimpleNamespace(wiki=wiki_config)
-
-    monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
-
-    captured = {}
-
-    class DummyFinder:
-        def __init__(self, variant):
-            captured["variant"] = variant
-
-    monkeypatch.setattr("core.factory.SpacyKeywordFinder", DummyFinder)
-
-    factory = AppFactory()
-    finder = factory.get_keyword_finder()
-
-    assert isinstance(finder, DummyFinder)
-    return captured["variant"]
-
-
-def test_get_keyword_finder_uses_medium_variant(monkeypatch):
-    variant = _capture_variant(
-        monkeypatch,
-        {"mode": "offline", "spacy_model_variant": "medium"},
-    )
-
-    assert variant is ModelVariant.MEDIUM
-
-
-def test_get_keyword_finder_supports_model_name(monkeypatch):
-    variant = _capture_variant(
-        monkeypatch,
-        {"mode": "offline", "spacy_model_variant": "de_core_news_md"},
-    )
-
-    assert variant is ModelVariant.MEDIUM
-
-
-def test_get_keyword_finder_falls_back_to_large(monkeypatch):
-    variant = _capture_variant(
-        monkeypatch,
-        {"mode": "offline", "spacy_model_variant": "unbekannt"},
-    )
-
-    assert variant is ModelVariant.LARGE
-
-
-def test_get_keyword_finder_defaults_when_missing(monkeypatch):
-    variant = _capture_variant(
-        monkeypatch,
-        {"mode": "offline"},
-    )
-
-    assert variant is ModelVariant.LARGE
-
-
-def test_get_keyword_finder_accepts_enum_value(monkeypatch):
-    variant = _capture_variant(
-        monkeypatch,
-        {"mode": "offline", "spacy_model_variant": ModelVariant.MEDIUM},
-    )
-
-    assert variant is ModelVariant.MEDIUM
