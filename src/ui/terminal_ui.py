@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 
 from colorama import Fore, Style, init
-from config.personas import get_all_persona_names, get_drink, system_prompts
+from config.personas import get_all_persona_names, get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 
 # Shared core utilities and streamer
@@ -55,7 +55,7 @@ class TerminalUI:
         print(self.texts["choose_persona"])
         for idx, name in enumerate(names, start=1):
             # Optional: show a brief description
-            desc = next(p for p in system_prompts if p["name"] == name)["description"]
+            desc = next(p for p in _load_system_prompts() if p["name"] == name)["description"]
             persona_line = f"{idx}. {name} – {desc}"
             print(persona_line)
         while True:

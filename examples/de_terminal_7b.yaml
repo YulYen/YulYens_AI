@@ -6,15 +6,15 @@ core:
   # Backend selection: use "ollama" for real LLMs, "dummy" for quick echo tests
   backend: "ollama"
   # Default model name at startup
-  model_name: "leo-hessianai-13b-chat.Q5" # e.g. "gptoss20b-q4ks", "mistral7b-local", or "leo-hessianai-13b-chat.Q5"
-  warm_up: true
+  model_name: "mistral7b-local" # e.g. "gptoss20b-q4ks", "mistral7b-local", or "leo-hessianai-13b-chat.Q5"
+  warm_up: false
   # Base URL for Ollama (protocol + host + port), e.g. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"
   include_date: true  # master switch to add the current date to persona system prompts
 
 # --- UI settings ---------------------------------------------------------------
 ui:
-  type: web   # options: "web", "terminal", or null (= API only)
+  type: terminal   # options: "web", "terminal", or null (= API only)
   web:
     host: "0.0.0.0"
     port: 7860
@@ -60,14 +60,14 @@ logging:
 
 # --- One-shot API (e.g. for tests) ----------------------------------------------
 api:
-  enabled: true
+  enabled: false
   host: "127.0.0.1"
   port: 8013
 
 security:
-  enabled: true
+  enabled: false
   guard: BasicGuard
-  prompt_injection_protection: true
+  prompt_injection_protection: false
   pii_protection: false
-  output_blocklist: true
+  output_blocklist: false
   # Input: block injections/PII. Output: mask PII, block secrets.

@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pytest
 from config.config_singleton import Config
-from config.personas import system_prompts
+from config.personas import _load_system_prompts
 from core import utils as utils_module
 from core.dummy_llm_core import DummyLLMCore
 from core.factory import AppFactory
@@ -164,10 +164,10 @@ def test_greeting_replaces_placeholders(tmp_path):
     """
     Verifies the one-to-one placeholder substitution from YAML:
     - {model_name} -> core.model_name
-    - {persona_name} -> system_prompts[0].name
+    - {persona_name} -> _load_system_prompts[0].name
     - unknown placeholders remain unchanged (SafeDict)
     """
-    persona_name = system_prompts[0]["name"]
+    persona_name = _load_system_prompts[0]["name"]
     g = _greeting_text(Config(), persona_name)
     assert f"{persona_name}" in g
     assert "Chat" in g
@@ -199,7 +199,7 @@ def test_system_prompt_with_date_uses_localized_suffix(monkeypatch):
 
     Config.reset_instance()
     cfg = Config()
-    persona_name = system_prompts[0]["name"]
+    persona_name = _load_system_prompts[0]["name"]
 
     monkeypatch.setattr(utils_module, "get_prompt_by_name", lambda name: "BASE")
     monkeypatch.setattr(utils_module, "datetime", _FixedDatetime)

@@ -2,7 +2,7 @@ import logging
 from functools import partial
 
 import gradio as gr
-from config.personas import get_drink, system_prompts
+from config.personas import get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 
@@ -397,7 +397,7 @@ class WebUI:
         greeting_template = ui.get("greeting")
         persona_btn_suffix = ui.get("persona_button_suffix")
 
-        persona_info = {p["name"].lower(): p for p in system_prompts}
+        persona_info = {p["name"].lower(): p for p in _load_system_prompts()}
 
         demo, components = self._build_ui(
             project_title,

@@ -12,14 +12,11 @@ from datetime import datetime
 
 import uvicorn
 
-# API imports
-from api.app import app, set_provider
-from config.config_singleton import Config
-
 # Logging setup
 from config.logging_setup import init_logging
 
 # Core and configuration
+from config.config_singleton import Config
 from core.factory import AppFactory
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
@@ -36,11 +33,10 @@ def main():
         help="Pfad zur YAML-Konfiguration; ohne Angabe wird ./config.yaml genutzt.",
     )
     args = parser.parse_args()
-
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
-        cfg = Config(config_path)  # load once
+        cfg = Config(path=config_path)  # load once
     except OSError as exc:
         config_location = os.path.abspath(
             getattr(exc, "filename", config_path) or config_path
@@ -127,6 +123,8 @@ def start_api_in_background(api_cfg, provider):
     """
     Starts Uvicorn in a daemon thread.
     """
+    from api.app import app, set_provider
+
     set_provider(provider)
     host = api_cfg["host"]
     port = int(api_cfg["port"])

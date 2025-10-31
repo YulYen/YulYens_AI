@@ -43,12 +43,9 @@ def _load_system_prompts() -> list[dict[str, Any]]:
     return personas
 
 
-system_prompts: list[dict[str, Any]] = _load_system_prompts()
-
-
 def get_prompt_by_name(name: str) -> str:
     """Returns the prompt text for a persona by name."""
-    for persona in system_prompts:
+    for persona in _load_system_prompts():
         if persona["name"].lower() == name.lower():
             return persona["prompt"]
     raise ValueError(f"Persona '{name}' not found.")
@@ -56,7 +53,7 @@ def get_prompt_by_name(name: str) -> str:
 
 def get_options(name: str) -> dict[str, Any] | None:
     """Returns the options for a persona by name."""
-    for persona in system_prompts:
+    for persona in _load_system_prompts():
         if persona["name"].lower() == name.lower():
             return persona.get("llm_options") or None
     raise ValueError(f"Persona '{name}' not found.")
@@ -64,12 +61,12 @@ def get_options(name: str) -> dict[str, Any] | None:
 
 def get_all_persona_names() -> list[str]:
     """Returns a list of all persona names."""
-    return [p["name"] for p in system_prompts]
+    return [p["name"] for p in _load_system_prompts()]
 
 
 def get_drink(name: str) -> str:
     """Returns a persona's favorite drink."""
-    for persona in system_prompts:
+    for persona in _load_system_prompts():
         if persona["name"].lower() == name.lower():
             return persona.get("drink", "Coffee")
     raise ValueError(f"Persona '{name}' not found.")
