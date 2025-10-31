@@ -173,6 +173,12 @@ Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
 python src/launch.py
 ```
 
+Optional kann eine alternative Konfigurationsdatei per `--config` (Kurzform `-c`) übergeben werden, zum Beispiel:
+
+```bash
+python src/launch.py --config pfad/zur/config.yaml
+```
+
 - **Terminal-UI**  
   - Bei `ui.type: "terminal"` im Terminal nutzen  
   - Eingabe: Fragen einfach eintippen  
