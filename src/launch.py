@@ -1,6 +1,7 @@
 # launch.py
 
 # General imports
+import argparse
 import logging
 import os
 import socket
@@ -27,7 +28,16 @@ from yaml import YAMLError
 
 def main():
 
-    config_path = "config.yaml"
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        dest="config",
+        help="Pfad zur YAML-Konfiguration; ohne Angabe wird ./config.yaml genutzt.",
+    )
+    args = parser.parse_args()
+
+    config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
         cfg = Config(config_path)  # load once
@@ -68,6 +78,7 @@ def main():
         logfile=logfile,
         to_console=to_console,
     )
+    logging.info(f"Using configuration file: {config_path}")
     logging.info("BOOT OK – Logging initialised and active.")
     logging.info(f"Python exe: {sys.executable}  version: {platform.python_version()}")
 
