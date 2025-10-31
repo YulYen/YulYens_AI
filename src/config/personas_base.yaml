@@ -1,24 +1,25 @@
 personas:
-  - name: LEAH
+  - name: CAPTAIN_SELINA
     llm_options:
-      temperature: 0.65
-      repeat_penalty: 1.15
+      temperature: 0.40         # diszipliniert, konsistent
+      repeat_penalty: 1.10
       num_ctx: 4096
+      seed: 11
     defaults:
       featured: true
-  - name: DORIS
+  - name: ZETA_FLUX
     llm_options:
-      temperature: 0.6
-      repeat_penalty: 1.15
+      temperature: 0.80         # frech, kreativ, schnippisch
+      repeat_penalty: 1.12
       num_ctx: 4096
-  - name: PETER
+  - name: ELIAS_MOREL
     llm_options:
-      temperature: 0.2
-      repeat_penalty: 1.15
+      temperature: 0.50         # ruhig, poetisch, präzise
+      repeat_penalty: 1.18
       num_ctx: 4096
-      seed: 42
-  - name: POPCORN
+      seed: 31
+  - name: LYRA_VEX
     llm_options:
-      temperature: 0.8
-      repeat_penalty: 1.15
+      temperature: 0.85         # elegant, verspielt, doppeldeutig
+      repeat_penalty: 1.08
       num_ctx: 4096
