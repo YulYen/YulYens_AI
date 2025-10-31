@@ -1,0 +1,25 @@
+personas:
+  - name: CAPTAIN_SELINA
+    llm_options:
+      temperature: 0.40         # diszipliniert, konsistent
+      repeat_penalty: 1.10
+      num_ctx: 4096
+      seed: 11
+    defaults:
+      featured: true
+  - name: ZETA_FLUX
+    llm_options:
+      temperature: 0.80         # frech, kreativ, schnippisch
+      repeat_penalty: 1.12
+      num_ctx: 4096
+  - name: ELIAS_MOREL
+    llm_options:
+      temperature: 0.50         # ruhig, poetisch, präzise
+      repeat_penalty: 1.18
+      num_ctx: 4096
+      seed: 31
+  - name: LYRA_VEX
+    llm_options:
+      temperature: 0.85         # elegant, verspielt, doppeldeutig
+      repeat_penalty: 1.08
+      num_ctx: 4096
