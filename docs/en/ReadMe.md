@@ -167,6 +167,12 @@ The `security` section selects the guard for input and output checks:
 python src/launch.py
 ```
 
+You can optionally pass an alternative configuration file via `--config` (short `-c`), for example:
+
+```bash
+python src/launch.py --config path/to/config.yaml
+```
+
 - **Terminal UI**
   - Use in the terminal when `ui.type: "terminal"`
   - Input: simply type your questions
