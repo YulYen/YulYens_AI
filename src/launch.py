@@ -30,17 +30,17 @@ def main():
         "-c",
         "--config",
         dest="config",
-        help="Pfad zur YAML-Konfiguration; ohne Angabe wird ./config.yaml genutzt.",
+        help="Path to the YAML configuration file; defaults to ./config.yaml if not specified.",
     )
     parser.add_argument(
         "-e",
         "--ensemble",
         dest="ensemble",
-        help="Name des Persona-Ensembles, das geladen werden soll.",
+        help="Name of the persona ensemble to load.",
     )
     args = parser.parse_args()
     if not args.ensemble:
-        parser.error("Fehlender Pflichtparameter: --ensemble / -e.")
+        parser.error("Missing required parameter: --ensemble / -e. If you art not sure, use 'python src/launch.py -e classic'")
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
