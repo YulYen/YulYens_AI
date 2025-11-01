@@ -9,16 +9,41 @@ import yaml
 
 from .config_singleton import Config
 
-_BASE_PATH = Path(__file__).with_name("personas_base.yaml")
-_LOCALES_DIR = Path(__file__).resolve().parents[2] / "locales"
+_ENSEMBLES_DIR = Path(__file__).resolve().parents[2] / "ensembles"
+
+
+def _resolve_persona_files() -> tuple[Path, Path]:
+    """Return the base and locale persona files for the active ensemble."""
+
+    cfg = Config()
+    ensemble = getattr(cfg, "ensemble", None)
+    if not ensemble:
+        raise RuntimeError(
+            "No persona ensemble configured. Ensure Config().ensemble is set before loading personas."
+        )
+
+    base_path = _ENSEMBLES_DIR / ensemble / "personas_base.yaml"
+    locale_path = _ENSEMBLES_DIR / ensemble / "locales" / cfg.language / "personas.yaml"
+
+    if not base_path.is_file():
+        raise FileNotFoundError(
+            f"Persona base file '{base_path}' not found for ensemble '{ensemble}'."
+        )
+
+    if not locale_path.is_file():
+        raise FileNotFoundError(
+            f"Persona locale file '{locale_path}' not found for ensemble '{ensemble}' and language '{cfg.language}'."
+        )
+
+    return base_path, locale_path
 
 
 def _load_system_prompts() -> list[dict[str, Any]]:
     """Loads persona data from the base and locale YAML files."""
 
     cfg = Config()
-    base_data = yaml.safe_load(_BASE_PATH.read_text(encoding="utf-8"))
-    locale_path = _LOCALES_DIR / cfg.language / "personas.yaml"
+    base_path, locale_path = _resolve_persona_files()
+    base_data = yaml.safe_load(base_path.read_text(encoding="utf-8"))
     locale_data = yaml.safe_load(locale_path.read_text(encoding="utf-8"))
 
     personas: list[dict[str, Any]] = []

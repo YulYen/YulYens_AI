@@ -62,6 +62,10 @@ class Config:
         for section, settings in data.items():
             setattr(self, section, settings)
 
+        # Persona ensembles are selected at runtime (e.g., via CLI parameter).
+        # Ensure the attribute exists even before it is set explicitly.
+        self.ensemble: str | None = None
+
     def override(self, section: str, updates: dict) -> None:
         """
         Updates configuration keys in the given section.
