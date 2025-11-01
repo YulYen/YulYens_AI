@@ -50,6 +50,7 @@ def client(request):
     Config.reset_instance()
     # Create a dedicated test config or reuse the repository's config.yaml
     cfg = Config("config.yaml")
+    cfg.ensemble = "classic"
     use_ollama = _should_use_ollama(request, cfg)
     # Override this test runtime flag
     core_updates = {"include_date": False}
@@ -75,6 +76,7 @@ def client_with_date_and_wiki(request):
     # Reset the config singleton and load the test configuration
     Config.reset_instance()
     cfg = Config("config.yaml")
+    cfg.ensemble = "classic"
 
     use_ollama = _should_use_ollama(request, cfg)
     if not use_ollama:
@@ -94,3 +96,19 @@ def client_with_date_and_wiki(request):
     # Cleanup: reset the provider and clear the config
     set_provider(None)
     Config.reset_instance()
+
+
+@pytest.fixture(autouse=True)
+def _default_ensemble(monkeypatch):
+    """Ensure the classic persona ensemble is available in tests."""
+
+    original_load_config = Config._load_config
+
+    def _patched_load_config(self, path):
+        original_load_config(self, path)
+        if getattr(self, "ensemble", None) is None:
+            self.ensemble = "classic"
+
+    monkeypatch.setattr(Config, "_load_config", _patched_load_config)
+    yield
+

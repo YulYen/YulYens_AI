@@ -21,7 +21,7 @@ def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
 
     Config.reset_instance()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["ai-orchestra"])
+    monkeypatch.setattr(sys, "argv", ["ai-orchestra", "-e", "classic"])
 
     with pytest.raises(SystemExit) as excinfo:
         launch.main()
@@ -56,6 +56,7 @@ def _build_test_cfg(backend: str = "dummy", core_updates: dict | None = None):
                 "timeout_read": 0.1,
             }
             self.logging = {"conversation_prefix": "test_conv"}
+            self.ensemble = "classic"
 
     cfg = DummyCfg()
     if core_updates:
