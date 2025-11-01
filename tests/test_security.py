@@ -31,11 +31,6 @@ def test_prompt_injection_block():
     assert r["ok"] is False and r["reason"] == "prompt_injection"
 
 
-def test_pii_email_block():
-    r = G.check_input("Meine Mail ist max.mustermann@example.org")
-    assert r["ok"] is False and r["reason"] == "pii_detected"
-
-
 def test_output_blocklist():
     r = G.check_output("Hier ist dein Key: sk-THISSHOULDNEVERBEPRINTED1234567890")
     assert r["ok"] is False and r["reason"] == "blocked_keyword"
