@@ -164,13 +164,24 @@ The `security` section selects the guard for input and output checks:
 ### Launch
 
 ```bash
-python src/launch.py
+python src/launch.py -e classic
 ```
 
-You can optionally pass an alternative configuration file via `--config` (short `-c`), for example:
+The `--ensemble` (short `-e`) parameter selects which ensemble definition to start. `classic` is the
+default choice for the regular experience. You can try another ensemble, such as the
+`spaceship_crew` example, by running:
 
 ```bash
-python src/launch.py --config path/to/config.yaml
+python src/launch.py -e examples/spaceship_crew
+```
+
+On Windows, replace `/` with `\` (`examples\spaceship_crew`).
+
+You can optionally pass an alternative configuration file via `--config` (short `-c`) alongside the
+ensemble parameter, for example:
+
+```bash
+python src/launch.py -e classic --config path/to/config.yaml
 ```
 
 - **Terminal UI**
