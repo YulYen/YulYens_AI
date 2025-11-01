@@ -1,5 +1,5 @@
 # tests/test_config.py
-import importlib
+import importlib, sys
 from datetime import datetime
 
 import pytest
@@ -21,6 +21,7 @@ def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
 
     Config.reset_instance()
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["ai-orchestra"])
 
     with pytest.raises(SystemExit) as excinfo:
         launch.main()
