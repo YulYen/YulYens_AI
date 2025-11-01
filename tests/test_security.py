@@ -31,8 +31,15 @@ def test_prompt_injection_block():
     assert r["ok"] is False and r["reason"] == "prompt_injection"
 
 
-def test_pii_email_block():
-    r = G.check_input("Meine Mail ist max.mustermann@example.org")
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Meine Mail ist max.mustermann@example.org",
+        "Meine E-Mail: vorname.nachname@beispiel.de",
+    ],
+)
+def test_pii_email_block(text):
+    r = G.check_input(text)
     assert r["ok"] is False and r["reason"] == "pii_detected"
 
 
@@ -65,11 +72,6 @@ def test_de_localhost_probe():
 
 def test_de_pii_phone():
     r = G.check_input("Ruf mich an: 040 123 45 67")
-    assert r["ok"] is False and r["reason"] == "pii_detected"
-
-
-def test_de_pii_email():
-    r = G.check_input("Meine E-Mail: vorname.nachname@beispiel.de")
     assert r["ok"] is False and r["reason"] == "pii_detected"
 
 
