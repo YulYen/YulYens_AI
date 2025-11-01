@@ -22,7 +22,7 @@ def _streamer_with_security(overrides=None):
         Config.reset_instance()
 
 
-def test_normal_input_ok():
+def test_ok_normalfrage():
     assert ok("Wie funktioniert die Merge-Sort-Algorithmusidee in O(n log n)?")
 
 
@@ -71,11 +71,6 @@ def test_de_pii_phone():
 def test_de_pii_email():
     r = G.check_input("Meine E-Mail: vorname.nachname@beispiel.de")
     assert r["ok"] is False and r["reason"] == "pii_detected"
-
-
-def test_de_ok_normalfrage():
-    r = G.check_input("Erkläre kurz den Unterschied zwischen Stack und Heap.")
-    assert r["ok"] is True
 
 
 EMAIL = "max.mustermann@example.org"
