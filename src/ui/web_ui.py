@@ -46,13 +46,17 @@ class WebUI:
     def _reset_conversation_state(self):
         return []
 
-    @staticmethod
-    def _persona_thumbnail_path(persona_name):
-        return f"static/personas/{persona_name}/thumb.webp"
+    def _persona_thumbnail_path(self, persona_name):
+        ensemble = getattr(self.cfg, "ensemble", None)
+        if not ensemble:
+            raise RuntimeError("No persona ensemble configured for the web UI.")
+        return f"ensembles/{ensemble}/static/personas/{persona_name}/thumb.webp"
 
-    @staticmethod
-    def _persona_full_image_path(persona_name):
-        return f"static/personas/{persona_name}/full.webp"
+    def _persona_full_image_path(self, persona_name):
+        ensemble = getattr(self.cfg, "ensemble", None)
+        if not ensemble:
+            raise RuntimeError("No persona ensemble configured for the web UI.")
+        return f"ensembles/{ensemble}/static/personas/{persona_name}/full.webp"
 
     def _handle_context_warning(self, llm_history, chat_history):
 

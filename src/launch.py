@@ -32,7 +32,15 @@ def main():
         dest="config",
         help="Pfad zur YAML-Konfiguration; ohne Angabe wird ./config.yaml genutzt.",
     )
+    parser.add_argument(
+        "-e",
+        "--ensemble",
+        dest="ensemble",
+        help="Name des Persona-Ensembles, das geladen werden soll.",
+    )
     args = parser.parse_args()
+    if not args.ensemble:
+        parser.error("Fehlender Pflichtparameter: --ensemble / -e.")
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
@@ -62,6 +70,8 @@ def main():
             file=sys.stderr,
         )
         sys.exit(3)
+
+    cfg.ensemble = args.ensemble
 
     # 1) Initialize logging first
     ensure_dir_exists(cfg.logging["dir"])
