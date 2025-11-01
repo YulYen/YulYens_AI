@@ -175,6 +175,9 @@ default choice for the regular experience. You can try another ensemble, such as
 python src/launch.py -e examples/spaceship_crew
 ```
 
+For a complete walkthrough on building your own ensemble, see
+[Adding a custom ensemble](Adding_an_ensemble.md).
+
 On Windows, replace `/` with `\` (`examples\spaceship_crew`).
 
 You can optionally pass an alternative configuration file via `--config` (short `-c`) alongside the

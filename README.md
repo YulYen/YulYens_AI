@@ -4,9 +4,10 @@ Ein modulares KI-System mit mehreren deutschsprachigen Personas (LEAH, DORIS, PE
 Ziel ist eine charmante, lokal laufende KI-Umgebung für Alltag, Kreativität und Experimente –  
 **inklusive eigener Offline-Wikipedia-Integration** für Wissen ohne Cloud.
 
-📖 **Dokumentation:**  
-→ [Deutsche Hauptdokumentation](docs/de/ReadMe.md)  
+📖 **Dokumentation:**
+→ [Deutsche Hauptdokumentation](docs/de/ReadMe.md)
 → [Englische Dokumentation](docs/en/ReadMe.md)
+→ Anleitung zum [Eigenen Ensemble (DE)](docs/de/Ensemble_hinzufuegen.md) / [Custom ensemble (EN)](docs/en/Adding_an_ensemble.md)
 
 💡 **Projektstruktur (Kurzüberblick):**
 - `src/` – Anwendungscode (WebUI, Terminal-Interface, Core-Logik)  
