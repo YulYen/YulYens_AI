@@ -170,13 +170,22 @@ Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
 ### Start
 
 ```bash
-python src/launch.py
+python src/launch.py -e classic
 ```
 
-Optional kann eine alternative Konfigurationsdatei per `--config` (Kurzform `-c`) übergeben werden, zum Beispiel:
+Mit dem Parameter `--ensemble` (Kurzform `-e`) wird festgelegt, welches Ensemble gestartet wird.
+`classic` ist die Standardwahl für den regulären Betrieb. Für ein alternatives Beispiel-Ensemble wie
+`spaceship_crew` lässt sich der Start wie folgt ausführen:
 
 ```bash
-python src/launch.py --config pfad/zur/config.yaml
+python src/launch.py -e examples\spaceship_crew
+```
+
+Optional kann zusätzlich eine alternative Konfigurationsdatei per `--config` (Kurzform `-c`)
+übergeben werden, zum Beispiel:
+
+```bash
+python src/launch.py -e classic --config pfad/zur/config.yaml
 ```
 
 - **Terminal-UI**  
