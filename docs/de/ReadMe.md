@@ -181,6 +181,9 @@ Mit dem Parameter `--ensemble` (Kurzform `-e`) wird festgelegt, welches Ensemble
 python src/launch.py -e examples\spaceship_crew
 ```
 
+Eine detaillierte Anleitung zur Erstellung eigener Ensembles findest du in
+[Eigenes Ensemble hinzufügen](Ensemble_hinzufuegen.md).
+
 Optional kann zusätzlich eine alternative Konfigurationsdatei per `--config` (Kurzform `-c`)
 übergeben werden, zum Beispiel:
 
