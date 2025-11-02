@@ -1,9 +1,53 @@
 # tests/conftest.py
 import importlib
 import socket
+import sys
+import types
 from urllib.parse import urlparse
 
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Optional dependency fallbacks
+# ---------------------------------------------------------------------------
+try:
+    import huggingface_hub as _huggingface_hub  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - executed only in CI without the dep
+    _huggingface_hub = types.ModuleType("huggingface_hub")
+    sys.modules["huggingface_hub"] = _huggingface_hub
+
+
+if not hasattr(_huggingface_hub, "HfFolder"):
+    class _FallbackHfFolder:
+        """Minimal stub used when the real class is unavailable."""
+
+        _token: str | None = None
+
+        @classmethod
+        def save_token(cls, token: str) -> None:
+            cls._token = token
+
+        @classmethod
+        def get_token(cls) -> str | None:
+            return cls._token
+
+        @classmethod
+        def token_exists(cls) -> bool:
+            return cls._token is not None
+
+
+    _huggingface_hub.HfFolder = _FallbackHfFolder  # type: ignore[attr-defined]
+
+
+if not hasattr(_huggingface_hub, "whoami"):
+    def _fallback_whoami(*_args, **_kwargs):  # pragma: no cover - trivial stub
+        return {"name": "stub-user"}
+
+
+    _huggingface_hub.whoami = _fallback_whoami  # type: ignore[attr-defined]
+
+
 from api.app import app, set_provider
 from config.config_singleton import Config
 from core.factory import AppFactory
