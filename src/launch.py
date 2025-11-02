@@ -40,7 +40,7 @@ def main():
     )
     args = parser.parse_args()
     if not args.ensemble:
-        parser.error("Missing required parameter: --ensemble / -e. If you art not sure, use 'python src/launch.py -e classic'")
+        parser.error("Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'")
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
