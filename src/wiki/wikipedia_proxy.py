@@ -16,6 +16,17 @@ config = Config()  # Load singleton instance (loads YAML on first access)
 WIKI_CFG = config.wiki
 OFFLINE_CFG = config.wiki["offline"]
 
+
+def _normalize_base_url(url: str) -> str:
+    return url.rstrip("/")
+
+
+ONLINE_BASE_URL_MAP = WIKI_CFG.get("online_base_url_map", {}) or {}
+ONLINE_BASE_URL = _normalize_base_url(
+    ONLINE_BASE_URL_MAP.get(config.language)
+    or f"https://{config.language}.wikipedia.org"
+)
+
 SNIPPET_LIMIT = int(WIKI_CFG["snippet_limit"])
 TIMEOUT = (float(WIKI_CFG["timeout_connect"]), float(WIKI_CFG["timeout_read"]))
 
@@ -63,7 +74,7 @@ def _build_kiwix_url(term: str) -> str:
 
 def _build_online_url(term: str) -> str:
     # Wikipedia accepts underscores as spaces
-    return f"https://de.wikipedia.org/wiki/{term}"
+    return f"{ONLINE_BASE_URL}/wiki/{term}"
 
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
@@ -230,8 +241,8 @@ def _fetch_kiwix(term: str):
 
 
 def _fetch_online(term: str):
-    """Fetches a short text from live German Wikipedia (REST Summary API)."""
-    url = f"https://de.wikipedia.org/api/rest_v1/page/summary/{term}"
+    """Fetches a short text from the configured live Wikipedia (REST Summary API)."""
+    url = f"{ONLINE_BASE_URL}/api/rest_v1/page/summary/{term}"
     logger.info(f"[FetchOnline] {url}")
     try:
         r = requests.get(

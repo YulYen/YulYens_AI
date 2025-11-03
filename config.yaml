@@ -36,6 +36,9 @@ wiki:
     en:
       medium: "en_core_web_md"
       large:  "en_core_web_lg"
+  online_base_url_map:
+    de: "https://de.wikipedia.org"
+    en: "https://en.wikipedia.org"
   # Port of the local proxy (always required)
   proxy_port: 8042
   # Maximum wiki snippet length in characters (recommend 1200–1600)
