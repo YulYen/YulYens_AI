@@ -1,6 +1,6 @@
 # Yul Yen’s AI Orchestra  
 
-Ein modulares KI-System mit mehreren deutschsprachigen Personas (LEAH, DORIS, PETER und POPCORN).  
+Ein modulares KI-System mit mehreren (deutschsprachigen) Personas (LEAH, DORIS, PETER und POPCORN als default-Ensemble).  
 Ziel ist eine charmante, lokal laufende KI-Umgebung für Alltag, Kreativität und Experimente –  
 **inklusive eigener Offline-Wikipedia-Integration** für Wissen ohne Cloud.
 
@@ -10,8 +10,9 @@ Ziel ist eine charmante, lokal laufende KI-Umgebung für Alltag, Kreativität un
 → Anleitung zum [Eigenen Ensemble (DE)](docs/de/Ensemble_hinzufuegen.md) / [Custom ensemble (EN)](docs/en/Adding_an_ensemble.md)
 
 💡 **Projektstruktur (Kurzüberblick):**
-- `src/` – Anwendungscode (WebUI, Terminal-Interface, Core-Logik)  
-- `locales/` – System-Prompts & Persona-Definitionen  
+- `src/` – Anwendungscode (WebUI, Terminal-Interface, Core-Logik)
+- `ensembles/` – Die Konfiguration der Personas  
+- `locales/` – Texte für das UI auf deutsch und englisch  
 - `docs/` – Projektdokumentation (de/en)  
 - `logs/`, `tests/` – Laufzeit-, Test- und Verlaufdaten  
 
