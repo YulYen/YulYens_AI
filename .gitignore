@@ -37,3 +37,4 @@ models/
 *.zim
 .ollama/
 nix_mit_AI/
+gamerecording.pb
