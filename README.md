@@ -1,4 +1,6 @@
 # Yul Yen’s AI Orchestra  
+![MIT License](https://img.shields.io/badge/License-MIT-green.svg)
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 
 Ein modulares KI-System mit mehreren deutschsprachigen Personas (LEAH, DORIS, PETER und POPCORN als Default-Ensemble).  
 Ziel ist eine charmante, lokal laufende KI-Umgebung für Alltag, Kreativität und Experimente –  
