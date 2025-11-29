@@ -60,6 +60,14 @@ Der folgende Screenshot zeigt eine typische Chat-Interaktion inklusive der lokal
 
 ---
 
+## ⚙️ Mindest-Anforderungen (Kurzüberblick)
+
+- **Python 3.10+**
+- **Ollama** (lokal installiert)
+- mindestens ein lokales Modell, z. B. **leo-hessianai-13b-chat.Q5_K_S.gguf**
+
+---
+
 ## 🧠 Lizenz & Beiträge
 
 Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).  
