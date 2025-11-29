@@ -21,11 +21,11 @@ Der folgende Screenshot zeigt eine typische Chat-Interaktion inklusive der lokal
                │ (Interaktion, Personas, UI)  │
                └───────────────┬──────────────┘
                                │
-                               ▼
-                  ┌────────────────────────┐
-                  │     Python Backend     │
-                  │ (OllamaStreamer Core)  │
-                  └──────────────┬─────────┘
+                               ▼                 optional:
+                  ┌────────────────────────┐   ┌───────────────────────────────────────────┐
+                  │     Python Backend     │   │  Lokales Wikipedia-Archiv (Kiwix + Proxy) │
+                  │ (OllamaStreamer Core)  │-->│  → Snippets als Systemkontext ins Modell  │
+                  └──────────────┬─────────┘   └───────────────────────────────────────────┘
                                  │
                                  ▼
                        ┌─────────────────┐
@@ -37,12 +37,6 @@ Der folgende Screenshot zeigt eine typische Chat-Interaktion inklusive der lokal
                  ┌────────────────────────────────┐
                  │     Modelle (z. B. Leo13B)     │
                  └────────────────────────────────┘
-
-  optional:
-   ┌───────────────────────────────────────────┐
-   │  Lokales Wikipedia-Archiv (Kiwix + Proxy) │
-   │  → Snippets als Systemkontext ins Modell  │
-   └───────────────────────────────────────────┘
 
 ---
 
