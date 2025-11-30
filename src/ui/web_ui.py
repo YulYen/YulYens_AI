@@ -41,8 +41,20 @@ class WebUI:
         self.bot = None  # assigned later
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
+        self.broadcast_enabled = self._is_broadcast_enabled()
         if self._t is None:
             self._t = lambda key, **kwargs: key
+
+    def _is_broadcast_enabled(self) -> bool:
+        ui_cfg = getattr(self.cfg, "ui", {}) or {}
+
+        try:
+            experimental_cfg = ui_cfg.get("experimental") or {}
+        except AttributeError:
+            experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
+
+        flag = experimental_cfg.get("broadcast_mode")
+        return True if flag is None else bool(flag)
 
     def _reset_conversation_state(self):
         return []
@@ -116,7 +128,7 @@ class WebUI:
             yield "", chat_history, history_state, gr.update(visible=False, value=[])
             return
 
-        if broadcast_mode:
+        if broadcast_mode and self.broadcast_enabled:
             chat_history.append((user_input, None))
             yield "", chat_history, history_state, gr.update(visible=True, value=[])
 
@@ -132,6 +144,8 @@ class WebUI:
                 visible=True, value=table_rows
             )
             return
+        elif broadcast_mode and not self.broadcast_enabled:
+            logging.info("Broadcast mode requested but disabled via config; falling back.")
 
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
@@ -298,7 +312,7 @@ class WebUI:
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
-            gr.update(value=False, visible=True),
+            gr.update(value=False, visible=self.broadcast_enabled),
             gr.update(value=[], visible=False),
             gr.update(
                 value="", visible=True, interactive=True, placeholder=input_placeholder
@@ -456,7 +470,7 @@ class WebUI:
             input_placeholder,
             new_chat_label,
             ui.get(
-                "broadcast_toggle_label", "Broadcast mode (all personas)"
+                "broadcast_toggle_label", "Broadcast mode (experimental; all personas)"
             ),
             ui.get("broadcast_table_persona_header", "Persona"),
             ui.get("broadcast_table_answer_header", "Answer"),

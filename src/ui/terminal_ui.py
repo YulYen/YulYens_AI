@@ -46,6 +46,7 @@ class TerminalUI:
         self.streamer = None  # set after selection
         self.texts = config.texts
         self._t = config.t
+        self.broadcast_enabled = self._is_broadcast_enabled(config)
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: list[dict[str, str]] = []
@@ -103,6 +104,17 @@ class TerminalUI:
     def print_exit(self) -> None:
         print(self.texts["terminal_exit_message"])
 
+    def _is_broadcast_enabled(self, config) -> bool:
+        ui_cfg = getattr(config, "ui", {}) or {}
+
+        try:
+            experimental_cfg = ui_cfg.get("experimental") or {}
+        except AttributeError:
+            experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
+
+        flag = experimental_cfg.get("broadcast_mode")
+        return True if flag is None else bool(flag)
+
     # ---------- Main loop ----------
     def launch(self) -> None:
         self.init_ui()
@@ -128,6 +140,14 @@ class TerminalUI:
 
             # Broadcast to all personas
             if user_input.lower().startswith("/askall"):
+                if not self.broadcast_enabled:
+                    disabled_msg = self.texts.get(
+                        "terminal_broadcast_disabled",
+                        "Broadcast mode is disabled (experimental).",
+                    )
+                    print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
+                    continue
+
                 question = user_input[len("/askall") :].strip()
                 if not question:
                     hint = self.texts.get(

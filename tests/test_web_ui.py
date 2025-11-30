@@ -33,8 +33,11 @@ def test_webui_start_server_uses_configured_host_and_port():
     )
 
 
-def _create_web_ui():
-    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key)
+def _create_web_ui(ui_config=None):
+    if ui_config is None:
+        ui_config = {"experimental": {"broadcast_mode": True}}
+
+    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key, ui=ui_config)
     return WebUI(
         factory=Mock(),
         config=dummy_config,
@@ -209,3 +212,33 @@ def test_respond_streaming_broadcast_collects_table_updates():
 
     assert value_attr == [["A", "One"], ["B", "Two"]]
     assert visible_attr is True
+
+
+def test_broadcast_mode_disabled_ignores_toggle(monkeypatch):
+    web_ui = _create_web_ui(ui_config={"experimental": {"broadcast_mode": False}})
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Hi"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.web_ui.broadcast_to_ensemble") as mock_broadcast,
+    ):
+        outputs = list(web_ui.respond_streaming("Hallo", [], [], True))
+
+    mock_broadcast.assert_not_called()
+    assert outputs
+    for _, _, _, table_update in outputs:
+        value_attr = getattr(table_update, "value", None)
+        visible_attr = getattr(table_update, "visible", None)
+
+        if value_attr is None and hasattr(table_update, "get"):
+            value_attr = table_update.get("value")
+        if visible_attr is None and hasattr(table_update, "get"):
+            visible_attr = table_update.get("visible")
+
+        assert value_attr == []
+        assert visible_attr is False
