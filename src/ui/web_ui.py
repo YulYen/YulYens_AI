@@ -200,6 +200,7 @@ class WebUI:
         broadcast_toggle_label,
         broadcast_table_persona_label,
         broadcast_table_answer_label,
+        send_button_label,
     ):
         with gr.Blocks() as demo:
             selected_persona_state = gr.Textbox(value="", visible=False)
@@ -221,6 +222,8 @@ class WebUI:
                 }
                 .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
                 .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
+                .chat-input-row { align-items: stretch; gap:12px; }
+                .new-chat-btn button { margin-top: 12px; }
                 </style>
             """
             )
@@ -275,6 +278,20 @@ class WebUI:
                 interactive=False,
             )
             clear = gr.Button(new_chat_label, visible=False)
+            with gr.Row(elem_classes="chat-input-row"):
+                txt = gr.Textbox(
+                    show_label=False,
+                    placeholder=input_placeholder,
+                    visible=False,
+                    interactive=False,
+                )
+                send_btn = gr.Button(
+                    send_button_label,
+                    variant="primary",
+                    visible=False,
+                    interactive=False,
+                )
+            clear = gr.Button(new_chat_label, visible=False, elem_classes="new-chat-btn")
             history_state = gr.State(self._reset_conversation_state())
 
         components = {
@@ -289,6 +306,7 @@ class WebUI:
             "broadcast_toggle": broadcast_toggle,
             "broadcast_table": broadcast_table,
             "txt": txt,
+            "send_btn": send_btn,
             "clear": clear,
             "persona_buttons": persona_buttons,
             "history_state": history_state,
@@ -317,6 +335,7 @@ class WebUI:
             gr.update(
                 value="", visible=True, interactive=True, placeholder=input_placeholder
             ),
+            gr.update(visible=True, interactive=True),
             gr.update(visible=True),
             self._reset_conversation_state(),
         )
@@ -333,6 +352,7 @@ class WebUI:
             gr.update(value=False, visible=False),
             gr.update(value=[], visible=False),
             gr.update(value="", visible=False, interactive=False),
+            gr.update(visible=False, interactive=False),
             gr.update(visible=False),
             self._reset_conversation_state(),
         )
@@ -370,6 +390,7 @@ class WebUI:
         broadcast_toggle = components["broadcast_toggle"]
         broadcast_table = components["broadcast_table"]
         txt = components["txt"]
+        send_btn = components["send_btn"]
         clear = components["clear"]
         history_state = components["history_state"]
 
@@ -384,6 +405,7 @@ class WebUI:
             broadcast_toggle,
             broadcast_table,
             txt,
+            send_btn,
             clear,
             history_state,
         ]
@@ -407,6 +429,13 @@ class WebUI:
             fn=self.respond_streaming,
             inputs=[txt, chatbot, history_state, broadcast_toggle],
             outputs=[txt, chatbot, history_state, broadcast_table],
+            queue=True,
+        )
+
+        send_btn.click(
+            fn=self.respond_streaming,
+            inputs=[txt, chatbot, history_state],
+            outputs=[txt, chatbot, history_state],
             queue=True,
         )
 
@@ -456,6 +485,7 @@ class WebUI:
         project_title = ui.get("project_name")
         choose_persona_txt = ui.get("choose_persona")
         new_chat_label = ui.get("new_chat")
+        send_button_label = ui.get("send_button")
         input_placeholder = ui.get("input_placeholder")
         greeting_template = ui.get("greeting")
         persona_btn_suffix = ui.get("persona_button_suffix")
@@ -474,6 +504,7 @@ class WebUI:
             ),
             ui.get("broadcast_table_persona_header", "Persona"),
             ui.get("broadcast_table_answer_header", "Answer"),
+            send_button_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
