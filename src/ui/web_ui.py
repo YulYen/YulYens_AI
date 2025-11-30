@@ -4,6 +4,7 @@ from functools import partial
 import gradio as gr
 from config.personas import get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
+from core.orchestrator import broadcast_to_ensemble
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 
 
@@ -106,11 +107,30 @@ class WebUI:
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
-    def respond_streaming(self, user_input, chat_history, history_state):
+    def respond_streaming(
+        self, user_input, chat_history, history_state, broadcast_mode=False
+    ):
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
-            yield "", chat_history, history_state
+            yield "", chat_history, history_state, gr.update(visible=False, value=[])
+            return
+
+        if broadcast_mode:
+            chat_history.append((user_input, None))
+            yield "", chat_history, history_state, gr.update(visible=True, value=[])
+
+            results = broadcast_to_ensemble(self.factory, user_input)
+            table_rows = [[item["persona"], item["reply"]] for item in results]
+
+            assistant_reply = "\n\n".join(
+                f"**{item['persona']}**: {item['reply']}" for item in results
+            )
+            chat_history[-1] = (user_input, assistant_reply)
+
+            yield "", chat_history, history_state, gr.update(
+                visible=True, value=table_rows
+            )
             return
 
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
@@ -150,7 +170,10 @@ class WebUI:
             yield None, chat_history, llm_history
 
         # 7) Stream the answer
-        yield from self._stream_reply(llm_history, chat_history)
+        yield from (
+            (txt, cb, state, gr.update(visible=False, value=[]))
+            for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
+        )
 
     def _build_ui(
         self,
@@ -160,6 +183,9 @@ class WebUI:
         persona_btn_suffix,
         input_placeholder,
         new_chat_label,
+        broadcast_toggle_label,
+        broadcast_table_persona_label,
+        broadcast_table_answer_label,
     ):
         with gr.Blocks() as demo:
             selected_persona_state = gr.Textbox(value="", visible=False)
@@ -219,6 +245,15 @@ class WebUI:
 
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
+            broadcast_toggle = gr.Checkbox(
+                label=broadcast_toggle_label, visible=False, value=False
+            )
+            broadcast_table = gr.Dataframe(
+                headers=[broadcast_table_persona_label, broadcast_table_answer_label],
+                visible=False,
+                datatype=["str", "str"],
+                wrap=True,
+            )
             txt = gr.Textbox(
                 show_label=False,
                 placeholder=input_placeholder,
@@ -237,6 +272,8 @@ class WebUI:
             "focus_md": focus_md,
             "greeting_md": greeting_md,
             "chatbot": chatbot,
+            "broadcast_toggle": broadcast_toggle,
+            "broadcast_table": broadcast_table,
             "txt": txt,
             "clear": clear,
             "persona_buttons": persona_buttons,
@@ -261,6 +298,8 @@ class WebUI:
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
+            gr.update(value=False, visible=True),
+            gr.update(value=[], visible=False),
             gr.update(
                 value="", visible=True, interactive=True, placeholder=input_placeholder
             ),
@@ -277,6 +316,8 @@ class WebUI:
             gr.update(value=""),
             gr.update(value="", visible=False),
             gr.update(value=[], label="", visible=False),
+            gr.update(value=False, visible=False),
+            gr.update(value=[], visible=False),
             gr.update(value="", visible=False, interactive=False),
             gr.update(visible=False),
             self._reset_conversation_state(),
@@ -312,6 +353,8 @@ class WebUI:
         focus_md = components["focus_md"]
         greeting_md = components["greeting_md"]
         chatbot = components["chatbot"]
+        broadcast_toggle = components["broadcast_toggle"]
+        broadcast_table = components["broadcast_table"]
         txt = components["txt"]
         clear = components["clear"]
         history_state = components["history_state"]
@@ -324,6 +367,8 @@ class WebUI:
             focus_md,
             greeting_md,
             chatbot,
+            broadcast_toggle,
+            broadcast_table,
             txt,
             clear,
             history_state,
@@ -346,8 +391,8 @@ class WebUI:
 
         txt.submit(
             fn=self.respond_streaming,
-            inputs=[txt, chatbot, history_state],
-            outputs=[txt, chatbot, history_state],
+            inputs=[txt, chatbot, history_state, broadcast_toggle],
+            outputs=[txt, chatbot, history_state, broadcast_table],
             queue=True,
         )
 
@@ -410,6 +455,11 @@ class WebUI:
             persona_btn_suffix,
             input_placeholder,
             new_chat_label,
+            ui.get(
+                "broadcast_toggle_label", "Broadcast mode (all personas)"
+            ),
+            ui.get("broadcast_table_persona_header", "Persona"),
+            ui.get("broadcast_table_answer_header", "Answer"),
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

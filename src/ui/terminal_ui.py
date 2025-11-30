@@ -6,6 +6,7 @@ import logging
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
+from core.orchestrator import broadcast_to_ensemble
 
 # Shared core utilities and streamer
 from core.streaming_provider import (
@@ -124,6 +125,37 @@ class TerminalUI:
             if user_input.lower() in ("exit", "quit"):
                 self.print_exit()
                 break
+
+            # Broadcast to all personas
+            if user_input.lower().startswith("/askall"):
+                question = user_input[len("/askall") :].strip()
+                if not question:
+                    hint = self.texts.get(
+                        "terminal_askall_missing_question",
+                        "Bitte gib eine Frage nach '/askall' ein.",
+                    )
+                    print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+                    continue
+
+                if not self.factory:
+                    raise RuntimeError("Broadcast mode requires an application factory.")
+
+                last_persona: str | None = None
+
+                def _on_token(persona: str, token: str) -> None:
+                    nonlocal last_persona
+                    if persona != last_persona:
+                        if last_persona is not None:
+                            print("\n")
+                        print(f"{Fore.CYAN}[{persona}]{Style.RESET_ALL} ", end="", flush=True)
+                        last_persona = persona
+                    print(token, end="", flush=True)
+
+                broadcast_to_ensemble(self.factory, question, on_token=_on_token)
+
+                if last_persona is not None:
+                    print("\n")
+                continue
 
             # Clear / start a new conversation
             if user_input.lower() == "clear":
