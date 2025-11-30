@@ -27,6 +27,16 @@ def _create_terminal_ui() -> TerminalUI:
     )
 
 
+def test_terminal_ui_prints_broadcast_hint_when_enabled(capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.greeting = "Hallo"
+
+    ui.print_welcome()
+
+    out = capsys.readouterr().out
+    assert "/askall" in out
+
+
 def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
     ui.bot = "LEAH"

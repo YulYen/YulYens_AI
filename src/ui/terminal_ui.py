@@ -88,6 +88,12 @@ class TerminalUI:
         print(self.greeting)
         print(f"{Fore.MAGENTA}{self.texts['terminal_exit_hint']}{Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}{self.texts['terminal_clear_hint']}{Style.RESET_ALL}")
+        if self.broadcast_enabled:
+            hint = self.texts.get(
+                "terminal_broadcast_hint",
+                "('/askall <Frage>' fragt alle Personas – experimentell)",
+            )
+            print(f"{Fore.MAGENTA}{hint}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(
@@ -113,7 +119,7 @@ class TerminalUI:
             experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
 
         flag = experimental_cfg.get("broadcast_mode")
-        return True if flag is None else bool(flag)
+        return bool(flag)
 
     # ---------- Main loop ----------
     def launch(self) -> None:

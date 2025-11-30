@@ -54,7 +54,7 @@ class WebUI:
             experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
 
         flag = experimental_cfg.get("broadcast_mode")
-        return True if flag is None else bool(flag)
+        return bool(flag)
 
     def _reset_conversation_state(self):
         return []
