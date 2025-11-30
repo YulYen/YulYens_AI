@@ -139,7 +139,7 @@ class WebUI:
         # 2) Clear the input field and show the user message in the chat window
         logging.debug("User input received (%d chars)", len(user_input))
         chat_history.append((user_input, None))
-        yield "", chat_history, llm_history
+        yield "", chat_history, llm_history, gr.update(visible=False, value=[])
 
         # 3) Wiki hint and snippet (top hit)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -155,7 +155,7 @@ class WebUI:
         if wiki_hint:
             # Display the UI hint (do not add it to the LLM context window)
             chat_history.append((None, wiki_hint))
-            yield None, chat_history, llm_history
+            yield None, chat_history, llm_history, gr.update(visible=False, value=[])
 
         # 4) Optional: inject wiki context
         if snippet:
@@ -167,7 +167,7 @@ class WebUI:
 
         # 6) Compress the context if needed and record that in chat history
         if self._handle_context_warning(llm_history, chat_history):
-            yield None, chat_history, llm_history
+            yield None, chat_history, llm_history, gr.update(visible=False, value=[])
 
         # 7) Stream the answer
         yield from (

@@ -153,6 +153,36 @@ def test_respond_streaming_keeps_session_histories_isolated():
     assert final_history_one is not final_history_two
 
 
+def test_respond_streaming_returns_broadcast_table_updates_when_disabled():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Hi"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.context_near_limit", return_value=False),
+    ):
+        outputs = list(web_ui.respond_streaming("Hallo", [], [], False))
+
+    assert outputs
+    assert all(len(item) == 4 for item in outputs)
+
+    for _, _, _, table_update in outputs:
+        value_attr = getattr(table_update, "value", None)
+        visible_attr = getattr(table_update, "visible", None)
+
+        if value_attr is None and hasattr(table_update, "get"):
+            value_attr = table_update.get("value")
+        if visible_attr is None and hasattr(table_update, "get"):
+            visible_attr = table_update.get("visible")
+
+        assert value_attr == []
+        assert visible_attr is False
+
+
 def test_respond_streaming_broadcast_collects_table_updates():
     web_ui = _create_web_ui()
     web_ui.bot = "Karl"
