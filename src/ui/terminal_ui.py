@@ -6,6 +6,7 @@ import logging
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
+from core.orchestrator import broadcast_to_ensemble
 
 # Shared core utilities and streamer
 from core.streaming_provider import (
@@ -45,6 +46,7 @@ class TerminalUI:
         self.streamer = None  # set after selection
         self.texts = config.texts
         self._t = config.t
+        self.broadcast_enabled = self._is_broadcast_enabled(config)
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: list[dict[str, str]] = []
@@ -86,6 +88,12 @@ class TerminalUI:
         print(self.greeting)
         print(f"{Fore.MAGENTA}{self.texts['terminal_exit_hint']}{Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}{self.texts['terminal_clear_hint']}{Style.RESET_ALL}")
+        if self.broadcast_enabled:
+            hint = self.texts.get(
+                "terminal_broadcast_hint",
+                "('/askall <Frage>' fragt alle Personas – experimentell)",
+            )
+            print(f"{Fore.MAGENTA}{hint}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(
@@ -101,6 +109,17 @@ class TerminalUI:
 
     def print_exit(self) -> None:
         print(self.texts["terminal_exit_message"])
+
+    def _is_broadcast_enabled(self, config) -> bool:
+        ui_cfg = getattr(config, "ui", {}) or {}
+
+        try:
+            experimental_cfg = ui_cfg.get("experimental") or {}
+        except AttributeError:
+            experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
+
+        flag = experimental_cfg.get("broadcast_mode")
+        return bool(flag)
 
     # ---------- Main loop ----------
     def launch(self) -> None:
@@ -124,6 +143,45 @@ class TerminalUI:
             if user_input.lower() in ("exit", "quit"):
                 self.print_exit()
                 break
+
+            # Broadcast to all personas
+            if user_input.lower().startswith("/askall"):
+                if not self.broadcast_enabled:
+                    disabled_msg = self.texts.get(
+                        "terminal_broadcast_disabled",
+                        "Broadcast mode is disabled (experimental).",
+                    )
+                    print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
+                    continue
+
+                question = user_input[len("/askall") :].strip()
+                if not question:
+                    hint = self.texts.get(
+                        "terminal_askall_missing_question",
+                        "Bitte gib eine Frage nach '/askall' ein.",
+                    )
+                    print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+                    continue
+
+                if not self.factory:
+                    raise RuntimeError("Broadcast mode requires an application factory.")
+
+                last_persona: str | None = None
+
+                def _on_token(persona: str, token: str) -> None:
+                    nonlocal last_persona
+                    if persona != last_persona:
+                        if last_persona is not None:
+                            print("\n")
+                        print(f"{Fore.CYAN}[{persona}]{Style.RESET_ALL} ", end="", flush=True)
+                        last_persona = persona
+                    print(token, end="", flush=True)
+
+                broadcast_to_ensemble(self.factory, question, on_token=_on_token)
+
+                if last_persona is not None:
+                    print("\n")
+                continue
 
             # Clear / start a new conversation
             if user_input.lower() == "clear":

@@ -33,8 +33,11 @@ def test_webui_start_server_uses_configured_host_and_port():
     )
 
 
-def _create_web_ui():
-    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key)
+def _create_web_ui(ui_config=None):
+    if ui_config is None:
+        ui_config = {"experimental": {"broadcast_mode": True}}
+
+    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key, ui=ui_config)
     return WebUI(
         factory=Mock(),
         config=dummy_config,
@@ -69,7 +72,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
             side_effect=lambda history, limit: history,
         ) as mock_prepare,
     ):
-        list(web_ui.respond_streaming("Hallo", chat_history, history_state))
+        list(web_ui.respond_streaming("Hallo", chat_history, history_state, False))
 
     mock_prepare.assert_called_once()
     assert mock_prepare.call_args[0][1] == 4096
@@ -96,7 +99,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
         patch("ui.web_ui.get_drink", return_value="☕"),
         patch("ui.web_ui.karl_prepare_quick_and_dirty") as mock_prepare,
     ):
-        list(web_ui.respond_streaming("Hallo", chat_history, history_state))
+        list(web_ui.respond_streaming("Hallo", chat_history, history_state, False))
 
     mock_prepare.assert_not_called()
     assert "Skipping 'karl_prepare_quick_and_dirty'" in caplog.text
@@ -127,10 +130,10 @@ def test_respond_streaming_keeps_session_histories_isolated():
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         session_one_outputs = list(
-            web_ui.respond_streaming("Frage 1", [], session_one_state)
+            web_ui.respond_streaming("Frage 1", [], session_one_state, False)
         )
         session_two_outputs = list(
-            web_ui.respond_streaming("Frage 2", [], session_two_state)
+            web_ui.respond_streaming("Frage 2", [], session_two_state, False)
         )
 
     final_history_one = session_one_outputs[-1][2]
@@ -151,3 +154,91 @@ def test_respond_streaming_keeps_session_histories_isolated():
         {"role": "assistant", "content": "Antwort 2"},
     ]
     assert final_history_one is not final_history_two
+
+
+def test_respond_streaming_returns_broadcast_table_updates_when_disabled():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Hi"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.context_near_limit", return_value=False),
+    ):
+        outputs = list(web_ui.respond_streaming("Hallo", [], [], False))
+
+    assert outputs
+    assert all(len(item) == 4 for item in outputs)
+
+    for _, _, _, table_update in outputs:
+        value_attr = getattr(table_update, "value", None)
+        visible_attr = getattr(table_update, "visible", None)
+
+        if value_attr is None and hasattr(table_update, "get"):
+            value_attr = table_update.get("value")
+        if visible_attr is None and hasattr(table_update, "get"):
+            visible_attr = table_update.get("visible")
+
+        assert value_attr == []
+        assert visible_attr is False
+
+
+def test_respond_streaming_broadcast_collects_table_updates():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    chat_history: list = []
+    history_state: list = []
+
+    with patch(
+        "ui.web_ui.broadcast_to_ensemble",
+        return_value=[{"persona": "A", "reply": "One"}, {"persona": "B", "reply": "Two"}],
+    ):
+        outputs = list(web_ui.respond_streaming("Hallo", chat_history, history_state, True))
+
+    final_chat = outputs[-1][1]
+    table_update = outputs[-1][3]
+
+    assert final_chat[-1][1] == "**A**: One\n\n**B**: Two"
+
+    value_attr = getattr(table_update, "value", None)
+    visible_attr = getattr(table_update, "visible", None)
+    if value_attr is None and hasattr(table_update, "get"):
+        value_attr = table_update.get("value")
+    if visible_attr is None and hasattr(table_update, "get"):
+        visible_attr = table_update.get("visible")
+
+    assert value_attr == [["A", "One"], ["B", "Two"]]
+    assert visible_attr is True
+
+
+def test_broadcast_mode_disabled_ignores_toggle(monkeypatch):
+    web_ui = _create_web_ui(ui_config={"experimental": {"broadcast_mode": False}})
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Hi"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.web_ui.broadcast_to_ensemble") as mock_broadcast,
+    ):
+        outputs = list(web_ui.respond_streaming("Hallo", [], [], True))
+
+    mock_broadcast.assert_not_called()
+    assert outputs
+    for _, _, _, table_update in outputs:
+        value_attr = getattr(table_update, "value", None)
+        visible_attr = getattr(table_update, "visible", None)
+
+        if value_attr is None and hasattr(table_update, "get"):
+            value_attr = table_update.get("value")
+        if visible_attr is None and hasattr(table_update, "get"):
+            visible_attr = table_update.get("visible")
+
+        assert value_attr == []
+        assert visible_attr is False
