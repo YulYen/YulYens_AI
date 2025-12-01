@@ -209,7 +209,7 @@ class WebUI:
                 .new-chat-btn button { margin-top: 12px; }
                 .ask-all-btn button { height: 100%; font-size: 1rem; padding: 14px 18px; }
                 .ask-all-strip { justify-content: center; gap: 12px; }
-                .ask-all-strip img { max-width: 64px; max-height: 64px; object-fit: contain; }
+                .ask-all-strip img { max-width: 250px; max-height: 250px; object-fit: contain; }
                 .persona-header-row { justify-content: space-between; align-items: center; }
                 </style>
             """
