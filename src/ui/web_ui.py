@@ -247,6 +247,24 @@ class WebUI:
                                     variant="secondary",
                                 )
                                 persona_buttons.append((key, btn))
+                    if self.broadcast_enabled:
+                        with gr.Column(scale=1, min_width=220):
+                            with gr.Group(elem_classes="persona-card"):
+                                gr.Image(
+                                    "static/ALL.png",
+                                    show_label=False,
+                                    container=False,
+                                    elem_classes="persona-img",
+                                )
+                                gr.Markdown(
+                                    f"<div class='name'>{ask_all_title}</div>"
+                                    f"<div class='desc'>{ask_all_input_placeholder}</div>"
+                                )
+                                ask_all_card_btn = gr.Button(
+                                    ask_all_button_label, variant="primary"
+                                )
+                    else:
+                        ask_all_card_btn = None
 
             with gr.Group(visible=False) as focus_group:
                 with gr.Row():
@@ -283,6 +301,12 @@ class WebUI:
             with gr.Group(visible=False) as ask_all_group:
                 gr.Markdown(f"## {ask_all_title}")
                 with gr.Row(elem_classes="ask-all-strip"):
+                    if self.broadcast_enabled:
+                        gr.Image(
+                            "static/ALL.png",
+                            show_label=False,
+                            container=False,
+                        )
                     for p in persona_info.values():
                         gr.Image(
                             self._persona_thumbnail_path(p["name"]),
@@ -333,6 +357,7 @@ class WebUI:
             "ask_all_submit": ask_all_submit,
             "ask_all_new_chat": ask_all_new_chat,
             "ask_all_status": ask_all_status,
+            "ask_all_card_btn": ask_all_card_btn,
         }
         return demo, components
 
@@ -489,6 +514,7 @@ class WebUI:
         ask_all_submit = components["ask_all_submit"]
         ask_all_new_chat = components["ask_all_new_chat"]
         ask_all_status = components["ask_all_status"]
+        ask_all_card_btn = components["ask_all_card_btn"]
 
         persona_outputs = [
             selected_persona_state,
@@ -554,7 +580,28 @@ class WebUI:
                 queue=False,
             )
 
+        if ask_all_card_btn is not None:
+            ask_all_card_btn.click(
+                fn=self._on_show_ask_all,
+                inputs=[],
+                outputs=persona_outputs,
+                queue=False,
+            )
+
         ask_all_submit.click(
+            fn=self._on_submit_ask_all,
+            inputs=[ask_all_question],
+            outputs=[
+                ask_all_question,
+                ask_all_status,
+                ask_all_results,
+                ask_all_submit,
+                ask_all_new_chat,
+            ],
+            queue=True,
+        )
+
+        ask_all_question.submit(
             fn=self._on_submit_ask_all,
             inputs=[ask_all_question],
             outputs=[
