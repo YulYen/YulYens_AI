@@ -219,14 +219,7 @@ class WebUI:
             with gr.Group(visible=True) as grid_group:
                 with gr.Row(elem_classes="persona-header-row", equal_height=True):
                     gr.Markdown(choose_persona_txt)
-                    if self.broadcast_enabled:
-                        ask_all_btn = gr.Button(
-                            ask_all_button_label,
-                            variant="primary",
-                            elem_classes="ask-all-btn",
-                        )
-                    else:
-                        ask_all_btn = None
+                    ask_all_btn = None
                 with gr.Row(elem_classes="persona-row", equal_height=True):
                     persona_buttons = []
                     for key, p in persona_info.items():
