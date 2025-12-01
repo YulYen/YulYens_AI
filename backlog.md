@@ -7,7 +7,7 @@
 | 6 | Model selection in the UI | Dropdown/radio for available models, explicitly selectable per persona and run | S | S | UX/Technology |
 | 7 | LoRA fine-tuning pipeline | IN PROGRESS → LoRA adapter for LeoLM13B | L | XL | Research/Quality |
 | 8 | Save/load chat histories | Persist sessions (JSON/DB) | M | L | Technical foundation |
-| 9 | Ask-all (broadcast): Finetuning | Wiki missing, streaming in webUI | S | M | Orchestration |
+| 9 | Ask-all (broadcast): Finetuning | Wiki missing, streaming in webUI, TerminalUI-Flow | S | M | Orchestration |
 | 10 | Stage mode (self-talk) | Two or more personas run n rounds of dialogue, starting with a single opening sentence | M | L | Orchestration |
 | 11 | Easter egg logic | Keyword triggers an extra tagline | M | M | Cool feature |
 | 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach | L | L | Technical foundation |
