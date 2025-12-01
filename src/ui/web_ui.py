@@ -210,13 +210,14 @@ class WebUI:
                 .ask-all-btn button { height: 100%; font-size: 1rem; padding: 14px 18px; }
                 .ask-all-strip { justify-content: center; gap: 12px; }
                 .ask-all-strip img { max-width: 64px; max-height: 64px; object-fit: contain; }
+                .persona-header-row { justify-content: space-between; align-items: center; }
                 </style>
             """
             )
             gr.Markdown(f"# {project_title}")
 
             with gr.Group(visible=True) as grid_group:
-                with gr.Row(justify="between", equal_height=True):
+                with gr.Row(elem_classes="persona-header-row", equal_height=True):
                     gr.Markdown(choose_persona_txt)
                     if self.broadcast_enabled:
                         ask_all_btn = gr.Button(
