@@ -42,6 +42,7 @@ class WebUI:
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         self.broadcast_enabled = self._is_broadcast_enabled()
+        self.ask_all_placeholder = ""
         if self._t is None:
             self._t = lambda key, **kwargs: key
 
@@ -120,32 +121,13 @@ class WebUI:
         yield None, chat_history, message_history
 
     def respond_streaming(
-        self, user_input, chat_history, history_state, broadcast_mode=False
+        self, user_input, chat_history, history_state
     ):
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
-            yield "", chat_history, history_state, gr.update(visible=False, value=[])
+            yield "", chat_history, history_state
             return
-
-        if broadcast_mode and self.broadcast_enabled:
-            chat_history.append((user_input, None))
-            yield "", chat_history, history_state, gr.update(visible=True, value=[])
-
-            results = broadcast_to_ensemble(self.factory, user_input)
-            table_rows = [[item["persona"], item["reply"]] for item in results]
-
-            assistant_reply = "\n\n".join(
-                f"**{item['persona']}**: {item['reply']}" for item in results
-            )
-            chat_history[-1] = (user_input, assistant_reply)
-
-            yield "", chat_history, history_state, gr.update(
-                visible=True, value=table_rows
-            )
-            return
-        elif broadcast_mode and not self.broadcast_enabled:
-            logging.info("Broadcast mode requested but disabled via config; falling back.")
 
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
@@ -153,7 +135,7 @@ class WebUI:
         # 2) Clear the input field and show the user message in the chat window
         logging.debug("User input received (%d chars)", len(user_input))
         chat_history.append((user_input, None))
-        yield "", chat_history, llm_history, gr.update(visible=False, value=[])
+        yield "", chat_history, llm_history
 
         # 3) Wiki hint and snippet (top hit)
         wiki_hint, title, snippet = lookup_wiki_snippet(
@@ -169,7 +151,7 @@ class WebUI:
         if wiki_hint:
             # Display the UI hint (do not add it to the LLM context window)
             chat_history.append((None, wiki_hint))
-            yield None, chat_history, llm_history, gr.update(visible=False, value=[])
+            yield None, chat_history, llm_history
 
         # 4) Optional: inject wiki context
         if snippet:
@@ -181,12 +163,11 @@ class WebUI:
 
         # 6) Compress the context if needed and record that in chat history
         if self._handle_context_warning(llm_history, chat_history):
-            yield None, chat_history, llm_history, gr.update(visible=False, value=[])
+            yield None, chat_history, llm_history
 
         # 7) Stream the answer
         yield from (
-            (txt, cb, state, gr.update(visible=False, value=[]))
-            for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
+            (txt, cb, state) for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
 
     def _build_ui(
@@ -197,10 +178,12 @@ class WebUI:
         persona_btn_suffix,
         input_placeholder,
         new_chat_label,
-        broadcast_toggle_label,
         broadcast_table_persona_label,
         broadcast_table_answer_label,
         send_button_label,
+        ask_all_button_label,
+        ask_all_title,
+        ask_all_input_placeholder,
     ):
         with gr.Blocks() as demo:
             selected_persona_state = gr.Textbox(value="", visible=False)
@@ -224,13 +207,25 @@ class WebUI:
                 .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
                 .chat-input-row { align-items: stretch; gap:12px; }
                 .new-chat-btn button { margin-top: 12px; }
+                .ask-all-btn button { height: 100%; font-size: 1rem; padding: 14px 18px; }
+                .ask-all-strip { justify-content: center; gap: 12px; }
+                .ask-all-strip img { max-width: 64px; max-height: 64px; object-fit: contain; }
                 </style>
             """
             )
             gr.Markdown(f"# {project_title}")
 
             with gr.Group(visible=True) as grid_group:
-                gr.Markdown(choose_persona_txt)
+                with gr.Row(justify="between", equal_height=True):
+                    gr.Markdown(choose_persona_txt)
+                    if self.broadcast_enabled:
+                        ask_all_btn = gr.Button(
+                            ask_all_button_label,
+                            variant="primary",
+                            elem_classes="ask-all-btn",
+                        )
+                    else:
+                        ask_all_btn = None
                 with gr.Row(elem_classes="persona-row", equal_height=True):
                     persona_buttons = []
                     for key, p in persona_info.items():
@@ -262,15 +257,6 @@ class WebUI:
 
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
-            broadcast_toggle = gr.Checkbox(
-                label=broadcast_toggle_label, visible=False, value=False
-            )
-            broadcast_table = gr.Dataframe(
-                headers=[broadcast_table_persona_label, broadcast_table_answer_label],
-                visible=False,
-                datatype=["str", "str"],
-                wrap=True,
-            )
             txt = gr.Textbox(
                 show_label=False,
                 placeholder=input_placeholder,
@@ -292,6 +278,37 @@ class WebUI:
                     interactive=False,
                 )
             clear = gr.Button(new_chat_label, visible=False, elem_classes="new-chat-btn")
+
+            with gr.Group(visible=False) as ask_all_group:
+                gr.Markdown(f"## {ask_all_title}")
+                with gr.Row(elem_classes="ask-all-strip"):
+                    for p in persona_info.values():
+                        gr.Image(
+                            self._persona_thumbnail_path(p["name"]),
+                            show_label=False,
+                            container=False,
+                        )
+                ask_all_status = gr.Markdown("", visible=False)
+                ask_all_question = gr.Textbox(
+                    show_label=False,
+                    placeholder=ask_all_input_placeholder,
+                    interactive=True,
+                )
+                with gr.Row(elem_classes="chat-input-row"):
+                    ask_all_submit = gr.Button(
+                        send_button_label,
+                        variant="primary",
+                    )
+                    ask_all_new_chat = gr.Button(
+                        new_chat_label,
+                        elem_classes="new-chat-btn",
+                    )
+                ask_all_results = gr.Dataframe(
+                    headers=[broadcast_table_persona_label, broadcast_table_answer_label],
+                    visible=False,
+                    datatype=["str", "str"],
+                    wrap=True,
+                )
             history_state = gr.State(self._reset_conversation_state())
 
         components = {
@@ -303,18 +320,28 @@ class WebUI:
             "focus_md": focus_md,
             "greeting_md": greeting_md,
             "chatbot": chatbot,
-            "broadcast_toggle": broadcast_toggle,
-            "broadcast_table": broadcast_table,
             "txt": txt,
             "send_btn": send_btn,
             "clear": clear,
             "persona_buttons": persona_buttons,
             "history_state": history_state,
+            "ask_all_btn": ask_all_btn,
+            "ask_all_group": ask_all_group,
+            "ask_all_results": ask_all_results,
+            "ask_all_question": ask_all_question,
+            "ask_all_submit": ask_all_submit,
+            "ask_all_new_chat": ask_all_new_chat,
+            "ask_all_status": ask_all_status,
         }
         return demo, components
 
     def _persona_selected_updates(
-        self, persona_key, persona, greeting_template, model_name, input_placeholder
+        self,
+        persona_key,
+        persona,
+        greeting_template,
+        model_name,
+        input_placeholder,
     ):
         display_name = persona["name"].title()
         greeting = greeting_template.format(
@@ -330,14 +357,16 @@ class WebUI:
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
-            gr.update(value=False, visible=self.broadcast_enabled),
-            gr.update(value=[], visible=False),
-            gr.update(
-                value="", visible=True, interactive=True, placeholder=input_placeholder
-            ),
+            gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),
             gr.update(visible=True, interactive=True),
             gr.update(visible=True),
             self._reset_conversation_state(),
+            gr.update(visible=False),
+            gr.update(value=[], visible=False),
+            gr.update(value="", visible=False, interactive=True, placeholder=self.ask_all_placeholder),
+            gr.update(visible=False, interactive=True),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
         )
 
     def _reset_ui_updates(self):
@@ -349,12 +378,16 @@ class WebUI:
             gr.update(value=""),
             gr.update(value="", visible=False),
             gr.update(value=[], label="", visible=False),
-            gr.update(value=False, visible=False),
-            gr.update(value=[], visible=False),
             gr.update(value="", visible=False, interactive=False),
             gr.update(visible=False, interactive=False),
             gr.update(visible=False),
             self._reset_conversation_state(),
+            gr.update(visible=False),
+            gr.update(value=[], visible=False),
+            gr.update(value=self.ask_all_placeholder, visible=False, interactive=True),
+            gr.update(visible=False, interactive=True),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
         )
 
     def _on_persona_selected(
@@ -377,6 +410,63 @@ class WebUI:
         self.streamer = None
         return self._reset_ui_updates()
 
+    def _on_show_ask_all(self):
+        self.bot = None
+        self.streamer = None
+        return (
+            gr.update(value=""),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value=None),
+            gr.update(value=""),
+            gr.update(value="", visible=False),
+            gr.update(value=[], label="", visible=False),
+            gr.update(value="", visible=False, interactive=False),
+            gr.update(visible=False, interactive=False),
+            gr.update(visible=False),
+            self._reset_conversation_state(),
+            gr.update(visible=True),
+            gr.update(value=[], visible=False),
+            gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
+            gr.update(visible=True, interactive=True),
+            gr.update(visible=True),
+            gr.update(value="", visible=False),
+        )
+
+    def _on_submit_ask_all(self, question):
+        question = (question or "").strip()
+
+        if not self.broadcast_enabled:
+            warning = self._t("ask_all_disabled")
+            return (
+                gr.update(value=question, visible=True, interactive=True),
+                gr.update(value=warning, visible=True),
+                gr.update(value=[], visible=False),
+                gr.update(visible=True, interactive=False),
+                gr.update(visible=True),
+            )
+
+        if not question:
+            warn = self._t("empty_question")
+            return (
+                gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
+                gr.update(value=warn, visible=True),
+                gr.update(value=[], visible=False),
+                gr.update(visible=True, interactive=True),
+                gr.update(visible=True),
+            )
+
+        results = broadcast_to_ensemble(self.factory, question)
+        table_rows = [[item["persona"], item["reply"]] for item in results]
+
+        return (
+            gr.update(value=question, interactive=False, visible=True),
+            gr.update(value="", visible=False),
+            gr.update(value=table_rows, visible=True),
+            gr.update(visible=False, interactive=False),
+            gr.update(visible=True),
+        )
+
     def _bind_events(
         self, components, persona_info, model_name, greeting_template, input_placeholder
     ):
@@ -387,12 +477,17 @@ class WebUI:
         focus_md = components["focus_md"]
         greeting_md = components["greeting_md"]
         chatbot = components["chatbot"]
-        broadcast_toggle = components["broadcast_toggle"]
-        broadcast_table = components["broadcast_table"]
         txt = components["txt"]
         send_btn = components["send_btn"]
         clear = components["clear"]
         history_state = components["history_state"]
+        ask_all_btn = components["ask_all_btn"]
+        ask_all_group = components["ask_all_group"]
+        ask_all_results = components["ask_all_results"]
+        ask_all_question = components["ask_all_question"]
+        ask_all_submit = components["ask_all_submit"]
+        ask_all_new_chat = components["ask_all_new_chat"]
+        ask_all_status = components["ask_all_status"]
 
         persona_outputs = [
             selected_persona_state,
@@ -402,12 +497,16 @@ class WebUI:
             focus_md,
             greeting_md,
             chatbot,
-            broadcast_toggle,
-            broadcast_table,
             txt,
             send_btn,
             clear,
             history_state,
+            ask_all_group,
+            ask_all_results,
+            ask_all_question,
+            ask_all_submit,
+            ask_all_new_chat,
+            ask_all_status,
         ]
 
         for key, btn in components["persona_buttons"]:
@@ -427,8 +526,8 @@ class WebUI:
 
         txt.submit(
             fn=self.respond_streaming,
-            inputs=[txt, chatbot, history_state, broadcast_toggle],
-            outputs=[txt, chatbot, history_state, broadcast_table],
+            inputs=[txt, chatbot, history_state],
+            outputs=[txt, chatbot, history_state],
             queue=True,
         )
 
@@ -440,6 +539,34 @@ class WebUI:
         )
 
         clear.click(
+            fn=self._on_reset_to_start,
+            inputs=[],
+            outputs=persona_outputs,
+            queue=False,
+        )
+
+        if ask_all_btn is not None:
+            ask_all_btn.click(
+                fn=self._on_show_ask_all,
+                inputs=[],
+                outputs=persona_outputs,
+                queue=False,
+            )
+
+        ask_all_submit.click(
+            fn=self._on_submit_ask_all,
+            inputs=[ask_all_question],
+            outputs=[
+                ask_all_question,
+                ask_all_status,
+                ask_all_results,
+                ask_all_submit,
+                ask_all_new_chat,
+            ],
+            queue=True,
+        )
+
+        ask_all_new_chat.click(
             fn=self._on_reset_to_start,
             inputs=[],
             outputs=persona_outputs,
@@ -489,6 +616,13 @@ class WebUI:
         input_placeholder = ui.get("input_placeholder")
         greeting_template = ui.get("greeting")
         persona_btn_suffix = ui.get("persona_button_suffix")
+        ask_all_button_label = ui.get("ask_all_button_label", "Frage an alle")
+        ask_all_title = ui.get("ask_all_title", "Frage an alle Personas")
+        ask_all_input_placeholder = ui.get(
+            "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
+        )
+
+        self.ask_all_placeholder = ask_all_input_placeholder
 
         persona_info = {p["name"].lower(): p for p in _load_system_prompts()}
 
@@ -499,12 +633,12 @@ class WebUI:
             persona_btn_suffix,
             input_placeholder,
             new_chat_label,
-            ui.get(
-                "broadcast_toggle_label", "Broadcast mode (experimental; all personas)"
-            ),
             ui.get("broadcast_table_persona_header", "Persona"),
             ui.get("broadcast_table_answer_header", "Answer"),
             send_button_label,
+            ask_all_button_label,
+            ask_all_title,
+            ask_all_input_placeholder,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
