@@ -41,6 +41,7 @@ See also: [Features.md](Features.md)
 - **UI**:
   - `TerminalUI` for the CLI
   - `WebUI` (Gradio) with persona selection & avatars
+  - Optional ask-all broadcast mode (enable `ui.experimental.broadcast_mode`) for `/askall <question>` in the terminal and the Ask-All card in the web UI
 - **API**: FastAPI server (`/ask` endpoint for one-shot questions)
 - **Logging**:
   - Chat transcripts and system logs in `logs/`

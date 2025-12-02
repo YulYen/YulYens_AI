@@ -18,6 +18,8 @@ Zwei verschiedene Benutzeroberflächen stehen zur Verfügung, auswählbar über 
 - **Terminal-UI** – Konsolenbasierte Chat-Anwendung mit farbig hervorgehobenen Rollen (Nutzer/KI). Bei Start wird die gewünschte Persona per Menü ausgewählt. Nutzereingaben werden direkt in der Konsole eingegeben, und die KI-Antwort erscheint tokenweise gestreamt. Es gibt einfache Befehle wie `exit` zum Beenden und `clear` für einen neuen Chatverlauf.
 - **Web-UI** – Webbasierte Oberfläche (Gradio), die im Browser verfügbar ist. Sie bietet eine grafische Persona-Auswahl (mit Avatar-Bildern) und ein Chat-Fenster für die Unterhaltung. Die KI-Antwort wird hier live im Verlauf angezeigt, während sie generiert wird. Die Web-UI ist im lokalen Netzwerk zugänglich und ermöglicht ein komfortables Chat-Erlebnis über HTTP.
 
+Optional kann ein **Ask-All/Broadcast-Modus** aktiviert werden (`ui.experimental.broadcast_mode: true`). Dann lässt sich eine Frage parallel an alle Personas richten – im Terminal über den Befehl `/askall <Frage>`, in der Web-UI über die Ask-All-Kachel mit Ergebnis-Tabelle für alle Antworten.
+
 Zusätzlich kann `ui.type` auch auf `null` gesetzt werden, um ausschließlich die API zu betreiben; die Web-UI unterstützt außerdem einen optionalen Gradio-Share-Link mit Zugangsdaten aus `ui.web.share_auth`.
 
 ## One-Shot API
