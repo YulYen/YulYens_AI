@@ -36,12 +36,13 @@ siehe auch: [Features.md](Features.md)
   - Austauschbarer LLM-Core (`OllamaLLMCore`, `DummyLLMCore` für Tests) samt `YulYenStreamingProvider`
   - Wikipedia-Support inkl. spaCy-basiertem Keyword-Extractor
 - **Personas**: Systemprompts & Eigenheiten in `src/config/personas.py`  
-- **UI**:  
-  - `TerminalUI` für CLI  
-  - `WebUI` (Gradio) mit Persona-Auswahl & Avataren  
-- **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen)  
-- **Logging**:  
-  - Chatverläufe und Systemlogs in `logs/`  
+- **UI**:
+  - `TerminalUI` für CLI
+  - `WebUI` (Gradio) mit Persona-Auswahl & Avataren
+  - Optionaler Ask-All/Broadcast-Modus (per `ui.experimental.broadcast_mode`), nutzt `/askall <Frage>` im Terminal und die Ask-All-Kachel in der Web-UI
+- **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen)
+- **Logging**:
+  - Chatverläufe und Systemlogs in `logs/`
   - Wiki-Proxy schreibt separate Logdateien  
 
 ---
