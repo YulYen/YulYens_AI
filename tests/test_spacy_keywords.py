@@ -108,7 +108,7 @@ def test_resolve_spacy_model_success():
         language="de",
         wiki={
             "spacy_model_variant": "large",
-            "spacy_modell_map": {"de": {"large": "de_core_news_lg"}},
+            "spacy_model_map": {"de": {"large": "de_core_news_lg"}},
         },
     )
 
@@ -120,7 +120,7 @@ def test_resolve_spacy_model_missing_mapping():
         language="fr",
         wiki={
             "spacy_model_variant": "large",
-            "spacy_modell_map": {"de": {"large": "de_core_news_lg"}},
+            "spacy_model_map": {"de": {"large": "de_core_news_lg"}},
         },
     )
 

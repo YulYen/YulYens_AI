@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 ### Sprachmodell für spaCy
 
-Für die Wikipedia-Integration wird ein spaCy-Modell benötigt, das zur eingestellten Sprache passt. Der Keyword-Finder ermittelt das passende Paket jetzt über die Kombination aus `language` und `wiki.spacy_model_variant` anhand der Zuordnung in `wiki.spacy_modell_map` in der `config.yaml`. Die Modellauswahl bleibt damit vollständig konfigurierbar – ohne hart codierte Vorgaben.
+Für die Wikipedia-Integration wird ein spaCy-Modell benötigt, das zur eingestellten Sprache passt. Der Keyword-Finder ermittelt das passende Paket jetzt über die Kombination aus `language` und `wiki.spacy_model_variant` anhand der Zuordnung in `wiki.spacy_model_map` in der `config.yaml`. Die Modellauswahl bleibt damit vollständig konfigurierbar – ohne hart codierte Vorgaben.
 
 Beispiel:
 
@@ -86,7 +86,7 @@ Beispiel:
 language: "de"
 wiki:
   spacy_model_variant: "large"
-  spacy_modell_map:
+  spacy_model_map:
     de:
       medium: "de_core_news_md"
       large:  "de_core_news_lg"

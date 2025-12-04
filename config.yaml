@@ -31,7 +31,7 @@ wiki:
   mode: offline
   # spaCy model variant for keyword extraction: "medium" or "large"
   spacy_model_variant: "large"
-  spacy_modell_map:
+  spacy_model_map:
     de:
       medium: "de_core_news_md"
       large:  "de_core_news_lg"
