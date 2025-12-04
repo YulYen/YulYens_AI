@@ -63,12 +63,12 @@ def resolve_spacy_model(cfg: dict) -> str:
     if "spacy_model_variant" not in wiki_cfg:
         raise ValueError("Missing 'spacy_model_variant' in wiki section.")
 
-    if "spacy_modell_map" not in wiki_cfg:
-        raise ValueError("Missing 'spacy_modell_map' in wiki section.")
+    if "spacy_model_map" not in wiki_cfg:
+        raise ValueError("Missing 'spacy_model_map' in wiki section.")
 
     lang = cfg.language
     variant = wiki_cfg["spacy_model_variant"]
-    model_map = wiki_cfg["spacy_modell_map"]
+    model_map = wiki_cfg["spacy_model_map"]
 
     try:
         return model_map[lang][variant]

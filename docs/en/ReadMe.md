@@ -79,7 +79,7 @@ pip install -r requirements.txt
 
 ### Language model for spaCy
 
-The Wikipedia integration requires a spaCy model that matches your configured language. The keyword finder now looks up the correct package via the combination of `language` and `wiki.spacy_model_variant`, using the mapping in `wiki.spacy_modell_map` inside `config.yaml`. This keeps the model choice entirely in configuration, without hard-coded defaults.
+The Wikipedia integration requires a spaCy model that matches your configured language. The keyword finder now looks up the correct package via the combination of `language` and `wiki.spacy_model_variant`, using the mapping in `wiki.spacy_model_map` inside `config.yaml`. This keeps the model choice entirely in configuration, without hard-coded defaults.
 
 Example:
 
@@ -87,7 +87,7 @@ Example:
 language: "en"
 wiki:
   spacy_model_variant: "medium"
-  spacy_modell_map:
+  spacy_model_map:
     en:
       medium: "en_core_web_md"
       large:  "en_core_web_lg"

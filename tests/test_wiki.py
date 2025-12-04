@@ -131,7 +131,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
 
 
 def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch):
-    dummy_cfg = SimpleNamespace(wiki={"mode": "offline", "spacy_model_variant": "large", "spacy_modell_map": {}}, language="de")
+    dummy_cfg = SimpleNamespace(wiki={"mode": "offline", "spacy_model_variant": "large", "spacy_model_map": {}}, language="de")
     monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
 
     try:
