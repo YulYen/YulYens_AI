@@ -1,6 +1,6 @@
 # Eigenes Ensemble hinzufügen
 
-Dieses Dokument beschreibt, wie du ein neues Persona-Ensemble für Yul Yen's AI Orchestra anlegst. Ein Ensemble bündelt alle Personas, ihre Spracheinstellungen sowie optionale Medien-Dateien. Du kannst bestehende Personas anpassen oder komplett neue Charaktere erstellen.
+Dieses Dokument beschreibt, wie du ein neues Persona-Ensemble für Yul Yen’s AI Orchestra anlegst. Ein Ensemble bündelt alle Personas, ihre Spracheinstellungen sowie optionale Medien-Dateien. Du kannst bestehende Personas anpassen oder komplett neue Charaktere erstellen.
 
 ## Verzeichnisstruktur verstehen
 
