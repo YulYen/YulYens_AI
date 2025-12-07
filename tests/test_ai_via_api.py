@@ -179,10 +179,12 @@ def ask(question: str, person: str, client) -> str:
     "case",
     [
         {
-            "name": "Identitaet/Erfinder",
+            "name": "Identitaet/Erfinder_Datum",
             "person": "LEAH",
-            "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden?",
+            "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden? Und welches Datum haben wir heute?",
             "must_contain": ["LEAH", "yul"],  # adjustable
+            "must_contain_any": [current_year, current_year_short],
+
         },
         {
             "name": "Portugal_PM_2025",
@@ -194,10 +196,9 @@ def ask(question: str, person: str, client) -> str:
         {
             "name": "Jens_Spahn_Amt",
             "person": "PETER",
-            "question": "Welches wichtige Amt bekleidet Jens Spahn aktuell? Und welches Datum haben wir heute?",
+            "question": "Welches wichtige Amt bekleidet der Politiker Jens Spahn aktuell?",
             # Intentionally broad (tolerant to spelling and inflection)
             "must_contain": ["vorsitzend", "cdu", "fraktion"],
-            "must_contain_any": [current_year, current_year_short],
         },
     ],
 )
