@@ -22,6 +22,7 @@ class WebUI:
         config,
         keyword_finder,
         wiki_snippet_limit,
+        max_wiki_snippets,
         wiki_mode,
         proxy_base,
         web_host,
@@ -33,6 +34,7 @@ class WebUI:
         self.cfg = config
         self.factory = factory
         self.wiki_snippet_limit = wiki_snippet_limit
+        self.max_wiki_snippets = max_wiki_snippets
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.web_host = web_host
@@ -138,7 +140,7 @@ class WebUI:
         yield "", chat_history, llm_history
 
         # 3) Wiki hint and snippet (top hit)
-        wiki_hint, title, snippet = lookup_wiki_snippet(
+        wiki_hints, contexts = lookup_wiki_snippet(
             user_input,
             self.bot,
             self.keyword_finder,
@@ -146,16 +148,19 @@ class WebUI:
             self.proxy_base,
             self.wiki_snippet_limit,
             self.wiki_timeout,
+            self.max_wiki_snippets,
         )
 
-        if wiki_hint:
-            # Display the UI hint (do not add it to the LLM context window)
-            chat_history.append((None, wiki_hint))
+        if wiki_hints:
+            # Display the UI hints (do not add them to the LLM context window)
+            for wiki_hint in wiki_hints:
+                if wiki_hint:
+                    chat_history.append((None, wiki_hint))
             yield None, chat_history, llm_history
 
         # 4) Optional: inject wiki context
-        if snippet:
-            inject_wiki_context(llm_history, title, snippet)
+        if contexts:
+            inject_wiki_context(llm_history, contexts)
 
         # 5) Send the user question to the LLM
         user_message = {"role": "user", "content": user_input}

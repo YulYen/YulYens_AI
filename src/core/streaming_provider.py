@@ -323,6 +323,7 @@ class YulYenStreamingProvider:
         wiki_proxy_port: int,
         wiki_snippet_limit: int,
         wiki_timeout: tuple[float, float],
+        max_wiki_snippets: int,
     ) -> str:
         """
         Convenience method for the API: runs a single prompt
@@ -330,8 +331,8 @@ class YulYenStreamingProvider:
         """
         messages: list[dict[str, Any]] = []
 
-        # Look up the Wikipedia snippet
-        wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+        # Look up the Wikipedia snippet(s)
+        _wiki_hints, contexts = lookup_wiki_snippet(
             user_input,
             persona,
             keyword_finder,
@@ -339,11 +340,12 @@ class YulYenStreamingProvider:
             wiki_proxy_port,
             wiki_snippet_limit,
             wiki_timeout,
+            max_wiki_snippets,
         )
 
         # Attach context
-        if snippet:
-            inject_wiki_context(messages, topic_title, snippet)
+        if contexts:
+            inject_wiki_context(messages, contexts)
 
         # Add the user question as the last message
         messages.append({"role": "user", "content": user_input})
@@ -375,22 +377,33 @@ def lookup_wiki_snippet(
     proxy_port: int,
     limit: int,
     timeout: tuple[float, float],
-) -> tuple[str, str, str]:
+    max_snippets: int,
+) -> tuple[list[str], list[tuple[str, str]]]:
     """
-    Helper function: fetches a Wikipedia snippet via a local proxy.
+    Helper function: fetches up to ``max_snippets`` Wikipedia snippets via a local proxy.
+    Returns UI hints and (topic, snippet) pairs for context injection.
     """
-    snippet: str | None = None
-    wiki_hint: str | None = None
-    topic_title: str | None = None
+    wiki_hints: list[str] = []
+    contexts: list[tuple[str, str]] = []
     cfg = _get_config()
     texts = cfg.texts
     proxy_base = "http://localhost:" + str(proxy_port)
 
-    if not keyword_finder:
-        return (None, None, None)
+    if not keyword_finder or max_snippets <= 0:
+        return (wiki_hints, contexts)
 
-    topic = keyword_finder.find_top_keyword(question)
-    if topic:
+    try:
+        topics = keyword_finder.find_keywords(question)
+    except AttributeError:
+        top = keyword_finder.find_top_keyword(question)
+        topics = [top] if top else []
+
+    for topic in topics[:max_snippets]:
+        if len(contexts) >= max_snippets:
+            break
+        if not topic:
+            continue
+
         online_flag = "1" if wiki_mode == "online" else "0"
         url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
         try:
@@ -401,11 +414,16 @@ def lookup_wiki_snippet(
                 text = (data.get("text") or "").replace("\r", " ").strip()
                 snippet = text[:limit]
                 wiki_hint = data.get("wiki_hint")
-                topic_title = topic
+                topic_title = (data.get("title") or topic).replace("_", " ")
+
+                if wiki_hint:
+                    wiki_hints.append(wiki_hint)
+                if snippet:
+                    contexts.append((topic_title, snippet))
             elif proxy_response.status_code == 404:
-                wiki_hint = cfg.t("wiki_hint_not_found", topic=topic)
+                wiki_hints.append(cfg.t("wiki_hint_not_found", topic=topic))
             else:
-                wiki_hint = cfg.t("wiki_hint_unreachable", topic=topic)
+                wiki_hints.append(cfg.t("wiki_hint_unreachable", topic=topic))
         except requests.exceptions.RequestException as err:
             logging.error(
                 "[WIKI EXC] Network error while retrieving '%s': %s",
@@ -413,29 +431,29 @@ def lookup_wiki_snippet(
                 err,
                 exc_info=True,
             )
-            wiki_hint = texts["wiki_hint_proxy_error"]
+            wiki_hints.append(texts["wiki_hint_proxy_error"])
         except Exception:  # pragma: no cover - unexpected errors
             logging.exception("[WIKI EXC] Unexpected error for topic='%s'", topic)
-            wiki_hint = texts["wiki_hint_unknown_error"]
-    return (wiki_hint, topic_title, snippet)
+            wiki_hints.append(texts["wiki_hint_unknown_error"])
+    return (wiki_hints, contexts)
 
 
-def inject_wiki_context(history: list, topic: str, snippet: str) -> None:
+def inject_wiki_context(history: list, contexts: list[tuple[str, str]]) -> None:
     """
-    If a Wikipedia snippet is available, append two system messages:
-    a guardrail message and a context message with the wiki text.
+    If Wikipedia snippets are available, append a guardrail message and one
+    system message per snippet. Each snippet block is clearly delimited.
     """
-    if not snippet:
+    if not contexts:
         return
     cfg = _get_config()
     guardrail = cfg.t("wiki_context_guardrail")
     history.append({"role": "system", "content": guardrail})
-    context_message = cfg.t(
-        "wiki_context_message",
-        topic=topic.replace("_", " "),
-        snippet=snippet,
-    )
-    history.append({"role": "system", "content": context_message})
+
+    for idx, (topic, snippet) in enumerate(contexts, start=1):
+        topic_clean = topic.replace("_", " ")
+        context_message = cfg.t("wiki_context_message", topic=topic_clean, snippet=snippet)
+        formatted_context = f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
+        history.append({"role": "system", "content": formatted_context})
 
 
 def run_llm_collect(

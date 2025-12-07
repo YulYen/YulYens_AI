@@ -45,6 +45,8 @@ wiki:
   proxy_port: 8042
   # Maximum wiki snippet length in characters (recommend 1200–1600)
   snippet_limit: 1200
+  # Maximum number of distinct wiki snippets to inject when multiple entities are detected
+  max_wiki_snippets: 2
   timeout_connect: 5.0
   timeout_read: 8.0
   offline:  # only relevant when mode == "offline" (Kiwix-based wiki mode)

@@ -20,6 +20,7 @@ class AiApiProvider:
         wiki_mode,
         wiki_proxy_port,
         wiki_snippet_limit,
+        max_wiki_snippets,
         wiki_timeout,
         factory,
     ):
@@ -27,6 +28,7 @@ class AiApiProvider:
         self.wiki_mode = wiki_mode
         self.wiki_proxy_port = wiki_proxy_port
         self.wiki_snippet_limit = wiki_snippet_limit
+        self.max_wiki_snippets = max_wiki_snippets
         self.wiki_timeout = wiki_timeout
         self.factory = factory
         self.cfg = factory.get_config() if factory is not None else Config()
@@ -60,5 +62,6 @@ class AiApiProvider:
             wiki_proxy_port=self.wiki_proxy_port,
             wiki_snippet_limit=self.wiki_snippet_limit,
             wiki_timeout=self.wiki_timeout,
+            max_wiki_snippets=self.max_wiki_snippets,
             persona=canonical_persona,
         ).strip()

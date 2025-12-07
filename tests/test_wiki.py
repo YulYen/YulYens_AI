@@ -21,6 +21,9 @@ class _DummyKeywordFinder:
     def find_top_keyword(self, question: str) -> str:  # pragma: no cover - trivial
         return self._topic
 
+    def find_keywords(self, question: str) -> list[str]:  # pragma: no cover - trivial
+        return [self._topic]
+
 
 def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
     """The wiki fallback informs the UI clearly about network errors."""
@@ -33,7 +36,7 @@ def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
 
     caplog.set_level(logging.ERROR)
 
-    wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+    wiki_hints, contexts = lookup_wiki_snippet(
         question="Was ist los?",
         persona_name="TEST",
         keyword_finder=dummy_finder,
@@ -41,12 +44,13 @@ def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
         proxy_port=9999,
         limit=42,
         timeout=(1.0, 1.0),
+        max_snippets=2,
     )
 
-    assert topic_title is None
-    assert snippet is None
-    assert "Wikipedia-Proxy nicht erreichbar" in wiki_hint
-    assert "Bitte prüfe die Verbindung" in wiki_hint
+    assert contexts == []
+    assert len(wiki_hints) == 1
+    assert "Wikipedia-Proxy nicht erreichbar" in wiki_hints[0]
+    assert "Bitte prüfe die Verbindung" in wiki_hints[0]
     assert "[WIKI EXC]" in caplog.text
 
 
@@ -61,7 +65,7 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
 
     caplog.set_level(logging.ERROR)
 
-    wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+    wiki_hints, contexts = lookup_wiki_snippet(
         question="Was ist los?",
         persona_name="TEST",
         keyword_finder=dummy_finder,
@@ -69,11 +73,12 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
         proxy_port=9999,
         limit=42,
         timeout=(1.0, 1.0),
+        max_snippets=2,
     )
 
-    assert topic_title is None
-    assert snippet is None
-    assert "Unbekannter Fehler" in wiki_hint
+    assert contexts == []
+    assert len(wiki_hints) == 1
+    assert "Unbekannter Fehler" in wiki_hints[0]
     assert "[WIKI EXC]" in caplog.text
     assert "kaputt" in caplog.text
 
@@ -89,7 +94,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     Config.reset_instance()
     Config("config.yaml")
 
-    german_hint, _, _ = lookup_wiki_snippet(
+    german_hints, german_contexts = lookup_wiki_snippet(
         question="Frage?",
         persona_name="TEST",
         keyword_finder=_DummyKeywordFinder("Testthema"),
@@ -97,9 +102,11 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
         proxy_port=9999,
         limit=42,
         timeout=(1.0, 1.0),
+        max_snippets=2,
     )
 
-    assert "Wikipedia-Proxy nicht erreichbar" in german_hint
+    assert german_contexts == []
+    assert "Wikipedia-Proxy nicht erreichbar" in german_hints[0]
 
     Config.reset_instance()
 
@@ -114,7 +121,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
 
     Config(str(english_config_path))
 
-    english_hint, _, _ = lookup_wiki_snippet(
+    english_hints, english_contexts = lookup_wiki_snippet(
         question="Question?",
         persona_name="TEST",
         keyword_finder=_DummyKeywordFinder("Testtopic"),
@@ -122,10 +129,12 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
         proxy_port=9999,
         limit=42,
         timeout=(1.0, 1.0),
+        max_snippets=2,
     )
 
-    assert "Wikipedia proxy unreachable" in english_hint
-    assert "Please check your connection" in english_hint
+    assert english_contexts == []
+    assert "Wikipedia proxy unreachable" in english_hints[0]
+    assert "Please check your connection" in english_hints[0]
 
     Config.reset_instance()
 
@@ -158,7 +167,7 @@ def test_lookup_wiki_snippet_for_germany():
     finder = SpacyKeywordFinder("de_core_news_md")
 
     # Assumptions: wiki_mode=offline, proxy runs locally on 8042, limit e.g. 1600
-    wiki_hint, topic_title, snippet = lookup_wiki_snippet(
+    wiki_hints, contexts = lookup_wiki_snippet(
         question="Was ist die Hauptstadt von Deutschland?",
         persona_name="PETER",
         keyword_finder=finder,
@@ -166,12 +175,12 @@ def test_lookup_wiki_snippet_for_germany():
         proxy_port=8042,
         limit=1600,
         timeout=(3.0, 8.0),
+        max_snippets=2,
     )
 
     # We expect the proxy to be reachable and to detect 'Deutschland'
-    assert (
-        wiki_hint is not None and topic_title is not None # Hint could be an error-Message
-    ), "Wiki proxy did not return a hint → it is probably not running"
+    assert wiki_hints and contexts, "Wiki proxy did not return data → it is probably not running"
+    topic_title, snippet = contexts[0]
     assert topic_title == "Deutschland"
     assert snippet, "Wiki proxy did not return any snippet text"
 
