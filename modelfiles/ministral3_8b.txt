@@ -1,9 +1,2 @@
-FROM Ministral-3-8B-Instruct-2512-Q5_K_M.gguf
-TEMPLATE """[INST] {{ range $index, $_ := .Messages }}
-{{- if eq .Role "system" }}{{ .Content }}
-
-{{ else if eq .Role "user" }}{{ .Content }}[/INST]
-{{- else if eq .Role "assistant" }} {{ .Content }}</s>[INST] {{ end }}
-{{- end }}"""
-PARAMETER stop <|im_start|>
-PARAMETER stop <|im_end|>
+ollama pull hf.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF:Q5_K_M
+ollama run hf.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF:Q5_K_M
