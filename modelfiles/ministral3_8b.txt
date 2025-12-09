@@ -1,2 +1,0 @@
-ollama pull hf.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF:Q5_K_M
-ollama run hf.co/mistralai/Ministral-3-8B-Instruct-2512-GGUF:Q5_K_M
