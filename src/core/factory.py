@@ -188,6 +188,7 @@ class AppFactory:
                 wiki_mode=self._cfg.wiki["mode"],
                 wiki_proxy_port=int(self._cfg.wiki["proxy_port"]),
                 wiki_snippet_limit=int(self._cfg.wiki["snippet_limit"]),
+                max_wiki_snippets=int(self._cfg.wiki["max_wiki_snippets"]),
                 wiki_timeout=(
                     float(self._cfg.wiki["timeout_connect"]),
                     float(self._cfg.wiki["timeout_read"]),
@@ -218,6 +219,7 @@ class AppFactory:
                 self._cfg,
                 finder,
                 int(wiki["snippet_limit"]),
+                int(wiki["max_wiki_snippets"]),
                 wiki["mode"],
                 int(wiki["proxy_port"]),
                 wiki_timeout=(
@@ -234,6 +236,7 @@ class AppFactory:
                 self._cfg,
                 finder,
                 int(wiki["snippet_limit"]),
+                int(wiki["max_wiki_snippets"]),
                 wiki["mode"],
                 int(wiki["proxy_port"]),
                 web_host=host,

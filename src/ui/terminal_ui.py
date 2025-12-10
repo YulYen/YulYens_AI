@@ -30,6 +30,7 @@ class TerminalUI:
         config,
         keyword_finder,
         wiki_snippet_limit,
+        max_wiki_snippets,
         wiki_mode,
         proxy_base,
         wiki_timeout,
@@ -38,6 +39,7 @@ class TerminalUI:
         self.config = config
         self.keyword_finder = keyword_finder
         self.wiki_snippet_limit = wiki_snippet_limit
+        self.max_wiki_snippets = max_wiki_snippets
         self.wiki_mode = wiki_mode
         self.proxy_base = proxy_base
         self.wiki_timeout = wiki_timeout
@@ -191,10 +193,9 @@ class TerminalUI:
                 )
                 continue
 
-            # --- (1) Wiki lookup: only the top match, show the hint, inject snippet if available ---
-            wiki_hint = None
+            # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
             if self.keyword_finder:
-                wiki_hint, title, snippet = lookup_wiki_snippet(
+                wiki_hints, contexts = lookup_wiki_snippet(
                     user_input,
                     self.bot,
                     self.keyword_finder,
@@ -202,15 +203,17 @@ class TerminalUI:
                     self.proxy_base,
                     self.wiki_snippet_limit,
                     self.wiki_timeout,
+                    self.max_wiki_snippets,
                 )
 
                 # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
-                if wiki_hint:
-                    print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
+                for wiki_hint in wiki_hints:
+                    if wiki_hint:
+                        print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
 
                 # Insert the snippet as system context (guardrail plus context)
-                if snippet:
-                    inject_wiki_context(self.history, title, snippet)
+                if contexts:
+                    inject_wiki_context(self.history, contexts)
 
             # --- (2) Append the user question to history ---
             self.history.append({"role": "user", "content": user_input})

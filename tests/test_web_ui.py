@@ -17,6 +17,7 @@ def test_webui_start_server_uses_configured_host_and_port():
         config=dummy_config,
         keyword_finder=Mock(),
         wiki_snippet_limit=42,
+        max_wiki_snippets=2,
         wiki_mode="offline",
         proxy_base="http://proxy",
         web_host="0.0.0.0",
@@ -43,6 +44,7 @@ def _create_web_ui(ui_config=None):
         config=dummy_config,
         keyword_finder=None,
         wiki_snippet_limit=42,
+        max_wiki_snippets=2,
         wiki_mode="offline",
         proxy_base="http://proxy",
         web_host="0.0.0.0",
@@ -63,7 +65,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     history_state = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
@@ -93,7 +95,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     history_state = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
@@ -126,7 +128,7 @@ def test_respond_streaming_keeps_session_histories_isolated():
     session_two_state = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         session_one_outputs = list(
@@ -168,7 +170,7 @@ def test_respond_streaming_returns_chat_and_state_updates():
     history_state: list = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         outputs = list(web_ui.respond_streaming("Hallo", chat_history, history_state))
@@ -191,7 +193,7 @@ def test_respond_streaming_appends_final_history_entries():
     web_ui.streamer = streamer
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=(None, None, None)),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         outputs = list(web_ui.respond_streaming("Hallo", chat_history, history_state))
