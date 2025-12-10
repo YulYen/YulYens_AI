@@ -58,6 +58,7 @@ def test_persona_name_normalized(client, monkeypatch):
         wiki_mode,
         wiki_proxy_port,
         wiki_snippet_limit,
+        max_wiki_snippets,
         wiki_timeout,
     ):
         captured["persona_arg"] = persona
