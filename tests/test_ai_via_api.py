@@ -101,22 +101,21 @@ def test_persona_name_normalized(client, monkeypatch):
 @pytest.mark.slow
 @pytest.mark.ollama
 @pytest.mark.skipif(
-    not is_model("leo-hessianai-13b-chat.Q5"),
-    reason="Same joke is only stable under leo-hessianai-13b-chat.Q5"
+    not is_model("ministral-3:8b"),
+    reason="Same joke-beginning is stable under ministral-3:8b"
 )
 def test_same_joke(client):
     """
     Expectation: identical question twice → exactly the same answer.
     Requirement: persona options include a fixed seed or deterministic settings.
     """
-    prompt = "Erzähl bitte einen kurzen Nerd-Witz über Bytes."
+    prompt = "Erzähl bitte EINEN kurzen Nerd-Witz über Bytes."
     r1 = client.post("/ask", json={"question": prompt, "persona": "PETER"})
 
     assert r1.status_code == 200
 
     a1 = r1.json().get("answer", "")
-    # a2 = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier Peaks bevorzugen."'  # LEO reference answer
-    anfang = 'Ein Byte geht in eine Bar und der Barkeeper sagt: "Sie wissen schon, dass wir hier'  # LEO stable beginning
+    anfang = """Hier kommt ein klassischer Nerd-Witz für dich – mit einem Augenzwinkern zu Bytes"""  # stable beginning
 
     # Non-empty and not just whitespace
     assert a1.strip()
