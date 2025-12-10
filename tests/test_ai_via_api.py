@@ -187,11 +187,11 @@ def ask(question: str, person: str, client) -> str:
 
         },
         {
-            "name": "Portugal_PM_2025",
+            "name": "Portugal_PM_2025_TWO_WIKI_SNIPPETS",
             "person": "PETER",
-            "question": "Wer ist im Jahre 2025 der amtierende Regierungschef von Portugal? Und wer bist du?",
+            "question": "Wer bist du? Und wer sind im Mai 2025 Regierungschefs von Portugal und Deutschland?",
             # Accept spellings with or without accents; also verify persona mention
-            "must_contain": ["luis montenegro", "PETER"],
+            "must_contain": ["luis montenegro", "PETER", "Friedrich Merz"],
         },
         {
             "name": "Jens_Spahn_Amt",
