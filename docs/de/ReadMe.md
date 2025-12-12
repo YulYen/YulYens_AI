@@ -139,7 +139,8 @@ wiki:
   mode: "offline"    # "offline", "online" oder false (deaktiviert)
   spacy_model_variant: "large"  # Alternativen: "medium" oder direkter Modellname
   proxy_port: 8042
-  snippet_limit: 1600
+  snippet_limit: 1600           # Maximale Länge eines einzelnen Snippets in Zeichen
+  max_wiki_snippets: 2          # Wieviele verschiedene Snippets maximal in den Prompt injiziert werden dürfen
 ```
 
 #### LLM-Backends
@@ -167,6 +168,7 @@ Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
 #### Wikipedia (Proxy & Autostart)
 
 - Im Offline-Modus (`wiki.mode: "offline"`) kann `kiwix-serve` automatisch gestartet werden, wenn `wiki.offline.autostart: true` gesetzt ist.
+- `wiki.max_wiki_snippets` begrenzt, wie viele unterschiedliche Wikipedia-Ausschnitte pro Frage in den Prompt aufgenommen werden (Standard: 2). So lassen sich Mehrfachtreffer nutzen, ohne den Kontext zu überfrachten.
 
 ### Start
 

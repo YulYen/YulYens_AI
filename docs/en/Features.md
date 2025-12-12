@@ -34,6 +34,7 @@ To deliver well-grounded answers, the system can automatically **incorporate Wik
 
 - **Automatic knowledge retrieval:** The relevant keyword is extracted from the user prompt using spaCy NLP. An internal wiki proxy then searches for a matching Wikipedia article—either **offline** via a local Kiwix database or **online** via the Wikipedia API, depending on the settings. In offline mode, the Kiwix server can be started automatically if configured.
 - **Context enrichment:** If the wiki proxy finds an article, a snippet is taken from it. This snippet is inserted into the chat context as an additional *system* message before the AI replies. The AI thus receives verified facts and can produce more precise responses. In the terminal UI a spyglass icon (🕵️) indicates when a Wikipedia snippet was used. If the search comes up empty, a short notice is displayed instead.
+- **Multiple hits usable:** If the keyword finder detects several relevant entities, multiple snippets can be injected into the prompt. The cap is configured via `wiki.max_wiki_snippets` (default: 2) to expand context deliberately without overloading it.
 
 ## Logging and tests
 
