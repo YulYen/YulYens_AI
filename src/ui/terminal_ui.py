@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink, _load_system_prompts
@@ -14,6 +15,7 @@ from core.streaming_provider import (
     lookup_wiki_snippet,
 )
 from core.utils import _greeting_text
+from ui.conversation_io_terminal import load_conversation, save_conversation
 
 
 class TerminalUI:
@@ -52,6 +54,7 @@ class TerminalUI:
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: list[dict[str, str]] = []
+        self.meta: dict[str, str] = {}
 
     def choose_persona(self) -> None:
         """Asks the user for the desired persona and configures the streamer."""
@@ -68,10 +71,7 @@ class TerminalUI:
                 choice = int(sel) - 1
                 if 0 <= choice < len(names):
                     persona_name = names[choice]
-                    # Build the streamer for the selected persona
-                    self.streamer = self.factory.get_streamer_for_persona(persona_name)
-                    self.bot = persona_name
-                    self.greeting = _greeting_text(self.config, self.bot)
+                    self._set_persona(persona_name)
 
                     selected_msg = self._t(
                         "terminal_persona_selected", persona_name=self.bot
@@ -123,18 +123,102 @@ class TerminalUI:
         flag = experimental_cfg.get("broadcast_mode")
         return bool(flag)
 
+    # ---------- Start menu ----------
+    def _start_dialog_flow(self) -> bool:
+        while True:
+            print(self.texts["terminal_start_menu_title"])
+            print(self.texts["terminal_start_menu_new_option"])
+            print(self.texts["terminal_start_menu_load_option"])
+
+            choice = input(self.texts["terminal_start_menu_prompt"] + " ").strip().lower()
+
+            if choice in {"1", "n", "new"}:
+                self.history.clear()
+                self.choose_persona()
+                self._reset_meta()
+                self.print_welcome()
+                return True
+
+            if choice in {"2", "l", "load"}:
+                if self._load_conversation_from_prompt():
+                    self.print_welcome()
+                    return True
+                continue
+
+            if choice in {"exit", "quit"}:
+                self.print_exit()
+                return False
+
+            print(f"{Fore.YELLOW}{self.texts['terminal_invalid_selection']}{Style.RESET_ALL}")
+
+    def _set_persona(self, persona_name: str) -> None:
+        # Build the streamer for the selected persona
+        self.streamer = self.factory.get_streamer_for_persona(persona_name)
+        self.bot = persona_name
+        self.greeting = _greeting_text(self.config, self.bot)
+
+    def _reset_meta(self) -> None:
+        self.meta = {
+            "created_at": datetime.now().isoformat(),
+            "model": str(self.config.core.get("model_name")),
+            "persona": self.bot,
+            "app": "terminal",
+        }
+
+    def _load_conversation_from_prompt(self) -> bool:
+        path = input(self.texts["terminal_load_path_prompt"] + " ").strip()
+        if not path:
+            hint = self.texts.get("terminal_load_path_required")
+            if hint:
+                print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+            return False
+
+        try:
+            meta, messages = load_conversation(path)
+        except (OSError, ValueError) as exc:
+            msg = self._t("terminal_load_failed", reason=str(exc))
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
+        persona_name = meta.get("persona")
+        if persona_name not in get_all_persona_names():
+            msg = self._t(
+                "terminal_load_invalid_persona", persona_name=persona_name or "<unbekannt>"
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
+        self._set_persona(persona_name)
+        self.history = messages
+        self.meta = meta
+
+        success = self._t("terminal_load_success", persona_name=self.bot)
+        print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
+        return True
+
+    def _handle_save_command(self, save_target: str) -> None:
+        if not save_target:
+            usage = self.texts.get("terminal_save_usage") or "/save <pfad>"
+            print(f"{Fore.YELLOW}{usage}{Style.RESET_ALL}\n")
+            return
+
+        try:
+            save_conversation(save_target, self.meta, self.history)
+        except (OSError, ValueError) as exc:
+            msg = self._t("terminal_save_failed", reason=str(exc))
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return
+
+        success = self._t("terminal_save_success", path=save_target)
+        print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
+
     # ---------- Main loop ----------
     def launch(self) -> None:
         self.init_ui()
         logging.info("Launching TerminalUI")
 
-        """Starts the terminal UI. Prompts for persona selection first."""
-        # 1. Select a persona if no streamer is configured yet
-        if self.streamer is None:
-            self.choose_persona()
-
-        # 2. Print the greeting plus the exit and clear hints
-        self.print_welcome()
+        if not self._start_dialog_flow():
+            return
 
         while True:
             user_input = self.prompt_user()
@@ -145,6 +229,12 @@ class TerminalUI:
             if user_input.lower() in ("exit", "quit"):
                 self.print_exit()
                 break
+
+            # Save conversation
+            if user_input.lower().startswith("/save"):
+                save_target = user_input[len("/save") :].strip()
+                self._handle_save_command(save_target)
+                continue
 
             # Broadcast to all personas
             if user_input.lower().startswith("/askall"):
@@ -187,10 +277,8 @@ class TerminalUI:
 
             # Clear / start a new conversation
             if user_input.lower() == "clear":
-                self.history.clear()
-                print(
-                    f"{Fore.BLUE}{self.texts['terminal_new_chat_started']}{Style.RESET_ALL}\n"
-                )
+                if not self._start_dialog_flow():
+                    break
                 continue
 
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
