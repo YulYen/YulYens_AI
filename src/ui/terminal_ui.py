@@ -90,6 +90,10 @@ class TerminalUI:
         print(self.greeting)
         print(f"{Fore.MAGENTA}{self.texts['terminal_exit_hint']}{Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}{self.texts['terminal_clear_hint']}{Style.RESET_ALL}")
+        save_hint = self.texts.get(
+            "terminal_save_hint", "('/save <pfad> zum Speichern)"
+        )
+        print(f"{Fore.MAGENTA}{save_hint}{Style.RESET_ALL}")
         if self.broadcast_enabled:
             hint = self.texts.get(
                 "terminal_broadcast_hint",
@@ -194,6 +198,7 @@ class TerminalUI:
 
         success = self._t("terminal_load_success", persona_name=self.bot)
         print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
+        self._print_loaded_history()
         return True
 
     def _handle_save_command(self, save_target: str) -> None:
@@ -366,3 +371,31 @@ class TerminalUI:
             )
             notice = self.texts["terminal_context_trim_notice"]
             print(f"{Fore.YELLOW}{notice}{Style.RESET_ALL}")
+
+    def _print_loaded_history(self) -> None:
+        if not self.history:
+            return
+
+        header = self.texts.get("terminal_loaded_history_header")
+        if header:
+            print(f"{Fore.MAGENTA}{header}{Style.RESET_ALL}")
+
+        role_labels = {
+            "user": f"{Fore.GREEN}{self.texts['terminal_user_prompt']}{Style.RESET_ALL}",
+            "assistant": f"{Fore.CYAN}{self._t('terminal_bot_prefix', persona_name=self.bot)}{Style.RESET_ALL}",
+            "system": f"{Fore.MAGENTA}[system]{Style.RESET_ALL}",
+        }
+
+        for msg in self.history:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            prefix = role_labels.get(role, f"{Fore.YELLOW}[{role}]{Style.RESET_ALL}")
+
+            lines = content.splitlines() or [""]
+            for idx, line in enumerate(lines):
+                if idx == 0:
+                    print(f"{prefix} {line}")
+                else:
+                    print(f"    {line}")
+
+        print()
