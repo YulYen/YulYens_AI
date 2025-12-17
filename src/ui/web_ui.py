@@ -1,4 +1,7 @@
+import json
 import logging
+import tempfile
+from datetime import datetime
 from functools import partial
 
 import gradio as gr
@@ -6,6 +9,7 @@ from config.personas import get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.orchestrator import broadcast_to_ensemble
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
+from ui.conversation_io_terminal import load_conversation
 
 
 class WebUI:
@@ -61,6 +65,41 @@ class WebUI:
 
     def _reset_conversation_state(self):
         return []
+
+    def _reset_meta_state(self):
+        return {}
+
+    def _build_meta(self, persona_name: str) -> dict:
+        return {
+            "created_at": datetime.now().isoformat(),
+            "model": str(self.cfg.core.get("model_name")),
+            "persona": persona_name,
+            "app": "web",
+        }
+
+    def _messages_to_chat_history(self, messages):
+        chat_history = []
+        pending_user = None
+
+        for item in messages or []:
+            role = item.get("role")
+            content = item.get("content")
+
+            if role == "user":
+                if pending_user is not None:
+                    chat_history.append((pending_user, None))
+                pending_user = content
+            elif role == "assistant":
+                if pending_user is not None:
+                    chat_history.append((pending_user, content))
+                    pending_user = None
+                else:
+                    chat_history.append((None, content))
+
+        if pending_user is not None:
+            chat_history.append((pending_user, None))
+
+        return chat_history
 
     def _persona_thumbnail_path(self, persona_name):
         ensemble = getattr(self.cfg, "ensemble", None)
@@ -189,6 +228,8 @@ class WebUI:
         ask_all_button_label,
         ask_all_title,
         ask_all_input_placeholder,
+        load_label,
+        save_button_label,
     ):
         with gr.Blocks() as demo:
             selected_persona_state = gr.Textbox(value="", visible=False)
@@ -264,6 +305,16 @@ class WebUI:
                     else:
                         ask_all_card_btn = None
 
+                with gr.Row():
+                    with gr.Column(scale=2, min_width=300):
+                        load_input = gr.File(
+                            label=load_label,
+                            file_types=[".json"],
+                            type="filepath",
+                        )
+                    with gr.Column(scale=3, min_width=300):
+                        load_status = gr.Markdown("", visible=False)
+
             with gr.Group(visible=False) as focus_group:
                 with gr.Row():
                     with gr.Column(scale=1):
@@ -281,6 +332,14 @@ class WebUI:
                 interactive=False,
             )
             clear = gr.Button(new_chat_label, visible=False)
+            with gr.Row():
+                download_btn = gr.Button(
+                    save_button_label,
+                    variant="secondary",
+                    visible=False,
+                )
+                download_file = gr.File(visible=False)
+            save_status = gr.Markdown("", visible=False)
             with gr.Row(elem_classes="chat-input-row"):
                 txt = gr.Textbox(
                     show_label=False,
@@ -333,6 +392,7 @@ class WebUI:
                     wrap=True,
                 )
             history_state = gr.State(self._reset_conversation_state())
+            meta_state = gr.State(self._reset_meta_state())
 
         components = {
             "demo": demo,
@@ -346,8 +406,12 @@ class WebUI:
             "txt": txt,
             "send_btn": send_btn,
             "clear": clear,
+            "download_btn": download_btn,
+            "download_file": download_file,
+            "save_status": save_status,
             "persona_buttons": persona_buttons,
             "history_state": history_state,
+            "meta_state": meta_state,
             "ask_all_btn": ask_all_btn,
             "ask_all_group": ask_all_group,
             "ask_all_results": ask_all_results,
@@ -356,6 +420,8 @@ class WebUI:
             "ask_all_new_chat": ask_all_new_chat,
             "ask_all_status": ask_all_status,
             "ask_all_card_btn": ask_all_card_btn,
+            "load_input": load_input,
+            "load_status": load_status,
         }
         return demo, components
 
@@ -372,6 +438,7 @@ class WebUI:
             persona_name=display_name, model_name=model_name
         )
         focus_text = f"### {persona['name']}\n{persona['description']}"
+        meta = self._build_meta(persona["name"])
 
         return (
             gr.update(value=persona_key),
@@ -384,12 +451,17 @@ class WebUI:
             gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),
             gr.update(visible=True, interactive=True),
             gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(value=None, visible=False),
+            gr.update(value="", visible=False),
             self._reset_conversation_state(),
+            meta,
             gr.update(visible=False),
             gr.update(value=[], visible=False),
             gr.update(value="", visible=False, interactive=True, placeholder=self.ask_all_placeholder),
             gr.update(visible=False, interactive=True),
             gr.update(visible=False),
+            gr.update(value="", visible=False),
             gr.update(value="", visible=False),
         )
 
@@ -405,12 +477,17 @@ class WebUI:
             gr.update(value="", visible=False, interactive=False),
             gr.update(visible=False, interactive=False),
             gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value=None, visible=False),
+            gr.update(value="", visible=False),
             self._reset_conversation_state(),
+            self._reset_meta_state(),
             gr.update(visible=False),
             gr.update(value=[], visible=False),
             gr.update(value=self.ask_all_placeholder, visible=False, interactive=True),
             gr.update(visible=False, interactive=True),
             gr.update(visible=False),
+            gr.update(value="", visible=False),
             gr.update(value="", visible=False),
         )
 
@@ -448,12 +525,17 @@ class WebUI:
             gr.update(value="", visible=False, interactive=False),
             gr.update(visible=False, interactive=False),
             gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value=None, visible=False),
+            gr.update(value="", visible=False),
             self._reset_conversation_state(),
+            self._reset_meta_state(),
             gr.update(visible=True),
             gr.update(value=[], visible=False),
             gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
             gr.update(visible=True, interactive=True),
             gr.update(visible=True),
+            gr.update(value="", visible=False),
             gr.update(value="", visible=False),
         )
 
@@ -491,6 +573,110 @@ class WebUI:
             gr.update(visible=True),
         )
 
+    def _load_failure_updates(self, message):
+        base = list(self._reset_ui_updates())
+        base[-1] = gr.update(value=message, visible=True)
+        return tuple(base)
+
+    def _conversation_loaded_updates(
+        self,
+        persona_key,
+        persona,
+        meta,
+        messages,
+        input_placeholder,
+    ):
+        display_name = persona["name"].title()
+        focus_text = f"### {persona['name']}\n{persona['description']}"
+        chat_history = self._messages_to_chat_history(messages)
+
+        greeting = self._t("web_load_status_success", persona_name=display_name)
+
+        return (
+            gr.update(value=persona_key),
+            gr.update(visible=False),
+            gr.update(visible=True),
+            gr.update(value=self._persona_full_image_path(persona["name"])),
+            gr.update(value=focus_text),
+            gr.update(value=greeting, visible=True),
+            gr.update(value=chat_history, label=display_name, visible=True),
+            gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),
+            gr.update(visible=True, interactive=True),
+            gr.update(visible=True),
+            gr.update(visible=True),
+            gr.update(value=None, visible=False),
+            gr.update(value="", visible=False),
+            messages,
+            meta,
+            gr.update(visible=False),
+            gr.update(value=[], visible=False),
+            gr.update(value="", visible=False, interactive=True, placeholder=self.ask_all_placeholder),
+            gr.update(visible=False, interactive=True),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=greeting, visible=True),
+        )
+
+    def _on_load_conversation(self, upload_path, persona_info, input_placeholder):
+        if not upload_path:
+            warning = self._t("web_load_missing_file")
+            return self._load_failure_updates(warning)
+
+        try:
+            meta, messages = load_conversation(upload_path)
+        except (OSError, ValueError) as exc:
+            msg = self._t("web_load_status_error", reason=str(exc))
+            return self._load_failure_updates(msg)
+
+        persona_name = meta.get("persona")
+        persona_key = (persona_name or "").lower()
+        persona = persona_info.get(persona_key)
+
+        if not persona:
+            msg = self._t("web_load_invalid_persona", persona_name=persona_name or "<unknown>")
+            return self._load_failure_updates(msg)
+
+        self.bot = persona["name"]
+        self.streamer = self.factory.get_streamer_for_persona(self.bot)
+
+        normalized_meta = dict(meta)
+        normalized_meta.setdefault("app", "web")
+
+        return self._conversation_loaded_updates(
+            persona_key,
+            persona,
+            normalized_meta,
+            messages,
+            input_placeholder,
+        )
+
+    def _on_download_conversation(self, messages, meta):
+        if not (meta and meta.get("persona")) and not self.bot:
+            msg = self._t("no_selection_warning")
+            return gr.update(value=None, visible=False), gr.update(
+                value=msg, visible=True
+            )
+
+        try:
+            payload = {
+                "meta": meta or self._build_meta(self.bot or ""),
+                "messages": messages or [],
+            }
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+                tmp.write(json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"))
+                file_path = tmp.name
+        except Exception as exc:  # pragma: no cover - UI utility
+            msg = self._t("web_save_status_error", reason=str(exc))
+            return gr.update(value=None, visible=False), gr.update(
+                value=msg, visible=True
+            )
+
+        success = self._t("web_save_status_ready")
+        return gr.update(value=file_path, visible=True), gr.update(
+            value=success, visible=True
+        )
+
     def _bind_events(
         self, components, persona_info, model_name, greeting_template, input_placeholder
     ):
@@ -504,7 +690,11 @@ class WebUI:
         txt = components["txt"]
         send_btn = components["send_btn"]
         clear = components["clear"]
+        download_btn = components["download_btn"]
+        download_file = components["download_file"]
+        save_status = components["save_status"]
         history_state = components["history_state"]
+        meta_state = components["meta_state"]
         ask_all_btn = components["ask_all_btn"]
         ask_all_group = components["ask_all_group"]
         ask_all_results = components["ask_all_results"]
@@ -513,6 +703,8 @@ class WebUI:
         ask_all_new_chat = components["ask_all_new_chat"]
         ask_all_status = components["ask_all_status"]
         ask_all_card_btn = components["ask_all_card_btn"]
+        load_input = components["load_input"]
+        load_status = components["load_status"]
 
         persona_outputs = [
             selected_persona_state,
@@ -525,13 +717,18 @@ class WebUI:
             txt,
             send_btn,
             clear,
+            download_btn,
+            download_file,
+            save_status,
             history_state,
+            meta_state,
             ask_all_group,
             ask_all_results,
             ask_all_question,
             ask_all_submit,
             ask_all_new_chat,
             ask_all_status,
+            load_status,
         ]
 
         for key, btn in components["persona_buttons"]:
@@ -549,6 +746,17 @@ class WebUI:
                 queue=False,
             )
 
+        load_input.upload(
+            fn=partial(
+                self._on_load_conversation,
+                persona_info=persona_info,
+                input_placeholder=input_placeholder,
+            ),
+            inputs=[load_input],
+            outputs=persona_outputs,
+            queue=False,
+        )
+
         txt.submit(
             fn=self.respond_streaming,
             inputs=[txt, chatbot, history_state],
@@ -561,6 +769,13 @@ class WebUI:
             inputs=[txt, chatbot, history_state],
             outputs=[txt, chatbot, history_state],
             queue=True,
+        )
+
+        download_btn.click(
+            fn=self._on_download_conversation,
+            inputs=[history_state, meta_state],
+            outputs=[download_file, save_status],
+            queue=False,
         )
 
         clear.click(
@@ -667,6 +882,10 @@ class WebUI:
         ask_all_input_placeholder = ui.get(
             "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
         )
+        load_label = ui.get("web_load_label", "Gespräch laden (JSON)")
+        save_button_label = ui.get(
+            "web_save_button", "Gespräch herunterladen (JSON)"
+        )
 
         self.ask_all_placeholder = ask_all_input_placeholder
 
@@ -685,6 +904,8 @@ class WebUI:
             ask_all_button_label,
             ask_all_title,
             ask_all_input_placeholder,
+            load_label,
+            save_button_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
