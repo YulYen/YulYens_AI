@@ -105,7 +105,7 @@ def test_terminal_ui_broadcast_flag_blocks_askall(monkeypatch, capsys) -> None:
     monkeypatch.setattr(ui, "print_welcome", lambda: None)
     monkeypatch.setattr(ui, "prompt_user", lambda: next(prompts))
     monkeypatch.setattr(ui, "print_exit", lambda: None)
-
+    monkeypatch.setattr("builtins.input", lambda _: "1")
     mock_broadcast = Mock()
     monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", mock_broadcast)
 
