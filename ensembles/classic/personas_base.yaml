@@ -16,7 +16,6 @@ personas:
       temperature: 0.2
       repeat_penalty: 1.15
       num_ctx: 4096
-      seed: 42
   - name: POPCORN
     llm_options:
       temperature: 0.8
