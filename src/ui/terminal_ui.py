@@ -94,12 +94,6 @@ class TerminalUI:
             "terminal_save_hint", "('/save <pfad> zum Speichern)"
         )
         print(f"{Fore.MAGENTA}{save_hint}{Style.RESET_ALL}")
-        if self.broadcast_enabled:
-            hint = self.texts.get(
-                "terminal_broadcast_hint",
-                "('/askall <Frage>' fragt alle Personas – experimentell)",
-            )
-            print(f"{Fore.MAGENTA}{hint}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(
@@ -134,7 +128,13 @@ class TerminalUI:
             print(self.texts["terminal_start_menu_new_option"])
             print(self.texts["terminal_start_menu_load_option"])
 
-            choice = input(self.texts["terminal_start_menu_prompt"] + " ").strip().lower()
+            if self.broadcast_enabled:
+                print(self.texts["terminal_start_menu_ask_all_option"])
+                prompt = self.texts["terminal_start_menu_prompt_with_ask_all"]
+            else:
+                prompt = self.texts["terminal_start_menu_prompt"]
+
+            choice = input(prompt + " ").strip().lower()
 
             if choice in {"1", "n", "new"}:
                 self.history.clear()
@@ -149,6 +149,10 @@ class TerminalUI:
                     return True
                 continue
 
+            if self.broadcast_enabled and choice in {"3", "a", "ask", "askall", "ask-all", "ask all"}:
+                self._run_ask_all_flow()
+                continue
+            
             if choice in {"exit", "quit"}:
                 self.print_exit()
                 return False
@@ -217,6 +221,39 @@ class TerminalUI:
         success = self._t("terminal_save_success", path=save_target)
         print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
 
+    def _run_ask_all_flow(self) -> None:
+        if not self.broadcast_enabled:
+            disabled_msg = self.texts.get("terminal_broadcast_disabled")
+            print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
+            return
+
+
+        question = input(self.texts["terminal_askall_prompt"] + " ").strip()
+        print()
+        if not question:
+            hint = self.texts.get("terminal_askall_missing_question")
+            print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+            return
+
+        print(f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}")
+
+        last_persona: str | None = None
+
+        def _on_token(persona: str, token: str) -> None:
+            nonlocal last_persona
+            if persona != last_persona:
+                if last_persona is not None:
+                    print("\n")
+                print(f"{Fore.CYAN}[{persona}]{Style.RESET_ALL} ", end="", flush=True)
+                last_persona = persona
+            print(token, end="", flush=True)
+
+        broadcast_to_ensemble(self.factory, question, on_token=_on_token)
+
+        if last_persona is not None:
+            print("\n")
+        print(f"{Fore.MAGENTA}{self.texts['terminal_askall_block_end']}{Style.RESET_ALL}\n")
+
     # ---------- Main loop ----------
     def launch(self) -> None:
         self.init_ui()
@@ -241,43 +278,12 @@ class TerminalUI:
                 self._handle_save_command(save_target)
                 continue
 
-            # Broadcast to all personas
             if user_input.lower().startswith("/askall"):
-                if not self.broadcast_enabled:
-                    disabled_msg = self.texts.get(
-                        "terminal_broadcast_disabled",
-                        "Broadcast mode is disabled (experimental).",
-                    )
-                    print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
-                    continue
-
-                question = user_input[len("/askall") :].strip()
-                if not question:
-                    hint = self.texts.get(
-                        "terminal_askall_missing_question",
-                        "Bitte gib eine Frage nach '/askall' ein.",
-                    )
-                    print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
-                    continue
-
-                if not self.factory:
-                    raise RuntimeError("Broadcast mode requires an application factory.")
-
-                last_persona: str | None = None
-
-                def _on_token(persona: str, token: str) -> None:
-                    nonlocal last_persona
-                    if persona != last_persona:
-                        if last_persona is not None:
-                            print("\n")
-                        print(f"{Fore.CYAN}[{persona}]{Style.RESET_ALL} ", end="", flush=True)
-                        last_persona = persona
-                    print(token, end="", flush=True)
-
-                broadcast_to_ensemble(self.factory, question, on_token=_on_token)
-
-                if last_persona is not None:
-                    print("\n")
+                hint = self.texts.get(
+                    "terminal_askall_use_menu",
+                    "Ask-All ist nur im Startmenü verfügbar.",
+                )
+                print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
                 continue
 
             # Clear / start a new conversation
