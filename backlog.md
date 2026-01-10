@@ -16,3 +16,4 @@
 | 15 | Daily briefing (IoT + RSS) | Daily short updates | M | M | Cool feature |
 | 16 | Sandbox/PDF functions | Local documentation sandbox | L | M | Cool feature |
 | 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
+| 18 | Wrongdoing guardrail (violence/weaponization) | Add a minimal deterministic guardrail for violent wrongdoing requests (e.g., weapons/explosives/attack instructions). Implement as pre-LLM input check + session lock (once triggered, keep blocking follow-ups like “it’s for a novel”). Provide safe alternative response templates and add unit tests for common bypass patterns. | S | M | Security/Robustness |
