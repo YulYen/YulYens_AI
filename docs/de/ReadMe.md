@@ -39,7 +39,7 @@ siehe auch: [Features.md](Features.md)
 - **UI**:
   - `TerminalUI` für CLI
   - `WebUI` (Gradio) mit Persona-Auswahl & Avataren
-  - Optionaler Ask-All/Broadcast-Modus (per `ui.experimental.broadcast_mode`), nutzt `/askall <Frage>` im Terminal und die Ask-All-Kachel in der Web-UI
+  - Optionaler Ask-All/Broadcast-Modus (per `ui.experimental.broadcast_mode`) über die Ask-All-Option im Terminal-Startmenü und die Ask-All-Kachel in der Web-UI
 - **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen)
 - **Logging**:
   - Chatverläufe und Systemlogs in `logs/`

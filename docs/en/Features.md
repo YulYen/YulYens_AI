@@ -20,7 +20,7 @@ Two different user interfaces are available and can be selected via the configur
 - **Terminal UI** – A console-based chat application with color-highlighted roles (user/AI). When launched, the desired persona is picked from a menu. User input is entered directly in the console, and the AI response is streamed token by token. Simple commands like `exit` end the session and `clear` starts a fresh chat history.
 - **Web UI** – A browser-based interface (Gradio). It offers a graphical persona selection (with avatar images) and a chat window for the conversation. The AI response is displayed live as it is generated. The web UI is accessible on the local network and enables a comfortable chat experience over HTTP.
 
-An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcast_mode: true`). This sends a question to all personas in parallel—via `/askall <question>` in the terminal and through the Ask-All card in the web UI, which shows a results table with every reply side by side.
+An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcast_mode: true`). This sends a question to all personas in parallel—via the Ask-All option in the terminal start menu and through the Ask-All card in the web UI, which shows a results table with every reply side by side.
 
 Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link using credentials from `ui.web.share_auth`.
 
