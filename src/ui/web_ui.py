@@ -572,25 +572,38 @@ class WebUI:
                 for persona in persona_names
             ]
 
+        streaming_status = self._t("ask_all_streaming")
         yield (
             gr.update(value=question, interactive=False, visible=True),
-            gr.update(value="", visible=False),
+            gr.update(value=streaming_status, visible=True),
             gr.update(value=_table_rows(), visible=True),
             gr.update(visible=False, interactive=False),
             gr.update(visible=True),
         )
 
-        for persona in persona_names:
-            streamer = self.factory.get_streamer_for_persona(persona)
-            for token in streamer.stream(messages=[{"role": "user", "content": question}]):
-                replies[persona] += token
-                yield (
-                    gr.update(value=question, interactive=False, visible=True),
-                    gr.update(value="", visible=False),
-                    gr.update(value=_table_rows(), visible=True),
-                    gr.update(visible=False, interactive=False),
-                    gr.update(visible=True),
-                )
+        try:
+            for persona in persona_names:
+                streamer = self.factory.get_streamer_for_persona(persona)
+                for token in streamer.stream(messages=[{"role": "user", "content": question}]):
+                    replies[persona] += token
+                    yield (
+                        gr.update(value=question, interactive=False, visible=True),
+                        gr.update(value=streaming_status, visible=True),
+                        gr.update(value=_table_rows(), visible=True),
+                        gr.update(visible=False, interactive=False),
+                        gr.update(visible=True),
+                    )
+        except Exception as exc:
+            logging.exception("Ask-all streaming failed.")
+            error_status = self._t("ask_all_error", reason=str(exc))
+            yield (
+                gr.update(value=question, interactive=True, visible=True),
+                gr.update(value=error_status, visible=True),
+                gr.update(value=_table_rows(strip=True), visible=True),
+                gr.update(visible=True, interactive=True),
+                gr.update(visible=True),
+            )
+            return
 
         yield (
             gr.update(value=question, interactive=False, visible=True),
