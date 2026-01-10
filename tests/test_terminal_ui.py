@@ -28,14 +28,16 @@ def _create_terminal_ui() -> TerminalUI:
     )
 
 
-def test_terminal_ui_prints_broadcast_hint_when_enabled(capsys) -> None:
+def test_terminal_ui_start_menu_shows_ask_all_when_enabled(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
-    ui.greeting = "Hallo"
 
-    ui.print_welcome()
+    prompts = iter(["exit"])
+    monkeypatch.setattr("builtins.input", lambda _: next(prompts))
+
+    ui._start_dialog_flow()
 
     out = capsys.readouterr().out
-    assert "/askall" in out
+    assert ui.texts["terminal_start_menu_ask_all_option"] in out
 
 
 def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> None:
@@ -75,7 +77,7 @@ def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> 
     assert "Ältere Nachrichten wurden entfernt" in captured.out
 
 
-def test_terminal_ui_broadcast_flag_blocks_askall(monkeypatch, capsys) -> None:
+def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
     locales_dir = Path(__file__).resolve().parents[1] / "locales"
     catalog = Texts(language="de", locales_dir=locales_dir)
     dummy_config = SimpleNamespace(
@@ -95,22 +97,47 @@ def test_terminal_ui_broadcast_flag_blocks_askall(monkeypatch, capsys) -> None:
         proxy_base="",
         wiki_timeout=0,
     )
-    ui.bot = "LEAH"
-    ui.streamer = SimpleNamespace(persona_options={})
-    ui.greeting = "Hallo"
+    prompts = iter(["3", "exit"])
+    monkeypatch.setattr("builtins.input", lambda _: next(prompts))
 
-    prompts = iter(["/askall Testfrage", "exit"])
+    ui._start_dialog_flow()
 
-    monkeypatch.setattr(ui, "choose_persona", lambda: None)
-    monkeypatch.setattr(ui, "print_welcome", lambda: None)
-    monkeypatch.setattr(ui, "prompt_user", lambda: next(prompts))
-    monkeypatch.setattr(ui, "print_exit", lambda: None)
-    monkeypatch.setattr("builtins.input", lambda _: "1")
+    out = capsys.readouterr().out
+    assert ui.texts["terminal_start_menu_ask_all_option"] not in out
+    assert ui.texts["terminal_invalid_selection"] in out
+
+
+def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.factory = SimpleNamespace()
+    question = "Testfrage"
+
+    monkeypatch.setattr("builtins.input", lambda _: question)
+
+    def fake_broadcast(factory, question_input, on_token):  # type: ignore[no-redef]
+        assert question_input == question
+        on_token("LEAH", "Hallo")
+        on_token("MAX", "Hi")
+
+    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", fake_broadcast)
+
+    ui._run_ask_all_flow()
+
+    out = capsys.readouterr().out
+    assert ui.texts["terminal_askall_block_start"] in out
+    assert ui.texts["terminal_askall_block_end"] in out
+    assert "[LEAH]" in out
+    assert "[MAX]" in out
+
+
+def test_terminal_ui_run_ask_all_flow_requires_question(monkeypatch, capsys) -> None:
+    ui = _create_terminal_ui()
+    monkeypatch.setattr("builtins.input", lambda _: "")
     mock_broadcast = Mock()
     monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", mock_broadcast)
 
-    ui.launch()
+    ui._run_ask_all_flow()
 
     out = capsys.readouterr().out
-    assert "deaktiviert" in out
+    assert ui.texts["terminal_askall_missing_question"] in out
     mock_broadcast.assert_not_called()
