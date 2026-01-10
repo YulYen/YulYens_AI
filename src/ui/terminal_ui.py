@@ -278,14 +278,6 @@ class TerminalUI:
                 self._handle_save_command(save_target)
                 continue
 
-            if user_input.lower().startswith("/askall"):
-                hint = self.texts.get(
-                    "terminal_askall_use_menu",
-                    "Ask-All ist nur im Startmenü verfügbar.",
-                )
-                print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
-                continue
-
             # Clear / start a new conversation
             if user_input.lower() == "clear":
                 if not self._start_dialog_flow():
