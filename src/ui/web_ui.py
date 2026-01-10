@@ -5,9 +5,8 @@ from datetime import datetime
 from functools import partial
 
 import gradio as gr
-from config.personas import get_drink, _load_system_prompts
+from config.personas import get_all_persona_names, get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
-from core.orchestrator import broadcast_to_ensemble
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from ui.conversation_io_terminal import load_conversation
 
@@ -544,31 +543,59 @@ class WebUI:
 
         if not self.broadcast_enabled:
             warning = self._t("ask_all_disabled")
-            return (
+            yield (
                 gr.update(value=question, visible=True, interactive=True),
                 gr.update(value=warning, visible=True),
                 gr.update(value=[], visible=False),
                 gr.update(visible=True, interactive=False),
                 gr.update(visible=True),
             )
+            return
 
         if not question:
             warn = self._t("empty_question")
-            return (
+            yield (
                 gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
                 gr.update(value=warn, visible=True),
                 gr.update(value=[], visible=False),
                 gr.update(visible=True, interactive=True),
                 gr.update(visible=True),
             )
+            return
 
-        results = broadcast_to_ensemble(self.factory, question)
-        table_rows = [[item["persona"], item["reply"]] for item in results]
+        persona_names = get_all_persona_names()
+        replies = {persona: "" for persona in persona_names}
 
-        return (
+        def _table_rows(strip: bool = False):
+            return [
+                [persona, replies[persona].strip() if strip else replies[persona]]
+                for persona in persona_names
+            ]
+
+        yield (
             gr.update(value=question, interactive=False, visible=True),
             gr.update(value="", visible=False),
-            gr.update(value=table_rows, visible=True),
+            gr.update(value=_table_rows(), visible=True),
+            gr.update(visible=False, interactive=False),
+            gr.update(visible=True),
+        )
+
+        for persona in persona_names:
+            streamer = self.factory.get_streamer_for_persona(persona)
+            for token in streamer.stream(messages=[{"role": "user", "content": question}]):
+                replies[persona] += token
+                yield (
+                    gr.update(value=question, interactive=False, visible=True),
+                    gr.update(value="", visible=False),
+                    gr.update(value=_table_rows(), visible=True),
+                    gr.update(visible=False, interactive=False),
+                    gr.update(visible=True),
+                )
+
+        yield (
+            gr.update(value=question, interactive=False, visible=True),
+            gr.update(value="", visible=False),
+            gr.update(value=_table_rows(strip=True), visible=True),
             gr.update(visible=False, interactive=False),
             gr.update(visible=True),
         )
