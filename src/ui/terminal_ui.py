@@ -125,33 +125,25 @@ class TerminalUI:
     def _start_dialog_flow(self) -> bool:
         while True:
             print(self.texts["terminal_start_menu_title"])
+            print(self.texts["terminal_start_menu_new_option"])
+            print(self.texts["terminal_start_menu_load_option"])
+
             if self.broadcast_enabled:
-                print(self.texts["terminal_start_menu_new_option"])
-                print(self.texts["terminal_start_menu_load_option"])
                 print(self.texts["terminal_start_menu_ask_all_option"])
                 prompt = self.texts["terminal_start_menu_prompt_with_ask_all"]
             else:
-                print(self.texts["terminal_start_menu_new_option"])
-                print(self.texts["terminal_start_menu_load_option"])
                 prompt = self.texts["terminal_start_menu_prompt"]
 
             choice = input(prompt + " ").strip().lower()
 
-            if choice in {"1", "n", "new"} and not self.broadcast_enabled:
+            if choice in {"1", "n", "new"}:
                 self.history.clear()
                 self.choose_persona()
                 self._reset_meta()
                 self.print_welcome()
                 return True
 
-            if self.broadcast_enabled and choice in {"1", "n", "new"}:
-                self.history.clear()
-                self.choose_persona()
-                self._reset_meta()
-                self.print_welcome()
-                return True
-
-            if choice in {"2", "l", "load"} and not self.broadcast_enabled:
+            if choice in {"2", "l", "load"}:
                 if self._load_conversation_from_prompt():
                     self.print_welcome()
                     return True
@@ -160,13 +152,7 @@ class TerminalUI:
             if self.broadcast_enabled and choice in {"3", "a", "ask", "askall", "ask-all", "ask all"}:
                 self._run_ask_all_flow()
                 continue
-
-            if self.broadcast_enabled and choice in {"2", "l", "load"}:
-                if self._load_conversation_from_prompt():
-                    self.print_welcome()
-                    return True
-                continue
-
+            
             if choice in {"exit", "quit"}:
                 self.print_exit()
                 return False
@@ -237,23 +223,15 @@ class TerminalUI:
 
     def _run_ask_all_flow(self) -> None:
         if not self.broadcast_enabled:
-            disabled_msg = self.texts.get(
-                "terminal_broadcast_disabled",
-                "Broadcast mode is disabled (experimental).",
-            )
+            disabled_msg = self.texts.get("terminal_broadcast_disabled")
             print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
             return
 
-        if not self.factory:
-            raise RuntimeError("Broadcast mode requires an application factory.")
 
         question = input(self.texts["terminal_askall_prompt"] + " ").strip()
         print()
         if not question:
-            hint = self.texts.get(
-                "terminal_askall_missing_question",
-                "Bitte gib eine Frage ein.",
-            )
+            hint = self.texts.get("terminal_askall_missing_question")
             print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
             return
 
