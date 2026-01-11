@@ -538,15 +538,16 @@ class WebUI:
             gr.update(value="", visible=False),
         )
 
-    def _on_submit_ask_all(self, question):
+    def _on_submit_ask_all(self, question, current_rows):
         question = (question or "").strip()
+        existing_rows = list(current_rows or [])
 
         if not self.broadcast_enabled:
             warning = self._t("ask_all_disabled")
             return (
                 gr.update(value=question, visible=True, interactive=True),
                 gr.update(value=warning, visible=True),
-                gr.update(value=[], visible=False),
+                gr.update(value=existing_rows, visible=bool(existing_rows)),
                 gr.update(visible=True, interactive=False),
                 gr.update(visible=True),
             )
@@ -556,7 +557,7 @@ class WebUI:
             return (
                 gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
                 gr.update(value=warn, visible=True),
-                gr.update(value=[], visible=False),
+                gr.update(value=existing_rows, visible=bool(existing_rows)),
                 gr.update(visible=True, interactive=True),
                 gr.update(visible=True),
             )
@@ -814,7 +815,7 @@ class WebUI:
 
         ask_all_submit.click(
             fn=self._on_submit_ask_all,
-            inputs=[ask_all_question],
+            inputs=[ask_all_question, ask_all_results],
             outputs=[
                 ask_all_question,
                 ask_all_status,
@@ -827,7 +828,7 @@ class WebUI:
 
         ask_all_question.submit(
             fn=self._on_submit_ask_all,
-            inputs=[ask_all_question],
+            inputs=[ask_all_question, ask_all_results],
             outputs=[
                 ask_all_question,
                 ask_all_status,
