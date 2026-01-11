@@ -543,23 +543,25 @@ class WebUI:
 
         if not self.broadcast_enabled:
             warning = self._t("ask_all_disabled")
-            return (
+            yield (
                 gr.update(value=question, visible=True, interactive=True),
                 gr.update(value=warning, visible=True),
                 gr.update(value=[], visible=False),
                 gr.update(visible=True, interactive=False),
                 gr.update(visible=True),
             )
+            return
 
         if not question:
             warn = self._t("empty_question")
-            return (
+            yield (
                 gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
                 gr.update(value=warn, visible=True),
                 gr.update(value=[], visible=False),
                 gr.update(visible=True, interactive=True),
                 gr.update(visible=True),
             )
+            return
 
         table_rows: list[list[str]] = []
         yield (
