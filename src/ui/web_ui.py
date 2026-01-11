@@ -5,9 +5,8 @@ from datetime import datetime
 from functools import partial
 
 import gradio as gr
-from config.personas import get_drink, _load_system_prompts
+from config.personas import get_all_persona_names, get_drink, _load_system_prompts
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
-from core.orchestrator import broadcast_to_ensemble
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from ui.conversation_io_terminal import load_conversation
 
@@ -562,16 +561,28 @@ class WebUI:
                 gr.update(visible=True),
             )
 
-        results = broadcast_to_ensemble(self.factory, question)
-        table_rows = [[item["persona"], item["reply"]] for item in results]
-
-        return (
+        table_rows: list[list[str]] = []
+        yield (
             gr.update(value=question, interactive=False, visible=True),
             gr.update(value="", visible=False),
             gr.update(value=table_rows, visible=True),
             gr.update(visible=False, interactive=False),
             gr.update(visible=True),
         )
+
+        for persona in get_all_persona_names():
+            streamer = self.factory.get_streamer_for_persona(persona)
+            reply_parts: list[str] = []
+            for token in streamer.stream(messages=[{"role": "user", "content": question}]):
+                reply_parts.append(token)
+            table_rows.append([persona, "".join(reply_parts).strip()])
+            yield (
+                gr.update(value=question, interactive=False, visible=True),
+                gr.update(value="", visible=False),
+                gr.update(value=table_rows, visible=True),
+                gr.update(visible=False, interactive=False),
+                gr.update(visible=True),
+            )
 
     def _load_failure_updates(self, message):
         base = list(self._reset_ui_updates())
