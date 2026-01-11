@@ -538,28 +538,31 @@ class WebUI:
             gr.update(value="", visible=False),
         )
 
-    def _on_submit_ask_all(self, question):
+    def _on_submit_ask_all(self, question, current_rows=None):
         question = (question or "").strip()
+        existing_rows = self._normalize_ask_all_rows(current_rows)
 
         if not self.broadcast_enabled:
             warning = self._t("ask_all_disabled")
-            return (
+            yield (
                 gr.update(value=question, visible=True, interactive=True),
                 gr.update(value=warning, visible=True),
-                gr.update(value=[], visible=False),
+                gr.update(value=existing_rows, visible=bool(existing_rows)),
                 gr.update(visible=True, interactive=False),
                 gr.update(visible=True),
             )
+            return
 
         if not question:
             warn = self._t("empty_question")
-            return (
+            yield (
                 gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
                 gr.update(value=warn, visible=True),
-                gr.update(value=[], visible=False),
+                gr.update(value=existing_rows, visible=bool(existing_rows)),
                 gr.update(visible=True, interactive=True),
                 gr.update(visible=True),
             )
+            return
 
         table_rows: list[list[str]] = []
         yield (
@@ -583,6 +586,19 @@ class WebUI:
                 gr.update(visible=False, interactive=False),
                 gr.update(visible=True),
             )
+
+    @staticmethod
+    def _normalize_ask_all_rows(current_rows):
+        if current_rows is None:
+            return []
+        if isinstance(current_rows, list):
+            return current_rows
+        if hasattr(current_rows, "values"):
+            try:
+                return current_rows.values.tolist()
+            except Exception:
+                return list(current_rows)
+        return list(current_rows)
 
     def _load_failure_updates(self, message):
         base = list(self._reset_ui_updates())
@@ -814,7 +830,7 @@ class WebUI:
 
         ask_all_submit.click(
             fn=self._on_submit_ask_all,
-            inputs=[ask_all_question],
+            inputs=[ask_all_question, ask_all_results],
             outputs=[
                 ask_all_question,
                 ask_all_status,
@@ -827,7 +843,7 @@ class WebUI:
 
         ask_all_question.submit(
             fn=self._on_submit_ask_all,
-            inputs=[ask_all_question],
+            inputs=[ask_all_question, ask_all_results],
             outputs=[
                 ask_all_question,
                 ask_all_status,
