@@ -381,12 +381,12 @@ def lookup_wiki_snippet(
 ) -> tuple[list[str], list[tuple[str, str]]]:
     """
     Helper function: fetches up to ``max_snippets`` Wikipedia snippets via a local proxy.
-    Returns UI hints and (topic, snippet) pairs for context injection.
+    Returns UI hints (only when snippets are found) and (topic, snippet) pairs for
+    context injection.
     """
     wiki_hints: list[str] = []
     contexts: list[tuple[str, str]] = []
     cfg = _get_config()
-    texts = cfg.texts
     proxy_base = "http://localhost:" + str(proxy_port)
 
     if not keyword_finder or max_snippets <= 0:
@@ -421,9 +421,13 @@ def lookup_wiki_snippet(
                 if snippet:
                     contexts.append((topic_title, snippet))
             elif proxy_response.status_code == 404:
-                wiki_hints.append(cfg.t("wiki_hint_not_found", topic=topic))
+                logging.info("[WIKI] No entry found for topic '%s'", topic)
             else:
-                wiki_hints.append(cfg.t("wiki_hint_unreachable", topic=topic))
+                logging.warning(
+                    "[WIKI] Unexpected status %s for topic '%s'",
+                    proxy_response.status_code,
+                    topic,
+                )
         except requests.exceptions.RequestException as err:
             logging.error(
                 "[WIKI EXC] Network error while retrieving '%s': %s",
@@ -431,10 +435,8 @@ def lookup_wiki_snippet(
                 err,
                 exc_info=True,
             )
-            wiki_hints.append(texts["wiki_hint_proxy_error"])
         except Exception:  # pragma: no cover - unexpected errors
             logging.exception("[WIKI EXC] Unexpected error for topic='%s'", topic)
-            wiki_hints.append(texts["wiki_hint_unknown_error"])
     return (wiki_hints, contexts)
 
 
