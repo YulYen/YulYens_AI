@@ -140,7 +140,7 @@ wiki:
   spacy_model_variant: "large"  # Alternativen: "medium" oder direkter Modellname
   proxy_port: 8042
   snippet_limit: 1600           # Maximale Länge eines einzelnen Snippets in Zeichen
-  max_wiki_snippets: 2          # Wieviele verschiedene Snippets maximal in den Prompt injiziert werden dürfen
+  max_wiki_snippets: 2          # Wie viele verschiedene Snippets maximal in den Prompt injiziert werden dürfen
 ```
 
 #### LLM-Backends
