@@ -13,6 +13,7 @@ import datetime
 import hashlib
 import json
 import logging
+from urllib.parse import quote
 import os
 import time
 import traceback
@@ -405,7 +406,11 @@ def lookup_wiki_snippet(
             continue
 
         online_flag = "1" if wiki_mode == "online" else "0"
-        url = f"{proxy_base.rstrip('/')}/{topic}?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
+        encoded_topic = quote(topic, safe="")
+        url = (
+            f"{proxy_base.rstrip('/')}/{encoded_topic}"
+            f"?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
+        )
         try:
             proxy_response = requests.get(url, timeout=timeout)
 

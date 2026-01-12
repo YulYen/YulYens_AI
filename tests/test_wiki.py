@@ -83,6 +83,31 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
     assert "kaputt" in caplog.text
 
 
+def test_lookup_wiki_snippet_url_encodes_topic(monkeypatch):
+    captured = {}
+    topic = "C++"
+
+    def _fake_get(url, *args, **kwargs):
+        captured["url"] = url
+        return SimpleNamespace(status_code=200, json=lambda: {"text": "", "title": topic})
+
+    dummy_finder = _DummyKeywordFinder(topic)
+    monkeypatch.setattr("core.streaming_provider.requests.get", _fake_get)
+
+    lookup_wiki_snippet(
+        question="Was ist C++?",
+        persona_name="TEST",
+        keyword_finder=dummy_finder,
+        wiki_mode="offline",
+        proxy_port=9999,
+        limit=42,
+        timeout=(1.0, 1.0),
+        max_snippets=1,
+    )
+
+    assert "/C%2B%2B" in captured["url"]
+
+
 def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     """A config reset with a language change is reflected in the wiki hints."""
 
@@ -186,4 +211,3 @@ def test_lookup_wiki_snippet_for_germany():
 
     # The capital Berlin should appear in the snippet (case-insensitive)
     assert "berlin" in snippet.lower()
-
