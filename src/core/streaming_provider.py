@@ -24,7 +24,7 @@ from config.config_singleton import Config
 from security.tinyguard import BasicGuard, zeigefinger_message
 
 from core.context_utils import approx_token_count
-from core.utils import clean_token, ensure_dir_exists
+from core.utils import ensure_dir_exists
 
 # Import the LLM interface
 from .llm_core import LLMCore
@@ -226,11 +226,8 @@ class YulYenStreamingProvider:
                         first_token_time = time.time()
                     token = chunk.get("message", {}).get("content", "")
                     if token:
-                        cleaned = clean_token(token)
-                        if not cleaned:
-                            continue
-                        buffer += cleaned
-                        full_reply_parts.append(cleaned)
+                        buffer += token
+                        full_reply_parts.append(token)
 
                         to_send = buffer
                         if self.guard:

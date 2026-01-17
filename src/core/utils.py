@@ -36,17 +36,3 @@ def _greeting_text(cfg, bot) -> str:
 def ensure_dir_exists(path: str | Path) -> None:
     """Create a directory if it does not already exist."""
     Path(path).mkdir(parents=True, exist_ok=True)
-
-
-_UNWANTED_TOKENS = {"assistant", "assistent:", "antwort:"}
-
-
-def clean_token(token: str) -> str:
-    # Remove dummy tags
-    token = re.sub(r"<dummy\d+>", "", token)
-
-    # Filter out standalone irrelevant tokens
-    if token.strip().lower() in _UNWANTED_TOKENS:
-        return ""
-
-    return token
