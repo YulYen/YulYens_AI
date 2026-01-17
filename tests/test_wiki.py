@@ -48,9 +48,7 @@ def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
     )
 
     assert contexts == []
-    assert len(wiki_hints) == 1
-    assert "Wikipedia-Proxy nicht erreichbar" in wiki_hints[0]
-    assert "Bitte prüfe die Verbindung" in wiki_hints[0]
+    assert wiki_hints == []
     assert "[WIKI EXC]" in caplog.text
 
 
@@ -77,8 +75,7 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
     )
 
     assert contexts == []
-    assert len(wiki_hints) == 1
-    assert "Unbekannter Fehler" in wiki_hints[0]
+    assert wiki_hints == []
     assert "[WIKI EXC]" in caplog.text
     assert "kaputt" in caplog.text
 
@@ -131,7 +128,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     )
 
     assert german_contexts == []
-    assert "Wikipedia-Proxy nicht erreichbar" in german_hints[0]
+    assert german_hints == []
 
     Config.reset_instance()
 
@@ -158,8 +155,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     )
 
     assert english_contexts == []
-    assert "Wikipedia proxy unreachable" in english_hints[0]
-    assert "Please check your connection" in english_hints[0]
+    assert english_hints == []
 
     Config.reset_instance()
 
