@@ -214,42 +214,6 @@ class WebUI:
             (txt, cb, state) for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
 
-    def _build_ui(
-        self,
-        project_title,
-        choose_persona_txt,
-        persona_info,
-        persona_btn_suffix,
-        input_placeholder,
-        new_chat_label,
-        broadcast_table_persona_label,
-        broadcast_table_answer_label,
-        send_button_label,
-        ask_all_button_label,
-        ask_all_title,
-        ask_all_input_placeholder,
-        load_label,
-        save_button_label,
-    ):
-        return build_ui(
-            persona_thumbnail_path_fn=self._persona_thumbnail_path,
-            persona_info=persona_info,
-            broadcast_enabled=self.broadcast_enabled,
-            project_title=project_title,
-            choose_persona_txt=choose_persona_txt,
-            persona_btn_suffix=persona_btn_suffix,
-            input_placeholder=input_placeholder,
-            new_chat_label=new_chat_label,
-            broadcast_table_persona_label=broadcast_table_persona_label,
-            broadcast_table_answer_label=broadcast_table_answer_label,
-            send_button_label=send_button_label,
-            ask_all_button_label=ask_all_button_label,
-            ask_all_title=ask_all_title,
-            ask_all_input_placeholder=ask_all_input_placeholder,
-            load_label=load_label,
-            save_button_label=save_button_label,
-        )
-
     def _persona_selected_updates(
         self,
         persona_key,
@@ -744,21 +708,23 @@ class WebUI:
 
         persona_info = {p["name"].lower(): p for p in _load_system_prompts()}
 
-        demo, components = self._build_ui(
-            project_title,
-            choose_persona_txt,
-            persona_info,
-            persona_btn_suffix,
-            input_placeholder,
-            new_chat_label,
-            ui.get("broadcast_table_persona_header", "Persona"),
-            ui.get("broadcast_table_answer_header", "Answer"),
-            send_button_label,
-            ask_all_button_label,
-            ask_all_title,
-            ask_all_input_placeholder,
-            load_label,
-            save_button_label,
+        demo, components =  build_ui(
+            persona_thumbnail_path_fn=self._persona_thumbnail_path,
+            persona_info=persona_info,
+            broadcast_enabled=self.broadcast_enabled,
+            project_title=project_title,
+            choose_persona_txt=choose_persona_txt,
+            persona_btn_suffix=persona_btn_suffix,
+            input_placeholder=input_placeholder,
+            new_chat_label=new_chat_label,
+            broadcast_table_persona_label=ui.get("broadcast_table_persona_header", "Persona"),
+            broadcast_table_answer_label= ui.get("broadcast_table_answer_header", "Answer"),
+            send_button_label=send_button_label,
+            ask_all_button_label=ask_all_button_label,
+            ask_all_title=ask_all_title,
+            ask_all_input_placeholder=ask_all_input_placeholder,
+            load_label=load_label,
+            save_button_label=save_button_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
