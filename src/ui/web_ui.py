@@ -324,13 +324,6 @@ class WebUI:
 
             greeting_md = gr.Markdown("", visible=False)
             chatbot = gr.Chatbot(label="", visible=False)
-            txt = gr.Textbox(
-                show_label=False,
-                placeholder=input_placeholder,
-                visible=False,
-                interactive=False,
-            )
-            clear = gr.Button(new_chat_label, visible=False)
             with gr.Row():
                 download_btn = gr.Button(
                     save_button_label,
