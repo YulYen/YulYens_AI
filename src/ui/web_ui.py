@@ -333,7 +333,7 @@ class WebUI:
                 download_file = gr.File(visible=False)
             save_status = gr.Markdown("", visible=False)
             with gr.Row(elem_classes="chat-input-row"):
-                txt = gr.Textbox(
+                input_box = gr.Textbox(
                     show_label=False,
                     placeholder=input_placeholder,
                     visible=False,
@@ -345,7 +345,7 @@ class WebUI:
                     visible=False,
                     interactive=False,
                 )
-            clear = gr.Button(new_chat_label, visible=False, elem_classes="new-chat-btn")
+            new_chat_btn = gr.Button(new_chat_label, visible=False, elem_classes="new-chat-btn")
 
             with gr.Group(visible=False) as ask_all_group:
                 gr.Markdown(f"## {ask_all_title}")
@@ -395,9 +395,9 @@ class WebUI:
             "focus_md": focus_md,
             "greeting_md": greeting_md,
             "chatbot": chatbot,
-            "txt": txt,
+            "input_box": input_box,
             "send_btn": send_btn,
-            "clear": clear,
+            "new_chat_btn": new_chat_btn,
             "download_btn": download_btn,
             "download_file": download_file,
             "save_status": save_status,
@@ -707,9 +707,9 @@ class WebUI:
         focus_md = components["focus_md"]
         greeting_md = components["greeting_md"]
         chatbot = components["chatbot"]
-        txt = components["txt"]
+        input_box = components["input_box"]
         send_btn = components["send_btn"]
-        clear = components["clear"]
+        new_chat_btn = components["new_chat_btn"]
         download_btn = components["download_btn"]
         download_file = components["download_file"]
         save_status = components["save_status"]
@@ -734,9 +734,9 @@ class WebUI:
             focus_md,
             greeting_md,
             chatbot,
-            txt,
+            input_box,
             send_btn,
-            clear,
+            new_chat_btn,
             download_btn,
             download_file,
             save_status,
@@ -777,17 +777,17 @@ class WebUI:
             queue=False,
         )
 
-        txt.submit(
+        input_box.submit(
             fn=self.respond_streaming,
-            inputs=[txt, chatbot, history_state],
-            outputs=[txt, chatbot, history_state],
+            inputs=[input_box, chatbot, history_state],
+            outputs=[input_box, chatbot, history_state],
             queue=True,
         )
 
         send_btn.click(
             fn=self.respond_streaming,
-            inputs=[txt, chatbot, history_state],
-            outputs=[txt, chatbot, history_state],
+            inputs=[input_box, chatbot, history_state],
+            outputs=[input_box, chatbot, history_state],
             queue=True,
         )
 
@@ -798,7 +798,7 @@ class WebUI:
             queue=False,
         )
 
-        clear.click(
+        new_chat_btn.click(
             fn=self._on_reset_to_start,
             inputs=[],
             outputs=persona_outputs,
