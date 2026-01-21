@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from colorama import Fore, Style
 
@@ -43,10 +44,31 @@ def _prompt_initial(texts: dict) -> str:
 def _stream_reply(streamer, history: list[dict[str, str]], label: str) -> str:
     print(f"{Fore.CYAN}[{label}]{Style.RESET_ALL} ", end="", flush=True)
     reply = ""
+    chunk_count = 0
+    t_start = time.time()
+    first_token_time: float | None = None
     for token in streamer.stream(messages=history):
+        if first_token_time is None:
+            first_token_time = time.time()
         reply += token
+        chunk_count += 1
         print(token, end="", flush=True)
     print()
+    t_end = time.time()
+    if first_token_time is None:
+        t_first_ms = None
+    else:
+        t_first_ms = int((first_token_time - t_start) * 1000)
+    logging.info(
+        "Self talk stream done for %s: chunks=%d chars=%d t_first_ms=%s t_total_ms=%d",
+        label,
+        chunk_count,
+        len(reply),
+        t_first_ms,
+        int((t_end - t_start) * 1000),
+    )
+    if chunk_count == 0:
+        logging.warning("Self talk stream for %s produced no output chunks.", label)
     return reply
 
 
@@ -64,19 +86,40 @@ def run(factory, config) -> None:
     history_b: list[dict[str, str]] = []
 
     logging.info("Starting self talk between %s and %s", persona_a, persona_b)
+    logging.info("Initial prompt length: %d", len(initial_prompt))
 
     try:
         turn_a = True
+        turn_index = 1
         while True:
             if turn_a:
+                logging.info(
+                    "Self talk turn %d (A): persona=%s history_a=%d history_b=%d",
+                    turn_index,
+                    persona_a,
+                    len(history_a),
+                    len(history_b),
+                )
                 reply = _stream_reply(streamer_a, history_a, persona_a)
                 history_a.append({"role": "assistant", "content": reply})
                 history_b.append({"role": "user", "content": reply})
             else:
+                logging.info(
+                    "Self talk turn %d (B): persona=%s history_a=%d history_b=%d",
+                    turn_index,
+                    persona_b,
+                    len(history_a),
+                    len(history_b),
+                )
                 reply = _stream_reply(streamer_b, history_b, persona_b)
                 history_b.append({"role": "assistant", "content": reply})
                 history_a.append({"role": "user", "content": reply})
+            logging.info("Self talk turn %d complete (reply length: %d)", turn_index, len(reply))
+            if not reply.strip():
+                logging.warning("Self talk turn %d returned an empty reply.", turn_index)
             turn_a = not turn_a
+            turn_index += 1
     except KeyboardInterrupt:
+        logging.info("Self talk stopped by user.")
         print()
         print(texts.get("terminal_self_talk_exit", "Stopping self talk."))
