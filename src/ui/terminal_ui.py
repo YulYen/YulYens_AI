@@ -16,6 +16,7 @@ from core.streaming_provider import (
 )
 from core.utils import _greeting_text
 from ui.conversation_io_terminal import load_conversation, save_conversation
+from ui import self_talk
 
 
 class TerminalUI:
@@ -127,12 +128,13 @@ class TerminalUI:
             print(self.texts["terminal_start_menu_title"])
             print(self.texts["terminal_start_menu_new_option"])
             print(self.texts["terminal_start_menu_load_option"])
+            print(self.texts["terminal_start_menu_self_talk_option"])
 
             if self.broadcast_enabled:
                 print(self.texts["terminal_start_menu_ask_all_option"])
-                prompt = self.texts["terminal_start_menu_prompt_with_ask_all"]
+                prompt = self.texts["terminal_start_menu_prompt_with_self_talk_and_ask_all"]
             else:
-                prompt = self.texts["terminal_start_menu_prompt"]
+                prompt = self.texts["terminal_start_menu_prompt_with_self_talk"]
 
             choice = input(prompt + " ").strip().lower()
 
@@ -149,7 +151,11 @@ class TerminalUI:
                     return True
                 continue
 
-            if self.broadcast_enabled and choice in {"3", "a", "ask", "askall", "ask-all", "ask all"}:
+            if choice in {"3", "s", "self", "self-talk", "self talk"}:
+                self_talk.run(self.factory, self.config)
+                continue
+
+            if self.broadcast_enabled and choice in {"4", "a", "ask", "askall", "ask-all", "ask all"}:
                 self._run_ask_all_flow()
                 continue
             
