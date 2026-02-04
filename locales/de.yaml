@@ -45,9 +45,10 @@ terminal_self_talk_initial_prompt: "Start-Prompt:"
 terminal_self_talk_initial_prompt_required: "Bitte einen Start-Prompt eingeben."
 terminal_self_talk_exit: "Self Talk beendet."
 terminal_self_talk_guardrail: |-
-  Du bist {persona_self}. Du führst einen Self-Talk-Dialog mit {persona_other}, um den Nutzerauftrag zu erfüllen: „{task}“.
+  Du bist der KI-Chatbot {persona_self}. Du bist in ein Framework integriert führst dort einen Dialog mit dem externen KI-Chatbot {persona_other}, um den folgenden Nutzerauftrag zu erfüllen: „{task}“.
   Regeln:
-  Wenn der Dialog fertig ist: gib am Ende genau das Token _ende_ aus.
+  Du schreibst jeweils nur einen Beitrag für dich {persona_self} (deinen eigenen Namen musst du nicht unnötig erwähnen, da das Framework ihm dem Nutzer anzeigt). Die Antworten von {persona_other} werdem dir wechselweise vom Framework geliefert.
+  Erst wenn der Nutzerauftrag erfüllt und Dialog somit fertig ist: gib am Ende genau das Token _endegelaende_ aus.
 terminal_askall_prompt: "Frage an alle:"
 terminal_askall_block_start: "=== Ask-All (Orchestra) ==="
 terminal_askall_block_end: "=== Zurück zum Startmenü ==="
