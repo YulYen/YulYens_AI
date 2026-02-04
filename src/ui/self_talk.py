@@ -142,8 +142,11 @@ def run(factory, config) -> None:
             logging.info("Self talk turn %d complete (reply length: %d)", turn_index, len(reply))
             if not reply.strip():
                 logging.warning("Self talk turn %d returned an empty reply.", turn_index)
-            if reply.strip().endswith("_ende_"):
-                logging.info("Self talk ended with _ende_ token at turn %d.", turn_index)
+            stripped_reply = reply.strip()
+            if stripped_reply.endswith("_endegelaende_") or stripped_reply.endswith("_ende_"):
+                logging.info(
+                    "Self talk ended with end token at turn %d (reply suffix).", turn_index
+                )
                 break
             turn_a = not turn_a
             turn_index += 1
