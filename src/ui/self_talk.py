@@ -72,6 +72,17 @@ def _stream_reply(streamer, history: list[dict[str, str]], label: str) -> str:
     return reply
 
 
+def _build_self_talk_guardrail(
+    texts: dict, persona_self: str, persona_other: str, task: str
+) -> str:
+    return texts.format(
+        "terminal_self_talk_guardrail",
+        persona_self=persona_self,
+        persona_other=persona_other,
+        task=task,
+    )
+
+
 def run(factory, config) -> None:
     texts = config.texts
     print(texts["terminal_self_talk_title"])
@@ -82,8 +93,22 @@ def run(factory, config) -> None:
     streamer_a = factory.get_streamer_for_persona(persona_a)
     streamer_b = factory.get_streamer_for_persona(persona_b)
 
-    history_a: list[dict[str, str]] = [{"role": "user", "content": initial_prompt}]
-    history_b: list[dict[str, str]] = []
+    history_a: list[dict[str, str]] = [
+        {
+            "role": "user",
+            "content": _build_self_talk_guardrail(
+                texts, persona_a, persona_b, initial_prompt
+            ),
+        }
+    ]
+    history_b: list[dict[str, str]] = [
+        {
+            "role": "user",
+            "content": _build_self_talk_guardrail(
+                texts, persona_b, persona_a, initial_prompt
+            ),
+        }
+    ]
 
     logging.info("Starting self talk between %s and %s", persona_a, persona_b)
     logging.info("Initial prompt length: %d", len(initial_prompt))
@@ -117,6 +142,9 @@ def run(factory, config) -> None:
             logging.info("Self talk turn %d complete (reply length: %d)", turn_index, len(reply))
             if not reply.strip():
                 logging.warning("Self talk turn %d returned an empty reply.", turn_index)
+            if reply.strip().endswith("_ende_"):
+                logging.info("Self talk ended with _ende_ token at turn %d.", turn_index)
+                break
             turn_a = not turn_a
             turn_index += 1
     except KeyboardInterrupt:

@@ -44,6 +44,10 @@ terminal_self_talk_persona_b_prompt: "Persona B Nummer:"
 terminal_self_talk_initial_prompt: "Start-Prompt:"
 terminal_self_talk_initial_prompt_required: "Bitte einen Start-Prompt eingeben."
 terminal_self_talk_exit: "Self Talk beendet."
+terminal_self_talk_guardrail: |-
+  Du bist {persona_self}. Du führst einen Self-Talk-Dialog mit {persona_other}, um den Nutzerauftrag zu erfüllen: „{task}“.
+  Regeln:
+  Wenn der Dialog fertig ist: gib am Ende genau das Token _ende_ aus.
 terminal_askall_prompt: "Frage an alle:"
 terminal_askall_block_start: "=== Ask-All (Orchestra) ==="
 terminal_askall_block_end: "=== Zurück zum Startmenü ==="
