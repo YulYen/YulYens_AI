@@ -72,12 +72,14 @@ def _stream_reply(streamer, history: list[dict[str, str]], label: str) -> str:
     return reply
 
 
-def _build_self_talk_guardrail(persona_self: str, persona_other: str, task: str) -> str:
-    return (
-        f"Du bist {persona_self}. Du führst einen Self-Talk-Dialog mit {persona_other}, "
-        f"um den Nutzerauftrag zu erfüllen: „{task}“.\n"
-        "Regeln:\n"
-        "Wenn der Dialog fertig ist: gib am Ende genau das Token _ende_ aus."
+def _build_self_talk_guardrail(
+    texts: dict, persona_self: str, persona_other: str, task: str
+) -> str:
+    return texts.format(
+        "terminal_self_talk_guardrail",
+        persona_self=persona_self,
+        persona_other=persona_other,
+        task=task,
     )
 
 
@@ -94,13 +96,17 @@ def run(factory, config) -> None:
     history_a: list[dict[str, str]] = [
         {
             "role": "user",
-            "content": _build_self_talk_guardrail(persona_a, persona_b, initial_prompt),
+            "content": _build_self_talk_guardrail(
+                texts, persona_a, persona_b, initial_prompt
+            ),
         }
     ]
     history_b: list[dict[str, str]] = [
         {
             "role": "user",
-            "content": _build_self_talk_guardrail(persona_b, persona_a, initial_prompt),
+            "content": _build_self_talk_guardrail(
+                texts, persona_b, persona_a, initial_prompt
+            ),
         }
     ]
 
