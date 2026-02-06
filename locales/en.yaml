@@ -45,9 +45,10 @@ terminal_self_talk_initial_prompt: "Initial prompt:"
 terminal_self_talk_initial_prompt_required: "Please enter an initial prompt."
 terminal_self_talk_exit: "Self talk stopped."
 terminal_self_talk_guardrail: |-
-  You are {persona_self}. You are having a self-talk dialog with {persona_other} to fulfill the user request: “{task}”.
+  You are the AI chatbot {persona_self}. You are integrated into a framework and holding a dialog with the external AI chatbot {persona_other} to fulfill the following user request: “{task}”.
   Rules:
-  When the dialog is finished: output exactly the token _ende_ at the end.
+  You only write one message for yourself {persona_self} at a time (no need to mention your own name unnecessarily, because the framework shows it to the user). The responses from {persona_other} are provided to you alternately by the framework.
+  Only once the user request is fulfilled and the dialog is therefore finished: output exactly the token _endegelaende_ at the end.
 terminal_askall_prompt: "Ask-All question"
 terminal_askall_block_start: "=== Ask-All (Orchestra) ==="
 terminal_askall_block_end: "=== Back to start menu ==="
