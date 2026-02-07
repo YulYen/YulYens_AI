@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from src.tts.piper_tts import VOICES, synthesize
+if __package__:
+    from .piper_tts import VOICES, synthesize
+else:
+    from piper_tts import VOICES, synthesize
 
 
 if __name__ == "__main__":
