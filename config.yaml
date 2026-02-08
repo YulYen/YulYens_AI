@@ -31,6 +31,15 @@ tts:
   enabled: true
   features:
     terminal_auto_create_wav: true  # creates a wav-file in "out" directory for every AI-Answer
+  voices:
+    default:
+      de: "de_DE-thorsten-high"
+      en: "en_US-amy-medium"
+    personas_de:
+      DORIS: "de_DE-kerstin-low"
+      POPCORN: "de_DE-pavoque-low"
+      LEAH: "de_DE-kerstin-low"
+      PETER: "de_DE-thorsten-high"
 
 # --- Wiki settings (including spaCy-Keyword-Finder) -------------------------------------------------------------
 wiki:
