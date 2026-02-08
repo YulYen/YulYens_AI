@@ -25,6 +25,13 @@ ui:
       username: ""
       password: ""
 
+
+# --- Text-to-Speech settings (piper is the only provider) ---------------------------------------------------------------
+tts:
+  enabled: true
+  features:
+    terminal_auto_create_wav: true  # creates a wav-file in "out" directory for every AI-Answer
+
 # --- Wiki settings (including spaCy-Keyword-Finder) -------------------------------------------------------------
 wiki:
   # offline uses Kiwix, online calls Wikipedia, false disables wiki snippets
