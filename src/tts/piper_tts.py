@@ -4,14 +4,15 @@ import wave
 from piper.voice import PiperVoice
 
 
-VOICES = {
-    "DORIS": "de_DE-kerstin-low.onnx",
-    "POPCORN": "de_DE-pavoque-low.onnx",
-    "LEAH": "de_DE-kerstin-low.onnx",
-    "PETER": "de_DE-thorsten-high.onnx",
-}
+def _resolve_model_name(persona: str, language: str, tts_cfg: dict) -> str:
+    voices_cfg = tts_cfg["voices"]
 
-DEFAULT_VOICE = "de_DE-thorsten-high.onnx"
+    if language == "de" and persona.upper() in voices_cfg["personas_de"]:
+        model_name = voices_cfg["personas_de"][persona.upper()]
+    else:
+        model_name = voices_cfg["default"][language]
+
+    return model_name if model_name.endswith(".onnx") else f"{model_name}.onnx"
 
 
 def synthesize(
@@ -19,8 +20,11 @@ def synthesize(
     persona: str,
     voices_dir: Path,
     out_wav: Path,
+    *,
+    tts_cfg: dict,
+    language: str = "de",
 ) -> None:
-    model_name = VOICES.get(persona, DEFAULT_VOICE)
+    model_name = _resolve_model_name(persona=persona, language=language, tts_cfg=tts_cfg)
     model_path = voices_dir / model_name
 
     if not model_path.exists():

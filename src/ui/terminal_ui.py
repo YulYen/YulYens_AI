@@ -53,9 +53,9 @@ class TerminalUI:
         self.texts = config.texts
         self._t = config.t
         self.broadcast_enabled = self._is_broadcast_enabled(config)
-        tts_cfg = getattr(config, "tts", {}) or {}
-        self.tts_auto_wav_enabled = bool(tts_cfg.get("enabled")) and bool(
-            tts_cfg.get("features", {}).get("terminal_auto_create_wav")
+        self.tts_cfg = getattr(config, "tts", {}) or {}
+        self.tts_auto_wav_enabled = bool(self.tts_cfg.get("enabled")) and bool(
+            self.tts_cfg.get("features", {}).get("terminal_auto_create_wav")
         )
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
@@ -350,7 +350,14 @@ class TerminalUI:
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             persona = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in self.bot)
             out_wav = Path("out") / f"{timestamp}_{persona}.wav"
-            synthesize(reply, self.bot, voices_dir=Path("voices"), out_wav=out_wav)
+            synthesize(
+                reply,
+                self.bot,
+                voices_dir=Path("voices"),
+                out_wav=out_wav,
+                tts_cfg=self.tts_cfg,
+                language=getattr(self.config, "language", "de"),
+            )
             logging.info("[Terminal] TTS wav created: %s", out_wav)
         except Exception as exc:
             logging.warning("[Terminal] Could not create TTS wav file: %s", exc)
