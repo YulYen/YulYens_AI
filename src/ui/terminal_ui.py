@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink, _load_system_prompts
@@ -52,6 +53,9 @@ class TerminalUI:
         self.texts = config.texts
         self._t = config.t
         self.broadcast_enabled = self._is_broadcast_enabled(config)
+        self.tts_auto_wav_enabled = bool(config.tts.get("enabled")) and bool(
+            config.tts.get("features", {}).get("terminal_auto_create_wav")
+        )
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: list[dict[str, str]] = []
@@ -328,11 +332,27 @@ class TerminalUI:
             logging.info(f"[Terminal] {self.bot}: {reply}")
 
             self.history.append({"role": "assistant", "content": reply})
+            self._maybe_create_tts_wav(reply)
             # Always ensure two trailing blank lines after the answer:
             # (If streaming already emitted \n, add only the missing ones.)
             trailing_nl = len(reply) - len(reply.rstrip("\n"))
             for _ in range(max(0, 2 - trailing_nl)):
                 print()
+
+    def _maybe_create_tts_wav(self, reply: str) -> None:
+        if not self.tts_auto_wav_enabled or not reply.strip() or not self.bot:
+            return
+
+        try:
+            from tts.piper_tts import synthesize
+
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            persona = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in self.bot)
+            out_wav = Path("out") / f"{timestamp}_{persona}.wav"
+            synthesize(reply, self.bot, voices_dir=Path("voices"), out_wav=out_wav)
+            logging.info("[Terminal] TTS wav created: %s", out_wav)
+        except Exception as exc:
+            logging.warning("[Terminal] Could not create TTS wav file: %s", exc)
 
     def _ensure_context_headroom(self) -> None:
         """Trims the history when the context limit is nearly reached."""
