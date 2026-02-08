@@ -5,11 +5,21 @@ from piper.voice import PiperVoice
 
 
 VOICES = {
-    "kerstin": "de_DE-kerstin-low.onnx",
-    "karlsson": "de_DE-karlsson-low.onnx",
-    "pavoque": "de_DE-pavoque-low.onnx",
-    "thorsten": "de_DE-thorsten-high.onnx",
+    "DORIS": "de_DE-kerstin-low.onnx",
+    "POPCORN": "de_DE-pavoque-low.onnx",
+    "LEAH": "de_DE-mls-medium.onnx",
+    "PETER": "de_DE-thorsten-high.onnx",
 }
+
+SPEAKER = {
+    "DORIS": 0,
+    "POPCORN": 0,
+    "LEAH": 103,
+    "PETER": 0,
+}
+
+DEFAULT_VOICE ="de_DE-thorsten-high.onnx"
+
 
 
 def synthesize(text: str, voice_key: str, voices_dir: Path, out_wav: Path) -> None:
