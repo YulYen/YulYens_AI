@@ -53,8 +53,9 @@ class TerminalUI:
         self.texts = config.texts
         self._t = config.t
         self.broadcast_enabled = self._is_broadcast_enabled(config)
-        self.tts_auto_wav_enabled = bool(config.tts.get("enabled")) and bool(
-            config.tts.get("features", {}).get("terminal_auto_create_wav")
+        tts_cfg = getattr(config, "tts", {}) or {}
+        self.tts_auto_wav_enabled = bool(tts_cfg.get("enabled")) and bool(
+            tts_cfg.get("features", {}).get("terminal_auto_create_wav")
         )
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
