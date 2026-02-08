@@ -7,7 +7,7 @@ else:
 
 
 if __name__ == "__main__":
-    text = "Dies ist ein Test für die TTS-Funktion in Deutsch. Wir sind Peter, Leah, Popcorn und Doris."
+    text = "Dies ist ein Test für die TTS-Funktion in Deutsch. Regenbögen und Einhörner sind Wörter. Wir sind Peter, Leah, Popcorn und Doris. Liebe Grüße an Julia K."
     voices_dir = Path("voices")
     out_dir = Path("out")
 
