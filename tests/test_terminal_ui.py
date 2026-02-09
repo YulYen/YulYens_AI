@@ -1,6 +1,7 @@
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
+import sys
 
 from config.texts import Texts
 from ui.terminal_ui import TerminalUI
@@ -97,7 +98,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
         proxy_base="",
         wiki_timeout=0,
     )
-    prompts = iter(["3", "exit"])
+    prompts = iter(["4", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(prompts))
 
     ui._start_dialog_flow()
@@ -141,3 +142,61 @@ def test_terminal_ui_run_ask_all_flow_requires_question(monkeypatch, capsys) -> 
     out = capsys.readouterr().out
     assert ui.texts["terminal_askall_missing_question"] in out
     mock_broadcast.assert_not_called()
+
+
+def test_terminal_ui_tts_uses_explicit_persona(monkeypatch) -> None:
+    ui = _create_terminal_ui()
+    ui.tts_auto_wav_enabled = True
+    ui.bot = None
+    ui.config = SimpleNamespace(language="de")
+    ui.tts_cfg = {"enabled": True, "features": {"terminal_auto_create_wav": True}, "voices": {}}
+
+    calls: dict[str, object] = {}
+
+    fake_piper = ModuleType("tts.piper_tts")
+    fake_audio = ModuleType("tts.audio_player")
+
+    def fake_create_wav(text, persona, voices_dir, out_wav, tts_cfg, language):
+        calls["create"] = {
+            "text": text,
+            "persona": persona,
+            "voices_dir": str(voices_dir),
+            "out_wav": str(out_wav),
+            "language": language,
+        }
+
+    def fake_play_wav(path, block):
+        calls["play"] = {"path": str(path), "block": block}
+
+    fake_piper.create_wav = fake_create_wav
+    fake_audio.play_wav = fake_play_wav
+    monkeypatch.setitem(sys.modules, "tts.piper_tts", fake_piper)
+    monkeypatch.setitem(sys.modules, "tts.audio_player", fake_audio)
+
+    ui._maybe_create_tts_wav("Hallo Selftalk", block=True, persona_name="LEAH")
+
+    assert calls["create"]["persona"] == "LEAH"
+    assert calls["create"]["language"] == "de"
+    assert calls["play"]["block"] is True
+
+
+def test_terminal_ui_tts_skips_without_persona(monkeypatch) -> None:
+    ui = _create_terminal_ui()
+    ui.tts_auto_wav_enabled = True
+    ui.bot = None
+
+    create_mock = Mock()
+    play_mock = Mock()
+
+    fake_piper = ModuleType("tts.piper_tts")
+    fake_audio = ModuleType("tts.audio_player")
+    fake_piper.create_wav = create_mock
+    fake_audio.play_wav = play_mock
+
+    monkeypatch.setitem(sys.modules, "tts.piper_tts", fake_piper)
+    monkeypatch.setitem(sys.modules, "tts.audio_player", fake_audio)
+
+    ui._maybe_create_tts_wav("Hallo ohne Persona")
+
+    create_mock.assert_not_called()
+    play_mock.assert_not_called()

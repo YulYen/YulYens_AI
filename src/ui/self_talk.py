@@ -126,6 +126,7 @@ def run(factory, config, terminal_ui) -> None:
                     len(history_b),
                 )
                 reply = _stream_reply(streamer_a, history_a, persona_a)
+                terminal_ui._maybe_create_tts_wav(reply, True, persona_name=persona_a)
                 history_a.append({"role": "assistant", "content": reply})
                 history_b.append({"role": "user", "content": reply})
             else:
@@ -137,7 +138,7 @@ def run(factory, config, terminal_ui) -> None:
                     len(history_b),
                 )
                 reply = _stream_reply(streamer_b, history_b, persona_b)
-                terminal_ui._maybe_create_tts_wav(reply, True)
+                terminal_ui._maybe_create_tts_wav(reply, True, persona_name=persona_b)
                 history_b.append({"role": "assistant", "content": reply})
                 history_a.append({"role": "user", "content": reply})
             logging.info("Self talk turn %d complete (reply length: %d)", turn_index, len(reply))

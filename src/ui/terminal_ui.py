@@ -340,8 +340,15 @@ class TerminalUI:
             for _ in range(max(0, 2 - trailing_nl)):
                 print()
 
-    def _maybe_create_tts_wav(self, reply: str,  block: bool = False) -> None:
-        if not self.tts_auto_wav_enabled or not reply.strip() or not self.bot:
+    def _maybe_create_tts_wav(
+        self,
+        reply: str,
+        block: bool = False,
+        persona_name: str | None = None,
+    ) -> None:
+        persona_for_tts = persona_name or self.bot
+
+        if not self.tts_auto_wav_enabled or not reply.strip() or not persona_for_tts:
             return
 
         try:
@@ -349,11 +356,14 @@ class TerminalUI:
             from tts.audio_player import play_wav
 
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            persona = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in self.bot)
+            persona = "".join(
+                ch if ch.isalnum() or ch in ("-", "_") else "_"
+                for ch in persona_for_tts
+            )
             out_wav = Path("out") / f"{timestamp}_{persona}.wav"
             create_wav(
                 reply,
-                self.bot,
+                persona_for_tts,
                 voices_dir=Path("voices"),
                 out_wav=out_wav,
                 tts_cfg=self.tts_cfg,
