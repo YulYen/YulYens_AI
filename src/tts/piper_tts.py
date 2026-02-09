@@ -16,7 +16,7 @@ def _resolve_model_name(persona: str, language: str, tts_cfg: dict) -> str:
     return model_name if model_name.endswith(".onnx") else f"{model_name}.onnx"
 
 
-def synthesize(
+def create_wav(
     text: str,
     persona: str,
     voices_dir: Path,

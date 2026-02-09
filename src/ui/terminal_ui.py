@@ -157,7 +157,7 @@ class TerminalUI:
                 continue
 
             if choice in {"3", "s", "self", "self-talk", "self talk"}:
-                self_talk.run(self.factory, self.config)
+                self_talk.run(self.factory, self.config, self)
                 continue
 
             if self.broadcast_enabled and choice in {"4", "a", "ask", "askall", "ask-all", "ask all"}:
@@ -340,17 +340,18 @@ class TerminalUI:
             for _ in range(max(0, 2 - trailing_nl)):
                 print()
 
-    def _maybe_create_tts_wav(self, reply: str) -> None:
+    def _maybe_create_tts_wav(self, reply: str,  block: bool = False) -> None:
         if not self.tts_auto_wav_enabled or not reply.strip() or not self.bot:
             return
 
         try:
-            from tts.piper_tts import synthesize
+            from tts.piper_tts import create_wav
+            from tts.audio_player import play_wav
 
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             persona = "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in self.bot)
             out_wav = Path("out") / f"{timestamp}_{persona}.wav"
-            synthesize(
+            create_wav(
                 reply,
                 self.bot,
                 voices_dir=Path("voices"),
@@ -359,8 +360,9 @@ class TerminalUI:
                 language=getattr(self.config, "language", "de"),
             )
             logging.info("[Terminal] TTS wav created: %s", out_wav)
+            play_wav(out_wav, block)
         except Exception as exc:
-            logging.warning("[Terminal] Could not create TTS wav file: %s", exc)
+            logging.warning("[Terminal] Could not create or play TTS wav file: %s", exc)
 
     def _ensure_context_headroom(self) -> None:
         """Trims the history when the context limit is nearly reached."""

@@ -83,7 +83,7 @@ def _build_self_talk_guardrail(
     )
 
 
-def run(factory, config) -> None:
+def run(factory, config, terminal_ui) -> None:
     texts = config.texts
     print(texts["terminal_self_talk_title"])
     persona_a = _choose_persona(texts, texts["terminal_self_talk_persona_a_prompt"])
@@ -137,6 +137,7 @@ def run(factory, config) -> None:
                     len(history_b),
                 )
                 reply = _stream_reply(streamer_b, history_b, persona_b)
+                terminal_ui._maybe_create_tts_wav(reply, True)
                 history_b.append({"role": "assistant", "content": reply})
                 history_a.append({"role": "user", "content": reply})
             logging.info("Self talk turn %d complete (reply length: %d)", turn_index, len(reply))
