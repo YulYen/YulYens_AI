@@ -178,4 +178,4 @@ def run(factory, config, terminal_ui) -> None:
     except KeyboardInterrupt:
         logging.info("Self talk stopped by user.")
         print()
-        print(texts.get("terminal_self_talk_exit", "Stopping self talk."))
+        print(texts.get("terminal_self_talk_exit", "Stopping AI Dialog."))

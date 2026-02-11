@@ -871,13 +871,13 @@ class WebUI:
             "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
         )
         load_label = ui.get("web_load_label", "Gespräch laden (JSON)")
-        self_talk_button_label = ui.get("self_talk_button_label", "Self-Talk")
-        self_talk_title = ui.get("self_talk_title", "Self-Talk")
+        self_talk_button_label = ui.get("self_talk_button_label", "AI Dialog")
+        self_talk_title = ui.get("self_talk_title", "AI Dialog")
         self_talk_description = ui.get("self_talk_description", "Zwei Personas sprechen automatisch.")
         self_talk_persona_a_label = ui.get("self_talk_persona_a_label", "Persona A")
         self_talk_persona_b_label = ui.get("self_talk_persona_b_label", "Persona B")
         self_talk_prompt_label = ui.get("self_talk_prompt_label", "Start-Prompt")
-        self_talk_start_label = ui.get("self_talk_start_label", "Self-Talk starten")
+        self_talk_start_label = ui.get("self_talk_start_label", "AI Dialog starten")
         self_talk_prompt_placeholder = ui.get("self_talk_prompt_placeholder", "Gib den Start-Prompt ein …")
         save_button_label = ui.get(
             "web_save_button", "Gespräch herunterladen (JSON)"
