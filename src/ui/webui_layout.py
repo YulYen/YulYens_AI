@@ -17,6 +17,14 @@ def build_ui(
     ask_all_button_label,
     ask_all_title,
     ask_all_input_placeholder,
+    self_talk_button_label,
+    self_talk_title,
+    self_talk_description,
+    self_talk_persona_a_label,
+    self_talk_persona_b_label,
+    self_talk_prompt_label,
+    self_talk_start_label,
+    self_talk_prompt_placeholder,
     load_label,
     save_button_label,
 ):
@@ -75,6 +83,16 @@ def build_ui(
                                 variant="secondary",
                             )
                             persona_buttons.append((key, btn))
+                with gr.Column(scale=1, min_width=220):
+                    with gr.Group(elem_classes="persona-card"):
+                        gr.Markdown(
+                            f"<div class='name'>{self_talk_title}</div>"
+                            f"<div class='desc'>{self_talk_description}</div>"
+                        )
+                        self_talk_card_btn = gr.Button(
+                            self_talk_button_label, variant="secondary"
+                        )
+
                 if broadcast_enabled:
                     with gr.Column(scale=1, min_width=220):
                         with gr.Group(elem_classes="persona-card"):
@@ -136,6 +154,28 @@ def build_ui(
                 interactive=False,
             )
         new_chat_btn = gr.Button(new_chat_label, visible=False, elem_classes="new-chat-btn")
+
+
+        with gr.Group(visible=False) as self_talk_group:
+            gr.Markdown(f"## {self_talk_title}")
+            self_talk_status = gr.Markdown("", visible=False)
+            with gr.Row():
+                self_talk_persona_a = gr.Dropdown(
+                    choices=[p["name"] for p in persona_info.values()],
+                    label=self_talk_persona_a_label,
+                    interactive=True,
+                )
+                self_talk_persona_b = gr.Dropdown(
+                    choices=[p["name"] for p in persona_info.values()],
+                    label=self_talk_persona_b_label,
+                    interactive=True,
+                )
+            self_talk_prompt = gr.Textbox(
+                label=self_talk_prompt_label,
+                placeholder=self_talk_prompt_placeholder,
+                interactive=True,
+            )
+            self_talk_start_btn = gr.Button(self_talk_start_label, variant="primary")
 
         with gr.Group(visible=False) as ask_all_group:
             gr.Markdown(f"## {ask_all_title}")
@@ -202,6 +242,13 @@ def build_ui(
         "ask_all_new_chat": ask_all_new_chat,
         "ask_all_status": ask_all_status,
         "ask_all_card_btn": ask_all_card_btn,
+        "self_talk_card_btn": self_talk_card_btn,
+        "self_talk_group": self_talk_group,
+        "self_talk_status": self_talk_status,
+        "self_talk_persona_a": self_talk_persona_a,
+        "self_talk_persona_b": self_talk_persona_b,
+        "self_talk_prompt": self_talk_prompt,
+        "self_talk_start_btn": self_talk_start_btn,
         "load_input": load_input,
         "load_status": load_status,
     }

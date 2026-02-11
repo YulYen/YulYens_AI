@@ -9,6 +9,7 @@ from config.personas import get_all_persona_names, get_drink, _load_system_promp
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from ui.conversation_io_terminal import load_conversation
+from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
 
 
@@ -49,6 +50,8 @@ class WebUI:
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         self.broadcast_enabled = self._is_broadcast_enabled()
         self.ask_all_placeholder = ""
+        self.self_talk_runner = None
+        self.self_talk_prompt_placeholder = ""
         if self._t is None:
             self._t = lambda key, **kwargs: key
 
@@ -252,6 +255,12 @@ class WebUI:
             gr.update(visible=False),
             gr.update(value="", visible=False),
             gr.update(value="", visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=None, interactive=True),
+            gr.update(value=None, interactive=True),
+            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(visible=False, interactive=True),
         )
 
     def _reset_ui_updates(self):
@@ -278,6 +287,12 @@ class WebUI:
             gr.update(visible=False),
             gr.update(value="", visible=False),
             gr.update(value="", visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=None, interactive=True),
+            gr.update(value=None, interactive=True),
+            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(visible=False, interactive=True),
         )
 
     def _on_persona_selected(
@@ -326,7 +341,113 @@ class WebUI:
             gr.update(visible=True),
             gr.update(value="", visible=False),
             gr.update(value="", visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=None, interactive=True),
+            gr.update(value=None, interactive=True),
+            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(visible=False, interactive=True),
         )
+
+    def _on_show_self_talk(self):
+        self.bot = None
+        self.streamer = None
+        self.self_talk_runner = None
+        base = list(self._reset_ui_updates())
+        base[15] = gr.update(visible=False)  # ask_all_group
+        base[22] = gr.update(value="", visible=False)  # load_status
+        base[23] = gr.update(visible=True)  # self_talk_group
+        base[24] = gr.update(value="", visible=False)  # self_talk_status
+        base[25] = gr.update(value=None, interactive=True)  # persona_a
+        base[26] = gr.update(value=None, interactive=True)  # persona_b
+        base[27] = gr.update(value="", visible=True, interactive=True, placeholder=self.self_talk_prompt_placeholder)
+        base[28] = gr.update(visible=True, interactive=True)
+        return tuple(base)
+
+    def _on_start_self_talk(self, persona_a, persona_b, start_prompt):
+        persona_a = (persona_a or "").strip()
+        persona_b = (persona_b or "").strip()
+        start_prompt = (start_prompt or "").strip()
+
+        if not persona_a or not persona_b:
+            msg = self._t("self_talk_persona_required")
+            return (
+                gr.update(value=msg, visible=True),
+                gr.update(value=[], visible=False),
+                [],
+                gr.update(value="", visible=False, interactive=False),
+                gr.update(visible=False, interactive=False),
+                gr.update(visible=False),
+                gr.update(value=None),
+                gr.update(value="", visible=False),
+            )
+
+        if persona_a == persona_b:
+            msg = self._t("self_talk_persona_distinct_required")
+            return (
+                gr.update(value=msg, visible=True),
+                gr.update(value=[], visible=False),
+                [],
+                gr.update(value="", visible=False, interactive=False),
+                gr.update(visible=False, interactive=False),
+                gr.update(visible=False),
+                gr.update(value=None),
+                gr.update(value="", visible=False),
+            )
+
+        if not start_prompt:
+            msg = self._t("terminal_self_talk_initial_prompt_required")
+            return (
+                gr.update(value=msg, visible=True),
+                gr.update(value=[], visible=False),
+                [],
+                gr.update(value="", visible=False, interactive=False),
+                gr.update(visible=False, interactive=False),
+                gr.update(visible=False),
+                gr.update(value=None),
+                gr.update(value="", visible=False),
+            )
+
+        self.self_talk_runner = SelfTalkRunner(
+            self.factory,
+            self.texts,
+            persona_a,
+            persona_b,
+            start_prompt,
+        )
+        title = self._t("self_talk_chat_label", persona_a=persona_a, persona_b=persona_b)
+        chat_history = [(start_prompt, None)]
+        history_state = [{"role": "user", "content": start_prompt}]
+        meta = self._build_meta(f"self-talk:{persona_a},{persona_b}")
+        return (
+            gr.update(value="", visible=False),
+            gr.update(value=chat_history, label=title, visible=True),
+            history_state,
+            gr.update(value="", visible=False, interactive=False),
+            gr.update(visible=False, interactive=False),
+            gr.update(visible=True),
+            meta,
+            gr.update(value="", visible=False),
+        )
+
+    def _run_self_talk_stream(self, chat_history, history_state):
+        if self.self_talk_runner is None:
+            return
+
+        chat_history = list(chat_history or [])
+        history_state = list(history_state or [])
+        while True:
+            persona_name, reply, should_stop, _ = self.self_talk_runner.run_turn()
+            shown_reply = f"{persona_name}: {reply}"
+            progressive = ""
+            for token in shown_reply:
+                progressive += token
+                yield chat_history + [(None, progressive)], history_state
+            chat_history.append((None, shown_reply))
+            history_state.append({"role": "assistant", "content": shown_reply})
+            yield chat_history, history_state
+            if should_stop:
+                break
 
     def _on_submit_ask_all(self, question, current_rows=None):
         question = (question or "").strip()
@@ -392,7 +513,7 @@ class WebUI:
 
     def _load_failure_updates(self, message):
         base = list(self._reset_ui_updates())
-        base[-1] = gr.update(value=message, visible=True)
+        base[22] = gr.update(value=message, visible=True)
         return tuple(base)
 
     def _conversation_loaded_updates(
@@ -432,6 +553,12 @@ class WebUI:
             gr.update(visible=False),
             gr.update(value="", visible=False),
             gr.update(value=greeting, visible=True),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            gr.update(value=None, interactive=True),
+            gr.update(value=None, interactive=True),
+            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(visible=False, interactive=True),
         )
 
     def _on_load_conversation(self, upload_path, persona_info, input_placeholder):
@@ -520,6 +647,13 @@ class WebUI:
         ask_all_new_chat = components["ask_all_new_chat"]
         ask_all_status = components["ask_all_status"]
         ask_all_card_btn = components["ask_all_card_btn"]
+        self_talk_card_btn = components["self_talk_card_btn"]
+        self_talk_group = components["self_talk_group"]
+        self_talk_status = components["self_talk_status"]
+        self_talk_persona_a = components["self_talk_persona_a"]
+        self_talk_persona_b = components["self_talk_persona_b"]
+        self_talk_prompt = components["self_talk_prompt"]
+        self_talk_start_btn = components["self_talk_start_btn"]
         load_input = components["load_input"]
         load_status = components["load_status"]
 
@@ -546,6 +680,12 @@ class WebUI:
             ask_all_new_chat,
             ask_all_status,
             load_status,
+            self_talk_group,
+            self_talk_status,
+            self_talk_persona_a,
+            self_talk_persona_b,
+            self_talk_prompt,
+            self_talk_start_btn,
         ]
 
         for key, btn in components["persona_buttons"]:
@@ -617,6 +757,36 @@ class WebUI:
                 outputs=persona_outputs,
                 queue=False,
             )
+
+
+        if self_talk_card_btn is not None:
+            self_talk_card_btn.click(
+                fn=self._on_show_self_talk,
+                inputs=[],
+                outputs=persona_outputs,
+                queue=False,
+            )
+
+        self_talk_start_btn.click(
+            fn=self._on_start_self_talk,
+            inputs=[self_talk_persona_a, self_talk_persona_b, self_talk_prompt],
+            outputs=[
+                self_talk_status,
+                chatbot,
+                history_state,
+                input_box,
+                send_btn,
+                new_chat_btn,
+                meta_state,
+                load_status,
+            ],
+            queue=False,
+        ).then(
+            fn=self._run_self_talk_stream,
+            inputs=[chatbot, history_state],
+            outputs=[chatbot, history_state],
+            queue=True,
+        )
 
         ask_all_submit.click(
             fn=self._on_submit_ask_all,
@@ -700,11 +870,20 @@ class WebUI:
             "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
         )
         load_label = ui.get("web_load_label", "Gespräch laden (JSON)")
+        self_talk_button_label = ui.get("self_talk_button_label", "Self-Talk")
+        self_talk_title = ui.get("self_talk_title", "Self-Talk")
+        self_talk_description = ui.get("self_talk_description", "Zwei Personas sprechen automatisch.")
+        self_talk_persona_a_label = ui.get("self_talk_persona_a_label", "Persona A")
+        self_talk_persona_b_label = ui.get("self_talk_persona_b_label", "Persona B")
+        self_talk_prompt_label = ui.get("self_talk_prompt_label", "Start-Prompt")
+        self_talk_start_label = ui.get("self_talk_start_label", "Self-Talk starten")
+        self_talk_prompt_placeholder = ui.get("self_talk_prompt_placeholder", "Gib den Start-Prompt ein …")
         save_button_label = ui.get(
             "web_save_button", "Gespräch herunterladen (JSON)"
         )
 
         self.ask_all_placeholder = ask_all_input_placeholder
+        self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
 
         persona_info = {p["name"].lower(): p for p in _load_system_prompts()}
 
@@ -723,6 +902,14 @@ class WebUI:
             ask_all_button_label=ask_all_button_label,
             ask_all_title=ask_all_title,
             ask_all_input_placeholder=ask_all_input_placeholder,
+            self_talk_button_label=self_talk_button_label,
+            self_talk_title=self_talk_title,
+            self_talk_description=self_talk_description,
+            self_talk_persona_a_label=self_talk_persona_a_label,
+            self_talk_persona_b_label=self_talk_persona_b_label,
+            self_talk_prompt_label=self_talk_prompt_label,
+            self_talk_start_label=self_talk_start_label,
+            self_talk_prompt_placeholder=self_talk_prompt_placeholder,
             load_label=load_label,
             save_button_label=save_button_label,
         )

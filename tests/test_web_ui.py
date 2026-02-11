@@ -203,3 +203,32 @@ def test_respond_streaming_appends_final_history_entries():
         {"role": "user", "content": "Hallo"},
         {"role": "assistant", "content": "Hallo"},
     ]
+
+
+def test_on_start_self_talk_validates_distinct_personas():
+    web_ui = _create_web_ui()
+
+    updates = web_ui._on_start_self_talk("Karl", "Karl", "Los geht's")
+
+    assert updates[0]["visible"] is True
+
+
+def test_run_self_talk_stream_yields_alternating_messages():
+    web_ui = _create_web_ui()
+
+    runner = Mock()
+    runner.run_turn.side_effect = [
+        ("Karl", "Hallo", False, 1),
+        ("Yul", "Hi", True, 2),
+    ]
+    web_ui.self_talk_runner = runner
+
+    outputs = list(web_ui._run_self_talk_stream([], []))
+
+    assert outputs
+    final_chat, final_state = outputs[-1]
+    assert final_chat[-2:] == [(None, "Karl: Hallo"), (None, "Yul: Hi")]
+    assert final_state[-2:] == [
+        {"role": "assistant", "content": "Karl: Hallo"},
+        {"role": "assistant", "content": "Yul: Hi"},
+    ]
