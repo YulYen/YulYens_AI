@@ -34,6 +34,6 @@ tts:
 
 ## Runtime behavior
 
-- In Terminal UI, WAV files are generated automatically when TTS is enabled.
-- Output files are written to `out/<timestamp>_<persona>.wav`.
-- The file is played automatically right after generation.
+- In Terminal UI, automatic WAV generation/playback is currently supported on Windows only.
+- On Windows, output files are written to `out/<timestamp>_<persona>.wav`.
+- On Linux/macOS, `tts.audio_player` import fails (`winsound` missing), so this auto-create/autoplay path is skipped.

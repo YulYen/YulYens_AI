@@ -115,7 +115,7 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Scha
 - `language`: steuert UI-Texte und Persona-Prompts (`"de"` oder `"en"`).
 - `ui.type`: wählt die Oberfläche (`"terminal"`, `"web"` oder `null` für nur API).
 - `tts.enabled`: schaltet Text-to-Speech ein/aus.
-- `tts.features.terminal_auto_create_wav`: erzeugt pro Antwort eine WAV-Datei (Ordner `out/`).
+- `tts.features.terminal_auto_create_wav`: versucht im Terminal-Modus pro Antwort eine WAV-Datei zu erzeugen (derzeit nur unter Windows, wegen `winsound`-Abhängigkeit in `tts.audio_player`).
 
 Beispiel:
 
