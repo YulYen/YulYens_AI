@@ -24,6 +24,28 @@ An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcas
 
 Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link using credentials from `ui.web.share_auth`.
 
+## AI dialog (self-talk)
+
+The project includes an **AI dialog mode** in which two personas talk to each other automatically to solve a given task:
+
+- **Terminal UI:** Select “Self Talk” in the start menu, then choose Persona A, Persona B, and an initial prompt.
+- **Web UI:** A dedicated self-talk tile starts the same flow directly in the browser.
+- **Flow:** Both personas answer in turns; each generated reply is forwarded as the next input for the other persona.
+- **Automatic end:** The dialog stops once one persona emits the defined end token (`_endegelaende_`).
+
+This mode is useful for brainstorming between two character styles or exploring multiple perspectives on the same question.
+
+## Text-to-speech (TTS)
+
+For terminal interaction, integrated **Piper-based text-to-speech output** is available:
+
+- Enable it via `tts.enabled: true`.
+- Create one WAV file per answer via `tts.features.terminal_auto_create_wav: true`.
+- Configure voices in `config.yaml` via `tts.voices` (language defaults plus optional persona-specific voices).
+- Generated files are stored in `out/` and played automatically.
+
+This allows replies to be consumed not only as text but also immediately as audio.
+
 ## One-shot API
 
 Alongside the UI, the system can be accessed through a REST API (e.g., for integrations or testing). A FastAPI server exposes an **`/ask` endpoint** that accepts individual questions via HTTP POST. The request accepts JSON (with fields for the **question** and desired **persona**) and returns the AI reply as JSON. A simple **`/health` endpoint** is also available for health checks. This API makes it possible to embed the AI functionality into external applications or use it for automation.
@@ -60,6 +82,6 @@ The architecture of *Yul Yen’s AI Orchestra* is designed to enable future enha
 
 - **Modular architecture:** The system encapsulates LLM access behind clearly defined interfaces. For example, interaction with the language model is implemented via the abstract `LLMCore` class. This makes it straightforward to swap out the backend (e.g., use a different model server instead of Ollama, or employ the dummy LLM for tests) without touching the rest of the application. New personas can also be added easily by extending the configuration.
 - **LoRA fine-tuning (PoC):** Early experiments for model refinement exist as a proof of concept but are not included in the standard repository for size reasons. Internally, a small **LoRA fine-tuning** example (based on [PEFT/QLoRA](https://github.com/huggingface/peft)) demonstrates how a compact adapter for the persona Doris was trained with about 200 question–answer pairs. The training scripts and test runs are for demonstration only and are not integrated into production. Interested parties can reach out to the maintainers for details or access to the materials.
-- **Future features:** The project already has a roadmap of upcoming ideas. Planned additions include tool integrations (*tool use* such as web search or calculators), speech input/output (speech-to-text, text-to-speech), and improved handling of long conversations via *retrieval-augmented generation* (e.g., automatically summarizing earlier chat parts with a virtual assistant called "Karl"). The current codebase provides a simple, extensible foundation on which these features can be built.
+- **Future features:** The project already has a roadmap of upcoming ideas. Planned additions include tool integrations (*tool use* such as web search or calculators) and improved handling of long conversations via *retrieval-augmented generation* (e.g., automatically summarizing earlier chat parts with a virtual assistant called "Karl"). The current codebase provides a simple, extensible foundation on which these features can be built.
 
 See also: [backlog.md](../../backlog.md)

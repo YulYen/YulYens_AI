@@ -1,15 +1,17 @@
 # Yul Yen’s AI Orchestra
 
-**Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter, Popcorn) vereint.  
-Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.  
+**Yul Yen’s AI Orchestra** ist eine lokal laufende KI-Umgebung, die mehrere **Personas** (Leah, Doris, Peter, Popcorn) vereint.
+Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.com/) oder kompatible Backends) und bringen eigene Charaktere und Sprachstile mit.
 
-Das Projekt unterstützt:  
-- **Terminal-UI** mit farbiger Konsolenausgabe & Streaming  
-- **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)  
-- **API (FastAPI)** zur Integration in externe Anwendungen  
-- **Wikipedia-Integration** (online oder offline via Kiwix-Proxy)  
-- **Sicherheits-Filter** (Prompt-Injection-Schutz & PII-Erkennung)  
-- **Logging & Tests** für stabile Nutzung  
+Das Projekt unterstützt:
+- **Terminal-UI** mit farbiger Konsolenausgabe & Streaming
+- **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)
+- **AI-Dialog (Self-Talk)** zwischen zwei Personas (Terminal + Web)
+- **Text-to-Speech (TTS)** mit automatischer WAV-Erstellung im Terminal-Modus
+- **API (FastAPI)** zur Integration in externe Anwendungen
+- **Wikipedia-Integration** (online oder offline via Kiwix-Proxy)
+- **Sicherheits-Filter** (Prompt-Injection-Schutz & PII-Erkennung)
+- **Logging & Tests** für stabile Nutzung
 
 
 siehe auch: [Features.md](Features.md)
@@ -18,14 +20,14 @@ siehe auch: [Features.md](Features.md)
 
 ## Ziele
 
-- Bereitstellung einer **privaten, lokal laufenden KI** für deutschsprachige Interaktion  
-- Mehrere **Charaktere mit unterschiedlichem Stil**:  
-  - **Leah**: empathisch, freundlich  
-  - **Doris**: sarkastisch, humorvoll, frech  
-  - **Peter**: faktenorientiert, analytisch  
-  - **Popcorn**: verspielt, kindgerecht  
-- **Erweiterbares Fundament** für zukünftige Features (z. B. LoRA-Finetuning, Tool-Use, RAG)  
-- **KISS-Prinzip**: einfache, nachvollziehbare Architektur  
+- Bereitstellung einer **privaten, lokal laufenden KI** für deutschsprachige Interaktion
+- Mehrere **Charaktere mit unterschiedlichem Stil**:
+  - **Leah**: empathisch, freundlich
+  - **Doris**: sarkastisch, humorvoll, frech
+  - **Peter**: faktenorientiert, analytisch
+  - **Popcorn**: verspielt, kindgerecht
+- **Erweiterbares Fundament** für zukünftige Features (z. B. LoRA-Finetuning, Tool-Use, RAG, STT)
+- **KISS-Prinzip**: einfache, nachvollziehbare Architektur
 
 ---
 
@@ -35,7 +37,7 @@ siehe auch: [Features.md](Features.md)
 - **Core**:
   - Austauschbarer LLM-Core (`OllamaLLMCore`, `DummyLLMCore` für Tests) samt `YulYenStreamingProvider`
   - Wikipedia-Support inkl. spaCy-basiertem Keyword-Extractor
-- **Personas**: Systemprompts & Eigenheiten in `src/config/personas.py`  
+- **Personas**: Systemprompts & Eigenheiten in `src/config/personas.py`
 - **UI**:
   - `TerminalUI` für CLI
   - `WebUI` (Gradio) mit Persona-Auswahl & Avataren
@@ -43,7 +45,7 @@ siehe auch: [Features.md](Features.md)
 - **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen)
 - **Logging**:
   - Chatverläufe und Systemlogs in `logs/`
-  - Wiki-Proxy schreibt separate Logdateien  
+  - Wiki-Proxy schreibt separate Logdateien
 
 ---
 
@@ -112,6 +114,8 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Scha
 
 - `language`: steuert UI-Texte und Persona-Prompts (`"de"` oder `"en"`).
 - `ui.type`: wählt die Oberfläche (`"terminal"`, `"web"` oder `null` für nur API).
+- `tts.enabled`: schaltet Text-to-Speech ein/aus.
+- `tts.features.terminal_auto_create_wav`: erzeugt pro Antwort eine WAV-Datei (Ordner `out/`).
 
 Beispiel:
 
@@ -194,10 +198,10 @@ Optional kann zusätzlich eine alternative Konfigurationsdatei per `--config` (K
 python src/launch.py -e classic --config pfad/zur/config.yaml
 ```
 
-- **Terminal-UI**  
-  - Bei `ui.type: "terminal"` im Terminal nutzen  
-  - Eingabe: Fragen einfach eintippen  
-  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten)  
+- **Terminal-UI**
+  - Bei `ui.type: "terminal"` im Terminal nutzen
+  - Eingabe: Fragen einfach eintippen
+  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten)
 
 - **Web-UI**
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
@@ -215,23 +219,23 @@ python src/launch.py -e classic --config pfad/zur/config.yaml
     curl -X POST http://127.0.0.1:8013/ask \
          -H "Content-Type: application/json" \
          -d '{"question":"Wer hat die Relativitätstheorie entwickelt?", "persona":"LEAH"}'
-    ```  
+    ```
 
 ---
 
 ## Beispiel
 
-**Frage (Leah):**  
+**Frage (Leah):**
 > Wer ist Angela Merkel?
 
-**Antwort (gestreamt):**  
+**Antwort (gestreamt):**
 > Angela Merkel ist eine deutsche Politikerin (CDU) und war von 2005 bis 2021 Bundeskanzlerin der Bundesrepublik Deutschland. …
 
 ---
 
 ## Tests
 
-Mit [pytest](https://docs.pytest.org/) ausführen:  
+Mit [pytest](https://docs.pytest.org/) ausführen:
 ```bash
 pytest tests/
 ```
@@ -240,5 +244,5 @@ pytest tests/
 
 ## Status
 
-🚧 **Work in Progress** – stabil nutzbar, aber aktiv in Entwicklung (inkl. erster LoRA-Finetuning-Experimente).  
+🚧 **Work in Progress** – stabil nutzbar, aber aktiv in Entwicklung (inkl. erster LoRA-Finetuning-Experimente).
 Privates Projekt, **nicht für Produktivbetrieb gedacht**.

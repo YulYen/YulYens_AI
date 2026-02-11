@@ -9,6 +9,8 @@ All personas are based on a local LLM (currently via [Ollama](https://ollama.com
 The project supports:
 - **Terminal UI** with colored console output & streaming
 - **Web UI** built on [Gradio](https://gradio.app) (accessible within the local network)
+- **AI dialog (self-talk)** between two personas (terminal + web)
+- **Text-to-speech (TTS)** with automatic WAV generation in terminal mode
 - **API (FastAPI)** for integration into external applications
 - **Wikipedia integration** (online or offline via Kiwix proxy)
 - **Security filters** (prompt-injection protection & PII detection)
@@ -26,7 +28,7 @@ See also: [Features.md](Features.md)
   - **Doris**: sarcastic, humorous, cheeky
   - **Peter**: fact-oriented, analytical
   - **Popcorn**: playful, child-friendly
-- **Extensible foundation** for future features (e.g., LoRA fine-tuning, tool use, RAG)
+- **Extensible foundation** for future features (e.g., LoRA fine-tuning, tool use, RAG, STT)
 - **KISS principle**: simple, transparent architecture
 
 ---
@@ -113,6 +115,8 @@ All central settings are controlled through `config.yaml`. Important toggles:
 
 - `language`: controls UI texts and persona prompts (`"de"` or `"en"`).
 - `ui.type`: selects the interface (`"terminal"`, `"web"`, or `null` for API only).
+- `tts.enabled`: enables/disables text-to-speech.
+- `tts.features.terminal_auto_create_wav`: creates one WAV file per reply (stored in `out/`).
 
 Example:
 
