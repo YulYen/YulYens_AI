@@ -85,6 +85,12 @@ def build_ui(
                             persona_buttons.append((key, btn))
                 with gr.Column(scale=1, min_width=220):
                     with gr.Group(elem_classes="persona-card"):
+                        gr.Image(
+                            "static/ST.png",
+                            show_label=False,
+                            container=False,
+                            elem_classes="persona-img",
+                        )
                         gr.Markdown(
                             f"<div class='name'>{self_talk_title}</div>"
                             f"<div class='desc'>{self_talk_description}</div>"
