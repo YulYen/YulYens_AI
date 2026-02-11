@@ -14,7 +14,7 @@ core:
 
 # --- UI settings ---------------------------------------------------------------
 ui:
-  type: terminal   # options: "web", "terminal", or null (= API only)
+  type: web   # options: "web", "terminal", or null (= API only)
   experimental:
     broadcast_mode: true  # enable the ensemble broadcast toggle (TerminalUI, WebUI)
   web:
@@ -26,7 +26,7 @@ ui:
       password: ""
 
 
-# --- Text-to-Speech settings (piper is the only provider) ---------------------------------------------------------------
+# --- Text-to-Speech settings (piper is currently the only provider) ---------------------------------------------------------------
 tts:
   enabled: true
   features:
