@@ -54,7 +54,7 @@ def _build_self_talk_guardrail(
 
 def is_end_of_self_talk(reply: str) -> bool:
     stripped_reply = (reply or "").strip()
-    return "_endegelaende_" in stripped_reply or stripped_reply.endswith("_ende_")
+    return "endegelaende" in stripped_reply or stripped_reply.endswith("_ende_")
 
 
 class SelfTalkRunner:
