@@ -203,3 +203,60 @@ def test_respond_streaming_appends_final_history_entries():
         {"role": "user", "content": "Hallo"},
         {"role": "assistant", "content": "Hallo"},
     ]
+
+
+def test_on_start_self_talk_validates_distinct_personas():
+    web_ui = _create_web_ui()
+
+    updates = web_ui._on_start_self_talk("Karl", "Karl", "Los geht's")
+
+    assert updates[0]["visible"] is True
+
+
+def test_run_self_talk_stream_yields_alternating_messages():
+    web_ui = _create_web_ui()
+
+    runner = Mock()
+    runner.run_turn.side_effect = [
+        ("Karl", "Hallo", False, 1),
+        ("Yul", "Hi", True, 2),
+    ]
+    web_ui.self_talk_runner = runner
+
+    outputs = list(web_ui._run_self_talk_stream([], []))
+
+    assert outputs
+    final_chat, final_state = outputs[-1]
+    assert final_chat[-2:] == [(None, "Karl: Hallo"), (None, "Yul: Hi")]
+    assert final_state[-2:] == [
+        {"role": "assistant", "content": "Karl: Hallo"},
+        {"role": "assistant", "content": "Yul: Hi"},
+    ]
+
+
+def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
+    web_ui = _create_web_ui()
+
+    updates = web_ui._on_show_self_talk()
+
+    assert len(updates) == 28
+    assert updates[22]["visible"] is True
+    assert updates[27]["interactive"] is True
+
+
+def test_load_failure_updates_sets_load_status_slot():
+    web_ui = _create_web_ui()
+
+    updates = web_ui._load_failure_updates("load failed")
+
+    assert updates[21]["value"] == "load failed"
+    assert updates[21]["visible"] is True
+
+
+def test_on_start_self_talk_clears_stale_runner_on_validation_error():
+    web_ui = _create_web_ui()
+    web_ui.self_talk_runner = Mock()
+
+    web_ui._on_start_self_talk("Karl", "Karl", "Prompt")
+
+    assert web_ui.self_talk_runner is None
