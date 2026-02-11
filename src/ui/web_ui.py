@@ -355,19 +355,20 @@ class WebUI:
         self.self_talk_runner = None
         base = list(self._reset_ui_updates())
         base[15] = gr.update(visible=False)  # ask_all_group
-        base[22] = gr.update(value="", visible=False)  # load_status
-        base[23] = gr.update(visible=True)  # self_talk_group
-        base[24] = gr.update(value="", visible=False)  # self_talk_status
-        base[25] = gr.update(value=None, interactive=True)  # persona_a
-        base[26] = gr.update(value=None, interactive=True)  # persona_b
-        base[27] = gr.update(value="", visible=True, interactive=True, placeholder=self.self_talk_prompt_placeholder)
-        base[28] = gr.update(visible=True, interactive=True)
+        base[21] = gr.update(value="", visible=False)  # load_status
+        base[22] = gr.update(visible=True)  # self_talk_group
+        base[23] = gr.update(value="", visible=False)  # self_talk_status
+        base[24] = gr.update(value=None, interactive=True)  # persona_a
+        base[25] = gr.update(value=None, interactive=True)  # persona_b
+        base[26] = gr.update(value="", visible=True, interactive=True, placeholder=self.self_talk_prompt_placeholder)
+        base[27] = gr.update(visible=True, interactive=True)
         return tuple(base)
 
     def _on_start_self_talk(self, persona_a, persona_b, start_prompt):
         persona_a = (persona_a or "").strip()
         persona_b = (persona_b or "").strip()
         start_prompt = (start_prompt or "").strip()
+        self.self_talk_runner = None
 
         if not persona_a or not persona_b:
             msg = self._t("self_talk_persona_required")
@@ -513,7 +514,7 @@ class WebUI:
 
     def _load_failure_updates(self, message):
         base = list(self._reset_ui_updates())
-        base[22] = gr.update(value=message, visible=True)
+        base[21] = gr.update(value=message, visible=True)
         return tuple(base)
 
     def _conversation_loaded_updates(
