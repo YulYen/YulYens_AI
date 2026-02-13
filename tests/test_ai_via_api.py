@@ -127,6 +127,10 @@ def _contains_any(ans_norm: str, items: list[str]) -> bool:
     return any(_normalize(kw) in ans_norm for kw in items)
 
 
+def _extract_words(text: str) -> list[str]:
+    return re.findall(r"\b\w+\b", text, flags=re.UNICODE)
+
+
 # ---- API Helper ---------------------------------------------------------------
 def ask(question: str, person: str, client) -> str:
     r = client.post("/ask", json={"question": question, "persona": person})
@@ -205,3 +209,25 @@ def test_api_contract(case, client_with_date_and_wiki):
             ans,
         ]
         pytest.fail("\n".join(fail_lines))
+
+
+@pytest.mark.slow
+@pytest.mark.ollama
+def test_peter_antwortet_nur_sonne_oder_mond(client):
+    ans_raw = ask("Antworte nur mit einem Wort: Sonne oder Mond?", "PETER", client)
+    ans_norm = _normalize(ans_raw)
+    words = _extract_words(ans_norm)
+
+    assert len(words) == 1, f"Expected exactly one word, got {words!r} from: {ans_raw!r}"
+    assert words[0] in {"sonne", "mond"}, (
+        f"Expected 'Sonne' or 'Mond', got {words[0]!r} from: {ans_raw!r}"
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.ollama
+def test_peter_antwortet_in_exakt_fuenf_woertern(client):
+    ans_raw = ask("Antworte mit genau fünf Wörtern. Was hilft gegen Langeweile?", "PETER", client)
+    words = _extract_words(ans_raw)
+
+    assert len(words) == 5, f"Expected exactly five words, got {len(words)} from: {ans_raw!r}"
