@@ -13,7 +13,7 @@ personas:
       num_ctx: 8192
   - name: PETER
     llm_options:
-      temperature: 0.2
+      temperature: 0.1
       repeat_penalty: 1.15
       num_ctx: 8192
   - name: POPCORN
