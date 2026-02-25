@@ -15,6 +15,15 @@ def _create_terminal_ui() -> TerminalUI:
         t=catalog.format,
         core={"model_name": "dummy"},
         ui={"experimental": {"broadcast_mode": True}},
+        context_management={
+            "strategy": "heuristic",
+            "karl": {
+                "model": "same_as_chat",
+                "summary_max_tokens": 512,
+                "keep_last_messages": 2,
+                "log_dir": "logs",
+            },
+        },
     )
 
     return TerminalUI(
@@ -86,6 +95,15 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
         t=catalog.format,
         core={"model_name": "dummy"},
         ui={"experimental": {"broadcast_mode": False}},
+        context_management={
+            "strategy": "heuristic",
+            "karl": {
+                "model": "same_as_chat",
+                "summary_max_tokens": 512,
+                "keep_last_messages": 2,
+                "log_dir": "logs",
+            },
+        },
     )
 
     ui = TerminalUI(

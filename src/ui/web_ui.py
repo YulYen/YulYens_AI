@@ -6,6 +6,7 @@ from functools import partial
 
 import gradio as gr
 from config.personas import get_all_persona_names, get_drink, _load_system_prompts
+from core.context_summarizer import KarlSummarizationError, KarlSummarizer
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from ui.conversation_io_terminal import load_conversation
@@ -127,6 +128,26 @@ class WebUI:
         chat_history.append((None, warn))
 
         persona_options = getattr(self.streamer, "persona_options", {}) or {}
+        context_management = self._require_context_management_config()
+        strategy = context_management["strategy"]
+
+        if strategy == "heuristic":
+            self._apply_heuristic_context_trim(llm_history, persona_options)
+            return True
+
+        if strategy == "karl":
+            self._apply_karl_context_summary(
+                llm_history,
+                context_management["karl"],
+                persona_options,
+            )
+            return True
+
+        raise ValueError(
+            "context_management.strategy must be either 'heuristic' or 'karl'."
+        )
+
+    def _apply_heuristic_context_trim(self, llm_history, persona_options):
 
         num_ctx_value = persona_options.get("num_ctx")
 
@@ -150,7 +171,51 @@ class WebUI:
                 num_ctx_value,
             )
 
-        return True
+    def _apply_karl_context_summary(self, llm_history, karl_cfg, persona_options):
+        summarizer = KarlSummarizer(
+            llm_core=self.streamer._llm_core,
+            config=karl_cfg,
+            chat_model_name=self.streamer.model_name,
+        )
+        try:
+            llm_history[:] = summarizer.summarize(llm_history)
+        except KarlSummarizationError:
+            fallback = karl_cfg.get("fallback_strategy")
+            if fallback == "heuristic":
+                self._apply_heuristic_context_trim(llm_history, persona_options)
+                return
+            logging.exception("Karl summarization failed and no fallback is configured.")
+            raise
+
+    def _require_context_management_config(self):
+        context_management = getattr(self.cfg, "context_management", None)
+        if not isinstance(context_management, dict):
+            raise ValueError("Missing required 'context_management' configuration section.")
+
+        strategy = context_management.get("strategy")
+        if strategy not in {"heuristic", "karl"}:
+            raise ValueError(
+                "context_management.strategy must be either 'heuristic' or 'karl'."
+            )
+
+        if strategy == "karl":
+            karl_cfg = context_management.get("karl")
+            if not isinstance(karl_cfg, dict):
+                raise ValueError("Missing required 'context_management.karl' section.")
+            required_keys = {
+                "model",
+                "summary_max_tokens",
+                "keep_last_messages",
+                "log_dir",
+            }
+            missing = [key for key in required_keys if key not in karl_cfg]
+            if missing:
+                raise ValueError(
+                    "Missing required context_management.karl keys: "
+                    + ", ".join(sorted(missing))
+                )
+
+        return context_management
 
     # Stream the response (UI updates continuously)
     def _stream_reply(self, message_history, chat_history):

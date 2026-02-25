@@ -94,3 +94,12 @@ security:
   pii_protection: false
   output_blocklist: true
   # Input: block injections/PII. Output: mask PII, block secrets.
+
+context_management:
+  strategy: "heuristic"  # allowed values: "heuristic" or "karl"
+
+  karl:
+    model: "same_as_chat"  # or explicit Ollama model name
+    summary_max_tokens: 512
+    keep_last_messages: 2
+    log_dir: "logs"

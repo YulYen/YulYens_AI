@@ -38,7 +38,20 @@ def _create_web_ui(ui_config=None):
     if ui_config is None:
         ui_config = {"experimental": {"broadcast_mode": True}}
 
-    dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key, ui=ui_config)
+    dummy_config = SimpleNamespace(
+        texts={},
+        t=lambda key, **kwargs: key,
+        ui=ui_config,
+        context_management={
+            "strategy": "heuristic",
+            "karl": {
+                "model": "same_as_chat",
+                "summary_max_tokens": 512,
+                "keep_last_messages": 2,
+                "log_dir": "logs",
+            },
+        },
+    )
     return WebUI(
         factory=Mock(),
         config=dummy_config,
@@ -79,6 +92,54 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     mock_prepare.assert_called_once()
     assert mock_prepare.call_args[0][1] == 4096
     streamer.stream.assert_called_once()
+
+
+def test_webui_heuristic_strategy_never_instantiates_karl():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {"num_ctx": "4096"}
+    streamer.stream.return_value = iter(["Hallo"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.context_near_limit", return_value=True),
+        patch("ui.web_ui.get_drink", return_value="☕"),
+        patch("ui.web_ui.karl_prepare_quick_and_dirty", side_effect=lambda h, c: h),
+        patch("ui.web_ui.KarlSummarizer") as mock_karl,
+    ):
+        list(web_ui.respond_streaming("Hallo", [], []))
+
+    mock_karl.assert_not_called()
+
+
+def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
+    web_ui = _create_web_ui()
+    web_ui.cfg.context_management["strategy"] = "karl"
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {"num_ctx": "4096"}
+    streamer.model_name = "chat-model"
+    streamer._llm_core = Mock()
+    streamer.stream.return_value = iter(["Antwort"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.context_near_limit", return_value=True),
+        patch("ui.web_ui.get_drink", return_value="☕"),
+        patch("ui.web_ui.karl_prepare_quick_and_dirty") as mock_prepare,
+        patch("ui.web_ui.KarlSummarizer") as mock_karl,
+    ):
+        instance = mock_karl.return_value
+        instance.summarize.return_value = [{"role": "system", "content": "S"}]
+        outputs = list(web_ui.respond_streaming("Hallo", [], []))
+
+    mock_prepare.assert_not_called()
+    mock_karl.assert_called_once()
+    final_state = outputs[-1][2]
+    assert final_state[0] == {"role": "system", "content": "S"}
 
 
 def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
