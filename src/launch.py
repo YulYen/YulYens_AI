@@ -4,19 +4,20 @@
 import argparse
 import logging
 import os
+import platform
 import socket
-import sys, platform
+import sys
 import threading
 import time
 from datetime import datetime
 
 import uvicorn
 
-# Logging setup
-from config.logging_setup import init_logging
-
 # Core and configuration
 from config.config_singleton import Config
+
+# Logging setup
+from config.logging_setup import init_logging
 from core.factory import AppFactory
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
@@ -40,7 +41,9 @@ def main():
     )
     args = parser.parse_args()
     if not args.ensemble:
-        parser.error("Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'")
+        parser.error(
+            "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
+        )
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
@@ -78,7 +81,9 @@ def main():
     logfile = os.path.join(
         cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
     )
-    to_console = cfg.logging["to_console"] == "true" or (cfg.logging["to_console"] == "auto" and cfg.ui["type"] != "terminal")
+    to_console = cfg.logging["to_console"] == "true" or (
+        cfg.logging["to_console"] == "auto" and cfg.ui["type"] != "terminal"
+    )
     init_logging(
         loglevel=str(cfg.logging["level"]),
         logfile=logfile,
@@ -87,7 +92,6 @@ def main():
     logging.info(f"Using configuration file: {config_path}")
     logging.info("BOOT OK – Logging initialised and active.")
     logging.info(f"Python exe: {sys.executable}  version: {platform.python_version()}")
-
 
     # Optional: set httpx/urllib3 to WARNING for extra safety
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -111,6 +115,10 @@ def main():
     factory = AppFactory()
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
+    email_cfg = getattr(cfg, "email_adapter", {})
+    email_provider = (
+        factory.get_one_shot_provider() if _email_adapter_enabled(email_cfg) else None
+    )
 
     logging.info(
         f"ui.type={cfg.ui['type']} wiki.mode={wiki_mode} snippet_limit={cfg.wiki['snippet_limit']}"
@@ -120,6 +128,9 @@ def main():
     if api_provider:
         start_api_in_background(cfg.api, api_provider)
 
+    # 4b) Optionally start the persona e-mail adapter
+    start_email_adapter_in_background(email_cfg, email_provider)
+
     # 5) Start the UI or block if API-only
     if cfg.ui["type"] is None:
         print("[Yul Yens AI] API is running. UI is disabled (ui.type = null).")
@@ -127,6 +138,27 @@ def main():
         return
     else:
         ui.launch()  # Terminal UI or Web UI
+
+
+def _email_adapter_enabled(email_cfg) -> bool:
+    if not isinstance(email_cfg, dict):
+        return False
+    value = email_cfg.get("enabled", False)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def start_email_adapter_in_background(email_cfg, provider):
+    """Starts the optional IMAP/SMTP persona adapter in a daemon thread."""
+    from email_adapter import start_email_adapter
+
+    try:
+        return start_email_adapter(email_cfg, provider)
+    except Exception as exc:
+        logging.error("Could not start e-mail adapter: %s", exc)
+        logging.debug("E-mail adapter startup failed.", exc_info=True)
+        return None
 
 
 def start_api_in_background(api_cfg, provider):

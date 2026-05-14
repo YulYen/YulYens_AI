@@ -81,6 +81,36 @@ logging:
   dir: "logs"
   conversation_prefix: "conversation"
 
+# --- Persona e-mail adapter -----------------------------------------------------
+# Optional IMAP/SMTP bridge: routes incoming plain-text e-mails to personas via
+# the same one-shot provider used by the HTTP API. Keep secrets in environment
+# variables (env:NAME or ${NAME}); never commit real mailbox credentials.
+email_adapter:
+  enabled: false
+  poll_interval_seconds: 60
+  address_persona_map:
+    # lea@example.de: LEAH
+    # peter@example.de: PETER
+  imap:
+    host: "imap.example.de"
+    port: 993
+    ssl: true
+    username: "env:YULYEN_MAIL_IMAP_USER"
+    password: "env:YULYEN_MAIL_IMAP_PASSWORD"
+  smtp:
+    host: "smtp.example.de"
+    port: 465
+    ssl: true
+    starttls: false
+    username: "env:YULYEN_MAIL_SMTP_USER"
+    password: "env:YULYEN_MAIL_SMTP_PASSWORD"
+    from_address: "env:YULYEN_MAIL_FROM"
+  processing:
+    source_mailbox: "INBOX"
+    processed_mailbox: "INBOX/YulYenProcessed"
+    processed_flag: "YulYenProcessed"
+    search_criteria: "UNSEEN"
+
 # --- One-shot API (e.g. for tests) ----------------------------------------------
 api:
   enabled: true

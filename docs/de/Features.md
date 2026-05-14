@@ -48,6 +48,12 @@ So kann die KI-Antwort nicht nur gelesen, sondern unmittelbar auch als Audio aus
 
 Parallel zur UI kann das System auch über eine REST-API angesprochen werden (z. B. für Integrationen oder Tests). Ein FastAPI-Server stellt einen **`/ask`-Endpoint** bereit, über den per HTTP-POST einzelne Fragen gestellt werden können. Die Anfrage nimmt ein JSON entgegen (mit Feldern für die **Frage** und die gewünschte **Persona**) und liefert die KI-Antwort als JSON-Antwort zurück. Zusätzlich existiert ein einfacher **`/health`-Endpoint** für Health-Checks. Diese API ermöglicht es, die KI-Funktionalität in externe Anwendungen einzubinden oder automatisiert zu nutzen.
 
+## E-Mail-Adapter für Personas
+
+Optional kann ein schlanker **E-Mail-Adapter** aktiviert werden (`email_adapter.enabled: true`). Er ruft regelmäßig neue Nachrichten aus einem konfigurierten IMAP-Postfach ab, ordnet Empfängeradressen über `email_adapter.address_persona_map` einer Persona zu und beantwortet die Anfrage mit derselben One-Shot-Logik, die auch die HTTP-API nutzt. Die Antwort wird per SMTP an den ursprünglichen Absender zurückgesendet.
+
+Das MVP verarbeitet einfache Text-E-Mails; HTML wird pragmatisch zu Text reduziert, Attachments werden ignoriert. Um Mail-Loops und doppelte Antworten zu vermeiden, ignoriert der Adapter eigene System-/Persona-Adressen und verschiebt erfolgreich bearbeitete oder bewusst ignorierte Nachrichten standardmäßig in den konfigurierten `processed_mailbox`-Ordner. Zugangsdaten gehören nicht in den Code: In `config.yaml` sind Platzhalter wie `env:YULYEN_MAIL_IMAP_PASSWORD` vorgesehen, die zur Laufzeit aus Umgebungsvariablen gelesen werden.
+
 ## Wikipedia-Integration
 
 Um fundierte Antworten zu ermöglichen, kann das System bei Wissensfragen automatisch **Wikipedia-Wissen einbinden** (optional konfigurierbar). Dabei kommen folgende Mechanismen zum Einsatz:
