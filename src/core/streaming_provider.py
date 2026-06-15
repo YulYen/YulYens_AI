@@ -16,6 +16,7 @@ import logging
 import os
 import time
 import traceback
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import quote
 
@@ -33,6 +34,84 @@ from .llm_core import LLMCore
 def _get_config() -> Config:
     """Returns the current config singleton instance."""
     return Config()
+
+
+# Number of trailing characters held back while streaming so that a PII or
+# secret pattern split across token boundaries is still detected before any
+# part of it reaches the user. Best-effort: patterns longer than this window
+# can still leak their prefix, so keep it above the longest blocklist match.
+_STREAM_HOLDBACK_CHARS = 96
+
+
+class _StreamModerator:
+    """
+    Applies the output guard to a *growing* response instead of to isolated
+    token batches.
+
+    The guard masks PII and blocks secrets, but those patterns can straddle
+    token boundaries (e.g. ``"jo" + "hn@example" + ".com"``). Checking each
+    batch in isolation therefore lets prefixes slip through. This helper keeps
+    the full accumulated text, re-runs the guard on it, and only releases the
+    portion that lies more than ``holdback`` characters behind the streaming
+    frontier — the region a still-forming pattern can no longer reach.
+    """
+
+    def __init__(
+        self,
+        guard: BasicGuard | None,
+        guard_texts: Mapping[str, str] | None,
+        holdback: int = _STREAM_HOLDBACK_CHARS,
+    ) -> None:
+        self.guard = guard
+        self.guard_texts = guard_texts
+        self.holdback = holdback
+        self.blocked = False
+        self._acc = ""
+        self._emitted = 0
+
+    def _block_message(self, reason: str | None) -> str:
+        self.blocked = True
+        return zeigefinger_message(
+            {"reason": reason or "blocked_keyword", "detail": ""},
+            texts=self.guard_texts,
+        )
+
+    def feed(self, token: str) -> list[str]:
+        """Consume one token; return the chunks that are now safe to emit."""
+        if self.blocked or not token:
+            return []
+        self._acc += token
+
+        # No guard: nothing to moderate, stream the token straight through.
+        if self.guard is None:
+            self._emitted += len(token)
+            return [token]
+
+        pol = self.guard.process_output(self._acc)
+        if pol["blocked"]:
+            return [self._block_message(pol.get("reason"))]
+
+        masked = pol["text"]
+        safe_upto = len(masked) - self.holdback
+        if safe_upto > self._emitted:
+            chunk = masked[self._emitted : safe_upto]
+            self._emitted = safe_upto
+            return [chunk]
+        return []
+
+    def flush(self) -> list[str]:
+        """Release the held-back tail once the stream has ended."""
+        if self.blocked or self.guard is None:
+            return []
+        pol = self.guard.process_output(self._acc)
+        if pol["blocked"]:
+            return [self._block_message(pol.get("reason"))]
+        masked = pol["text"]
+        if len(masked) > self._emitted:
+            chunk = masked[self._emitted :]
+            self._emitted = len(masked)
+            return [chunk]
+        return []
 
 
 class YulYenStreamingProvider:
@@ -219,57 +298,24 @@ class YulYenStreamingProvider:
                 keep_alive=600,
             )
 
+            moderator = _StreamModerator(self.guard, guard_texts)
             try:
-                buffer = ""
                 for chunk in stream_obj:
                     logging.debug("[RAW CHUNK] %r", chunk)
                     if first_token_time is None:
                         first_token_time = time.time()
                     token = chunk.get("message", {}).get("content", "")
-                    if token:
-                        buffer += token
-                        full_reply_parts.append(token)
+                    if not token:
+                        continue
+                    full_reply_parts.append(token)
+                    for out in moderator.feed(token):
+                        yield out
+                    if moderator.blocked:
+                        break
 
-                        to_send = buffer
-                        if self.guard:
-                            pol = self.guard.process_output(to_send)
-                            if pol["blocked"]:
-                                yield zeigefinger_message(
-                                    {
-                                        "reason": pol.get("reason")
-                                        or "blocked_keyword",
-                                        "detail": "",
-                                    },
-                                    texts=guard_texts,
-                                )
-                                break
-                            to_send = pol["text"]
-
-                        # Batch heuristically — send once at least one separator appears
-                        seps = [" ", "\n", "\t", "!", "?"]
-                        count = sum(to_send.count(sep) for sep in seps)
-                        logging.debug("Buffer:" + to_send + "###" + str(count))
-                        if count >= 1:
-                            yield to_send
-                            buffer = ""
-
-                # Send the remaining buffer
-                if buffer:
-                    to_send = buffer
-                    if self.guard:
-                        pol = self.guard.process_output(to_send)
-                        if pol["blocked"]:
-                            yield zeigefinger_message(
-                                {
-                                    "reason": pol.get("reason") or "blocked_keyword",
-                                    "detail": "",
-                                },
-                                texts=guard_texts,
-                            )
-                        else:
-                            yield pol["text"]
-                    else:
-                        yield to_send
+                # Release the held-back tail (unless we already blocked).
+                for out in moderator.flush():
+                    yield out
 
             finally:
                 # Always close the stream when possible
@@ -294,8 +340,13 @@ class YulYenStreamingProvider:
                 int((t_end - t_start) * 1000),
             )
 
-            # Log the final assistant reply
-            full_reply = "".join(full_reply_parts).strip()
+            # Log the final assistant reply. When the guard blocked the output
+            # we must not persist the raw (e.g. secret) text to the log.
+            if moderator.blocked:
+                self._append_conversation_log("assistant", "[BLOCKED by guard]")
+                full_reply = ""
+            else:
+                full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
                 try:

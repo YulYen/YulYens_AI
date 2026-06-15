@@ -5,6 +5,21 @@ from typing import Any
 
 from core.dummy_llm_core import DummyLLMCore
 from core.streaming_provider import YulYenStreamingProvider
+from security.tinyguard import BasicGuard
+
+
+class FakeTokenCore:
+    """LLM core stub that emits a predefined sequence of tokens."""
+
+    def __init__(self, tokens: list[str]) -> None:
+        self._tokens = tokens
+
+    def stream_chat(self, **_kwargs: Any):
+        for token in self._tokens:
+            yield {"message": {"content": token}}
+
+    def warm_up(self, *_args: Any, **_kwargs: Any) -> None:
+        pass
 
 
 class AllowAllGuard:
@@ -104,3 +119,62 @@ def test_streaming_writes_conversation_json_log(tmp_path) -> None:
     assert any(
         row.get("bot") == "DORIS" and row.get("model") == "LEAH13B" for row in rows
     )
+
+
+def test_secret_split_across_tokens_is_blocked() -> None:
+    """A secret straddling token boundaries must never leak its prefix."""
+
+    guard = BasicGuard(True, True, True, True)
+    # "sk-" arrives first, the key body only completes two tokens later.
+    core = FakeTokenCore(["Here is the key: sk-", "SECRETTOBLOCK", "123456789", " ok"])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    out = "".join(provider.stream([{"role": "user", "content": "key?"}]))
+
+    assert "sk-" not in out
+    assert "SECRETTOBLOCK" not in out
+    assert out == guard.texts["security_blocked_keyword"]
+
+
+def test_email_split_across_tokens_is_masked() -> None:
+    """An email split across token boundaries must be fully masked."""
+
+    guard = BasicGuard(True, True, True, True)
+    core = FakeTokenCore(["Contact: max.mustermann", "@example", ".org please"])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    out = "".join(provider.stream([{"role": "user", "content": "mail?"}]))
+
+    assert "max.mustermann@example.org" not in out
+    assert guard.mask_text in out
+    assert out.startswith("Contact: ")
+
+
+def test_email_after_long_prefix_still_masked() -> None:
+    """Even with text beyond the holdback window, a later email is masked."""
+
+    guard = BasicGuard(True, True, True, True)
+    padding = "A" * 150
+    core = FakeTokenCore(
+        [f"{padding} contact ", "max.mustermann", "@example", ".org end"]
+    )
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    out = "".join(provider.stream([{"role": "user", "content": "mail?"}]))
+
+    assert "max.mustermann@example.org" not in out
+    assert guard.mask_text in out
+    # The safe prefix is still delivered to the user.
+    assert padding in out
+
+
+def test_plain_text_streams_through_with_guard() -> None:
+    """Benign multi-token output is delivered unchanged."""
+
+    guard = BasicGuard(True, True, True, True)
+    core = FakeTokenCore(["Hello ", "there, ", "how are ", "you?"])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    out = "".join(provider.stream([{"role": "user", "content": "hi"}]))
+
+    assert out == "Hello there, how are you?"
