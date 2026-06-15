@@ -41,7 +41,6 @@ def _resolve_persona_files() -> tuple[Path, Path]:
 def _load_system_prompts() -> list[dict[str, Any]]:
     """Loads persona data from the base and locale YAML files."""
 
-    cfg = Config()
     base_path, locale_path = _resolve_persona_files()
     base_data = yaml.safe_load(base_path.read_text(encoding="utf-8"))
     locale_data = yaml.safe_load(locale_path.read_text(encoding="utf-8"))

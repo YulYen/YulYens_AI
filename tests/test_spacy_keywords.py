@@ -1,9 +1,7 @@
-import pytest
-from wiki.spacy_keyword_finder import (
-    SpacyKeywordFinder,
-    resolve_spacy_model
-)
 from types import SimpleNamespace
+
+import pytest
+from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
 
 from tests.util import has_spacy_model
 
@@ -103,6 +101,7 @@ tricky_negative = [
     ("Guten Morgen, Siri!", []),
 ]
 
+
 def test_resolve_spacy_model_success():
     cfg = SimpleNamespace(
         language="de",
@@ -128,6 +127,7 @@ def test_resolve_spacy_model_missing_mapping():
         resolve_spacy_model(cfg)
 
     assert "language='fr', variant='large'" in str(excinfo.value)
+
 
 @pytest.fixture(scope="module")
 def keyword_finder():

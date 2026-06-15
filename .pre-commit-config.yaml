@@ -1,0 +1,15 @@
+# Run `pre-commit install` once, then Black + Ruff run on every commit.
+# Versions are kept in sync with requirements-dev.txt.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.10
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+        # We use Black for formatting; keep ruff-format off and rely on Black below.
+        stages: [manual]
+  - repo: https://github.com/psf/black
+    rev: 24.4.2
+    hooks:
+      - id: black

@@ -5,7 +5,7 @@ from datetime import datetime
 from functools import partial
 
 import gradio as gr
-from config.personas import get_all_persona_names, get_drink, _load_system_prompts
+from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from ui.conversation_io_terminal import load_conversation
@@ -164,9 +164,7 @@ class WebUI:
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
-    def respond_streaming(
-        self, user_input, chat_history, history_state
-    ):
+    def respond_streaming(self, user_input, chat_history, history_state):
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
@@ -214,7 +212,8 @@ class WebUI:
 
         # 7) Stream the answer
         yield from (
-            (txt, cb, state) for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
+            (txt, cb, state)
+            for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
 
     def _persona_selected_updates(
@@ -240,7 +239,9 @@ class WebUI:
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=[], label=display_name, visible=True),
-            gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),
+            gr.update(
+                value="", visible=True, interactive=True, placeholder=input_placeholder
+            ),
             gr.update(visible=True, interactive=True),
             gr.update(visible=True),
             gr.update(visible=True),
@@ -250,7 +251,12 @@ class WebUI:
             meta,
             gr.update(visible=False),
             gr.update(value=[], visible=False),
-            gr.update(value="", visible=False, interactive=True, placeholder=self.ask_all_placeholder),
+            gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.ask_all_placeholder,
+            ),
             gr.update(visible=False, interactive=True),
             gr.update(visible=False),
             gr.update(value="", visible=False),
@@ -259,7 +265,12 @@ class WebUI:
             gr.update(value="", visible=False),
             gr.update(value=None, interactive=True),
             gr.update(value=None, interactive=True),
-            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.self_talk_prompt_placeholder,
+            ),
             gr.update(visible=False, interactive=True),
         )
 
@@ -291,7 +302,12 @@ class WebUI:
             gr.update(value="", visible=False),
             gr.update(value=None, interactive=True),
             gr.update(value=None, interactive=True),
-            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.self_talk_prompt_placeholder,
+            ),
             gr.update(visible=False, interactive=True),
         )
 
@@ -336,7 +352,12 @@ class WebUI:
             self._reset_meta_state(),
             gr.update(visible=True),
             gr.update(value=[], visible=False),
-            gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
+            gr.update(
+                value="",
+                visible=True,
+                interactive=True,
+                placeholder=self.ask_all_placeholder,
+            ),
             gr.update(visible=True, interactive=True),
             gr.update(visible=True),
             gr.update(value="", visible=False),
@@ -345,7 +366,12 @@ class WebUI:
             gr.update(value="", visible=False),
             gr.update(value=None, interactive=True),
             gr.update(value=None, interactive=True),
-            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.self_talk_prompt_placeholder,
+            ),
             gr.update(visible=False, interactive=True),
         )
 
@@ -360,7 +386,12 @@ class WebUI:
         base[23] = gr.update(value="", visible=False)  # self_talk_status
         base[24] = gr.update(value=None, interactive=True)  # persona_a
         base[25] = gr.update(value=None, interactive=True)  # persona_b
-        base[26] = gr.update(value="", visible=True, interactive=True, placeholder=self.self_talk_prompt_placeholder)
+        base[26] = gr.update(
+            value="",
+            visible=True,
+            interactive=True,
+            placeholder=self.self_talk_prompt_placeholder,
+        )
         base[27] = gr.update(visible=True, interactive=True)
         return tuple(base)
 
@@ -416,7 +447,9 @@ class WebUI:
             persona_b,
             start_prompt,
         )
-        title = self._t("self_talk_chat_label", persona_a=persona_a, persona_b=persona_b)
+        title = self._t(
+            "self_talk_chat_label", persona_a=persona_a, persona_b=persona_b
+        )
         chat_history = [(start_prompt, None)]
         history_state = [{"role": "user", "content": start_prompt}]
         meta = self._build_meta(f"self-talk:{persona_a},{persona_b}")
@@ -468,7 +501,12 @@ class WebUI:
         if not question:
             warn = self._t("empty_question")
             yield (
-                gr.update(value="", visible=True, interactive=True, placeholder=self.ask_all_placeholder),
+                gr.update(
+                    value="",
+                    visible=True,
+                    interactive=True,
+                    placeholder=self.ask_all_placeholder,
+                ),
                 gr.update(value=warn, visible=True),
                 gr.update(value=existing_rows, visible=bool(existing_rows)),
                 gr.update(visible=True, interactive=True),
@@ -488,7 +526,9 @@ class WebUI:
         for persona in get_all_persona_names():
             streamer = self.factory.get_streamer_for_persona(persona)
             reply_parts: list[str] = []
-            for token in streamer.stream(messages=[{"role": "user", "content": question}]):
+            for token in streamer.stream(
+                messages=[{"role": "user", "content": question}]
+            ):
                 reply_parts.append(token)
             table_rows.append([persona, "".join(reply_parts).strip()])
             yield (
@@ -539,7 +579,9 @@ class WebUI:
             gr.update(value=focus_text),
             gr.update(value=greeting, visible=True),
             gr.update(value=chat_history, label=display_name, visible=True),
-            gr.update(value="", visible=True, interactive=True, placeholder=input_placeholder),
+            gr.update(
+                value="", visible=True, interactive=True, placeholder=input_placeholder
+            ),
             gr.update(visible=True, interactive=True),
             gr.update(visible=True),
             gr.update(visible=True),
@@ -549,7 +591,12 @@ class WebUI:
             meta,
             gr.update(visible=False),
             gr.update(value=[], visible=False),
-            gr.update(value="", visible=False, interactive=True, placeholder=self.ask_all_placeholder),
+            gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.ask_all_placeholder,
+            ),
             gr.update(visible=False, interactive=True),
             gr.update(visible=False),
             gr.update(value="", visible=False),
@@ -558,7 +605,12 @@ class WebUI:
             gr.update(value="", visible=False),
             gr.update(value=None, interactive=True),
             gr.update(value=None, interactive=True),
-            gr.update(value="", visible=False, interactive=True, placeholder=self.self_talk_prompt_placeholder),
+            gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.self_talk_prompt_placeholder,
+            ),
             gr.update(visible=False, interactive=True),
         )
 
@@ -578,7 +630,9 @@ class WebUI:
         persona = persona_info.get(persona_key)
 
         if not persona:
-            msg = self._t("web_load_invalid_persona", persona_name=persona_name or "<unknown>")
+            msg = self._t(
+                "web_load_invalid_persona", persona_name=persona_name or "<unknown>"
+            )
             return self._load_failure_updates(msg)
 
         self.bot = persona["name"]
@@ -609,7 +663,9 @@ class WebUI:
             }
 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
-                tmp.write(json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"))
+                tmp.write(
+                    json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                )
                 file_path = tmp.name
         except Exception as exc:  # pragma: no cover - UI utility
             msg = self._t("web_save_status_error", reason=str(exc))
@@ -759,7 +815,6 @@ class WebUI:
                 queue=False,
             )
 
-
         if self_talk_card_btn is not None:
             self_talk_card_btn.click(
                 fn=self._on_show_self_talk,
@@ -873,22 +928,24 @@ class WebUI:
         load_label = ui.get("web_load_label", "Gespräch laden (JSON)")
         self_talk_button_label = ui.get("self_talk_button_label", "AI Dialog")
         self_talk_title = ui.get("self_talk_title", "AI Dialog")
-        self_talk_description = ui.get("self_talk_description", "Zwei Personas sprechen automatisch.")
+        self_talk_description = ui.get(
+            "self_talk_description", "Zwei Personas sprechen automatisch."
+        )
         self_talk_persona_a_label = ui.get("self_talk_persona_a_label", "Persona A")
         self_talk_persona_b_label = ui.get("self_talk_persona_b_label", "Persona B")
         self_talk_prompt_label = ui.get("self_talk_prompt_label", "Start-Prompt")
         self_talk_start_label = ui.get("self_talk_start_label", "AI Dialog starten")
-        self_talk_prompt_placeholder = ui.get("self_talk_prompt_placeholder", "Gib den Start-Prompt ein …")
-        save_button_label = ui.get(
-            "web_save_button", "Gespräch herunterladen (JSON)"
+        self_talk_prompt_placeholder = ui.get(
+            "self_talk_prompt_placeholder", "Gib den Start-Prompt ein …"
         )
+        save_button_label = ui.get("web_save_button", "Gespräch herunterladen (JSON)")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
 
         persona_info = {p["name"].lower(): p for p in _load_system_prompts()}
 
-        demo, components =  build_ui(
+        demo, components = build_ui(
             persona_thumbnail_path_fn=self._persona_thumbnail_path,
             persona_info=persona_info,
             broadcast_enabled=self.broadcast_enabled,
@@ -897,8 +954,12 @@ class WebUI:
             persona_btn_suffix=persona_btn_suffix,
             input_placeholder=input_placeholder,
             new_chat_label=new_chat_label,
-            broadcast_table_persona_label=ui.get("broadcast_table_persona_header", "Persona"),
-            broadcast_table_answer_label= ui.get("broadcast_table_answer_header", "Answer"),
+            broadcast_table_persona_label=ui.get(
+                "broadcast_table_persona_header", "Persona"
+            ),
+            broadcast_table_answer_label=ui.get(
+                "broadcast_table_answer_header", "Answer"
+            ),
             send_button_label=send_button_label,
             ask_all_button_label=ask_all_button_label,
             ask_all_title=ask_all_title,

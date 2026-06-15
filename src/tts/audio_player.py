@@ -1,5 +1,6 @@
-from pathlib import Path
 import winsound
+from pathlib import Path
+
 
 # Windows-only
 def play_wav(path: Path, block: bool = False) -> None:

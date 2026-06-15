@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
-
 
 _REQUIRED_META_KEYS: set[str] = {"created_at", "model", "persona", "app"}
 
@@ -26,7 +25,9 @@ def load_conversation(path: str):
         ) from exc
 
     if not isinstance(data, dict):
-        raise ValueError("Conversation file must contain an object with 'meta' and 'messages'.")
+        raise ValueError(
+            "Conversation file must contain an object with 'meta' and 'messages'."
+        )
 
     meta = data.get("meta")
     messages = data.get("messages")
@@ -61,12 +62,16 @@ def _validate_meta(meta: dict | None) -> None:
     missing_keys = [key for key in _REQUIRED_META_KEYS if key not in meta]
     if missing_keys:
         missing = ", ".join(sorted(missing_keys))
-        raise ValueError(f"Conversation metadata is missing required fields: {missing}.")
+        raise ValueError(
+            f"Conversation metadata is missing required fields: {missing}."
+        )
 
     for key in _REQUIRED_META_KEYS:
         value = meta.get(key)
         if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"Conversation metadata field '{key}' must be a non-empty string.")
+            raise ValueError(
+                f"Conversation metadata field '{key}' must be a non-empty string."
+            )
 
 
 def _validate_messages(messages: Iterable | None) -> list[dict[str, str]]:

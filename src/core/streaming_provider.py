@@ -13,11 +13,11 @@ import datetime
 import hashlib
 import json
 import logging
-from urllib.parse import quote
 import os
 import time
 import traceback
 from typing import Any
+from urllib.parse import quote
 
 import requests
 from config.config_singleton import Config
@@ -138,7 +138,9 @@ class YulYenStreamingProvider:
         # 1) Compute a deterministic hash / preview of the payload (best effort)
         payload = {"messages": messages, "options": options}
         try:
-            canon = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+            canon = json.dumps(
+                payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+            )
         except Exception:
             # Fallback if serialization fails due to non-JSON types
             canon = f"<unserializable payload: messages={type(messages)!r}, options={type(options)!r}>"
@@ -169,7 +171,6 @@ class YulYenStreamingProvider:
             "num_ctx": num_ctx_val,
         }
         logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
-
 
     def stream(self, messages: list[dict[str, Any]]):
         """
@@ -384,7 +385,6 @@ def lookup_wiki_snippet(
     """
     wiki_hints: list[str] = []
     contexts: list[tuple[str, str]] = []
-    cfg = _get_config()
     proxy_base = "http://localhost:" + str(proxy_port)
 
     if not keyword_finder or max_snippets <= 0:
@@ -455,8 +455,12 @@ def inject_wiki_context(history: list, contexts: list[tuple[str, str]]) -> None:
 
     for idx, (topic, snippet) in enumerate(contexts, start=1):
         topic_clean = topic.replace("_", " ")
-        context_message = cfg.t("wiki_context_message", topic=topic_clean, snippet=snippet)
-        formatted_context = f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
+        context_message = cfg.t(
+            "wiki_context_message", topic=topic_clean, snippet=snippet
+        )
+        formatted_context = (
+            f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
+        )
         history.append({"role": "system", "content": formatted_context})
 
 

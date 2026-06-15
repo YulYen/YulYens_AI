@@ -4,19 +4,20 @@
 import argparse
 import logging
 import os
+import platform
 import socket
-import sys, platform
+import sys
 import threading
 import time
 from datetime import datetime
 
 import uvicorn
 
-# Logging setup
-from config.logging_setup import init_logging
-
 # Core and configuration
 from config.config_singleton import Config
+
+# Logging setup
+from config.logging_setup import init_logging
 from core.factory import AppFactory
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
@@ -40,7 +41,9 @@ def main():
     )
     args = parser.parse_args()
     if not args.ensemble:
-        parser.error("Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'")
+        parser.error(
+            "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
+        )
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
@@ -78,7 +81,9 @@ def main():
     logfile = os.path.join(
         cfg.logging["dir"], f"yulyen_ai_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.log"
     )
-    to_console = cfg.logging["to_console"] == "true" or (cfg.logging["to_console"] == "auto" and cfg.ui["type"] != "terminal")
+    to_console = cfg.logging["to_console"] == "true" or (
+        cfg.logging["to_console"] == "auto" and cfg.ui["type"] != "terminal"
+    )
     init_logging(
         loglevel=str(cfg.logging["level"]),
         logfile=logfile,
@@ -87,7 +92,6 @@ def main():
     logging.info(f"Using configuration file: {config_path}")
     logging.info("BOOT OK – Logging initialised and active.")
     logging.info(f"Python exe: {sys.executable}  version: {platform.python_version()}")
-
 
     # Optional: set httpx/urllib3 to WARNING for extra safety
     logging.getLogger("httpx").setLevel(logging.WARNING)

@@ -1,0 +1,5 @@
+# Development tooling (formatting, linting, tests).
+# Pinned so CI and local runs agree on formatting decisions.
+black==24.4.2
+ruff==0.4.10
+pytest>=8.2,<9.0

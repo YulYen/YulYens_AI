@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from colorama import Fore, Style, init
-from config.personas import get_all_persona_names, get_drink, _load_system_prompts
+from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.orchestrator import broadcast_to_ensemble
 
@@ -16,8 +16,8 @@ from core.streaming_provider import (
     lookup_wiki_snippet,
 )
 from core.utils import _greeting_text
-from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui import self_talk
+from ui.conversation_io_terminal import load_conversation, save_conversation
 
 
 class TerminalUI:
@@ -68,7 +68,9 @@ class TerminalUI:
         print(self.texts["choose_persona"])
         for idx, name in enumerate(names, start=1):
             # Optional: show a brief description
-            desc = next(p for p in _load_system_prompts() if p["name"] == name)["description"]
+            desc = next(p for p in _load_system_prompts() if p["name"] == name)[
+                "description"
+            ]
             persona_line = f"{idx}. {name} – {desc}"
             print(persona_line)
         while True:
@@ -137,7 +139,9 @@ class TerminalUI:
 
             if self.broadcast_enabled:
                 print(self.texts["terminal_start_menu_ask_all_option"])
-                prompt = self.texts["terminal_start_menu_prompt_with_self_talk_and_ask_all"]
+                prompt = self.texts[
+                    "terminal_start_menu_prompt_with_self_talk_and_ask_all"
+                ]
             else:
                 prompt = self.texts["terminal_start_menu_prompt_with_self_talk"]
 
@@ -160,15 +164,24 @@ class TerminalUI:
                 self_talk.run(self.factory, self.config, self)
                 continue
 
-            if self.broadcast_enabled and choice in {"4", "a", "ask", "askall", "ask-all", "ask all"}:
+            if self.broadcast_enabled and choice in {
+                "4",
+                "a",
+                "ask",
+                "askall",
+                "ask-all",
+                "ask all",
+            }:
                 self._run_ask_all_flow()
                 continue
-            
+
             if choice in {"exit", "quit"}:
                 self.print_exit()
                 return False
 
-            print(f"{Fore.YELLOW}{self.texts['terminal_invalid_selection']}{Style.RESET_ALL}")
+            print(
+                f"{Fore.YELLOW}{self.texts['terminal_invalid_selection']}{Style.RESET_ALL}"
+            )
 
     def _set_persona(self, persona_name: str) -> None:
         # Build the streamer for the selected persona
@@ -202,7 +215,8 @@ class TerminalUI:
         persona_name = meta.get("persona")
         if persona_name not in get_all_persona_names():
             msg = self._t(
-                "terminal_load_invalid_persona", persona_name=persona_name or "<unbekannt>"
+                "terminal_load_invalid_persona",
+                persona_name=persona_name or "<unbekannt>",
             )
             print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
             return False
@@ -238,7 +252,6 @@ class TerminalUI:
             print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
             return
 
-
         question = input(self.texts["terminal_askall_prompt"] + " ").strip()
         print()
         if not question:
@@ -246,7 +259,9 @@ class TerminalUI:
             print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
             return
 
-        print(f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}")
+        print(
+            f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}"
+        )
 
         last_persona: str | None = None
 
@@ -263,7 +278,9 @@ class TerminalUI:
 
         if last_persona is not None:
             print("\n")
-        print(f"{Fore.MAGENTA}{self.texts['terminal_askall_block_end']}{Style.RESET_ALL}\n")
+        print(
+            f"{Fore.MAGENTA}{self.texts['terminal_askall_block_end']}{Style.RESET_ALL}\n"
+        )
 
     # ---------- Main loop ----------
     def launch(self) -> None:
@@ -352,8 +369,8 @@ class TerminalUI:
             return
 
         try:
-            from tts.piper_tts import create_wav
             from tts.audio_player import play_wav
+            from tts.piper_tts import create_wav
 
             timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             persona = "".join(

@@ -1,5 +1,4 @@
 import logging
-from enum import Enum
 
 import spacy
 
@@ -49,7 +48,6 @@ W_TOKENS = {
     "wieso",
 }
 GENERIC_NOUNS = {"amt", "funktion", "rolle", "posten", "thema", "frage"}
-
 
 
 def resolve_spacy_model(cfg: dict) -> str:

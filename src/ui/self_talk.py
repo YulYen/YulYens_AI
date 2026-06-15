@@ -4,15 +4,16 @@ import logging
 import time
 
 from colorama import Fore, Style
-
-from config.personas import get_all_persona_names, _load_system_prompts
+from config.personas import _load_system_prompts, get_all_persona_names
 
 
 def _choose_persona(texts: dict, prompt: str) -> str:
     names = get_all_persona_names()
     print(texts["choose_persona"])
     for idx, name in enumerate(names, start=1):
-        desc = next(p for p in _load_system_prompts() if p["name"] == name)["description"]
+        desc = next(p for p in _load_system_prompts() if p["name"] == name)[
+            "description"
+        ]
         persona_line = f"{idx}. {name} – {desc}"
         print(persona_line)
 
@@ -118,7 +119,11 @@ class SelfTalkRunner:
             self.history_a.append({"role": "user", "content": reply})
 
         t_end = time.time()
-        t_first_ms = None if first_token_time is None else int((first_token_time - t_start) * 1000)
+        t_first_ms = (
+            None
+            if first_token_time is None
+            else int((first_token_time - t_start) * 1000)
+        )
         logging.info(
             "Self talk stream done for %s: chunks=%d chars=%d t_first_ms=%s t_total_ms=%d",
             persona_name,
@@ -128,7 +133,9 @@ class SelfTalkRunner:
             int((t_end - t_start) * 1000),
         )
         if chunk_count == 0:
-            logging.warning("Self talk stream for %s produced no output chunks.", persona_name)
+            logging.warning(
+                "Self talk stream for %s produced no output chunks.", persona_name
+            )
 
         should_stop = is_end_of_self_talk(reply)
         current_turn_index = self.turn_index
@@ -161,18 +168,25 @@ def run(factory, config, terminal_ui) -> None:
                 len(runner.history_a),
                 len(runner.history_b),
             )
-            print(f"{Fore.CYAN}[{active_persona}]{Style.RESET_ALL} ", end="", flush=True)
+            print(
+                f"{Fore.CYAN}[{active_persona}]{Style.RESET_ALL} ", end="", flush=True
+            )
             persona_name, reply, should_stop, turn_index = runner.run_turn(
                 on_token=lambda _persona, token: print(token, end="", flush=True)
             )
             print()
             terminal_ui._maybe_create_tts_wav(reply, True, persona_name=persona_name)
-            logging.info("Self talk turn %d complete (reply length: %d)", turn_index, len(reply))
+            logging.info(
+                "Self talk turn %d complete (reply length: %d)", turn_index, len(reply)
+            )
             if not reply.strip():
-                logging.warning("Self talk turn %d returned an empty reply.", turn_index)
+                logging.warning(
+                    "Self talk turn %d returned an empty reply.", turn_index
+                )
             if should_stop:
                 logging.info(
-                    "Self talk ended with end token at turn %d (reply suffix).", turn_index
+                    "Self talk ended with end token at turn %d (reply suffix).",
+                    turn_index,
                 )
                 break
     except KeyboardInterrupt:

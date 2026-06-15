@@ -1,5 +1,5 @@
-from pathlib import Path
 import wave
+from pathlib import Path
 
 from piper.voice import PiperVoice
 
@@ -25,7 +25,9 @@ def create_wav(
     tts_cfg: dict,
     language: str = "de",
 ) -> None:
-    model_name = _resolve_model_name(persona=persona, language=language, tts_cfg=tts_cfg)
+    model_name = _resolve_model_name(
+        persona=persona, language=language, tts_cfg=tts_cfg
+    )
     model_path = voices_dir / model_name
 
     if not model_path.exists():

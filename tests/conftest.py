@@ -7,7 +7,6 @@ from urllib.parse import urlparse
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Optional dependency fallbacks
 # ---------------------------------------------------------------------------
@@ -19,6 +18,7 @@ except ModuleNotFoundError:  # pragma: no cover - executed only in CI without th
 
 
 if not hasattr(_huggingface_hub, "HfFolder"):
+
     class _FallbackHfFolder:
         """Minimal stub used when the real class is unavailable."""
 
@@ -36,14 +36,13 @@ if not hasattr(_huggingface_hub, "HfFolder"):
         def token_exists(cls) -> bool:
             return cls._token is not None
 
-
     _huggingface_hub.HfFolder = _FallbackHfFolder  # type: ignore[attr-defined]
 
 
 if not hasattr(_huggingface_hub, "whoami"):
+
     def _fallback_whoami(*_args, **_kwargs):  # pragma: no cover - trivial stub
         return {"name": "stub-user"}
-
 
     _huggingface_hub.whoami = _fallback_whoami  # type: ignore[attr-defined]
 
@@ -155,4 +154,3 @@ def _default_ensemble(monkeypatch):
 
     monkeypatch.setattr(Config, "_load_config", _patched_load_config)
     yield
-

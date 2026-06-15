@@ -2,14 +2,15 @@
 
 import importlib.util
 from functools import lru_cache
-from config.config_singleton import Config
 
+from config.config_singleton import Config
 
 
 @lru_cache
 def has_spacy_model(name: str) -> bool:
     """Return True if the specified spaCy language model is installed."""
     return importlib.util.find_spec(name) is not None
+
 
 def is_model(name: str) -> bool:
     """

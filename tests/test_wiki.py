@@ -86,7 +86,9 @@ def test_lookup_wiki_snippet_url_encodes_topic(monkeypatch):
 
     def _fake_get(url, *args, **kwargs):
         captured["url"] = url
-        return SimpleNamespace(status_code=200, json=lambda: {"text": "", "title": topic})
+        return SimpleNamespace(
+            status_code=200, json=lambda: {"text": "", "title": topic}
+        )
 
     dummy_finder = _DummyKeywordFinder(topic)
     monkeypatch.setattr("core.streaming_provider.requests.get", _fake_get)
@@ -161,13 +163,16 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
 
 
 def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch):
-    dummy_cfg = SimpleNamespace(wiki={"mode": "offline", "spacy_model_variant": "large", "spacy_model_map": {}}, language="de")
+    dummy_cfg = SimpleNamespace(
+        wiki={"mode": "offline", "spacy_model_variant": "large", "spacy_model_map": {}},
+        language="de",
+    )
     monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
 
     try:
         factory = AppFactory()
         factory.get_keyword_finder()
-        assert False # Fail if no Exception
+        assert False  # Fail if no Exception
     except ValueError as ve:
         assert "No spaCy model mapping for language='de', variant='large" in str(ve)
 
@@ -200,7 +205,9 @@ def test_lookup_wiki_snippet_for_germany():
     )
 
     # We expect the proxy to be reachable and to detect 'Deutschland'
-    assert wiki_hints and contexts, "Wiki proxy did not return data → it is probably not running"
+    assert (
+        wiki_hints and contexts
+    ), "Wiki proxy did not return data → it is probably not running"
     topic_title, snippet = contexts[0]
     assert topic_title == "Deutschland"
     assert snippet, "Wiki proxy did not return any snippet text"

@@ -8,7 +8,7 @@ from config.config_singleton import Config
 from security.tinyguard import BasicGuard, create_guard
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
-from wiki.spacy_keyword_finder import  SpacyKeywordFinder, resolve_spacy_model
+from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
 
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
@@ -49,7 +49,6 @@ class AppFactory:
             else:
                 self._keyword_finder = None
         return self._keyword_finder
-
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Creates a new LLM streamer for the given persona."""

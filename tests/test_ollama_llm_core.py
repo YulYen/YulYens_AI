@@ -41,7 +41,9 @@ class RecordingClient:
 
 
 @pytest.fixture()
-def fake_client_factory(monkeypatch: pytest.MonkeyPatch) -> Callable[[], RecordingClient]:
+def fake_client_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> Callable[[], RecordingClient]:
     """Install a fake :class:`ollama.Client` and return the created instance."""
 
     created_clients: list[RecordingClient] = []
@@ -61,7 +63,9 @@ def fake_client_factory(monkeypatch: pytest.MonkeyPatch) -> Callable[[], Recordi
     return get_last_client
 
 
-def test_warm_up_uses_dummy_prompt(fake_client_factory: Callable[[], RecordingClient]) -> None:
+def test_warm_up_uses_dummy_prompt(
+    fake_client_factory: Callable[[], RecordingClient],
+) -> None:
     core = OllamaLLMCore(base_url="http://example")
     fake_client = fake_client_factory()
 

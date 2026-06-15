@@ -31,8 +31,7 @@ def build_ui(
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
 
-        gr.HTML(
-            """
+        gr.HTML("""
                 <style>
                 .persona-row { gap:24px; }
                 .persona-card {
@@ -55,8 +54,7 @@ def build_ui(
                 .ask-all-strip img { max-width: 250px; max-height: 250px; object-fit: contain; }
                 .persona-header-row { justify-content: space-between; align-items: center; }
                 </style>
-            """
-        )
+            """)
         gr.Markdown(f"# {project_title}")
 
         with gr.Group(visible=True) as grid_group:
@@ -159,8 +157,9 @@ def build_ui(
                 visible=False,
                 interactive=False,
             )
-        new_chat_btn = gr.Button(new_chat_label, visible=False, elem_classes="new-chat-btn")
-
+        new_chat_btn = gr.Button(
+            new_chat_label, visible=False, elem_classes="new-chat-btn"
+        )
 
         with gr.Group(visible=False) as self_talk_group:
             gr.Markdown(f"## {self_talk_title}")

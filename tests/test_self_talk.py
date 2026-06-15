@@ -33,4 +33,7 @@ def test_self_talk_runner_alternates_histories():
     assert p2 == "Yul"
     assert r2 == "Antwort B _endegelaende_"
     assert stop2
-    assert runner.history_a[-1] == {"role": "user", "content": "Antwort B _endegelaende_"}
+    assert runner.history_a[-1] == {
+        "role": "user",
+        "content": "Antwort B _endegelaende_",
+    }

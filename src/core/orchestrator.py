@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from config.personas import get_all_persona_names
+
 from core.streaming_provider import YulYenStreamingProvider
 
 
@@ -30,14 +31,18 @@ def broadcast_to_ensemble(
         reply text.
     """
 
-    personas = list(persona_names) if persona_names is not None else get_all_persona_names()
+    personas = (
+        list(persona_names) if persona_names is not None else get_all_persona_names()
+    )
     results: list[dict[str, str]] = []
 
     for persona in personas:
         streamer: YulYenStreamingProvider = factory.get_streamer_for_persona(persona)
         reply_parts: list[str] = []
 
-        for token in streamer.stream(messages=[{"role": "user", "content": user_input}]):
+        for token in streamer.stream(
+            messages=[{"role": "user", "content": user_input}]
+        ):
             reply_parts.append(token)
             if on_token:
                 on_token(persona, token)

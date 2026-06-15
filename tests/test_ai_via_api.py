@@ -9,8 +9,6 @@ import pytest
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
 from core.streaming_provider import YulYenStreamingProvider
-from tests.util import is_model
-
 
 # ---- Deterministic time in Europe/Berlin ------------------------------------
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -158,7 +156,6 @@ def ask(question: str, person: str, client) -> str:
             "question": "Antworte bitte kurz: Wer bist du und wer hat dich erfunden? Und welches Datum haben wir heute?",
             "must_contain": ["LEAH", "yul"],  # adjustable
             "must_contain_any": [current_year, current_year_short],
-
         },
         {
             "name": "Portugal_PM_2025_TWO_WIKI_SNIPPETS",
@@ -218,16 +215,23 @@ def test_peter_antwortet_nur_sonne_oder_mond(client):
     ans_norm = _normalize(ans_raw)
     words = _extract_words(ans_norm)
 
-    assert len(words) == 1, f"Expected exactly one word, got {words!r} from: {ans_raw!r}"
-    assert words[0] in {"sonne", "mond"}, (
-        f"Expected 'Sonne' or 'Mond', got {words[0]!r} from: {ans_raw!r}"
-    )
+    assert (
+        len(words) == 1
+    ), f"Expected exactly one word, got {words!r} from: {ans_raw!r}"
+    assert words[0] in {
+        "sonne",
+        "mond",
+    }, f"Expected 'Sonne' or 'Mond', got {words[0]!r} from: {ans_raw!r}"
 
 
 @pytest.mark.slow
 @pytest.mark.ollama
 def test_peter_antwortet_in_exakt_fuenf_woertern(client):
-    ans_raw = ask("Antworte mit genau fünf Wörtern. Was hilft gegen Langeweile?", "PETER", client)
+    ans_raw = ask(
+        "Antworte mit genau fünf Wörtern. Was hilft gegen Langeweile?", "PETER", client
+    )
     words = _extract_words(ans_raw)
 
-    assert len(words) == 5, f"Expected exactly five words, got {len(words)} from: {ans_raw!r}"
+    assert (
+        len(words) == 5
+    ), f"Expected exactly five words, got {len(words)} from: {ans_raw!r}"

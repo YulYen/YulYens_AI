@@ -1,7 +1,7 @@
+import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
-import sys
 
 from config.texts import Texts
 from ui.terminal_ui import TerminalUI
@@ -149,7 +149,11 @@ def test_terminal_ui_tts_uses_explicit_persona(monkeypatch) -> None:
     ui.tts_auto_wav_enabled = True
     ui.bot = None
     ui.config = SimpleNamespace(language="de")
-    ui.tts_cfg = {"enabled": True, "features": {"terminal_auto_create_wav": True}, "voices": {}}
+    ui.tts_cfg = {
+        "enabled": True,
+        "features": {"terminal_auto_create_wav": True},
+        "voices": {},
+    }
 
     calls: dict[str, object] = {}
 

@@ -28,11 +28,14 @@ def test_resolve_model_name_uses_german_persona_override() -> None:
 
 
 def test_resolve_model_name_uses_language_default() -> None:
-    cfg = {"voices": {"default": {"de": "de_DE-thorsten-high", "en": "en_US-amy-medium"}}}
+    cfg = {
+        "voices": {"default": {"de": "de_DE-thorsten-high", "en": "en_US-amy-medium"}}
+    }
     assert _resolve_model_name("UNKNOWN", "en", cfg) == "en_US-amy-medium.onnx"
 
 
 def test_resolve_model_name_falls_back_to_german_default_without_personas_de() -> None:
-    cfg = {"voices": {"default": {"de": "de_DE-thorsten-high", "en": "en_US-amy-medium"}}}
+    cfg = {
+        "voices": {"default": {"de": "de_DE-thorsten-high", "en": "en_US-amy-medium"}}
+    }
     assert _resolve_model_name("LEAH", "de", cfg) == "de_DE-thorsten-high.onnx"
-

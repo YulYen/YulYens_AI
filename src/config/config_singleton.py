@@ -1,4 +1,5 @@
 """Singleton-backed configuration loader used throughout the application."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -51,7 +52,7 @@ class Config:
 
         self.language = language
         # neu (am Projektsrc ausrichten, unabhängig vom Config-Standort)
-        project_root = Path(__file__).resolve().parents[2]   # .../repo-root
+        project_root = Path(__file__).resolve().parents[2]  # .../repo-root
         locales_dir = project_root / "locales"
         text_catalog = Texts(language=language, locales_dir=locales_dir)
         self.texts = text_catalog
