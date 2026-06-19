@@ -42,3 +42,16 @@ gamerecording.pb
 # piper voices
 voices/
 out/
+
+# Claude Code / MCP local config
+.claude/
+.mcp.json
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Local UI test screenshots
+/ui-test.png
+
+# Ruff cache
+.ruff_cache/
