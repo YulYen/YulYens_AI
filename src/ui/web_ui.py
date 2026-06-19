@@ -8,6 +8,7 @@ import gradio as gr
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
+from core.utils import is_broadcast_enabled
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
@@ -48,23 +49,12 @@ class WebUI:
         self.bot = None  # assigned later
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
-        self.broadcast_enabled = self._is_broadcast_enabled()
+        self.broadcast_enabled = is_broadcast_enabled(self.cfg)
         self.ask_all_placeholder = ""
         self.self_talk_runner = None
         self.self_talk_prompt_placeholder = ""
         if self._t is None:
             self._t = lambda key, **kwargs: key
-
-    def _is_broadcast_enabled(self) -> bool:
-        ui_cfg = getattr(self.cfg, "ui", {}) or {}
-
-        try:
-            experimental_cfg = ui_cfg.get("experimental") or {}
-        except AttributeError:
-            experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
-
-        flag = experimental_cfg.get("broadcast_mode")
-        return bool(flag)
 
     def _reset_conversation_state(self):
         return []

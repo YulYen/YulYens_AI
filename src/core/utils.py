@@ -32,6 +32,16 @@ def _greeting_text(cfg, bot) -> str:
     return tpl.format_map(values)
 
 
+def is_broadcast_enabled(config) -> bool:
+    """Return True when experimental broadcast/ask-all mode is enabled in the config."""
+    ui_cfg = getattr(config, "ui", {}) or {}
+    try:
+        experimental_cfg = ui_cfg.get("experimental") or {}
+    except AttributeError:
+        experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
+    return bool(experimental_cfg.get("broadcast_mode"))
+
+
 def ensure_dir_exists(path: str | Path) -> None:
     """Create a directory if it does not already exist."""
     Path(path).mkdir(parents=True, exist_ok=True)

@@ -279,9 +279,7 @@ class YulYenStreamingProvider:
                 break
 
         # Apply LLM options
-        options: dict[str, Any] = {}
-        if self.persona_options:
-            options = self.persona_options
+        options: dict[str, Any] = self.persona_options or {}
 
         full_reply_parts = []
         try:

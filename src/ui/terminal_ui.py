@@ -15,7 +15,7 @@ from core.streaming_provider import (
     inject_wiki_context,
     lookup_wiki_snippet,
 )
-from core.utils import _greeting_text
+from core.utils import _greeting_text, is_broadcast_enabled
 from ui import self_talk
 from ui.conversation_io_terminal import load_conversation, save_conversation
 
@@ -52,7 +52,7 @@ class TerminalUI:
         self.streamer = None  # set after selection
         self.texts = config.texts
         self._t = config.t
-        self.broadcast_enabled = self._is_broadcast_enabled(config)
+        self.broadcast_enabled = is_broadcast_enabled(config)
         self.tts_cfg = getattr(config, "tts", {}) or {}
         self.tts_auto_wav_enabled = bool(self.tts_cfg.get("enabled")) and bool(
             self.tts_cfg.get("features", {}).get("terminal_auto_create_wav")
@@ -117,17 +117,6 @@ class TerminalUI:
 
     def print_exit(self) -> None:
         print(self.texts["terminal_exit_message"])
-
-    def _is_broadcast_enabled(self, config) -> bool:
-        ui_cfg = getattr(config, "ui", {}) or {}
-
-        try:
-            experimental_cfg = ui_cfg.get("experimental") or {}
-        except AttributeError:
-            experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
-
-        flag = experimental_cfg.get("broadcast_mode")
-        return bool(flag)
 
     # ---------- Start menu ----------
     def _start_dialog_flow(self) -> bool:

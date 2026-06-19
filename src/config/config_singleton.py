@@ -51,7 +51,7 @@ class Config:
             )
 
         self.language = language
-        # neu (am Projektsrc ausrichten, unabhängig vom Config-Standort)
+        # Anchor on the project root, independent of the config file location
         project_root = Path(__file__).resolve().parents[2]  # .../repo-root
         locales_dir = project_root / "locales"
         text_catalog = Texts(language=language, locales_dir=locales_dir)

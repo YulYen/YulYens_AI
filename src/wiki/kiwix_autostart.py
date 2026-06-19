@@ -30,12 +30,11 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
     timeout_s = offline.get("startup_timeout_s")
 
     if not host or port in (None, ""):
-        if logger:
-            logger.error(
-                "Kiwix autostart requested, but host (%s) or kiwix_port (%s) missing.",
-                host,
-                port,
-            )
+        logger.error(
+            "Kiwix autostart requested, but host (%s) or kiwix_port (%s) missing.",
+            host,
+            port,
+        )
         return False
 
     def is_up():
@@ -46,33 +45,27 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
             return False
 
     if is_up():
-        if logger:
-            logger.info("Kiwix already running on %s:%s", host, port)
+        logger.info("Kiwix already running on %s:%s", host, port)
         return True
 
     if not exe or not zim:
-        if logger:
-            logger.warning("Kiwix autostart requested, but kiwix_exe/zim_path not set.")
+        logger.warning("Kiwix autostart requested, but kiwix_exe/zim_path not set.")
         return False
 
     try:
         # subprocess.Popen([exe, "--port", str(port), zim])
         subprocess.Popen([exe, f"--port={port}", zim])
-        if logger:
-            logger.info("Starting kiwix-serve: %s --port %s %s", exe, port, zim)
+        logger.info("Starting kiwix-serve: %s --port %s %s", exe, port, zim)
     except Exception as e:
-        if logger:
-            logger.error("Failed to start kiwix-serve: %s", e)
+        logger.error("Failed to start kiwix-serve: %s", e)
         return False
 
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         if is_up():
-            if logger:
-                logger.info("Kiwix ready on %s:%s", host, port)
+            logger.info("Kiwix ready on %s:%s", host, port)
             return True
         time.sleep(0.25)
 
-    if logger:
-        logger.warning("Kiwix did not become ready within %s s.", timeout_s)
+    logger.warning("Kiwix did not become ready within %s s.", timeout_s)
     return False
