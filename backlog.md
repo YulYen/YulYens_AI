@@ -16,3 +16,4 @@
 | 16 | Sandbox/PDF functions | Local documentation sandbox | L | M | Cool feature |
 | 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
 | 18 | Wrongdoing guardrail (violence/weaponization) | Add a minimal deterministic guardrail for violent wrongdoing requests (e.g., weapons/explosives/attack instructions). Implement as pre-LLM input check + session lock (once triggered, keep blocking follow-ups like “it’s for a novel”). Provide safe alternative response templates and add unit tests for common bypass patterns. | S | M | Security/Robustness |
+| 20 | Ask-all results table polish | Ergebnis-Tabelle der Broadcast-Ansicht hübscher/robuster: read-only statt editierbare `gr.Dataframe` (kein "New row/New column"), Markdown in Zellen rendern (aktuell literale `*Sternchen*`), ggf. Persona-Avatare. Nebenbei Console-Warnung `Too many arguments provided for the endpoint` aufklären. | S | S | UX/Technology |
