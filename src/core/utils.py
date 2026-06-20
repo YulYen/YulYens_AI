@@ -45,3 +45,11 @@ def is_broadcast_enabled(config) -> bool:
 def ensure_dir_exists(path: str | Path) -> None:
     """Create a directory if it does not already exist."""
     Path(path).mkdir(parents=True, exist_ok=True)
+
+
+def is_ollama_module_not_found(exc: ModuleNotFoundError) -> bool:
+    """Return True when a ModuleNotFoundError points to the missing 'ollama' package."""
+    missing_name = getattr(exc, "name", None)
+    return missing_name == "ollama" or (
+        missing_name is None and "ollama" in str(exc).lower()
+    )

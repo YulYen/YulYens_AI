@@ -36,6 +36,27 @@ def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
     Config.reset_instance()
 
 
+def test_launch_main_handles_invalid_yaml(tmp_path, monkeypatch, capfd):
+    from src import launch
+
+    Config.reset_instance()
+    bad_config = tmp_path / "config.yaml"
+    bad_config.write_text(": : invalid: yaml: [\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["ai-orchestra", "-e", "classic"])
+
+    with pytest.raises(SystemExit) as excinfo:
+        launch.main()
+
+    assert excinfo.value.code != 0
+
+    captured = capfd.readouterr()
+    assert "Configuration file" in captured.err
+    assert "invalid YAML" in captured.err
+
+    Config.reset_instance()
+
+
 def _build_test_cfg(backend: str = "dummy", core_updates: dict | None = None):
     class DummyCfg:
         def __init__(self) -> None:

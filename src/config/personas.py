@@ -48,6 +48,11 @@ def _load_system_prompts() -> list[dict[str, Any]]:
     personas: list[dict[str, Any]] = []
     for base_persona in base_data["personas"]:
         persona_name = base_persona["name"]
+        if persona_name not in locale_data.get("personas", {}):
+            raise KeyError(
+                f"Persona '{persona_name}' is defined in personas_base.yaml but missing "
+                f"from the locale file '{locale_path}'."
+            )
         localized = locale_data["personas"][persona_name]
 
         entry: dict[str, Any] = {

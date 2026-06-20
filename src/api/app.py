@@ -49,6 +49,5 @@ def ask(req: AskRequest):
         logging.warning("Invalid persona requested: %s", req.persona)
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logging.error(e)
-        logging.error(f"API error:\n{traceback.format_exc()}")
+        logging.error("API error:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))

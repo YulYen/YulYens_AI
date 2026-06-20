@@ -13,3 +13,17 @@ ignore = ["E203", "E501"]
 [tool.ruff.lint.per-file-ignores]
 # Tests stub modules in sys.modules before importing the unit under test.
 "tests/*" = ["E402"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra"
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "ollama: marks tests that perform real Ollama calls",
+]
+filterwarnings = [
+    "ignore:Importing 'parser\\.split_arg_string'.*:DeprecationWarning",
+    "ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning",
+]

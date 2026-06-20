@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
 
@@ -16,14 +18,14 @@ class AiApiProvider:
     def __init__(
         self,
         *,
-        keyword_finder,
-        wiki_mode,
-        wiki_proxy_port,
-        wiki_snippet_limit,
-        max_wiki_snippets,
-        wiki_timeout,
-        factory,
-    ):
+        keyword_finder: Any,
+        wiki_mode: str | bool,
+        wiki_proxy_port: int,
+        wiki_snippet_limit: int,
+        max_wiki_snippets: int,
+        wiki_timeout: tuple[float, float],
+        factory: Any,
+    ) -> None:
         self.keyword_finder = keyword_finder
         self.wiki_mode = wiki_mode
         self.wiki_proxy_port = wiki_proxy_port

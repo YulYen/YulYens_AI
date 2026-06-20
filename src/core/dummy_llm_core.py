@@ -18,7 +18,6 @@ class DummyLLMCore(LLMCore):
 
     def warm_up(self, model_name: str) -> None:
         """No warm-up required for the dummy."""
-        return None
 
     def stream_chat(
         self,
@@ -36,7 +35,7 @@ class DummyLLMCore(LLMCore):
         :param keep_alive: Ignored.
         :returns: Iterator with exactly one element.
         """
-        # Die letzte User‑Nachricht finden
+        # Find the last user message
         user_input = ""
         for m in reversed(messages or []):
             if m.get("role") == "user":

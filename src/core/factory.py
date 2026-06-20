@@ -13,7 +13,11 @@ from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
 from core.streaming_provider import YulYenStreamingProvider
-from core.utils import _system_prompt_with_date, _wiki_mode_enabled
+from core.utils import (
+    _system_prompt_with_date,
+    _wiki_mode_enabled,
+    is_ollama_module_not_found,
+)
 
 
 class AppFactory:
@@ -127,11 +131,7 @@ class AppFactory:
             try:
                 ollama_core_cls = self._load_ollama_core_class()
             except ModuleNotFoundError as exc:
-                missing_name = getattr(exc, "name", None)
-                message = str(exc)
-                if missing_name == "ollama" or (
-                    missing_name is None and "ollama" in message.lower()
-                ):
+                if is_ollama_module_not_found(exc):
                     raise RuntimeError(
                         "The Ollama backend is enabled (core.backend: 'ollama'), "
                         "but the Python package 'ollama' is not installed. "

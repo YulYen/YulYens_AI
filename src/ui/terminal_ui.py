@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 from colorama import Fore, Style, init
-from config.personas import _load_system_prompts, get_all_persona_names, get_drink
+from config.personas import get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.orchestrator import broadcast_to_ensemble
 
@@ -18,6 +18,7 @@ from core.streaming_provider import (
 from core.utils import _greeting_text, is_broadcast_enabled
 from ui import self_talk
 from ui.conversation_io_terminal import load_conversation, save_conversation
+from ui.persona_chooser import prompt_persona_choice
 
 
 class TerminalUI:
@@ -65,30 +66,11 @@ class TerminalUI:
     def choose_persona(self) -> None:
         """Asks the user for the desired persona and configures the streamer."""
         names = get_all_persona_names()
-        print(self.texts["choose_persona"])
-        for idx, name in enumerate(names, start=1):
-            # Optional: show a brief description
-            desc = next(p for p in _load_system_prompts() if p["name"] == name)[
-                "description"
-            ]
-            persona_line = f"{idx}. {name} – {desc}"
-            print(persona_line)
-        while True:
-            sel = input(f"{self.texts['terminal_persona_prompt']} ").strip()
-            try:
-                choice = int(sel) - 1
-                if 0 <= choice < len(names):
-                    persona_name = names[choice]
-                    self._set_persona(persona_name)
-
-                    selected_msg = self._t(
-                        "terminal_persona_selected", persona_name=self.bot
-                    )
-                    print(selected_msg)
-                    break
-            except ValueError:
-                pass
-            print(self.texts["terminal_invalid_selection"])
+        persona_name = prompt_persona_choice(
+            names, self.texts, "terminal_persona_prompt"
+        )
+        self._set_persona(persona_name)
+        print(self._t("terminal_persona_selected", persona_name=self.bot))
 
     # ---------- Small UI helpers ----------
     def init_ui(self) -> None:

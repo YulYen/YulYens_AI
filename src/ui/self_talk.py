@@ -4,32 +4,15 @@ import logging
 import time
 
 from colorama import Fore, Style
-from config.personas import _load_system_prompts, get_all_persona_names
+from config.personas import get_all_persona_names
+from ui.persona_chooser import prompt_persona_choice
 
 
-def _choose_persona(texts: dict, prompt: str) -> str:
+def _choose_persona(texts: dict, prompt_key: str) -> str:
     names = get_all_persona_names()
-    print(texts["choose_persona"])
-    for idx, name in enumerate(names, start=1):
-        desc = next(p for p in _load_system_prompts() if p["name"] == name)[
-            "description"
-        ]
-        persona_line = f"{idx}. {name} – {desc}"
-        print(persona_line)
-
-    while True:
-        sel = input(f"{prompt} ").strip()
-        try:
-            choice = int(sel) - 1
-            if 0 <= choice < len(names):
-                persona_name = names[choice]
-                print(
-                    texts["terminal_persona_selected"].format(persona_name=persona_name)
-                )
-                return persona_name
-        except ValueError:
-            pass
-        print(texts["terminal_invalid_selection"])
+    persona_name = prompt_persona_choice(names, texts, prompt_key)
+    print(texts["terminal_persona_selected"].format(persona_name=persona_name))
+    return persona_name
 
 
 def _prompt_initial(texts: dict) -> str:
@@ -149,8 +132,8 @@ class SelfTalkRunner:
 def run(factory, config, terminal_ui) -> None:
     texts = config.texts
     print(texts["terminal_self_talk_title"])
-    persona_a = _choose_persona(texts, texts["terminal_self_talk_persona_a_prompt"])
-    persona_b = _choose_persona(texts, texts["terminal_self_talk_persona_b_prompt"])
+    persona_a = _choose_persona(texts, "terminal_self_talk_persona_a_prompt")
+    persona_b = _choose_persona(texts, "terminal_self_talk_persona_b_prompt")
     initial_prompt = _prompt_initial(texts)
 
     runner = SelfTalkRunner(factory, texts, persona_a, persona_b, initial_prompt)

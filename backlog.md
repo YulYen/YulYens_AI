@@ -2,6 +2,7 @@
 
 | No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
+| 19 | Drei-Zeitstempel-Transparenz | Personas verwechseln Tagesdatum, Modell-Trainings-Cutoff und Kiwix-Datenstand. Alle drei Werte im System-Prompt klar trennen und Persona-Formulierungen testen, damit kein Modell behauptet sein Wissen reiche bis heute. | M | M | Quality/Correctness |
 | 2 | Web-UI "New conversation" in stream | Done? End streaming cleanly so that the "New conversation" button works | M | L | Bugfix |
 | 5 | Health checks/monitoring | Status page (Ollama/VRAM), simple `/healthz` endpoint plus VRAM probe | S | M | Technical foundation |
 | 6 | Model selection in the UI | Dropdown/radio for available models, explicitly selectable per persona and run | S | S | UX/Technology |

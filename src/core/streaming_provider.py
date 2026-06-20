@@ -16,7 +16,7 @@ import logging
 import os
 import time
 import traceback
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 from urllib.parse import quote
 
@@ -25,7 +25,7 @@ from config.config_singleton import Config
 from security.tinyguard import BasicGuard, zeigefinger_message
 
 from core.context_utils import approx_token_count
-from core.utils import ensure_dir_exists
+from core.utils import ensure_dir_exists, is_ollama_module_not_found
 
 # Import the LLM interface
 from .llm_core import LLMCore
@@ -150,11 +150,7 @@ class YulYenStreamingProvider:
             try:
                 from .ollama_llm_core import OllamaLLMCore
             except ModuleNotFoundError as exc:
-                missing_name = getattr(exc, "name", None)
-                message = str(exc)
-                if missing_name == "ollama" or (
-                    missing_name is None and "ollama" in message.lower()
-                ):
+                if is_ollama_module_not_found(exc):
                     raise RuntimeError(
                         "No LLM core was injected and the Python package 'ollama' is missing. "
                         "Install 'ollama' or provide a dummy implementation."
@@ -251,7 +247,7 @@ class YulYenStreamingProvider:
         }
         logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
 
-    def stream(self, messages: list[dict[str, Any]]):
+    def stream(self, messages: list[dict[str, Any]]) -> Iterator[str]:
         """
         Generator that yields the LLM response token by token.
         Includes logging and security checks.
