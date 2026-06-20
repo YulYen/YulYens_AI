@@ -11,7 +11,7 @@
 | 11 | Easter egg logic | Keyword triggers an extra tagline | M | M | Cool feature |
 | 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach | L | L | Technical foundation |
 | 13 | STT MVP | Simple speech Input | M | M | Cool feature |
-| 14 | Email to/from AI | Read, compose, and send email | M | M | Integration |
+| 14 | Email to/from AI | Read, compose, and send email. Implementierung liegt bereit auf Branch `origin/codex/add-email-adapter-for-personas` (`src/email_adapter/service.py`, ~470 Z. + Tests) — zur Sichtung/Integration in Phase C. | S | M | Integration |
 | 15 | Daily briefing (IoT + RSS) | Daily short updates | M | M | Cool feature |
 | 16 | Sandbox/PDF functions | Local documentation sandbox | L | M | Cool feature |
 | 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
