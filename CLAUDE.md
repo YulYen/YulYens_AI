@@ -49,6 +49,7 @@ c:\J_KI\
 │   │   ├── terminal_ui.py       # Terminal-UI (farbig)
 │   │   ├── webui_layout.py      # Gradio-Layout-Builder
 │   │   ├── conversation_io_terminal.py  # JSON-Speichern/Laden
+│   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
 │   ├── api/
 │   │   ├── app.py               # FastAPI: /ask, /health
@@ -61,7 +62,7 @@ c:\J_KI\
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
 │   └── tts/
 │       ├── piper_tts.py         # TTS-Wrapper
-│       └── audio_player.py      # Windows winsound
+│       └── audio_player.py      # winsound (Windows-only, plattform-sicher)
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -73,9 +74,8 @@ c:\J_KI\
 │   ├── de.yaml                  # 83+ UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
-├── pyproject.toml               # Black/Ruff-Konfiguration
-├── pytest.ini                   # Test-Konfiguration
-├── Makefile                     # make format / make lint / make fix
+├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
+├── Makefile                     # make format / lint / fix / test / test-all / clean / run
 └── backlog.md                   # Feature-Backlog mit Effort/Benefit
 ```
 
