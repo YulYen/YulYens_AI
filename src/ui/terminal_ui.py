@@ -7,6 +7,7 @@ from pathlib import Path
 
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
+from core.context_summarizer import KarlSummarizationError, KarlSummarizer
 from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
 from core.orchestrator import broadcast_to_ensemble
 
@@ -377,6 +378,24 @@ class TerminalUI:
         wait_msg = self._t("context_wait_message", persona_name=self.bot, drink=drink)
         print(wait_msg)
 
+        context_management = self._require_context_management_config()
+        strategy = context_management["strategy"]
+
+        if strategy == "heuristic":
+            self._apply_heuristic_context_trim(persona_options)
+            return
+
+        if strategy == "karl":
+            self._apply_karl_context_summary(
+                context_management["karl"], persona_options
+            )
+            return
+
+        raise ValueError(
+            "context_management.strategy must be either 'heuristic' or 'karl'."
+        )
+
+    def _apply_heuristic_context_trim(self, persona_options) -> None:
         num_ctx = persona_options.get("num_ctx")
         if not num_ctx:
             logging.info("TerminalUI: Context limit reached, but 'num_ctx' is not set.")
@@ -403,6 +422,62 @@ class TerminalUI:
             )
             notice = self.texts["terminal_context_trim_notice"]
             print(f"{Fore.YELLOW}{notice}{Style.RESET_ALL}")
+
+    def _apply_karl_context_summary(self, karl_cfg, persona_options) -> None:
+        summarizer = KarlSummarizer(
+            llm_core=self.streamer._llm_core,
+            config=karl_cfg,
+            chat_model_name=self.streamer.model_name,
+        )
+        original_length = len(self.history)
+        try:
+            self.history = summarizer.summarize(self.history)
+        except KarlSummarizationError:
+            fallback = karl_cfg.get("fallback_strategy")
+            if fallback == "heuristic":
+                self._apply_heuristic_context_trim(persona_options)
+                return
+            logging.exception(
+                "Karl summarization failed and no fallback is configured."
+            )
+            raise
+
+        removed = original_length - len(self.history)
+        if removed > 0:
+            notice = self.texts["terminal_context_trim_notice"]
+            print(f"{Fore.YELLOW}{notice}{Style.RESET_ALL}")
+
+    def _require_context_management_config(self):
+        context_management = getattr(self.config, "context_management", None)
+        if not isinstance(context_management, dict):
+            raise ValueError(
+                "Missing required 'context_management' configuration section."
+            )
+
+        strategy = context_management.get("strategy")
+        if strategy not in {"heuristic", "karl"}:
+            raise ValueError(
+                "context_management.strategy must be either 'heuristic' or 'karl'."
+            )
+
+        if strategy == "karl":
+            karl_cfg = context_management.get("karl")
+            if not isinstance(karl_cfg, dict):
+                raise ValueError("Missing required 'context_management.karl' section.")
+            required_keys = {
+                "model",
+                "summary_max_tokens",
+                "keep_last_messages",
+                "log_dir",
+            }
+            missing = [key for key in required_keys if key not in karl_cfg]
+            if missing:
+                raise ValueError(
+                    "Missing required context_management.karl keys: "
+                    + ", ".join(sorted(missing))
+                )
+
+        return context_management
 
     def _print_loaded_history(self) -> None:
         if not self.history:
