@@ -234,6 +234,14 @@ class EmailAdapterService:
                 persona,
             )
             answer = self.provider.answer(incoming.body, persona)
+            if not answer.strip() or answer.lstrip().startswith("[ERROR]"):
+                logging.warning(
+                    "No valid LLM answer for uid=%s (likely a transient backend "
+                    "error, e.g. Ollama down); leaving the e-mail untouched in the "
+                    "mailbox to retry on the next poll.",
+                    uid.decode(errors="replace"),
+                )
+                return False
             self._send_reply(incoming, answer)
             self._mark_processed(imap, uid)
             return True

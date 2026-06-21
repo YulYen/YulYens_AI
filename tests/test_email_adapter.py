@@ -171,6 +171,37 @@ def test_email_adapter_does_not_answer_own_addresses():
     assert ("uid", "copy", b"103", "Processed") in imap.commands
 
 
+class FakeErrorProvider:
+    def __init__(self):
+        self.calls = []
+
+    def answer(self, question, persona):
+        self.calls.append((question, persona))
+        return "[ERROR] LLM is not responding correctly."
+
+
+def test_email_adapter_keeps_mail_on_llm_error():
+    """On a transient LLM failure the mail must stay in the inbox (no reply,
+    not marked processed) so the next poll retries it."""
+    imap = FakeImap({b"104": _raw_mail()})
+    smtp = FakeSmtp()
+    provider = FakeErrorProvider()
+    service = EmailAdapterService(
+        _cfg(),
+        provider,
+        imap_factory=lambda _cfg: imap,
+        smtp_factory=lambda _cfg: smtp,
+    )
+
+    assert service.run_once() == 0
+
+    # The LLM was attempted, but nothing is sent and the mail is left untouched.
+    assert provider.calls == [("Hallo Leah", "LEAH")]
+    assert smtp.messages == []
+    assert not any(c[:2] == ("uid", "copy") for c in imap.commands)
+    assert not any(c[:2] == ("uid", "store") for c in imap.commands)
+
+
 def test_email_adapter_resolves_environment_secret(monkeypatch):
     monkeypatch.setenv("MAIL_PASSWORD", "from-env")
 
