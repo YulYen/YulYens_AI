@@ -55,3 +55,6 @@ out/
 
 # Ruff cache
 .ruff_cache/
+
+# Local config override (real/personal values, never committed)
+config.local.yaml

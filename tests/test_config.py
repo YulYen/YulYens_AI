@@ -4,6 +4,39 @@ from datetime import datetime
 
 import pytest
 from config.config_singleton import Config
+
+
+def test_config_local_override_is_merged(tmp_path):
+    """A sibling config.local.yaml is deep-merged over config.yaml (local wins)."""
+    base = tmp_path / "config.yaml"
+    base.write_text(
+        'language: "de"\n'
+        "email_adapter:\n"
+        "  enabled: false\n"
+        "  imap:\n"
+        '    host: "imap.example.de"\n'
+        "    port: 993\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "config.local.yaml").write_text(
+        "email_adapter:\n"
+        "  enabled: true\n"
+        "  imap:\n"
+        '    host: "real.host.example"\n',
+        encoding="utf-8",
+    )
+
+    Config.reset_instance()
+    cfg = Config(str(base))
+    try:
+        assert cfg.email_adapter["enabled"] is True
+        assert cfg.email_adapter["imap"]["host"] == "real.host.example"
+        # untouched base keys survive the merge
+        assert cfg.email_adapter["imap"]["port"] == 993
+    finally:
+        Config.reset_instance()
+
+
 from config.personas import _load_system_prompts
 from core import utils as utils_module
 from core.dummy_llm_core import DummyLLMCore

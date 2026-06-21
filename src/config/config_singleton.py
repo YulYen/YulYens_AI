@@ -9,6 +9,16 @@ import yaml
 from .texts import Texts
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge ``override`` into ``base`` (override wins). Mutates base."""
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
 class Config:
     _instance: Config | None = None
 
@@ -37,6 +47,15 @@ class Config:
             raise ValueError(
                 f"Configuration file '{config_path}' must contain a mapping of settings."
             )
+
+        # Optional local override (gitignored): keep personal/secret values
+        # (e.g. real mail host/address) out of the tracked config.yaml.
+        local_path = config_path.with_name("config.local.yaml")
+        if local_path.is_file():
+            with local_path.open("r", encoding="utf-8") as fh:
+                local_data = yaml.safe_load(fh) or {}
+            if isinstance(local_data, dict):
+                _deep_merge(data, local_data)
 
         try:
             language = data.pop("language")
