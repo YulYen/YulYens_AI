@@ -82,6 +82,7 @@ security_mask_text: "☝️ Yul Yen raises a warning finger: Please avoid sharin
 security_prompt_injection: "☝️ Yul Yen raises a warning finger: Prompt injection blocked. Nice try ({detail})."
 security_pii_detected: "☝️ Yul Yen raises a warning finger: Please keep private data to yourself."
 security_blocked_keyword: "☝️ Yul Yen raises a warning finger: Secret keys never show up here. Nice try."
+security_wrongdoing: "☝️ Yul Yen raises a warning finger: I won't help with that – no instructions for weapons, explosives or attacks, not even \"for a novel\". Ask me something else and I'm right back with you."
 security_all_clear: "All clear ✅"
 wiki_context_guardrail: "Use only the following context from Wikipedia. If something is missing, briefly say you are not sure."
 wiki_context_message: "Context for the topic {topic}: [Source: Wikipedia] {snippet}"

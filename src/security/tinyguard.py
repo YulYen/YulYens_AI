@@ -7,7 +7,8 @@ from typing import Any, TypedDict
 
 class SecurityResult(TypedDict):
     ok: bool
-    reason: str  # "ok" | "prompt_injection" | "pii_detected" | "blocked_keyword"
+    # "ok" | "prompt_injection" | "pii_detected" | "blocked_keyword" | "wrongdoing"
+    reason: str
     detail: str | None  # first match / hint
 
 
@@ -45,9 +46,16 @@ def _require_security_text(locale_key: str, texts: Mapping[str, str]) -> str:
 class BasicGuard:
     """
     Tiny, deterministic guard for v0.
-    - check_input: prompt injection + PII
+    - check_input: wrongdoing (violence/weaponization) + prompt injection + PII
     - check_output: PII + output blocklist (API keys etc.)
     No network calls, no external dependencies.
+
+    The wrongdoing check is a pre-LLM input filter for violent wrongdoing
+    requests (weapons/explosives/attack instructions). Once it fires it sets a
+    per-instance session lock so follow-ups keep getting refused (e.g. the
+    classic "but it's for a novel" reframing). The guard lives for the duration
+    of one conversation/streamer, so the lock resets automatically on a new
+    conversation; call reset_session() to clear it explicitly.
     """
 
     def __init__(
@@ -56,6 +64,7 @@ class BasicGuard:
         prompt_injection_protection: bool,
         pii_protection: bool,
         output_blocklist: bool,
+        wrongdoing_protection: bool = True,
         custom_patterns: dict[str, list[str]] | None = None,
         texts: Mapping[str, str] | None = None,
     ):
@@ -64,7 +73,10 @@ class BasicGuard:
             "prompt_injection_protection": prompt_injection_protection,
             "pii_protection": pii_protection,
             "output_blocklist": output_blocklist,
+            "wrongdoing_protection": wrongdoing_protection,
         }
+        # Session lock: set once a wrongdoing request is seen, blocks follow-ups.
+        self._wrongdoing_locked = False
 
         self.texts = _load_texts(texts)
         for key in _SECURITY_KEYS:
@@ -112,6 +124,51 @@ class BasicGuard:
             r"(?i)\baws_secret_access_key\b.*?[A-Za-z0-9/+]{30,}",  # AWS Secret (heur.)
         ]
 
+        # Wrongdoing: instructional violence/weaponization. Patterns target the
+        # verb+object intent ("build a bomb", "synthesize a nerve agent") rather
+        # than bare nouns, to keep benign mentions ("the news reported on
+        # weapons") from tripping the filter.
+        _weapon_en = (
+            r"(?:bomb|explosives?|grenade|landmine|napalm|molotov(?:\s+cocktail)?"
+            r"|ied|pipe\s+bomb|dirty\s+bomb|nerve\s+agent|sarin|vx(?:\s+gas)?"
+            r"|bio\s?weapons?|biological\s+weapons?|chemical\s+weapons?"
+            r"|nuclear\s+(?:bomb|weapon|device)|nuke)"
+        )
+        _make_en = (
+            r"(?:mak(?:e|es|ing)|buil(?:d|ds|ding)|construct(?:s|ing)?"
+            r"|assembl(?:e|es|ing)|synthesi[sz](?:e|es|ing)"
+            r"|manufactur(?:e|es|ing)|creat(?:e|es|ing)|detonat(?:e|es|ing))"
+        )
+        wrong = [
+            rf"(?i)\b{_make_en}\b.{{0,40}}\b{_weapon_en}\b",
+            rf"(?i)\b{_weapon_en}\b.{{0,40}}\b{_make_en}\b",
+            r"(?i)\bhow\s+to\b.{0,30}\b(kill|murder|poison)\b.{0,30}"
+            r"\b(someone|a\s+person|people|him|her|them)\b",
+            r"(?i)\b(mass|school)\s+shooting\b",
+            r"(?i)\bmaximi[sz]e\b.{0,20}\b(casualties|deaths|victims)\b",
+        ]
+
+        _weapon_de = (
+            r"(?:bombe|sprengstoff|sprengsatz|granate|napalm"
+            r"|molotow(?:cocktail)?|nervengas|sarin|biowaffen?"
+            r"|biologische\s+waffen?|chemiewaffen?|chemische\s+waffen?"
+            r"|atombombe|nuklearwaffe|schmutzige\s+bombe|rohrbombe)"
+        )
+        _make_de = (
+            r"(?:bau(?:e|en|st|t)?|herstell(?:e|en|ung|t)|stell(?:e|en|st|t)?"
+            r"|bastel[nst]?|bastle|misch(?:e|en|st|t)?|z(?:ü|ue)nde[nst]?)"
+        )
+        de_wrong = [
+            rf"(?i)\bwie\b.{{0,40}}\b{_make_de}\b.{{0,40}}\b{_weapon_de}\b",
+            rf"(?i)\b{_make_de}\b.{{0,40}}\b{_weapon_de}\b",
+            rf"(?i)\b\w*anleitung\b.{{0,40}}\b{_weapon_de}\b",
+            r"(?i)\bbombenbau\b",
+            r"(?i)\bwie\b.{0,30}\b(t(?:ö|oe)te[nst]?|ermorde[nst]?"
+            r"|vergifte[nst]?)\b.{0,30}\b(jemanden|eine\s+person|menschen|ihn|sie)\b",
+            r"(?i)\b(amoklauf|schulamoklauf)\b",
+        ]
+        wrong += de_wrong
+
         if custom_patterns:
             if "prompt_injection" in custom_patterns:
                 inj = custom_patterns["prompt_injection"]
@@ -119,16 +176,29 @@ class BasicGuard:
                 pii = custom_patterns["pii"]
             if "output_blocklist" in custom_patterns:
                 block = custom_patterns["output_blocklist"]
+            if "wrongdoing" in custom_patterns:
+                wrong = custom_patterns["wrongdoing"]
 
         self._inj = [re.compile(p, re.IGNORECASE) for p in inj]
         self._pii = [re.compile(p, re.IGNORECASE) for p in pii]
         self._block = [re.compile(p, re.IGNORECASE) for p in block]
+        self._wrong = [re.compile(p, re.IGNORECASE) for p in wrong]
 
     # ---- Public API -------------------------------------------------------
 
     def check_input(self, text: str) -> SecurityResult:
         if not self.enabled:
             return self._ok()
+
+        # Wrongdoing first: once the session is locked, every follow-up is
+        # refused regardless of how harmless it looks ("it's for a novel").
+        if self.flags.get("wrongdoing_protection"):
+            if self._wrongdoing_locked:
+                return self._bad("wrongdoing", "session_locked")
+            m = self._first_match(self._wrong, text)
+            if m:
+                self._wrongdoing_locked = True
+                return self._bad("wrongdoing", m)
 
         if self.flags.get("prompt_injection_protection"):
             m = self._first_match(self._inj, text)
@@ -195,6 +265,10 @@ class BasicGuard:
 
         return {"blocked": False, "reason": None, "text": out, "masked": masked}
 
+    def reset_session(self) -> None:
+        """Clear the wrongdoing session lock (e.g. on a new conversation)."""
+        self._wrongdoing_locked = False
+
     # ---- Helpers ----------------------------------------------------------
 
     def _first_match(self, patterns: list[re.Pattern], text: str) -> str | None:
@@ -225,6 +299,7 @@ class DisabledGuard(BasicGuard):
             prompt_injection_protection=False,
             pii_protection=False,
             output_blocklist=False,
+            wrongdoing_protection=False,
         )
 
 
@@ -246,6 +321,7 @@ def create_guard(name: str, settings: dict[str, Any]) -> BasicGuard:
             ),
             pii_protection=bool(settings.get("pii_protection", True)),
             output_blocklist=bool(settings.get("output_blocklist", True)),
+            wrongdoing_protection=bool(settings.get("wrongdoing_protection", True)),
             custom_patterns=settings.get("custom_patterns"),
         )
 
@@ -262,6 +338,9 @@ def zeigefinger_message(
     catalog = _load_texts(texts)
     reason = (res.get("reason") or "ok").lower()
     detail = (res.get("detail") or "")[:80]
+    if reason == "wrongdoing":
+        # Deliberately ignores `detail` so the harmful phrasing is never echoed.
+        return _require_security_text("security_wrongdoing", catalog)
     if reason == "prompt_injection":
         template = _require_security_text("security_prompt_injection", catalog)
         return template.format(detail=detail)

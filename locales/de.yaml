@@ -82,6 +82,7 @@ security_mask_text: "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine pr
 security_prompt_injection: "☝️ Yul Yen hebt mahnend den Zeigefinger: Prompt-Injection geblockt. Netter Versuch ({detail})"
 security_pii_detected: "☝️ Yul Yen hebt mahnend den Zeigefinger: Bitte keine privaten Daten."
 security_blocked_keyword: "☝️ Yul Yen hebt mahnend den Zeigefinger: Geheime Schlüssel werden hier nie angezeigt. Netter Versuch."
+security_wrongdoing: "☝️ Yul Yen hebt mahnend den Zeigefinger: Dabei helfe ich nicht – keine Anleitungen für Waffen, Sprengstoff oder Angriffe, auch nicht „für einen Roman“. Frag mich gern etwas anderes, dann bin ich wieder dabei."
 security_all_clear: "Alles sauber ✅"
 wiki_context_guardrail: "Nutze ausschließlich den folgenden Kontext aus Wikipedia. Wenn etwas dort nicht steht, sag kurz, dass du dir nicht sicher bist."
 wiki_context_message: "Kontext zum Thema {topic}: [Quelle: Wikipedia] {snippet}"

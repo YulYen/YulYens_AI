@@ -8,7 +8,7 @@ stabile ID und ändert sich nicht beim Umsortieren.
 
 | No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
-| 18 | Wrongdoing guardrail (violence/weaponization) | Add a minimal deterministic guardrail for violent wrongdoing requests (e.g., weapons/explosives/attack instructions). Implement as pre-LLM input check + session lock (once triggered, keep blocking follow-ups like "it's for a novel"). Provide safe alternative response templates and add unit tests for common bypass patterns. **Stand: 0 % — BasicGuard deckt nur Prompt-Injection/PII/Secrets ab, kein Gewalt-Filter, kein Session-Lock.** | S | M | Security/Robustness |
+| 18 | Wrongdoing guardrail (violence/weaponization) | Add a minimal deterministic guardrail for violent wrongdoing requests (e.g., weapons/explosives/attack instructions). Implement as pre-LLM input check + session lock (once triggered, keep blocking follow-ups like "it's for a novel"). Provide safe alternative response templates and add unit tests for common bypass patterns. **DONE: `wrongdoing_protection` in `tinyguard.py` (EN/DE verb+objekt-Patterns, Session-Lock via `_wrongdoing_locked`/`reset_session`), Locale-Template `security_wrongdoing`, Config-Flag, 17 Unit-Tests in `tests/test_wrongdoing_guard.py`. Default on.** | S | M | Security/Robustness |
 | 19 | Drei-Zeitstempel-Transparenz | Personas verwechseln Tagesdatum, Modell-Trainings-Cutoff und Kiwix-Datenstand. Alle drei Werte im System-Prompt klar trennen und Persona-Formulierungen testen, damit kein Modell behauptet sein Wissen reiche bis heute. | M | M | Quality/Correctness |
 
 ## Tier B — Quick Wins & „fast fertig" abschließen

@@ -123,7 +123,9 @@ security:
   prompt_injection_protection: true
   pii_protection: false
   output_blocklist: true
-  # Input: block injections/PII. Output: mask PII, block secrets.
+  wrongdoing_protection: true
+  # Input: block wrongdoing (weapons/violence, with session lock) + injections/PII.
+  # Output: mask PII, block secrets.
 
 # --- Context management ---------------------------------------------------------
 # strategy "heuristic" (default): quick token-based trimming of old messages.
