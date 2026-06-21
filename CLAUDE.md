@@ -158,7 +158,20 @@ api:
 security:
   enabled: true
   guard: BasicGuard
+
+email_adapter:
+  enabled: false             # opt-in IMAP/SMTP-Bridge (Personas per Mail)
+
+context_management:
+  strategy: "heuristic"      # "heuristic" (Default) | "karl" (LLM-Zusammenfassung)
 ```
+
+### Lokales Override: `config.local.yaml` (gitignored)
+Beim Laden wird ein optionales `config.local.yaml` (neben `config.yaml`) **per
+Deep-Merge** über `config.yaml` gelegt (lokale Werte gewinnen). Damit bleiben
+persönliche/geheime Werte (z. B. echter Mail-Host/-Adresse) aus der **öffentlichen**
+`config.yaml` heraus, während die App lokal trotzdem läuft. `config.local.yaml` ist
+in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
 ## Code-Stil
 
@@ -167,6 +180,21 @@ security:
 - `make format` → Black + Ruff-Fix
 - `make lint` → Ruff check only
 - Keine Docstrings für einfache Methoden, kurze Inline-Kommentare nur wenn nötig
+
+### Pre-commit / Versions-Pinning (wichtig!)
+CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
+sind in `requirements-dev.txt` gepinnt** (aktuell `black==24.4.2`, `ruff==0.4.10`) —
+exakt dieselben Versionen in `.pre-commit-config.yaml`. Eine **abweichende lokale
+Black-Version formatiert anders und lässt die CI fehlschlagen.** Daher:
+
+```bash
+pip install -r requirements-dev.txt   # gepinnte Tool-Versionen ins venv
+pre-commit install                    # Hook aktivieren (einmalig pro Clone)
+```
+
+Danach formatiert jeder Commit automatisch mit der CI-Version (Hook läuft isoliert,
+unabhängig von sonstigen venv-Versionen). Tool-Versionen nur bewusst und **synchron**
+in `requirements-dev.txt` **und** `.pre-commit-config.yaml` ändern.
 
 ## Feature-Modi
 
