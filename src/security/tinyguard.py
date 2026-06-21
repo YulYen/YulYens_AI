@@ -129,10 +129,11 @@ class BasicGuard:
         # than bare nouns, to keep benign mentions ("the news reported on
         # weapons") from tripping the filter.
         _weapon_en = (
-            r"(?:bomb|explosives?|grenade|landmine|napalm|molotov(?:\s+cocktail)?"
-            r"|ied|pipe\s+bomb|dirty\s+bomb|nerve\s+agent|sarin|vx(?:\s+gas)?"
-            r"|bio\s?weapons?|biological\s+weapons?|chemical\s+weapons?"
-            r"|nuclear\s+(?:bomb|weapon|device)|nuke)"
+            r"(?:bombs?|explosives?|grenades?|landmines?|napalm"
+            r"|molotov(?:\s+cocktails?)?|ieds?|pipe\s+bombs?|dirty\s+bombs?"
+            r"|nerve\s+agents?|sarin|vx(?:\s+gas)?|bio\s?weapons?"
+            r"|biological\s+weapons?|chemical\s+weapons?"
+            r"|nuclear\s+(?:bombs?|weapons?|devices?)|nukes?)"
         )
         _make_en = (
             r"(?:mak(?:e|es|ing)|buil(?:d|ds|ding)|construct(?:s|ing)?"
@@ -149,10 +150,10 @@ class BasicGuard:
         ]
 
         _weapon_de = (
-            r"(?:bombe|sprengstoff|sprengsatz|granate|napalm"
-            r"|molotow(?:cocktail)?|nervengas|sarin|biowaffen?"
+            r"(?:bomben?|sprengstoff|sprengs(?:atz|ätze)|granaten?|napalm"
+            r"|molotow(?:cocktails?)?|nervengas|sarin|biowaffen?"
             r"|biologische\s+waffen?|chemiewaffen?|chemische\s+waffen?"
-            r"|atombombe|nuklearwaffe|schmutzige\s+bombe|rohrbombe)"
+            r"|atombomben?|nuklearwaffen?|schmutzige\s+bomben?|rohrbomben?)"
         )
         _make_de = (
             r"(?:bau(?:e|en|st|t)?|herstell(?:e|en|ung|t)|stell(?:e|en|st|t)?"
