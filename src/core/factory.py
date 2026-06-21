@@ -31,6 +31,7 @@ class AppFactory:
         self._cfg = Config()
         self._keyword_finder: SpacyKeywordFinder | None = None
         self._api_provider = None
+        self._one_shot_provider = None
         self._ui = None  # TerminalUI or WebUI
 
     # --------- Lazy‑Singleton Getter ---------
@@ -175,14 +176,12 @@ class AppFactory:
                 f"Unknown security guard in security.guard: {raw_guard_name!r}"
             ) from exc
 
-    def get_api_provider(self):
-        """Only build when enabled in YAML. No server start here."""
-        if self._api_provider is None:
-            if not bool(self._cfg.api["enabled"]):
-                return None
+    def get_one_shot_provider(self):
+        """Builds the shared one-shot provider used by the API and adapters."""
+        if self._one_shot_provider is None:
             from api.provider import AiApiProvider
 
-            self._api_provider = AiApiProvider(
+            self._one_shot_provider = AiApiProvider(
                 keyword_finder=self.get_keyword_finder(),
                 wiki_mode=self._cfg.wiki["mode"],
                 wiki_proxy_port=int(self._cfg.wiki["proxy_port"]),
@@ -194,6 +193,14 @@ class AppFactory:
                 ),
                 factory=self,
             )
+        return self._one_shot_provider
+
+    def get_api_provider(self):
+        """Only expose the one-shot provider to HTTP when enabled in YAML."""
+        if not bool(self._cfg.api["enabled"]):
+            return None
+        if self._api_provider is None:
+            self._api_provider = self.get_one_shot_provider()
         return self._api_provider
 
     def get_ui(self):

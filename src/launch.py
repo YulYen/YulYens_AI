@@ -115,6 +115,10 @@ def main():
     factory = AppFactory()
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
+    email_cfg = getattr(cfg, "email_adapter", {})
+    email_provider = (
+        factory.get_one_shot_provider() if _email_adapter_enabled(email_cfg) else None
+    )
 
     logging.info(
         f"ui.type={cfg.ui['type']} wiki.mode={wiki_mode} snippet_limit={cfg.wiki['snippet_limit']}"
@@ -124,6 +128,9 @@ def main():
     if api_provider:
         start_api_in_background(cfg.api, api_provider)
 
+    # 4b) Optionally start the persona e-mail adapter
+    start_email_adapter_in_background(email_cfg, email_provider)
+
     # 5) Start the UI or block if API-only
     if cfg.ui["type"] is None:
         print("[Yul Yens AI] API is running. UI is disabled (ui.type = null).")
@@ -131,6 +138,29 @@ def main():
         return
     else:
         ui.launch()  # Terminal UI or Web UI
+
+
+def _email_adapter_enabled(email_cfg) -> bool:
+    if not isinstance(email_cfg, dict):
+        return False
+    value = email_cfg.get("enabled", False)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "on"}
+    return bool(value)
+
+
+def start_email_adapter_in_background(email_cfg, provider):
+    """Starts the optional IMAP/SMTP persona adapter in a daemon thread."""
+    if provider is None:
+        return None
+    from email_adapter import start_email_adapter
+
+    try:
+        return start_email_adapter(email_cfg, provider)
+    except Exception as exc:
+        logging.error("Could not start e-mail adapter: %s", exc)
+        logging.debug("E-mail adapter startup failed.", exc_info=True)
+        return None
 
 
 def start_api_in_background(api_cfg, provider):
