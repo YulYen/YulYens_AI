@@ -11,7 +11,7 @@
 | 11 | Easter egg logic | Keyword triggers an extra tagline | M | M | Cool feature |
 | 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach | L | L | Technical foundation |
 | 13 | STT MVP | Simple speech Input | M | M | Cool feature |
-| 14 | Email to/from AI | Read, compose, and send email. Implementierung liegt bereit auf Branch `origin/codex/add-email-adapter-for-personas` (`src/email_adapter/service.py`, ~470 Z. + Tests) — zur Sichtung/Integration in Phase C. | S | M | Integration |
+| 14 | Email to/from AI | DONE (MVP): `src/email_adapter/service.py` auf main, end-to-end live getestet (KAS-Postfach, LEAH antwortet via IMAP/SMTP). Helfer-Skripte `scripts/mail_smoketest.py` (Login-Check) + `scripts/mail_runonce.py` (1 Poll). Default `enabled: false`. Offen: (a) `processed_mailbox` mit KAS/Dovecot-Punkt-Trenner (`INBOX.YulYenProcessed`) scharf testen; (b) Dauerbetrieb via `launch.py` verifizieren; (c) Postfach-Passwort rotieren (stand im Chat). | S | M | Integration |
 | 15 | Daily briefing (IoT + RSS) | Daily short updates | M | M | Cool feature |
 | 16 | Sandbox/PDF functions | Local documentation sandbox | L | M | Cool feature |
 | 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
