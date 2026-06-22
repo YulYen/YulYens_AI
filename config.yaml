@@ -12,10 +12,13 @@ core:
   ollama_url: "http://127.0.0.1:11434"
   include_date: true  # master switch for the "three timestamps" prompt block
   # Training-knowledge cutoff per model (YYYY-MM). Used so personas don't claim
-  # their knowledge reaches today. Values are approximate — verify for your model.
-  # Models not listed here are described in the prompt as "cutoff unknown".
+  # their knowledge reaches today. Models not listed here are described in the
+  # prompt as "cutoff unknown".
+  # NOTE: the value below is an UNVERIFIED ESTIMATE — Mistral does not publish an
+  # exact cutoff for Ministral. Replace it with a confirmed date, or remove the
+  # entry to have the prompt honestly say "unknown".
   knowledge_cutoffs:
-    "ministral-3:8b": "2024-06"
+    "ministral-3:8b": "2024-06"  # estimate, verify
 
 # --- UI settings ---------------------------------------------------------------
 ui:
