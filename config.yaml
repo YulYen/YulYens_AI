@@ -10,7 +10,12 @@ core:
   warm_up: false
   # Base URL for Ollama (protocol + host + port), e.g. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"
-  include_date: true  # master switch to add the current date to persona system prompts
+  include_date: true  # master switch for the "three timestamps" prompt block
+  # Training-knowledge cutoff per model (YYYY-MM). Used so personas don't claim
+  # their knowledge reaches today. Values are approximate — verify for your model.
+  # Models not listed here are described in the prompt as "cutoff unknown".
+  knowledge_cutoffs:
+    "ministral-3:8b": "2024-06"
 
 # --- UI settings ---------------------------------------------------------------
 ui:

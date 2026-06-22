@@ -228,7 +228,7 @@ def test_wiki_mode_enabled(mode, expected):
     assert _wiki_mode_enabled(mode) is expected
 
 
-def test_system_prompt_with_date_uses_localized_suffix(monkeypatch):
+def test_system_prompt_includes_three_timestamps(monkeypatch):
     class _FixedDatetime(datetime):
         @classmethod
         def now(cls):
@@ -236,14 +236,36 @@ def test_system_prompt_with_date_uses_localized_suffix(monkeypatch):
 
     Config.reset_instance()
     cfg = Config()
+    cfg.override(
+        "core",
+        {
+            "include_date": True,
+            "model_name": "ministral-3:8b",
+            "knowledge_cutoffs": {"ministral-3:8b": "2024-06"},
+        },
+    )
+    cfg.override(
+        "wiki",
+        {
+            "mode": "offline",
+            "offline": {"zim_prefix": "wikipedia_de_all_nopic_2025-06"},
+        },
+    )
     persona_name = _load_system_prompts()[0]["name"]
 
     monkeypatch.setattr(utils_module, "get_prompt_by_name", lambda name: "BASE")
     monkeypatch.setattr(utils_module, "datetime", _FixedDatetime)
 
     try:
-        result = _system_prompt_with_date(persona_name, True)
-        expected_suffix = cfg.t("persona_prompt_date_suffix", date="2024-01-02")
+        result = _system_prompt_with_date(persona_name, cfg)
+        expected_suffix = " ".join(
+            [
+                cfg.t("persona_ts_today", date="2024-01-02"),
+                cfg.t("persona_ts_cutoff", cutoff="2024-06"),
+                cfg.t("persona_ts_wiki_offline", date="2025-06"),
+                cfg.t("persona_ts_guidance"),
+            ]
+        )
         assert result == f"BASE | {expected_suffix}"
     finally:
         Config.reset_instance()

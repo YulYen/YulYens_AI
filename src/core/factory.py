@@ -58,9 +58,7 @@ class AppFactory:
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Creates a new LLM streamer for the given persona."""
         core_cfg = self._cfg.core
-        persona_prompt = _system_prompt_with_date(
-            persona_name, core_cfg["include_date"]
-        )
+        persona_prompt = _system_prompt_with_date(persona_name, self._cfg)
         options = personas.get_options(persona_name)
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
