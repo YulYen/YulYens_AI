@@ -1,7 +1,8 @@
 import logging
 import traceback
 
-from fastapi import FastAPI, HTTPException
+import core.system_checks as system_checks
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from .provider import AiApiProvider, UnknownPersonaError
@@ -36,7 +37,20 @@ app = FastAPI(title="Leah One‑Shot API", version="1.0.0")
 
 @app.get("/health")
 def health():
+    # Cheap liveness probe: the process answers.
     return {"status": "ok"}
+
+
+@app.get("/healthz")
+def healthz(response: Response):
+    # Deep readiness probe: Ollama/model/spaCy/Kiwix/VRAM. 503 on a critical fail.
+    from config.config_singleton import Config
+
+    results = system_checks.run_checks(Config())
+    status = system_checks.overall_status(results)
+    if status == "error":
+        response.status_code = 503
+    return {"status": status, "checks": [r.as_dict() for r in results]}
 
 
 @app.post("/ask", response_model=AskResponse)

@@ -11,17 +11,18 @@ import threading
 import time
 from datetime import datetime
 
-import uvicorn
-
 # Core and configuration
 from config.config_singleton import Config
 
 # Logging setup
 from config.logging_setup import init_logging
-from core.factory import AppFactory
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
 from yaml import YAMLError
+
+# NOTE: the heavy AppFactory import (→ gradio) and uvicorn are deferred into the
+# functions that need them, so light commands like `--doctor` stay importable
+# even when the UI/web stack is missing or broken.
 
 
 def main():
@@ -39,7 +40,16 @@ def main():
         dest="ensemble",
         help="Name of the persona ensemble to load.",
     )
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run preflight system checks (Ollama/model/spaCy/Kiwix/VRAM) and exit.",
+    )
     args = parser.parse_args()
+
+    if args.doctor:
+        sys.exit(_run_doctor(args.config))
+
     if not args.ensemble:
         parser.error(
             "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
@@ -112,6 +122,8 @@ def main():
             logging.error(f"Unexpected error during kiwix autostart. Continuing. {e}")
 
     # 3) Build objects (Factory) without starting them
+    from core.factory import AppFactory
+
     factory = AppFactory()
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
@@ -138,6 +150,63 @@ def main():
         return
     else:
         ui.launch()  # Terminal UI or Web UI
+
+
+def _load_config_for_cli(config_path: str | None) -> "Config":
+    """Load the config for one-shot CLI commands, printing friendly errors."""
+    resolved = os.path.abspath(config_path or "config.yaml")
+    try:
+        return Config(path=resolved)
+    except OSError as exc:
+        details = exc.strerror or str(exc)
+        print(
+            f"[Yul Yens AI] Critical error: Configuration file '{resolved}' "
+            f"could not be loaded ({details}).",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    except YAMLError as exc:
+        print(
+            f"[Yul Yens AI] Critical error: Configuration file '{resolved}' "
+            f"contains invalid YAML ({exc}).",
+            file=sys.stderr,
+        )
+        sys.exit(3)
+
+
+def _run_doctor(config_path: str | None) -> int:
+    """Run system preflight checks, print a report, return a process exit code."""
+    from colorama import Fore, Style
+    from colorama import init as colorama_init
+    from core.system_checks import overall_status, run_checks
+
+    colorama_init()
+    cfg = _load_config_for_cli(config_path)
+    results = run_checks(cfg)
+
+    symbols = {
+        ("critical", False): (f"{Fore.RED}✗{Style.RESET_ALL}", "FAIL"),
+        ("warning", False): (f"{Fore.YELLOW}!{Style.RESET_ALL}", "WARN"),
+        ("info", False): (f"{Fore.YELLOW}!{Style.RESET_ALL}", "WARN"),
+    }
+    ok_symbol = (f"{Fore.GREEN}✓{Style.RESET_ALL}", "OK")
+
+    print(f"\n{Style.BRIGHT}Yul Yen — Setup-Doktor{Style.RESET_ALL}")
+    print("-" * 48)
+    for r in results:
+        mark, label = ok_symbol if r.ok else symbols[(r.severity, False)]
+        print(f"  {mark} {label:5} {r.name:14} {r.detail}")
+    print("-" * 48)
+
+    status = overall_status(results)
+    status_color = {
+        "ok": Fore.GREEN,
+        "degraded": Fore.YELLOW,
+        "error": Fore.RED,
+    }.get(status, "")
+    print(f"  Status: {status_color}{status.upper()}{Style.RESET_ALL}\n")
+
+    return 1 if status == "error" else 0
 
 
 def _email_adapter_enabled(email_cfg) -> bool:
@@ -167,6 +236,7 @@ def start_api_in_background(api_cfg, provider):
     """
     Starts Uvicorn in a daemon thread.
     """
+    import uvicorn
     from api.app import app, set_provider
 
     set_provider(provider)
