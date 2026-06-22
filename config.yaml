@@ -14,11 +14,11 @@ core:
   # Training-knowledge cutoff per model (YYYY-MM). Used so personas don't claim
   # their knowledge reaches today. Models not listed here are described in the
   # prompt as "cutoff unknown".
-  # NOTE: the value below is an UNVERIFIED ESTIMATE — Mistral does not publish an
-  # exact cutoff for Ministral. Replace it with a confirmed date, or remove the
-  # entry to have the prompt honestly say "unknown".
   knowledge_cutoffs:
-    "ministral-3:8b": "2024-06"  # estimate, verify
+    # Source: Mistral's official SYSTEM_PROMPT.txt for Ministral-3 states a
+    # knowledge cutoff of 2023-10 (same base data as Mistral Small 3.1/3.2).
+    # Note: release tag is 2512 (Dec 2025) — release date != data cutoff.
+    "ministral-3:8b": "2023-10"
 
 # --- UI settings ---------------------------------------------------------------
 ui:
