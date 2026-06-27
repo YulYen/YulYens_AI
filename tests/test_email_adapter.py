@@ -135,6 +135,45 @@ def test_email_adapter_routes_mail_to_persona_and_replies():
     assert imap.logged_out
 
 
+def test_email_adapter_quotes_original_message_in_reply():
+    imap = FakeImap({b"101": _raw_mail(body="Hallo Leah\nWie geht es dir?")})
+    smtp = FakeSmtp()
+    provider = FakeProvider()
+    service = EmailAdapterService(
+        _cfg(),
+        provider,
+        imap_factory=lambda _cfg: imap,
+        smtp_factory=lambda _cfg: smtp,
+    )
+
+    assert service.run_once() == 1
+
+    content = smtp.messages[0].get_content()
+    assert "max@example.org schrieb:" in content
+    assert "> Hallo Leah" in content
+    assert "> Wie geht es dir?" in content
+    # The persona answer still comes first, above the quoted original.
+    assert content.index("Antwort von LEAH") < content.index("> Hallo Leah")
+
+
+def test_email_adapter_uses_localized_quote_attribution():
+    imap = FakeImap({b"101": _raw_mail(body="Hello Leah")})
+    smtp = FakeSmtp()
+    provider = FakeProvider()
+    service = EmailAdapterService(
+        _cfg(quote={"attribution_no_date": "On older mail {sender} wrote:"}),
+        provider,
+        imap_factory=lambda _cfg: imap,
+        smtp_factory=lambda _cfg: smtp,
+    )
+
+    assert service.run_once() == 1
+
+    content = smtp.messages[0].get_content()
+    assert "On older mail max@example.org wrote:" in content
+    assert "> Hello Leah" in content
+
+
 def test_email_adapter_ignores_unmapped_recipient_and_marks_processed():
     imap = FakeImap({b"102": _raw_mail(to="unknown@example.de")})
     smtp = FakeSmtp()

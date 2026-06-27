@@ -61,12 +61,17 @@ class EmailAdapterConfig:
     smtp_password: str = ""
     smtp_from_address: str = ""
 
+    # Localized templates for the quoted original mail in replies.
+    quote_attribution: str = "Am {date} schrieb {sender}:"
+    quote_attribution_no_date: str = "{sender} schrieb:"
+
     @classmethod
     def from_mapping(cls, data: dict | None) -> EmailAdapterConfig:
         data = data or {}
         imap_cfg = data.get("imap", {}) or {}
         smtp_cfg = data.get("smtp", {}) or {}
         processing_cfg = data.get("processing", {}) or {}
+        quote_cfg = data.get("quote", {}) or {}
 
         return cls(
             enabled=_as_bool(data.get("enabled", False)),
@@ -90,6 +95,10 @@ class EmailAdapterConfig:
             smtp_username=_resolve_secret(smtp_cfg.get("username", "")),
             smtp_password=_resolve_secret(smtp_cfg.get("password", "")),
             smtp_from_address=_resolve_secret(smtp_cfg.get("from_address", "")),
+            quote_attribution=str(quote_cfg.get("attribution", cls.quote_attribution)),
+            quote_attribution_no_date=str(
+                quote_cfg.get("attribution_no_date", cls.quote_attribution_no_date)
+            ),
         )
 
     @property
@@ -137,6 +146,7 @@ class IncomingEmail:
     subject: str
     body: str
     message_id: str | None
+    date: str = ""
 
 
 class EmailAdapterService:
@@ -272,6 +282,7 @@ class EmailAdapterService:
             subject=_decode_header(msg.get("Subject", "")),
             body=_extract_text(msg),
             message_id=msg.get("Message-ID"),
+            date=_decode_header(msg.get("Date", "")),
         )
 
     def _persona_for(self, recipients: list[str]) -> str | None:
@@ -290,7 +301,7 @@ class EmailAdapterService:
         if incoming.message_id:
             msg["In-Reply-To"] = incoming.message_id
             msg["References"] = incoming.message_id
-        msg.set_content(answer.strip() or " ")
+        msg.set_content(_reply_body(answer, incoming, self.cfg))
 
         smtp = self._smtp_factory(self.cfg)
         try:
@@ -467,6 +478,28 @@ def _html_to_text(value: str) -> str:
     text = re.sub(r"(?i)</p>", "\n\n", text)
     text = re.sub(r"<[^>]+>", "", text)
     return html.unescape(text).strip()
+
+
+def _reply_body(answer: str, incoming: IncomingEmail, cfg: EmailAdapterConfig) -> str:
+    """Persona answer followed by the quoted original mail, like usual clients."""
+    body = answer.strip() or " "
+    quote = _quote_original(incoming, cfg)
+    if quote:
+        return f"{body}\n\n{quote}"
+    return body
+
+
+def _quote_original(incoming: IncomingEmail, cfg: EmailAdapterConfig) -> str:
+    original = (incoming.body or "").strip()
+    if not original:
+        return ""
+    quoted = "\n".join(f"> {line}" for line in original.splitlines())
+    sender = incoming.sender or "?"
+    if incoming.date:
+        attribution = cfg.quote_attribution.format(date=incoming.date, sender=sender)
+    else:
+        attribution = cfg.quote_attribution_no_date.format(sender=sender)
+    return f"{attribution}\n{quoted}"
 
 
 def _reply_subject(subject: str) -> str:

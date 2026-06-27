@@ -225,11 +225,29 @@ def start_email_adapter_in_background(email_cfg, provider):
     from email_adapter import start_email_adapter
 
     try:
-        return start_email_adapter(email_cfg, provider)
+        return start_email_adapter(_with_localized_quotes(email_cfg), provider)
     except Exception as exc:
         logging.error("Could not start e-mail adapter: %s", exc)
         logging.debug("E-mail adapter startup failed.", exc_info=True)
         return None
+
+
+def _with_localized_quotes(email_cfg):
+    """Injects the locale's reply-quote attribution templates into the adapter
+    config so the quoted original mail follows the project language."""
+    try:
+        texts = Config().texts
+        quote = {
+            "attribution": texts["email_quote_attribution"],
+            "attribution_no_date": texts["email_quote_attribution_no_date"],
+        }
+    except Exception:
+        logging.debug("No localized quote templates; using defaults.", exc_info=True)
+        return email_cfg
+
+    merged = dict(email_cfg or {})
+    merged["quote"] = {**merged.get("quote", {}), **quote}
+    return merged
 
 
 def start_api_in_background(api_cfg, provider):
