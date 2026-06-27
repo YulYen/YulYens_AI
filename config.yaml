@@ -88,6 +88,8 @@ logging:
   to_console: "auto" # "true", "false" or "auto" (auto: false if terminal-ui, otherwise true)
   dir: "logs"
   conversation_prefix: "conversation"
+  trace_prompts: false  # true: log the readable final prompt (incl. injected wiki snippets) per turn at INFO
+  log_raw_chunks: false # true: log every raw token chunk at DEBUG (very noisy; needs level: DEBUG too)
 
 # --- Persona e-mail adapter -----------------------------------------------------
 # Optional IMAP/SMTP bridge: routes incoming plain-text e-mails to personas via

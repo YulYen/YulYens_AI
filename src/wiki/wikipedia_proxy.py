@@ -368,6 +368,15 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 "source": source,
                 "wiki_hint": wiki_hint,
             }
+            # Make the actually-served snippet visible (this was the blind spot:
+            # request + timing were logged, but never the returned text itself).
+            logger.info(
+                "[Snippet] term='%s' source=%s len=%d head=%r",
+                search_term,
+                source,
+                len(clean_text),
+                clean_text[:160],
+            )
             _send_json(self, 200, payload)
         finally:
             # Always log the total duration

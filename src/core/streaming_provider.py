@@ -36,6 +36,30 @@ def _get_config() -> Config:
     return Config()
 
 
+def _log_flag(name: str, default: bool = False) -> bool:
+    """Reads a boolean switch from the `logging:` config section (best effort)."""
+    try:
+        return bool(_get_config().logging.get(name, default))
+    except Exception:
+        return default
+
+
+def _render_prompt_trace(
+    persona: str, model: str, messages: list[dict[str, Any]], max_chars: int = 1200
+) -> str:
+    """Renders the final message list (incl. injected wiki snippets) human-readably."""
+    lines = [f"[PROMPT TRACE] persona={persona} model={model} messages={len(messages)}"]
+    for idx, m in enumerate(messages, start=1):
+        role = m.get("role", "?")
+        content = m.get("content") or ""
+        if len(content) > max_chars:
+            content = f"{content[:max_chars]}…(+{len(content) - max_chars} chars)"
+        lines.append(
+            f"  [{idx}] {role} ({len(m.get('content') or '')} chars): {content}"
+        )
+    return "\n".join(lines)
+
+
 # Number of trailing characters held back while streaming so that a PII or
 # secret pattern split across token boundaries is still detected before any
 # part of it reaches the user. Best-effort: patterns longer than this window
@@ -66,6 +90,7 @@ class _StreamModerator:
         self.guard_texts = guard_texts
         self.holdback = holdback
         self.blocked = False
+        self.masked = False
         self._acc = ""
         self._emitted = 0
 
@@ -91,6 +116,7 @@ class _StreamModerator:
         if pol["blocked"]:
             return [self._block_message(pol.get("reason"))]
 
+        self.masked = self.masked or bool(pol.get("masked"))
         masked = pol["text"]
         safe_upto = len(masked) - self.holdback
         if safe_upto > self._emitted:
@@ -106,6 +132,7 @@ class _StreamModerator:
         pol = self.guard.process_output(self._acc)
         if pol["blocked"]:
             return [self._block_message(pol.get("reason"))]
+        self.masked = self.masked or bool(pol.get("masked"))
         masked = pol["text"]
         if len(masked) > self._emitted:
             chunk = masked[self._emitted :]
@@ -247,6 +274,12 @@ class YulYenStreamingProvider:
         }
         logging.info("[LLM TURN] %s", json.dumps(log_payload, ensure_ascii=False))
 
+        # 5) Optional human-readable trace of the exact prompt (incl. wiki snippets)
+        if _log_flag("trace_prompts"):
+            logging.info(
+                "%s", _render_prompt_trace(self.persona, self.model_name, messages)
+            )
+
     def stream(self, messages: list[dict[str, Any]]) -> Iterator[str]:
         """
         Generator that yields the LLM response token by token.
@@ -259,6 +292,11 @@ class YulYenStreamingProvider:
                 if m.get("role") == "user":
                     res = self.guard.check_input(m.get("content") or "")
                     if not res["ok"]:
+                        logging.info(
+                            "[GUARD] input blocked persona=%s reason=%s",
+                            self.persona,
+                            res.get("reason"),
+                        )
                         yield zeigefinger_message(res, texts=guard_texts)
                         return
                     break
@@ -292,10 +330,12 @@ class YulYenStreamingProvider:
                 keep_alive=600,
             )
 
+            log_raw_chunks = _log_flag("log_raw_chunks")
             moderator = _StreamModerator(self.guard, guard_texts)
             try:
                 for chunk in stream_obj:
-                    logging.debug("[RAW CHUNK] %r", chunk)
+                    if log_raw_chunks:
+                        logging.debug("[RAW CHUNK] %r", chunk)
                     if first_token_time is None:
                         first_token_time = time.time()
                     token = chunk.get("message", {}).get("content", "")
@@ -337,9 +377,12 @@ class YulYenStreamingProvider:
             # Log the final assistant reply. When the guard blocked the output
             # we must not persist the raw (e.g. secret) text to the log.
             if moderator.blocked:
+                logging.info("[GUARD] output blocked persona=%s", self.persona)
                 self._append_conversation_log("assistant", "[BLOCKED by guard]")
                 full_reply = ""
             else:
+                if moderator.masked:
+                    logging.info("[GUARD] output masked PII persona=%s", self.persona)
                 full_reply = "".join(full_reply_parts).strip()
             if full_reply:
                 self._append_conversation_log("assistant", full_reply)
@@ -399,6 +442,11 @@ class YulYenStreamingProvider:
             guard_texts = getattr(self.guard, "texts", None)
             res_in = self.guard.check_input(user_input or "")
             if not res_in["ok"]:
+                logging.info(
+                    "[GUARD] input blocked persona=%s reason=%s",
+                    persona,
+                    res_in.get("reason"),
+                )
                 return zeigefinger_message(res_in, texts=guard_texts)
 
         # Run the LLM and collect the answer
@@ -408,6 +456,11 @@ class YulYenStreamingProvider:
         if self.guard:
             res_out = self.guard.check_output(full_reply or "")
             if not res_out["ok"]:
+                logging.info(
+                    "[GUARD] output blocked persona=%s reason=%s",
+                    persona,
+                    res_out.get("reason"),
+                )
                 return zeigefinger_message(res_out, texts=guard_texts)
 
         return full_reply
