@@ -15,7 +15,6 @@ import json
 import logging
 import os
 import time
-import traceback
 from collections.abc import Iterator, Mapping
 from typing import Any
 from urllib.parse import quote
@@ -40,7 +39,8 @@ def _log_flag(name: str, default: bool = False) -> bool:
     """Reads a boolean switch from the `logging:` config section (best effort)."""
     try:
         return bool(_get_config().logging.get(name, default))
-    except Exception:
+    except (AttributeError, KeyError, TypeError):
+        # logging section missing or not a mapping
         return default
 
 
@@ -207,9 +207,8 @@ class YulYenStreamingProvider:
             self._llm_core.warm_up(self.model_name)
             logging.info("Model warmed up successfully.")
         except Exception:
-            logging.error(
-                "Error while warming up the model:\n%s", traceback.format_exc()
-            )
+            # Warm-up is an optimization; startup must survive any backend error.
+            logging.exception("Warm-up failed for model %s", self.model_name)
 
     def _append_conversation_log(self, role: str, content: str) -> None:
         """Writes an entry to the conversation JSON log."""
@@ -226,8 +225,12 @@ class YulYenStreamingProvider:
             }
             with open(self.conversation_log_path, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception as e:
-            logging.error("Error while writing the conversation JSON log: %s", e)
+        except (OSError, TypeError, ValueError):
+            # Logging must never break the stream; file or serialization issues
+            # are reported with a full traceback instead of failing the reply.
+            logging.exception(
+                "Could not write conversation log %s", self.conversation_log_path
+            )
 
     def _log_generation_start(
         self, messages: list[dict[str, Any]], options: dict[str, Any]
@@ -243,7 +246,7 @@ class YulYenStreamingProvider:
             canon = json.dumps(
                 payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
             )
-        except Exception:
+        except (TypeError, ValueError):
             # Fallback if serialization fails due to non-JSON types
             canon = f"<unserializable payload: messages={type(messages)!r}, options={type(options)!r}>"
         sha = hashlib.sha256(canon.encode("utf-8")).hexdigest()
@@ -252,7 +255,7 @@ class YulYenStreamingProvider:
         # 2) Estimate token count (non-critical)
         try:
             estimated_tokens = approx_token_count(messages)
-        except Exception:
+        except (TypeError, ValueError):
             estimated_tokens = None  # best effort; do not warn
 
         # 3) Extract num_ctx from persona options (try to cast to int if possible)
@@ -358,7 +361,7 @@ class YulYenStreamingProvider:
                     if callable(close):
                         close()
                 except Exception:
-                    pass
+                    logging.debug("Closing the LLM stream failed", exc_info=True)
 
             # Log performance metrics
             t_end = time.time()
@@ -396,7 +399,11 @@ class YulYenStreamingProvider:
                     logging.warning("Unable to log LLM output: %s", exc)
 
         except Exception:
-            logging.error("Error in stream():\n%s", traceback.format_exc())
+            # Robustness boundary: whatever the backend throws, the UI gets a
+            # readable error instead of a stacktrace; details go to the log.
+            logging.exception(
+                "stream() failed persona=%s model=%s", self.persona, self.model_name
+            )
             err = "[ERROR] LLM is not responding correctly."
             self._append_conversation_log("assistant", err)
             yield err
@@ -488,11 +495,7 @@ def lookup_wiki_snippet(
     if not keyword_finder or max_snippets <= 0:
         return (wiki_hints, contexts)
 
-    try:
-        topics = keyword_finder.find_keywords(question)
-    except AttributeError:
-        top = keyword_finder.find_top_keyword(question)
-        topics = [top] if top else []
+    topics = keyword_finder.find_keywords(question)
 
     for topic in topics[:max_snippets]:
         if len(contexts) >= max_snippets:
