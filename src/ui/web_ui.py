@@ -754,7 +754,6 @@ class WebUI:
         save_status = components["save_status"]
         history_state = components["history_state"]
         meta_state = components["meta_state"]
-        ask_all_btn = components["ask_all_btn"]
         ask_all_group = components["ask_all_group"]
         ask_all_results = components["ask_all_results"]
         ask_all_question = components["ask_all_question"]
@@ -856,14 +855,6 @@ class WebUI:
             outputs=persona_outputs,
             queue=False,
         )
-
-        if ask_all_btn is not None:
-            ask_all_btn.click(
-                fn=self._on_show_ask_all,
-                inputs=[],
-                outputs=persona_outputs,
-                queue=False,
-            )
 
         if ask_all_card_btn is not None:
             ask_all_card_btn.click(

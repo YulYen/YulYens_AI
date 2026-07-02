@@ -13,5 +13,4 @@ beautifulsoup4>=4.12,<5.0
 spacy>=3.7,<4.0
 annotated-types==0.7.0   # Ergänzt für Reproduzierbarkeit
 
-# --- Tests (einfach drinlassen, weil Single-File-Ansatz) ---
-pytest>=8.2,<9.0
+# Test-/Dev-Tooling (pytest, black, ruff, pre-commit): requirements-dev.txt
