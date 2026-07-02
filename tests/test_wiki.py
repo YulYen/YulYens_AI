@@ -8,11 +8,11 @@ import pytest
 import requests
 from config.config_singleton import Config
 from core.factory import AppFactory
-from wiki.lookup import lookup_wiki_snippet
 from launch import (
     ensure_kiwix_running_if_offlinemode_and_autostart,
     start_wiki_proxy_thread,
 )
+from wiki.lookup import lookup_wiki_snippet
 from wiki.spacy_keyword_finder import SpacyKeywordFinder
 
 from tests.util import has_spacy_model
