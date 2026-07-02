@@ -5,6 +5,8 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
+from core.context_summarizer import KarlSummarizationError, KarlSummarizer
+
 Message = dict[str, Any]
 
 chars_per_token: float = 3.25  # ~3.25 characters per token (heuristic, conservative)
@@ -121,3 +123,126 @@ def context_near_limit(
 
     used = approx_token_count(history)
     return used >= limit * threshold
+
+
+# --------- Shared context-management flow (used by terminal and web UI) ---------
+
+
+def require_context_management_config(cfg) -> dict:
+    """Validate and return the 'context_management' section of the config."""
+
+    context_management = getattr(cfg, "context_management", None)
+    if not isinstance(context_management, dict):
+        raise ValueError("Missing required 'context_management' configuration section.")
+
+    strategy = context_management.get("strategy")
+    if strategy not in {"heuristic", "karl"}:
+        raise ValueError(
+            "context_management.strategy must be either 'heuristic' or 'karl'."
+        )
+
+    if strategy == "karl":
+        karl_cfg = context_management.get("karl")
+        if not isinstance(karl_cfg, dict):
+            raise ValueError("Missing required 'context_management.karl' section.")
+        required_keys = {
+            "model",
+            "summary_max_tokens",
+            "keep_last_messages",
+            "log_dir",
+        }
+        missing = [key for key in required_keys if key not in karl_cfg]
+        if missing:
+            raise ValueError(
+                "Missing required context_management.karl keys: "
+                + ", ".join(sorted(missing))
+            )
+
+    return context_management
+
+
+def apply_heuristic_context_trim(
+    history: Sequence[Message],
+    persona_options: dict[str, Any],
+    *,
+    persona_name: str | None = None,
+) -> list[Message]:
+    """Trim the history token-based; returns it unchanged when num_ctx is unusable."""
+
+    num_ctx_value = persona_options.get("num_ctx")
+
+    ctx_limit = None
+    if num_ctx_value is not None:
+        try:
+            ctx_limit = int(num_ctx_value)
+        except (TypeError, ValueError):
+            logging.warning(
+                "Invalid 'num_ctx' value for persona %r: %r",
+                persona_name,
+                num_ctx_value,
+            )
+
+    if ctx_limit and ctx_limit > 0:
+        return karl_prepare_quick_and_dirty(history, ctx_limit)
+
+    logging.warning(
+        "Skipping 'karl_prepare_quick_and_dirty' for persona %r: num_ctx=%r",
+        persona_name,
+        num_ctx_value,
+    )
+    return list(history)
+
+
+def apply_karl_context_summary(
+    history: Sequence[Message],
+    karl_cfg: dict[str, Any],
+    persona_options: dict[str, Any],
+    *,
+    llm_core,
+    chat_model_name: str,
+    persona_name: str | None = None,
+) -> list[Message]:
+    """Compress the history via Karl; falls back to the heuristic trim if configured."""
+
+    summarizer = KarlSummarizer(
+        llm_core=llm_core,
+        config=karl_cfg,
+        chat_model_name=chat_model_name,
+    )
+    try:
+        return summarizer.summarize(history)
+    except KarlSummarizationError:
+        if karl_cfg.get("fallback_strategy") == "heuristic":
+            return apply_heuristic_context_trim(
+                history, persona_options, persona_name=persona_name
+            )
+        logging.exception("Karl summarization failed and no fallback is configured.")
+        raise
+
+
+def shrink_history_for_context(
+    history: Sequence[Message],
+    cfg,
+    persona_options: dict[str, Any],
+    *,
+    llm_core,
+    chat_model_name: str,
+    persona_name: str | None = None,
+) -> list[Message]:
+    """Apply the configured context-management strategy and return the new history."""
+
+    context_management = require_context_management_config(cfg)
+
+    if context_management["strategy"] == "karl":
+        return apply_karl_context_summary(
+            history,
+            context_management["karl"],
+            persona_options,
+            llm_core=llm_core,
+            chat_model_name=chat_model_name,
+            persona_name=persona_name,
+        )
+
+    return apply_heuristic_context_trim(
+        history, persona_options, persona_name=persona_name
+    )

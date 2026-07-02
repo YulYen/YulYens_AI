@@ -83,7 +83,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
         patch(
-            "ui.web_ui.karl_prepare_quick_and_dirty",
+            "core.context_utils.karl_prepare_quick_and_dirty",
             side_effect=lambda history, limit: history,
         ) as mock_prepare,
     ):
@@ -106,8 +106,11 @@ def test_webui_heuristic_strategy_never_instantiates_karl():
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
-        patch("ui.web_ui.karl_prepare_quick_and_dirty", side_effect=lambda h, c: h),
-        patch("ui.web_ui.KarlSummarizer") as mock_karl,
+        patch(
+            "core.context_utils.karl_prepare_quick_and_dirty",
+            side_effect=lambda h, c: h,
+        ),
+        patch("core.context_utils.KarlSummarizer") as mock_karl,
     ):
         list(web_ui.respond_streaming("Hallo", [], []))
 
@@ -129,8 +132,8 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
-        patch("ui.web_ui.karl_prepare_quick_and_dirty") as mock_prepare,
-        patch("ui.web_ui.KarlSummarizer") as mock_karl,
+        patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
+        patch("core.context_utils.KarlSummarizer") as mock_karl,
     ):
         instance = mock_karl.return_value
         instance.summarize.return_value = [{"role": "system", "content": "S"}]
@@ -160,7 +163,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
-        patch("ui.web_ui.karl_prepare_quick_and_dirty") as mock_prepare,
+        patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
     ):
         list(web_ui.respond_streaming("Hallo", chat_history, history_state))
 
