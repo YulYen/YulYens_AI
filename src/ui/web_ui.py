@@ -5,8 +5,9 @@ from datetime import datetime
 from functools import partial
 
 import gradio as gr
-from config.personas import _load_system_prompts, get_all_persona_names, get_drink
+from config.personas import _load_system_prompts, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
+from core.orchestrator import iter_broadcast
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from core.utils import is_broadcast_enabled
 from ui.conversation_io_terminal import load_conversation
@@ -498,14 +499,8 @@ class WebUI:
             gr.update(visible=True),
         )
 
-        for persona in get_all_persona_names():
-            streamer = self.factory.get_streamer_for_persona(persona)
-            reply_parts: list[str] = []
-            for token in streamer.stream(
-                messages=[{"role": "user", "content": question}]
-            ):
-                reply_parts.append(token)
-            table_rows.append([persona, "".join(reply_parts).strip()])
+        for result in iter_broadcast(self.factory, question):
+            table_rows.append([result["persona"], result["reply"]])
             yield (
                 gr.update(value=question, interactive=False, visible=True),
                 gr.update(value="", visible=False),
