@@ -17,10 +17,12 @@ jobs:
           cache: pip
       - name: Install tooling
         run: pip install -r requirements-dev.txt
+      # 'python -m' erzwingt die gepinnten pip-Versionen (PATH-Shadowing-Falle,
+      # siehe CLAUDE.md "Bekannte Falle: PATH-Shadowing")
       - name: Black (check only)
-        run: black --check .
+        run: python -m black --check .
       - name: Ruff
-        run: ruff check .
+        run: python -m ruff check .
 
   test:
     name: Tests

@@ -202,6 +202,23 @@ Danach formatiert jeder Commit automatisch mit der CI-Version (Hook läuft isoli
 unabhängig von sonstigen venv-Versionen). Tool-Versionen nur bewusst und **synchron**
 in `requirements-dev.txt` **und** `.pre-commit-config.yaml` ändern.
 
+#### ⚠️ Bekannte Falle: PATH-Shadowing (ist schon mehrfach passiert!)
+Black/Ruff **immer als Modul aufrufen**, nie als nacktes Binary:
+
+```bash
+python -m black .        # statt: black .
+python -m ruff check .   # statt: ruff check .
+```
+
+Grund: In Sandboxes/CI-Runnern/Systemen liegt oft ein **anderes, neueres Black
+im PATH** (z. B. `/root/.local/bin/black`), das das pip-installierte, gepinnte
+24.4.2 verdeckt. Neuere Black-Versionen formatieren Multiline-Strings anders
+("hugging" von `gr.HTML("""…""")`) → lokal sieht alles sauber aus, aber
+`black --check .` in der CI schlägt fehl. Vor dem Formatieren im Zweifel
+`python -m black --version` gegen den Pin in `requirements-dev.txt` prüfen
+(`black --version` zeigt ggf. das falsche PATH-Binary!). Das Makefile ruft
+bewusst `python -m black`/`python -m ruff` auf.
+
 ## Feature-Modi
 
 | Modus | Beschreibung |

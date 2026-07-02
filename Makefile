@@ -5,14 +5,17 @@ setup:
 	python -m spacy download de_core_news_lg
 	pre-commit install
 
+# 'python -m' erzwingt die pip-installierten, gepinnten Versionen —
+# nackte Binaries im PATH können neuere Versionen sein (siehe CLAUDE.md,
+# "Bekannte Falle: PATH-Shadowing") und formatieren dann anders als die CI.
 format:
-	black .
+	python -m black .
 
 lint:
-	ruff check .
+	python -m ruff check .
 
 fix:
-	ruff check --fix .
+	python -m ruff check --fix .
 
 test:
 	pytest -q -m "not slow and not ollama"
