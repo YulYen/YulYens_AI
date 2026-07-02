@@ -1,4 +1,9 @@
-.PHONY: format lint fix test test-all clean run
+.PHONY: setup format lint fix test test-all clean run
+
+setup:
+	pip install -r requirements.txt -r requirements-dev.txt
+	python -m spacy download de_core_news_lg
+	pre-commit install
 
 format:
 	black .

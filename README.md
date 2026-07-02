@@ -66,7 +66,8 @@ Der folgende Screenshot zeigt eine typische Chat-Interaktion inklusive der lokal
 
 - **Python 3.10+**
 - **Ollama** (lokal installiert)
-- mindestens ein lokales Modell, z. B. **leo-hessianai-13b-chat.Q5_K_S.gguf**
+- mindestens ein lokales Modell, z. B. **ministral-3:8b** (Default in `config.yaml`)
+  oder **leo-hessianai-13b-chat.Q5_K_S.gguf**
 
 ---
 
