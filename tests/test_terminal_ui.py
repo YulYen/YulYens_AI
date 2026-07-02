@@ -33,7 +33,7 @@ def _create_terminal_ui() -> TerminalUI:
         wiki_snippet_limit=0,
         max_wiki_snippets=0,
         wiki_mode=False,
-        proxy_base="",
+        proxy_port=0,
         wiki_timeout=0,
     )
 
@@ -113,7 +113,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
         wiki_snippet_limit=0,
         max_wiki_snippets=0,
         wiki_mode=False,
-        proxy_base="",
+        proxy_port=0,
         wiki_timeout=0,
     )
     prompts = iter(["4", "exit"])

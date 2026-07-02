@@ -31,7 +31,7 @@ class WebUI:
         wiki_snippet_limit,
         max_wiki_snippets,
         wiki_mode,
-        proxy_base,
+        proxy_port,
         web_host,
         web_port,
         wiki_timeout,
@@ -43,7 +43,7 @@ class WebUI:
         self.wiki_snippet_limit = wiki_snippet_limit
         self.max_wiki_snippets = max_wiki_snippets
         self.wiki_mode = wiki_mode
-        self.proxy_base = proxy_base
+        self.proxy_port = proxy_port
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
@@ -161,7 +161,7 @@ class WebUI:
             self.bot,
             self.keyword_finder,
             self.wiki_mode,
-            self.proxy_base,
+            self.proxy_port,
             self.wiki_snippet_limit,
             self.wiki_timeout,
             self.max_wiki_snippets,

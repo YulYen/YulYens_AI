@@ -37,7 +37,7 @@ class TerminalUI:
         wiki_snippet_limit,
         max_wiki_snippets,
         wiki_mode,
-        proxy_base,
+        proxy_port,
         wiki_timeout,
     ):
         self.factory = factory
@@ -46,7 +46,7 @@ class TerminalUI:
         self.wiki_snippet_limit = wiki_snippet_limit
         self.max_wiki_snippets = max_wiki_snippets
         self.wiki_mode = wiki_mode
-        self.proxy_base = proxy_base
+        self.proxy_port = proxy_port
         self.wiki_timeout = wiki_timeout
         self.greeting = None  # set after selection
         self.bot = None  # set after selection
@@ -290,7 +290,7 @@ class TerminalUI:
                     self.bot,
                     self.keyword_finder,
                     self.wiki_mode,
-                    self.proxy_base,
+                    self.proxy_port,
                     self.wiki_snippet_limit,
                     self.wiki_timeout,
                     self.max_wiki_snippets,
