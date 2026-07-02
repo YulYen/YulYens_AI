@@ -8,7 +8,7 @@ import pytest
 import requests
 from config.config_singleton import Config
 from core.factory import AppFactory
-from core.streaming_provider import lookup_wiki_snippet
+from wiki.lookup import lookup_wiki_snippet
 from launch import (
     ensure_kiwix_running_if_offlinemode_and_autostart,
     start_wiki_proxy_thread,
@@ -36,7 +36,7 @@ def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
         raise requests.exceptions.ConnectionError("proxy down")
 
     dummy_finder = _DummyKeywordFinder("Testthema")
-    monkeypatch.setattr("core.streaming_provider.requests.get", _raise_connection_error)
+    monkeypatch.setattr("wiki.lookup.requests.get", _raise_connection_error)
 
     caplog.set_level(logging.ERROR)
 
@@ -63,7 +63,7 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
         raise RuntimeError("kaputt")
 
     dummy_finder = _DummyKeywordFinder("Testthema")
-    monkeypatch.setattr("core.streaming_provider.requests.get", _raise_unexpected_error)
+    monkeypatch.setattr("wiki.lookup.requests.get", _raise_unexpected_error)
 
     caplog.set_level(logging.ERROR)
 
@@ -95,7 +95,7 @@ def test_lookup_wiki_snippet_url_encodes_topic(monkeypatch):
         )
 
     dummy_finder = _DummyKeywordFinder(topic)
-    monkeypatch.setattr("core.streaming_provider.requests.get", _fake_get)
+    monkeypatch.setattr("wiki.lookup.requests.get", _fake_get)
 
     lookup_wiki_snippet(
         question="Was ist C++?",
@@ -117,7 +117,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     def _raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("proxy down")
 
-    monkeypatch.setattr("core.streaming_provider.requests.get", _raise_connection_error)
+    monkeypatch.setattr("wiki.lookup.requests.get", _raise_connection_error)
 
     Config.reset_instance()
     Config("config.yaml")

@@ -9,16 +9,11 @@ from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
-
-# Shared core utilities and streamer
-from core.streaming_provider import (
-    inject_wiki_context,
-    lookup_wiki_snippet,
-)
 from core.utils import _greeting_text, is_broadcast_enabled
 from ui import self_talk
 from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui.persona_chooser import prompt_persona_choice
+from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
 
 
 class TerminalUI:

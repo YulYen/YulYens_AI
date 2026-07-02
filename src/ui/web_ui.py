@@ -8,11 +8,11 @@ import gradio as gr
 from config.personas import _load_system_prompts, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import iter_broadcast
-from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from core.utils import is_broadcast_enabled
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
+from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
 
 # Single source of truth for the order of the "switch view" output components.
 # Every handler bound to these outputs builds a dict keyed by these names and
