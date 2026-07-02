@@ -31,7 +31,8 @@ def build_ui(
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
 
-        gr.HTML("""
+        gr.HTML(
+            """
                 <style>
                 .persona-row { gap:24px; }
                 .persona-card {
@@ -54,7 +55,8 @@ def build_ui(
                 .ask-all-strip img { max-width: 250px; max-height: 250px; object-fit: contain; }
                 .persona-header-row { justify-content: space-between; align-items: center; }
                 </style>
-            """)
+            """
+        )
         gr.Markdown(f"# {project_title}")
 
         with gr.Group(visible=True) as grid_group:
