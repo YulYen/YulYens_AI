@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import json
 import logging
 import tempfile
+from collections.abc import Iterator
 from datetime import datetime
 from functools import partial
+from typing import TYPE_CHECKING, Any
 
 import gradio as gr
 from config.personas import _load_system_prompts, get_drink
@@ -13,6 +17,15 @@ from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
 from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
+
+if TYPE_CHECKING:
+    from config.config_singleton import Config
+    from core.factory import AppFactory
+    from wiki.spacy_keyword_finder import SpacyKeywordFinder
+
+# One chatbot entry: (user_text, bot_text) — either side may be None.
+ChatPair = tuple[str | None, str | None]
+Message = dict[str, str]
 
 # Single source of truth for the order of the "switch view" output components.
 # Every handler bound to these outputs builds a dict keyed by these names and
@@ -59,17 +72,17 @@ class WebUI:
 
     def __init__(
         self,
-        factory,
-        config,
-        keyword_finder,
-        wiki_snippet_limit,
-        max_wiki_snippets,
-        wiki_mode,
-        proxy_port,
-        web_host,
-        web_port,
-        wiki_timeout,
-    ):
+        factory: AppFactory,
+        config: Config,
+        keyword_finder: SpacyKeywordFinder | None,
+        wiki_snippet_limit: int,
+        max_wiki_snippets: int,
+        wiki_mode: str,
+        proxy_port: int,
+        web_host: str,
+        web_port: int | str,
+        wiki_timeout: tuple[float, float],
+    ) -> None:
         self.streamer = None  # assigned later
         self.keyword_finder = keyword_finder
         self.cfg = config
@@ -81,7 +94,7 @@ class WebUI:
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
-        self.bot = None  # assigned later
+        self.bot: str | None = None  # assigned later
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
@@ -91,10 +104,10 @@ class WebUI:
         if self._t is None:
             self._t = lambda key, **kwargs: key
 
-    def _reset_conversation_state(self):
+    def _reset_conversation_state(self) -> list[Message]:
         return []
 
-    def _reset_meta_state(self):
+    def _reset_meta_state(self) -> dict:
         return {}
 
     def _build_meta(self, persona_name: str) -> dict:
@@ -105,7 +118,9 @@ class WebUI:
             "app": "web",
         }
 
-    def _messages_to_chat_history(self, messages):
+    def _messages_to_chat_history(
+        self, messages: list[Message] | None
+    ) -> list[ChatPair]:
         chat_history = []
         pending_user = None
 
@@ -129,19 +144,21 @@ class WebUI:
 
         return chat_history
 
-    def _persona_thumbnail_path(self, persona_name):
+    def _persona_thumbnail_path(self, persona_name: str) -> str:
         ensemble = getattr(self.cfg, "ensemble", None)
         if not ensemble:
             raise RuntimeError("No persona ensemble configured for the web UI.")
         return f"ensembles/{ensemble}/static/personas/{persona_name}/thumb.webp"
 
-    def _persona_full_image_path(self, persona_name):
+    def _persona_full_image_path(self, persona_name: str) -> str:
         ensemble = getattr(self.cfg, "ensemble", None)
         if not ensemble:
             raise RuntimeError("No persona ensemble configured for the web UI.")
         return f"ensembles/{ensemble}/static/personas/{persona_name}/full.webp"
 
-    def _handle_context_warning(self, llm_history, chat_history):
+    def _handle_context_warning(
+        self, llm_history: list[Message], chat_history: list[ChatPair]
+    ) -> bool:
 
         if not context_near_limit(llm_history, self.streamer.persona_options):
             return False
@@ -163,7 +180,9 @@ class WebUI:
         return True
 
     # Stream the response (UI updates continuously)
-    def _stream_reply(self, message_history, chat_history):
+    def _stream_reply(
+        self, message_history: list[Message], chat_history: list[ChatPair]
+    ) -> Iterator[tuple[None, list[ChatPair], list[Message]]]:
         reply = ""
         for token in self.streamer.stream(messages=message_history):
             reply += token
@@ -174,7 +193,12 @@ class WebUI:
         message_history.append({"role": "assistant", "content": reply})
         yield None, chat_history, message_history
 
-    def respond_streaming(self, user_input, chat_history, history_state):
+    def respond_streaming(
+        self,
+        user_input: str,
+        chat_history: list[ChatPair],
+        history_state: list[Message] | None,
+    ) -> Iterator[tuple[str | None, list[ChatPair], list[Message]]]:
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
@@ -275,12 +299,12 @@ class WebUI:
 
     def _persona_selected_updates(
         self,
-        persona_key,
-        persona,
-        greeting_template,
-        model_name,
-        input_placeholder,
-    ):
+        persona_key: str,
+        persona: dict[str, Any],
+        greeting_template: str,
+        model_name: str,
+        input_placeholder: str,
+    ) -> tuple:
         display_name = persona["name"].title()
         greeting = greeting_template.format(
             persona_name=display_name, model_name=model_name
@@ -312,12 +336,17 @@ class WebUI:
         )
         return self._as_persona_outputs(updates)
 
-    def _reset_ui_updates(self):
+    def _reset_ui_updates(self) -> tuple:
         return self._as_persona_outputs(self._reset_updates())
 
     def _on_persona_selected(
-        self, key, persona_info, greeting_template, model_name, input_placeholder
-    ):
+        self,
+        key: str,
+        persona_info: dict[str, dict[str, Any]],
+        greeting_template: str,
+        model_name: str,
+        input_placeholder: str,
+    ) -> tuple:
         persona = persona_info.get(key)
         if not persona:
             self.bot = None
@@ -330,12 +359,12 @@ class WebUI:
             key, persona, greeting_template, model_name, input_placeholder
         )
 
-    def _on_reset_to_start(self):
+    def _on_reset_to_start(self) -> tuple:
         self.bot = None
         self.streamer = None
         return self._reset_ui_updates()
 
-    def _on_show_ask_all(self):
+    def _on_show_ask_all(self) -> tuple:
         self.bot = None
         self.streamer = None
         updates = self._reset_updates()
@@ -353,7 +382,7 @@ class WebUI:
         )
         return self._as_persona_outputs(updates)
 
-    def _on_show_self_talk(self):
+    def _on_show_self_talk(self) -> tuple:
         self.bot = None
         self.streamer = None
         self.self_talk_runner = None
@@ -370,7 +399,9 @@ class WebUI:
         )
         return self._as_persona_outputs(updates)
 
-    def _on_start_self_talk(self, persona_a, persona_b, start_prompt):
+    def _on_start_self_talk(
+        self, persona_a: str | None, persona_b: str | None, start_prompt: str | None
+    ) -> tuple:
         persona_a = (persona_a or "").strip()
         persona_b = (persona_b or "").strip()
         start_prompt = (start_prompt or "").strip()
@@ -439,7 +470,9 @@ class WebUI:
             gr.update(value="", visible=False),
         )
 
-    def _run_self_talk_stream(self, chat_history, history_state):
+    def _run_self_talk_stream(
+        self, chat_history: list[ChatPair], history_state: list[Message]
+    ) -> Iterator[tuple[list[ChatPair], list[Message]]]:
         if self.self_talk_runner is None:
             return
 
@@ -458,7 +491,9 @@ class WebUI:
             if should_stop:
                 break
 
-    def _on_submit_ask_all(self, question, current_rows=None):
+    def _on_submit_ask_all(
+        self, question: str | None, current_rows: Any = None
+    ) -> Iterator[tuple]:
         question = (question or "").strip()
         existing_rows = self._normalize_ask_all_rows(current_rows)
 
@@ -509,7 +544,7 @@ class WebUI:
             )
 
     @staticmethod
-    def _normalize_ask_all_rows(current_rows):
+    def _normalize_ask_all_rows(current_rows: Any) -> list:
         if current_rows is None:
             return []
         if isinstance(current_rows, list):
@@ -521,19 +556,19 @@ class WebUI:
                 return list(current_rows)
         return list(current_rows)
 
-    def _load_failure_updates(self, message):
+    def _load_failure_updates(self, message: str) -> tuple:
         updates = self._reset_updates()
         updates["load_status"] = gr.update(value=message, visible=True)
         return self._as_persona_outputs(updates)
 
     def _conversation_loaded_updates(
         self,
-        persona_key,
-        persona,
-        meta,
-        messages,
-        input_placeholder,
-    ):
+        persona_key: str,
+        persona: dict[str, Any],
+        meta: dict,
+        messages: list[Message],
+        input_placeholder: str,
+    ) -> tuple:
         display_name = persona["name"].title()
         focus_text = f"### {persona['name']}\n{persona['description']}"
         chat_history = self._messages_to_chat_history(messages)
@@ -567,7 +602,12 @@ class WebUI:
         )
         return self._as_persona_outputs(updates)
 
-    def _on_load_conversation(self, upload_path, persona_info, input_placeholder):
+    def _on_load_conversation(
+        self,
+        upload_path: str | None,
+        persona_info: dict[str, dict[str, Any]],
+        input_placeholder: str,
+    ) -> tuple:
         if not upload_path:
             warning = self._t("web_load_missing_file")
             return self._load_failure_updates(warning)
@@ -602,7 +642,9 @@ class WebUI:
             input_placeholder,
         )
 
-    def _on_download_conversation(self, messages, meta):
+    def _on_download_conversation(
+        self, messages: list[Message] | None, meta: dict | None
+    ) -> tuple:
         if not (meta and meta.get("persona")) and not self.bot:
             msg = self._t("no_selection_warning")
             return gr.update(value=None, visible=False), gr.update(
@@ -632,8 +674,13 @@ class WebUI:
         )
 
     def _bind_events(
-        self, components, persona_info, model_name, greeting_template, input_placeholder
-    ):
+        self,
+        components: dict[str, Any],
+        persona_info: dict[str, dict[str, Any]],
+        model_name: str,
+        greeting_template: str,
+        input_placeholder: str,
+    ) -> None:
         chatbot = components["chatbot"]
         input_box = components["input_box"]
         send_btn = components["send_btn"]
@@ -785,7 +832,7 @@ class WebUI:
             queue=False,
         )
 
-    def _start_server(self, demo):
+    def _start_server(self, demo: gr.Blocks) -> None:
         launch_kwargs = {
             "server_name": self.web_host,
             "server_port": self.web_port,
@@ -818,7 +865,7 @@ class WebUI:
 
         demo.launch(**launch_kwargs)
 
-    def launch(self):
+    def launch(self) -> None:
         ui = self.texts
         model_name = self.cfg.core.get("model_name")
         project_title = ui.get("project_name")

@@ -29,12 +29,12 @@ class TerminalUI:
         factory,
         config,
         keyword_finder,
-        wiki_snippet_limit,
-        max_wiki_snippets,
-        wiki_mode,
-        proxy_port,
-        wiki_timeout,
-    ):
+        wiki_snippet_limit: int,
+        max_wiki_snippets: int,
+        wiki_mode: str,
+        proxy_port: int,
+        wiki_timeout: tuple[float, float],
+    ) -> None:
         self.factory = factory
         self.config = config
         self.keyword_finder = keyword_finder
@@ -85,7 +85,7 @@ class TerminalUI:
             f"{Fore.GREEN}{self.texts['terminal_user_prompt']}{Style.RESET_ALL} "
         ).strip()
 
-    def print_bot_prefix(self, bot) -> None:
+    def print_bot_prefix(self, bot: str) -> None:
         bot_prefix = self._t("terminal_bot_prefix", persona_name=bot)
         print(f"{Fore.CYAN}{bot_prefix}{Style.RESET_ALL} ", end="", flush=True)
 
