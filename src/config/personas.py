@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -39,9 +41,28 @@ def _resolve_persona_files() -> tuple[Path, Path]:
 
 
 def _load_system_prompts() -> list[dict[str, Any]]:
-    """Loads persona data from the base and locale YAML files."""
+    """Loads persona data from the base and locale YAML files (cached per file state)."""
 
     base_path, locale_path = _resolve_persona_files()
+    personas = _parse_persona_files(
+        str(base_path),
+        str(locale_path),
+        base_path.stat().st_mtime_ns,
+        locale_path.stat().st_mtime_ns,
+    )
+    # Callers own the returned data, so hand out copies of the cached parse.
+    return copy.deepcopy(personas)
+
+
+@lru_cache(maxsize=8)
+def _parse_persona_files(
+    base_file: str,
+    locale_file: str,
+    base_mtime_ns: int,
+    locale_mtime_ns: int,
+) -> list[dict[str, Any]]:
+    base_path = Path(base_file)
+    locale_path = Path(locale_file)
     base_data = yaml.safe_load(base_path.read_text(encoding="utf-8"))
     locale_data = yaml.safe_load(locale_path.read_text(encoding="utf-8"))
 

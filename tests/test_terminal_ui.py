@@ -33,7 +33,7 @@ def _create_terminal_ui() -> TerminalUI:
         wiki_snippet_limit=0,
         max_wiki_snippets=0,
         wiki_mode=False,
-        proxy_base="",
+        proxy_port=0,
         wiki_timeout=0,
     )
 
@@ -74,7 +74,7 @@ def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> 
         return trimmed_history
 
     monkeypatch.setattr("ui.terminal_ui.context_near_limit", fake_context_near_limit)
-    monkeypatch.setattr("ui.terminal_ui.karl_prepare_quick_and_dirty", fake_karl)
+    monkeypatch.setattr("core.context_utils.karl_prepare_quick_and_dirty", fake_karl)
 
     ui._ensure_context_headroom()
 
@@ -113,7 +113,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
         wiki_snippet_limit=0,
         max_wiki_snippets=0,
         wiki_mode=False,
-        proxy_base="",
+        proxy_port=0,
         wiki_timeout=0,
     )
     prompts = iter(["4", "exit"])

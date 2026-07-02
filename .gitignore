@@ -13,6 +13,11 @@ logs/
 .pytest_cache/
 tests/__pycache__/
 
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
 # Temporäre Dateien / Editor-Artefakte
 *.swp
 *.swo

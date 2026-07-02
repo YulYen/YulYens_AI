@@ -5,14 +5,48 @@ from datetime import datetime
 from functools import partial
 
 import gradio as gr
-from config.personas import _load_system_prompts, get_all_persona_names, get_drink
-from core.context_summarizer import KarlSummarizationError, KarlSummarizer
-from core.context_utils import context_near_limit, karl_prepare_quick_and_dirty
+from config.personas import _load_system_prompts, get_drink
+from core.context_utils import context_near_limit, shrink_history_for_context
+from core.orchestrator import iter_broadcast
 from core.streaming_provider import inject_wiki_context, lookup_wiki_snippet
 from core.utils import is_broadcast_enabled
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
+
+# Single source of truth for the order of the "switch view" output components.
+# Every handler bound to these outputs builds a dict keyed by these names and
+# resolves it via WebUI._as_persona_outputs() — never by positional index.
+PERSONA_OUTPUT_KEYS = (
+    "selected_persona_state",
+    "grid_group",
+    "focus_group",
+    "focus_img",
+    "focus_md",
+    "greeting_md",
+    "chatbot",
+    "input_box",
+    "send_btn",
+    "new_chat_btn",
+    "download_btn",
+    "download_file",
+    "save_status",
+    "history_state",
+    "meta_state",
+    "ask_all_group",
+    "ask_all_results",
+    "ask_all_question",
+    "ask_all_submit",
+    "ask_all_new_chat",
+    "ask_all_status",
+    "load_status",
+    "self_talk_group",
+    "self_talk_status",
+    "self_talk_persona_a",
+    "self_talk_persona_b",
+    "self_talk_prompt",
+    "self_talk_start_btn",
+)
 
 
 class WebUI:
@@ -31,7 +65,7 @@ class WebUI:
         wiki_snippet_limit,
         max_wiki_snippets,
         wiki_mode,
-        proxy_base,
+        proxy_port,
         web_host,
         web_port,
         wiki_timeout,
@@ -43,7 +77,7 @@ class WebUI:
         self.wiki_snippet_limit = wiki_snippet_limit
         self.max_wiki_snippets = max_wiki_snippets
         self.wiki_mode = wiki_mode
-        self.proxy_base = proxy_base
+        self.proxy_port = proxy_port
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
@@ -118,97 +152,15 @@ class WebUI:
         chat_history.append((None, warn))
 
         persona_options = getattr(self.streamer, "persona_options", {}) or {}
-        context_management = self._require_context_management_config()
-        strategy = context_management["strategy"]
-
-        if strategy == "heuristic":
-            self._apply_heuristic_context_trim(llm_history, persona_options)
-            return True
-
-        if strategy == "karl":
-            self._apply_karl_context_summary(
-                llm_history,
-                context_management["karl"],
-                persona_options,
-            )
-            return True
-
-        raise ValueError(
-            "context_management.strategy must be either 'heuristic' or 'karl'."
+        llm_history[:] = shrink_history_for_context(
+            llm_history,
+            self.cfg,
+            persona_options,
+            llm_core=getattr(self.streamer, "_llm_core", None),
+            chat_model_name=getattr(self.streamer, "model_name", ""),
+            persona_name=self.bot,
         )
-
-    def _apply_heuristic_context_trim(self, llm_history, persona_options):
-        num_ctx_value = persona_options.get("num_ctx")
-
-        ctx_limit = None
-        if num_ctx_value is not None:
-            try:
-                ctx_limit = int(num_ctx_value)
-            except (TypeError, ValueError):
-                logging.warning(
-                    "Invalid 'num_ctx' value for persona %r: %r",
-                    self.bot,
-                    num_ctx_value,
-                )
-
-        if ctx_limit and ctx_limit > 0:
-            llm_history[:] = karl_prepare_quick_and_dirty(llm_history, ctx_limit)
-        else:
-            logging.warning(
-                "Skipping 'karl_prepare_quick_and_dirty' for persona %r: num_ctx=%r",
-                self.bot,
-                num_ctx_value,
-            )
-
-    def _apply_karl_context_summary(self, llm_history, karl_cfg, persona_options):
-        summarizer = KarlSummarizer(
-            llm_core=self.streamer._llm_core,
-            config=karl_cfg,
-            chat_model_name=self.streamer.model_name,
-        )
-        try:
-            llm_history[:] = summarizer.summarize(llm_history)
-        except KarlSummarizationError:
-            fallback = karl_cfg.get("fallback_strategy")
-            if fallback == "heuristic":
-                self._apply_heuristic_context_trim(llm_history, persona_options)
-                return
-            logging.exception(
-                "Karl summarization failed and no fallback is configured."
-            )
-            raise
-
-    def _require_context_management_config(self):
-        context_management = getattr(self.cfg, "context_management", None)
-        if not isinstance(context_management, dict):
-            raise ValueError(
-                "Missing required 'context_management' configuration section."
-            )
-
-        strategy = context_management.get("strategy")
-        if strategy not in {"heuristic", "karl"}:
-            raise ValueError(
-                "context_management.strategy must be either 'heuristic' or 'karl'."
-            )
-
-        if strategy == "karl":
-            karl_cfg = context_management.get("karl")
-            if not isinstance(karl_cfg, dict):
-                raise ValueError("Missing required 'context_management.karl' section.")
-            required_keys = {
-                "model",
-                "summary_max_tokens",
-                "keep_last_messages",
-                "log_dir",
-            }
-            missing = [key for key in required_keys if key not in karl_cfg]
-            if missing:
-                raise ValueError(
-                    "Missing required context_management.karl keys: "
-                    + ", ".join(sorted(missing))
-                )
-
-        return context_management
+        return True
 
     # Stream the response (UI updates continuously)
     def _stream_reply(self, message_history, chat_history):
@@ -243,7 +195,7 @@ class WebUI:
             self.bot,
             self.keyword_finder,
             self.wiki_mode,
-            self.proxy_base,
+            self.proxy_port,
             self.wiki_snippet_limit,
             self.wiki_timeout,
             self.max_wiki_snippets,
@@ -274,6 +226,53 @@ class WebUI:
             for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
 
+    def _as_persona_outputs(self, updates: dict) -> tuple:
+        """Resolve a named update dict into the tuple order of PERSONA_OUTPUT_KEYS."""
+        unknown = set(updates) - set(PERSONA_OUTPUT_KEYS)
+        if unknown:
+            raise KeyError(f"Unknown persona-output keys: {sorted(unknown)}")
+        return tuple(updates[key] for key in PERSONA_OUTPUT_KEYS)
+
+    def _reset_updates(self) -> dict:
+        """Baseline 'back to start screen' state; handlers override what differs."""
+        return {
+            "selected_persona_state": gr.update(value=""),
+            "grid_group": gr.update(visible=True),
+            "focus_group": gr.update(visible=False),
+            "focus_img": gr.update(value=None),
+            "focus_md": gr.update(value=""),
+            "greeting_md": gr.update(value="", visible=False),
+            "chatbot": gr.update(value=[], label="", visible=False),
+            "input_box": gr.update(value="", visible=False, interactive=False),
+            "send_btn": gr.update(visible=False, interactive=False),
+            "new_chat_btn": gr.update(visible=False),
+            "download_btn": gr.update(visible=False),
+            "download_file": gr.update(value=None, visible=False),
+            "save_status": gr.update(value="", visible=False),
+            "history_state": self._reset_conversation_state(),
+            "meta_state": self._reset_meta_state(),
+            "ask_all_group": gr.update(visible=False),
+            "ask_all_results": gr.update(value=[], visible=False),
+            "ask_all_question": gr.update(
+                value=self.ask_all_placeholder, visible=False, interactive=True
+            ),
+            "ask_all_submit": gr.update(visible=False, interactive=True),
+            "ask_all_new_chat": gr.update(visible=False),
+            "ask_all_status": gr.update(value="", visible=False),
+            "load_status": gr.update(value="", visible=False),
+            "self_talk_group": gr.update(visible=False),
+            "self_talk_status": gr.update(value="", visible=False),
+            "self_talk_persona_a": gr.update(value=None, interactive=True),
+            "self_talk_persona_b": gr.update(value=None, interactive=True),
+            "self_talk_prompt": gr.update(
+                value="",
+                visible=False,
+                interactive=True,
+                placeholder=self.self_talk_prompt_placeholder,
+            ),
+            "self_talk_start_btn": gr.update(visible=False, interactive=True),
+        }
+
     def _persona_selected_updates(
         self,
         persona_key,
@@ -287,87 +286,34 @@ class WebUI:
             persona_name=display_name, model_name=model_name
         )
         focus_text = f"### {persona['name']}\n{persona['description']}"
-        meta = self._build_meta(persona["name"])
 
-        return (
-            gr.update(value=persona_key),
-            gr.update(visible=False),
-            gr.update(visible=True),
-            gr.update(value=self._persona_full_image_path(persona["name"])),
-            gr.update(value=focus_text),
-            gr.update(value=greeting, visible=True),
-            gr.update(value=[], label=display_name, visible=True),
-            gr.update(
+        updates = self._reset_updates()
+        updates.update(
+            selected_persona_state=gr.update(value=persona_key),
+            grid_group=gr.update(visible=False),
+            focus_group=gr.update(visible=True),
+            focus_img=gr.update(value=self._persona_full_image_path(persona["name"])),
+            focus_md=gr.update(value=focus_text),
+            greeting_md=gr.update(value=greeting, visible=True),
+            chatbot=gr.update(value=[], label=display_name, visible=True),
+            input_box=gr.update(
                 value="", visible=True, interactive=True, placeholder=input_placeholder
             ),
-            gr.update(visible=True, interactive=True),
-            gr.update(visible=True),
-            gr.update(visible=True),
-            gr.update(value=None, visible=False),
-            gr.update(value="", visible=False),
-            self._reset_conversation_state(),
-            meta,
-            gr.update(visible=False),
-            gr.update(value=[], visible=False),
-            gr.update(
+            send_btn=gr.update(visible=True, interactive=True),
+            new_chat_btn=gr.update(visible=True),
+            download_btn=gr.update(visible=True),
+            meta_state=self._build_meta(persona["name"]),
+            ask_all_question=gr.update(
                 value="",
                 visible=False,
                 interactive=True,
                 placeholder=self.ask_all_placeholder,
             ),
-            gr.update(visible=False, interactive=True),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value="", visible=False),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value=None, interactive=True),
-            gr.update(value=None, interactive=True),
-            gr.update(
-                value="",
-                visible=False,
-                interactive=True,
-                placeholder=self.self_talk_prompt_placeholder,
-            ),
-            gr.update(visible=False, interactive=True),
         )
+        return self._as_persona_outputs(updates)
 
     def _reset_ui_updates(self):
-        return (
-            gr.update(value=""),
-            gr.update(visible=True),
-            gr.update(visible=False),
-            gr.update(value=None),
-            gr.update(value=""),
-            gr.update(value="", visible=False),
-            gr.update(value=[], label="", visible=False),
-            gr.update(value="", visible=False, interactive=False),
-            gr.update(visible=False, interactive=False),
-            gr.update(visible=False),
-            gr.update(visible=False),
-            gr.update(value=None, visible=False),
-            gr.update(value="", visible=False),
-            self._reset_conversation_state(),
-            self._reset_meta_state(),
-            gr.update(visible=False),
-            gr.update(value=[], visible=False),
-            gr.update(value=self.ask_all_placeholder, visible=False, interactive=True),
-            gr.update(visible=False, interactive=True),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value="", visible=False),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value=None, interactive=True),
-            gr.update(value=None, interactive=True),
-            gr.update(
-                value="",
-                visible=False,
-                interactive=True,
-                placeholder=self.self_talk_prompt_placeholder,
-            ),
-            gr.update(visible=False, interactive=True),
-        )
+        return self._as_persona_outputs(self._reset_updates())
 
     def _on_persona_selected(
         self, key, persona_info, greeting_template, model_name, input_placeholder
@@ -392,66 +338,37 @@ class WebUI:
     def _on_show_ask_all(self):
         self.bot = None
         self.streamer = None
-        return (
-            gr.update(value=""),
-            gr.update(visible=False),
-            gr.update(visible=False),
-            gr.update(value=None),
-            gr.update(value=""),
-            gr.update(value="", visible=False),
-            gr.update(value=[], label="", visible=False),
-            gr.update(value="", visible=False, interactive=False),
-            gr.update(visible=False, interactive=False),
-            gr.update(visible=False),
-            gr.update(visible=False),
-            gr.update(value=None, visible=False),
-            gr.update(value="", visible=False),
-            self._reset_conversation_state(),
-            self._reset_meta_state(),
-            gr.update(visible=True),
-            gr.update(value=[], visible=False),
-            gr.update(
+        updates = self._reset_updates()
+        updates.update(
+            grid_group=gr.update(visible=False),
+            ask_all_group=gr.update(visible=True),
+            ask_all_question=gr.update(
                 value="",
                 visible=True,
                 interactive=True,
                 placeholder=self.ask_all_placeholder,
             ),
-            gr.update(visible=True, interactive=True),
-            gr.update(visible=True),
-            gr.update(value="", visible=False),
-            gr.update(value="", visible=False),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value=None, interactive=True),
-            gr.update(value=None, interactive=True),
-            gr.update(
-                value="",
-                visible=False,
-                interactive=True,
-                placeholder=self.self_talk_prompt_placeholder,
-            ),
-            gr.update(visible=False, interactive=True),
+            ask_all_submit=gr.update(visible=True, interactive=True),
+            ask_all_new_chat=gr.update(visible=True),
         )
+        return self._as_persona_outputs(updates)
 
     def _on_show_self_talk(self):
         self.bot = None
         self.streamer = None
         self.self_talk_runner = None
-        base = list(self._reset_ui_updates())
-        base[15] = gr.update(visible=False)  # ask_all_group
-        base[21] = gr.update(value="", visible=False)  # load_status
-        base[22] = gr.update(visible=True)  # self_talk_group
-        base[23] = gr.update(value="", visible=False)  # self_talk_status
-        base[24] = gr.update(value=None, interactive=True)  # persona_a
-        base[25] = gr.update(value=None, interactive=True)  # persona_b
-        base[26] = gr.update(
-            value="",
-            visible=True,
-            interactive=True,
-            placeholder=self.self_talk_prompt_placeholder,
+        updates = self._reset_updates()
+        updates.update(
+            self_talk_group=gr.update(visible=True),
+            self_talk_prompt=gr.update(
+                value="",
+                visible=True,
+                interactive=True,
+                placeholder=self.self_talk_prompt_placeholder,
+            ),
+            self_talk_start_btn=gr.update(visible=True, interactive=True),
         )
-        base[27] = gr.update(visible=True, interactive=True)
-        return tuple(base)
+        return self._as_persona_outputs(updates)
 
     def _on_start_self_talk(self, persona_a, persona_b, start_prompt):
         persona_a = (persona_a or "").strip()
@@ -581,14 +498,8 @@ class WebUI:
             gr.update(visible=True),
         )
 
-        for persona in get_all_persona_names():
-            streamer = self.factory.get_streamer_for_persona(persona)
-            reply_parts: list[str] = []
-            for token in streamer.stream(
-                messages=[{"role": "user", "content": question}]
-            ):
-                reply_parts.append(token)
-            table_rows.append([persona, "".join(reply_parts).strip()])
+        for result in iter_broadcast(self.factory, question):
+            table_rows.append([result["persona"], result["reply"]])
             yield (
                 gr.update(value=question, interactive=False, visible=True),
                 gr.update(value="", visible=False),
@@ -611,9 +522,9 @@ class WebUI:
         return list(current_rows)
 
     def _load_failure_updates(self, message):
-        base = list(self._reset_ui_updates())
-        base[21] = gr.update(value=message, visible=True)
-        return tuple(base)
+        updates = self._reset_updates()
+        updates["load_status"] = gr.update(value=message, visible=True)
+        return self._as_persona_outputs(updates)
 
     def _conversation_loaded_updates(
         self,
@@ -629,48 +540,32 @@ class WebUI:
 
         greeting = self._t("web_load_status_success", persona_name=display_name)
 
-        return (
-            gr.update(value=persona_key),
-            gr.update(visible=False),
-            gr.update(visible=True),
-            gr.update(value=self._persona_full_image_path(persona["name"])),
-            gr.update(value=focus_text),
-            gr.update(value=greeting, visible=True),
-            gr.update(value=chat_history, label=display_name, visible=True),
-            gr.update(
+        updates = self._reset_updates()
+        updates.update(
+            selected_persona_state=gr.update(value=persona_key),
+            grid_group=gr.update(visible=False),
+            focus_group=gr.update(visible=True),
+            focus_img=gr.update(value=self._persona_full_image_path(persona["name"])),
+            focus_md=gr.update(value=focus_text),
+            greeting_md=gr.update(value=greeting, visible=True),
+            chatbot=gr.update(value=chat_history, label=display_name, visible=True),
+            input_box=gr.update(
                 value="", visible=True, interactive=True, placeholder=input_placeholder
             ),
-            gr.update(visible=True, interactive=True),
-            gr.update(visible=True),
-            gr.update(visible=True),
-            gr.update(value=None, visible=False),
-            gr.update(value="", visible=False),
-            messages,
-            meta,
-            gr.update(visible=False),
-            gr.update(value=[], visible=False),
-            gr.update(
+            send_btn=gr.update(visible=True, interactive=True),
+            new_chat_btn=gr.update(visible=True),
+            download_btn=gr.update(visible=True),
+            history_state=messages,
+            meta_state=meta,
+            ask_all_question=gr.update(
                 value="",
                 visible=False,
                 interactive=True,
                 placeholder=self.ask_all_placeholder,
             ),
-            gr.update(visible=False, interactive=True),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value=greeting, visible=True),
-            gr.update(visible=False),
-            gr.update(value="", visible=False),
-            gr.update(value=None, interactive=True),
-            gr.update(value=None, interactive=True),
-            gr.update(
-                value="",
-                visible=False,
-                interactive=True,
-                placeholder=self.self_talk_prompt_placeholder,
-            ),
-            gr.update(visible=False, interactive=True),
+            load_status=gr.update(value=greeting, visible=True),
         )
+        return self._as_persona_outputs(updates)
 
     def _on_load_conversation(self, upload_path, persona_info, input_placeholder):
         if not upload_path:
@@ -739,12 +634,6 @@ class WebUI:
     def _bind_events(
         self, components, persona_info, model_name, greeting_template, input_placeholder
     ):
-        selected_persona_state = components["selected_persona_state"]
-        grid_group = components["grid_group"]
-        focus_group = components["focus_group"]
-        focus_img = components["focus_img"]
-        focus_md = components["focus_md"]
-        greeting_md = components["greeting_md"]
         chatbot = components["chatbot"]
         input_box = components["input_box"]
         send_btn = components["send_btn"]
@@ -754,8 +643,6 @@ class WebUI:
         save_status = components["save_status"]
         history_state = components["history_state"]
         meta_state = components["meta_state"]
-        ask_all_btn = components["ask_all_btn"]
-        ask_all_group = components["ask_all_group"]
         ask_all_results = components["ask_all_results"]
         ask_all_question = components["ask_all_question"]
         ask_all_submit = components["ask_all_submit"]
@@ -763,7 +650,6 @@ class WebUI:
         ask_all_status = components["ask_all_status"]
         ask_all_card_btn = components["ask_all_card_btn"]
         self_talk_card_btn = components["self_talk_card_btn"]
-        self_talk_group = components["self_talk_group"]
         self_talk_status = components["self_talk_status"]
         self_talk_persona_a = components["self_talk_persona_a"]
         self_talk_persona_b = components["self_talk_persona_b"]
@@ -772,36 +658,8 @@ class WebUI:
         load_input = components["load_input"]
         load_status = components["load_status"]
 
-        persona_outputs = [
-            selected_persona_state,
-            grid_group,
-            focus_group,
-            focus_img,
-            focus_md,
-            greeting_md,
-            chatbot,
-            input_box,
-            send_btn,
-            new_chat_btn,
-            download_btn,
-            download_file,
-            save_status,
-            history_state,
-            meta_state,
-            ask_all_group,
-            ask_all_results,
-            ask_all_question,
-            ask_all_submit,
-            ask_all_new_chat,
-            ask_all_status,
-            load_status,
-            self_talk_group,
-            self_talk_status,
-            self_talk_persona_a,
-            self_talk_persona_b,
-            self_talk_prompt,
-            self_talk_start_btn,
-        ]
+        # Same order as the update dicts resolved via _as_persona_outputs()
+        persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
 
         for key, btn in components["persona_buttons"]:
             btn.click(
@@ -856,14 +714,6 @@ class WebUI:
             outputs=persona_outputs,
             queue=False,
         )
-
-        if ask_all_btn is not None:
-            ask_all_btn.click(
-                fn=self._on_show_ask_all,
-                inputs=[],
-                outputs=persona_outputs,
-                queue=False,
-            )
 
         if ask_all_card_btn is not None:
             ask_all_card_btn.click(

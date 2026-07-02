@@ -27,9 +27,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 ## Verzeichnisstruktur
 
 ```
-c:\J_KI\
+<repo-root>/
 ├── src/
-│   ├── launch.py              # Haupteinstiegspunkt
+│   ├── launch.py              # Haupteinstiegspunkt (inkl. --doctor Systemcheck)
 │   ├── core/
 │   │   ├── llm_core.py        # Abstrakte LLM-Schnittstelle
 │   │   ├── ollama_llm_core.py # Ollama-Implementierung
@@ -38,6 +38,8 @@ c:\J_KI\
 │   │   ├── orchestrator.py    # Broadcast an alle Personas
 │   │   ├── factory.py         # AppFactory (Lazy Singletons)
 │   │   ├── context_utils.py   # Token-Zählung
+│   │   ├── context_summarizer.py  # "Karl": LLM-basierte Kontext-Zusammenfassung
+│   │   ├── system_checks.py   # Deep-Checks für /healthz und --doctor
 │   │   └── utils.py           # Hilfsfunktionen
 │   ├── config/
 │   │   ├── config_singleton.py  # YAML-Config (Singleton, reset_instance() für Tests)
@@ -52,8 +54,10 @@ c:\J_KI\
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
 │   ├── api/
-│   │   ├── app.py               # FastAPI: /ask, /health
+│   │   ├── app.py               # FastAPI: /ask, /health, /healthz
 │   │   └── provider.py
+│   ├── email_adapter/
+│   │   └── service.py           # opt-in IMAP/SMTP-Bridge (Personas per Mail)
 │   ├── wiki/
 │   │   ├── wikipedia_proxy.py   # HTTP-Proxy (Port 8042)
 │   │   ├── spacy_keyword_finder.py  # NLP-Schlüsselwortextraktion
@@ -69,7 +73,7 @@ c:\J_KI\
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 13 Testmodule
+│   └── test_*.py                # 18 Testmodule
 ├── locales/
 │   ├── de.yaml                  # 83+ UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
@@ -126,6 +130,8 @@ pytest tests/test_ai_via_api.py  # Gezielt
 - Test-Fixture `client`: Dummy-Backend, Wiki deaktiviert
 - Test-Fixture `client_with_date_and_wiki`: echte Wiki-Integration (braucht spaCy-Modell)
 - Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar
+- spaCy-Modelle (`python -m spacy download de_core_news_lg`) schalten die
+  Keyword-/Wiki-Tests frei; ohne Modell werden sie sauber geskippt
 
 ## Konfiguration (config.yaml)
 
@@ -196,12 +202,29 @@ Danach formatiert jeder Commit automatisch mit der CI-Version (Hook läuft isoli
 unabhängig von sonstigen venv-Versionen). Tool-Versionen nur bewusst und **synchron**
 in `requirements-dev.txt` **und** `.pre-commit-config.yaml` ändern.
 
+#### ⚠️ Bekannte Falle: PATH-Shadowing (ist schon mehrfach passiert!)
+Black/Ruff **immer als Modul aufrufen**, nie als nacktes Binary:
+
+```bash
+python -m black .        # statt: black .
+python -m ruff check .   # statt: ruff check .
+```
+
+Grund: In Sandboxes/CI-Runnern/Systemen liegt oft ein **anderes, neueres Black
+im PATH** (z. B. `/root/.local/bin/black`), das das pip-installierte, gepinnte
+24.4.2 verdeckt. Neuere Black-Versionen formatieren Multiline-Strings anders
+("hugging" von `gr.HTML("""…""")`) → lokal sieht alles sauber aus, aber
+`black --check .` in der CI schlägt fehl. Vor dem Formatieren im Zweifel
+`python -m black --version` gegen den Pin in `requirements-dev.txt` prüfen
+(`black --version` zeigt ggf. das falsche PATH-Binary!). Das Makefile ruft
+bewusst `python -m black`/`python -m ruff` auf.
+
 ## Feature-Modi
 
 | Modus | Beschreibung |
 |---|---|
 | **Chat** | Einzelne Persona, Streaming |
-| **AI-Dialog** | Zwei Personas konversieren automatisch (`_endegelaende_` = Stop) |
+| **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas, Ergebnisse als Tabelle |
 
 ## Backlog (wichtigste offene Punkte)
@@ -225,10 +248,14 @@ Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matri
 
 ```
 POST http://127.0.0.1:8013/ask
-  Body: { "persona": "LEAH", "message": "Hallo", "history": [] }
-  
-GET  http://127.0.0.1:8013/health
+  Body: { "question": "Hallo", "persona": "LEAH" }
+  → { "answer": "..." }
+
+GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet)
+GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler)
 ```
+
+Dieselben Deep-Checks gibt es auch ohne laufenden Server: `python src/launch.py --doctor`.
 
 ## Logging
 

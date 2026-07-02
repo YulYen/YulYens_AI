@@ -53,7 +53,6 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
         return False
 
     try:
-        # subprocess.Popen([exe, "--port", str(port), zim])
         subprocess.Popen([exe, f"--port={port}", zim])
         logger.info("Starting kiwix-serve: %s --port %s %s", exe, port, zim)
     except Exception as e:

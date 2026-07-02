@@ -2,20 +2,20 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
 
 from config.personas import get_all_persona_names
 
 from core.streaming_provider import YulYenStreamingProvider
 
 
-def broadcast_to_ensemble(
+def iter_broadcast(
     factory,
     user_input: str,
     persona_names: Iterable[str] | None = None,
     on_token: Callable[[str, str], None] | None = None,
-) -> list[dict[str, str]]:
-    """Runs the same prompt sequentially for every persona.
+) -> Iterator[dict[str, str]]:
+    """Runs the same prompt sequentially for every persona, yielding per persona.
 
     Args:
         factory: Object that can build a :class:`YulYenStreamingProvider` via
@@ -26,15 +26,14 @@ def broadcast_to_ensemble(
         on_token: Optional callback that receives ``(persona, token)`` for
             streaming progress reporting.
 
-    Returns:
-        A list of dictionaries containing the persona name and the collected
-        reply text.
+    Yields:
+        One dictionary per persona with the persona name and the collected
+        reply text, as soon as that persona has finished.
     """
 
     personas = (
         list(persona_names) if persona_names is not None else get_all_persona_names()
     )
-    results: list[dict[str, str]] = []
 
     for persona in personas:
         streamer: YulYenStreamingProvider = factory.get_streamer_for_persona(persona)
@@ -47,6 +46,15 @@ def broadcast_to_ensemble(
             if on_token:
                 on_token(persona, token)
 
-        results.append({"persona": persona, "reply": "".join(reply_parts).strip()})
+        yield {"persona": persona, "reply": "".join(reply_parts).strip()}
 
-    return results
+
+def broadcast_to_ensemble(
+    factory,
+    user_input: str,
+    persona_names: Iterable[str] | None = None,
+    on_token: Callable[[str, str], None] | None = None,
+) -> list[dict[str, str]]:
+    """Like :func:`iter_broadcast`, but collects all results into a list."""
+
+    return list(iter_broadcast(factory, user_input, persona_names, on_token))

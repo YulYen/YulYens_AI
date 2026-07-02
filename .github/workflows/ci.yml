@@ -14,12 +14,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: pip
       - name: Install tooling
         run: pip install -r requirements-dev.txt
+      # 'python -m' erzwingt die gepinnten pip-Versionen (PATH-Shadowing-Falle,
+      # siehe CLAUDE.md "Bekannte Falle: PATH-Shadowing")
       - name: Black (check only)
-        run: black --check .
+        run: python -m black --check .
       - name: Ruff
-        run: ruff check .
+        run: python -m ruff check .
 
   test:
     name: Tests
@@ -29,11 +32,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
+          cache: pip
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
       - name: Run tests
+        # Deliberately includes the 'slow' marker (locally 'make test' skips it).
         # spaCy- and Ollama-dependent tests skip themselves when the
         # model or server is unavailable (see tests/conftest.py).
-        run: pytest -q -m "not ollama"
+        run: pytest -q -m "not ollama" --cov=src --cov-report=term-missing

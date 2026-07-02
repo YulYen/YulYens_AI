@@ -188,6 +188,7 @@ skip_without_medium_model = pytest.mark.skipif(
 
 
 @skip_without_medium_model
+@pytest.mark.slow
 def test_lookup_wiki_snippet_for_germany():
     """
     Integration test: verifies that the local wiki proxy returns a snippet for
@@ -196,37 +197,41 @@ def test_lookup_wiki_snippet_for_germany():
     Starts the proxy and offline Kiwix itself (same mechanism as the
     ``client_with_date_and_wiki`` fixture) so the test does not depend on other
     tests having started them first. When the offline wiki is unavailable
-    (e.g. Kiwix not installed), the test skips instead of failing.
+    (e.g. Kiwix not installed), the test skips instead of failing — before
+    starting the proxy thread, so no resources leak on skip.
     """
     Config.reset_instance()
-    cfg = Config("config.yaml")
-    cfg.ensemble = "classic"
+    try:
+        cfg = Config("config.yaml")
+        cfg.ensemble = "classic"
 
-    start_wiki_proxy_thread()
-    ensure_kiwix_running_if_offlinemode_and_autostart(cfg)
+        if not ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
+            pytest.skip("Offline wiki (Kiwix) not available")
 
-    # KeywordFinder in medium mode (detects 'Deutschland')
-    finder = SpacyKeywordFinder("de_core_news_md")
+        start_wiki_proxy_thread()
 
-    wiki_hints, contexts = lookup_wiki_snippet(
-        question="Was ist die Hauptstadt von Deutschland?",
-        persona_name="PETER",
-        keyword_finder=finder,
-        wiki_mode="offline",
-        proxy_port=8042,
-        limit=1600,
-        timeout=(3.0, 8.0),
-        max_snippets=2,
-    )
+        # KeywordFinder in medium mode (detects 'Deutschland')
+        finder = SpacyKeywordFinder("de_core_news_md")
 
-    if not (wiki_hints and contexts):
-        pytest.skip("Offline wiki (proxy/Kiwix on port 8042) not available")
+        wiki_hints, contexts = lookup_wiki_snippet(
+            question="Was ist die Hauptstadt von Deutschland?",
+            persona_name="PETER",
+            keyword_finder=finder,
+            wiki_mode="offline",
+            proxy_port=8042,
+            limit=1600,
+            timeout=(3.0, 8.0),
+            max_snippets=2,
+        )
 
-    topic_title, snippet = contexts[0]
-    assert topic_title == "Deutschland"
-    assert snippet, "Wiki proxy did not return any snippet text"
+        if not (wiki_hints and contexts):
+            pytest.skip("Offline wiki (proxy/Kiwix on port 8042) not available")
 
-    # The capital Berlin should appear in the snippet (case-insensitive)
-    assert "berlin" in snippet.lower()
+        topic_title, snippet = contexts[0]
+        assert topic_title == "Deutschland"
+        assert snippet, "Wiki proxy did not return any snippet text"
 
-    Config.reset_instance()
+        # The capital Berlin should appear in the snippet (case-insensitive)
+        assert "berlin" in snippet.lower()
+    finally:
+        Config.reset_instance()

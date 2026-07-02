@@ -293,8 +293,8 @@ def start_wiki_proxy_thread() -> threading.Thread | None:
         )
         return None
 
-    # Start in the same process as a thread
-    import wiki.wikipedia_proxy as wiki_proxy  # uses the configuration set in wikipedia-proxy.py
+    # Start in the same process as a thread (the proxy reads its config lazily on first request)
+    import wiki.wikipedia_proxy as wiki_proxy
 
     t = threading.Thread(target=wiki_proxy.run, name="WikiProxy", daemon=True)
     t.start()

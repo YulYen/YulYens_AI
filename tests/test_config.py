@@ -197,6 +197,25 @@ def test_factory_ollama_backend_missing_dependency(monkeypatch):
     assert "pip install ollama" in message
 
 
+def test_load_system_prompts_caches_yaml_parse(monkeypatch):
+    """Repeated persona loads must not re-parse the YAML files (mtime-keyed cache)."""
+    from config import personas as personas_mod
+
+    personas_mod._parse_persona_files.cache_clear()
+    first = personas_mod._load_system_prompts()
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("YAML re-parsed although the files did not change")
+
+    monkeypatch.setattr(personas_mod.yaml, "safe_load", _fail)
+    second = personas_mod._load_system_prompts()
+    assert second == first
+
+    # callers get independent copies: mutations must not leak into the cache
+    second[0]["name"] = "MUTATED"
+    assert personas_mod._load_system_prompts()[0]["name"] != "MUTATED"
+
+
 def test_greeting_replaces_placeholders(tmp_path):
     """
     Verifies the one-to-one placeholder substitution from YAML:
