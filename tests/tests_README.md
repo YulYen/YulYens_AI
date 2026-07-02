@@ -61,6 +61,23 @@ Run the entire test suite.
 
 ---
 
+## Coverage
+
+`pytest-cov` is part of `requirements-dev.txt`. Run locally via:
+
+```bash
+make coverage        # fast lane with coverage report
+make test-ci         # same scope as CI (includes 'slow', with coverage)
+```
+
+CI prints a `--cov=src` report on every run. Baseline (fast lane,
+without spaCy-model-dependent tests) as of 2026-07: **~60 % total**.
+There is deliberately no hard threshold gate yet — measure first.
+Lowest-covered areas: `webui_layout` (Gradio layout), `kiwix_autostart`,
+`logging_setup`, `conversation_io_terminal`.
+
+---
+
 ## Environment preparation
 
 ### LLM backend (Ollama)
