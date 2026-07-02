@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -50,12 +51,15 @@ class Config:
 
         # Optional local override (gitignored): keep personal/secret values
         # (e.g. real mail host/address) out of the tracked config.yaml.
-        local_path = config_path.with_name("config.local.yaml")
-        if local_path.is_file():
-            with local_path.open("r", encoding="utf-8") as fh:
-                local_data = yaml.safe_load(fh) or {}
-            if isinstance(local_data, dict):
-                _deep_merge(data, local_data)
+        # Tests set YULYEN_SKIP_LOCAL_CONFIG=1 so a developer's personal
+        # config.local.yaml cannot change test behavior vs. CI.
+        if not os.environ.get("YULYEN_SKIP_LOCAL_CONFIG"):
+            local_path = config_path.with_name("config.local.yaml")
+            if local_path.is_file():
+                with local_path.open("r", encoding="utf-8") as fh:
+                    local_data = yaml.safe_load(fh) or {}
+                if isinstance(local_data, dict):
+                    _deep_merge(data, local_data)
 
         try:
             language = data.pop("language")

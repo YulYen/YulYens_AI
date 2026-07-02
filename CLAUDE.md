@@ -179,6 +179,11 @@ persönliche/geheime Werte (z. B. echter Mail-Host/-Adresse) aus der **öffentli
 `config.yaml` heraus, während die App lokal trotzdem läuft. `config.local.yaml` ist
 in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
+**Tests ignorieren das lokale Override:** Die Test-Suite setzt automatisch
+`YULYEN_SKIP_LOCAL_CONFIG=1` (autouse-Fixture in `tests/conftest.py`), damit
+eine persönliche `config.local.yaml` die Tests nicht anders laufen lässt als
+in der CI (z. B. würde `api.enabled: false` sonst API-Tests brechen).
+
 ## Code-Stil
 
 - **Black** mit `line-length = 88`

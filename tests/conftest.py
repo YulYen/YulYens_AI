@@ -154,3 +154,16 @@ def _default_ensemble(monkeypatch):
 
     monkeypatch.setattr(Config, "_load_config", _patched_load_config)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _ignore_local_config_override(monkeypatch):
+    """Keep a developer's personal config.local.yaml out of the test run.
+
+    Without this, tests behave differently on machines with a local override
+    (e.g. api.enabled: false) than in CI. Tests that exercise the merge itself
+    delete the variable explicitly.
+    """
+
+    monkeypatch.setenv("YULYEN_SKIP_LOCAL_CONFIG", "1")
+    yield

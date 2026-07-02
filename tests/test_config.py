@@ -6,8 +6,10 @@ import pytest
 from config.config_singleton import Config
 
 
-def test_config_local_override_is_merged(tmp_path):
+def test_config_local_override_is_merged(tmp_path, monkeypatch):
     """A sibling config.local.yaml is deep-merged over config.yaml (local wins)."""
+    # The autouse fixture disables the merge for all tests; re-enable it here.
+    monkeypatch.delenv("YULYEN_SKIP_LOCAL_CONFIG", raising=False)
     base = tmp_path / "config.yaml"
     base.write_text(
         'language: "de"\n'
@@ -33,6 +35,22 @@ def test_config_local_override_is_merged(tmp_path):
         assert cfg.email_adapter["imap"]["host"] == "real.host.example"
         # untouched base keys survive the merge
         assert cfg.email_adapter["imap"]["port"] == 993
+    finally:
+        Config.reset_instance()
+
+
+def test_config_local_override_skipped_in_tests(tmp_path):
+    """With YULYEN_SKIP_LOCAL_CONFIG set (autouse fixture), the merge is off."""
+    base = tmp_path / "config.yaml"
+    base.write_text('language: "de"\napi:\n  enabled: true\n', encoding="utf-8")
+    (tmp_path / "config.local.yaml").write_text(
+        "api:\n  enabled: false\n", encoding="utf-8"
+    )
+
+    Config.reset_instance()
+    try:
+        cfg = Config(str(base))
+        assert cfg.api["enabled"] is True
     finally:
         Config.reset_instance()
 
