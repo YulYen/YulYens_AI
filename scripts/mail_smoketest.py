@@ -18,7 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from email_adapter.service import EmailAdapterConfig, _open_imap  # noqa: E402
+from email_adapter.service import EmailAdapterConfig, open_imap  # noqa: E402
 
 
 def main() -> int:
@@ -43,7 +43,7 @@ def main() -> int:
     # --- IMAP ---------------------------------------------------------------
     print("--- IMAP-Login ---")
     try:
-        imap = _open_imap(cfg)
+        imap = open_imap(cfg)
         imap.login(cfg.imap_username, cfg.imap_password)
         status, data = imap.select(cfg.source_mailbox, readonly=True)
         print(f"  Login OK. SELECT {cfg.source_mailbox}: status={status}")

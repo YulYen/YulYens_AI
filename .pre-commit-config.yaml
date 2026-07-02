@@ -1,6 +1,14 @@
 # Run `pre-commit install` once, then Black + Ruff run on every commit.
 # Versions are kept in sync with requirements-dev.txt.
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        # Keep intentional Markdown hard line breaks (two trailing spaces)
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.4.10
     hooks:

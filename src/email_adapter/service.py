@@ -162,8 +162,8 @@ class EmailAdapterService:
     ) -> None:
         self.cfg = cfg
         self.provider = provider
-        self._imap_factory = imap_factory or _open_imap
-        self._smtp_factory = smtp_factory or _open_smtp
+        self._imap_factory = imap_factory or open_imap
+        self._smtp_factory = smtp_factory or open_smtp
         self._stop_event = threading.Event()
 
     def stop(self) -> None:
@@ -348,13 +348,13 @@ def start_email_adapter(
     return thread
 
 
-def _open_imap(cfg: EmailAdapterConfig) -> ImapClient:
+def open_imap(cfg: EmailAdapterConfig) -> ImapClient:
     if cfg.imap_ssl:
         return imaplib.IMAP4_SSL(cfg.imap_host, cfg.imap_port)
     return imaplib.IMAP4(cfg.imap_host, cfg.imap_port)
 
 
-def _open_smtp(cfg: EmailAdapterConfig) -> SmtpClient:
+def open_smtp(cfg: EmailAdapterConfig) -> SmtpClient:
     if cfg.smtp_ssl:
         return smtplib.SMTP_SSL(cfg.smtp_host, cfg.smtp_port)
     return smtplib.SMTP(cfg.smtp_host, cfg.smtp_port)
