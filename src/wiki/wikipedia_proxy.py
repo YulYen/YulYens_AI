@@ -11,32 +11,46 @@ from bs4 import BeautifulSoup
 from config.config_singleton import Config
 
 # --- Configuration --------------------------------------------------------------
-config = Config()  # Load singleton instance (loads YAML on first access)
-
-WIKI_CFG = config.wiki
-OFFLINE_CFG = config.wiki["offline"]
 
 
 def _normalize_base_url(url: str) -> str:
     return url.rstrip("/")
 
 
-ONLINE_BASE_URL_MAP = WIKI_CFG.get("online_base_url_map", {}) or {}
-ONLINE_BASE_URL = _normalize_base_url(
-    ONLINE_BASE_URL_MAP.get(config.language)
-    or f"https://{config.language}.wikipedia.org"
-)
+class _ProxySettings:
+    """Reads all proxy settings from the Config once, on first use (not at import)."""
 
-SNIPPET_LIMIT = int(WIKI_CFG["snippet_limit"])
-TIMEOUT = (float(WIKI_CFG["timeout_connect"]), float(WIKI_CFG["timeout_read"]))
+    def __init__(self, config: Config):
+        self.config = config
+        wiki_cfg = config.wiki
+        offline_cfg = wiki_cfg["offline"]
 
-KIWIX_PORT = int(OFFLINE_CFG["kiwix_port"])
-KIWIX_HOST = OFFLINE_CFG["host"]
-PROXY_PORT = int(WIKI_CFG["proxy_port"])
-ZIM_PREFIX = OFFLINE_CFG["zim_prefix"]
+        online_map = wiki_cfg.get("online_base_url_map", {}) or {}
+        self.online_base_url = _normalize_base_url(
+            online_map.get(config.language)
+            or f"https://{config.language}.wikipedia.org"
+        )
 
-KIWIX_TIMEOUT = TIMEOUT
-ONLINE_TIMEOUT = TIMEOUT
+        self.snippet_limit = int(wiki_cfg["snippet_limit"])
+        self.timeout = (
+            float(wiki_cfg["timeout_connect"]),
+            float(wiki_cfg["timeout_read"]),
+        )
+        self.kiwix_port = int(offline_cfg["kiwix_port"])
+        self.kiwix_host = offline_cfg["host"]
+        self.proxy_port = int(wiki_cfg["proxy_port"])
+        self.zim_prefix = offline_cfg["zim_prefix"]
+
+
+_settings: _ProxySettings | None = None
+
+
+def _get_settings() -> _ProxySettings:
+    global _settings
+    if _settings is None:
+        _settings = _ProxySettings(Config())
+    return _settings
+
 
 # --- Configure logging ----------------------------------------------------------
 logger = logging.getLogger("wiki_proxy")
@@ -69,12 +83,13 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
 
 # ---------- Helpers for request processing -------------------------------------
 def _build_kiwix_url(term: str) -> str:
-    return f"http://{KIWIX_HOST}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
+    s = _get_settings()
+    return f"http://{s.kiwix_host}:{s.kiwix_port}/{s.zim_prefix}/{term}"
 
 
 def _build_online_url(term: str) -> str:
     # Wikipedia accepts underscores as spaces
-    return f"{ONLINE_BASE_URL}/wiki/{term}"
+    return f"{_get_settings().online_base_url}/wiki/{term}"
 
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
@@ -197,7 +212,8 @@ def _build_user_visible_link(
     if online:
         return _build_online_url(term)
     # Local Kiwix link (same host as the user request, but port 8080)
-    return f"http://{hostname}:{KIWIX_PORT}/{ZIM_PREFIX}/{term}"
+    s = _get_settings()
+    return f"http://{hostname}:{s.kiwix_port}/{s.zim_prefix}/{term}"
 
 
 def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
@@ -205,7 +221,7 @@ def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
     Builds the prefix from config.yaml (online/offline) and appends the link.
     """
     key = "wiki_lookup_prefix_online" if online else "wiki_lookup_prefix_offline"
-    tpl = config.texts[
+    tpl = cfg.texts[
         key
     ]  # Intentionally allow KeyError if config.yaml is missing the key
     prefix = tpl.format(
@@ -215,11 +231,12 @@ def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
 
 
 def _parse_limit(query: dict) -> int:
+    snippet_limit = _get_settings().snippet_limit
     try:
-        val = int(query.get("limit", [SNIPPET_LIMIT])[0])
+        val = int(query.get("limit", [snippet_limit])[0])
     except (ValueError, TypeError):
-        val = SNIPPET_LIMIT
-    return max(0, min(val, SNIPPET_LIMIT))
+        val = snippet_limit
+    return max(0, min(val, snippet_limit))
 
 
 def _fetch_kiwix(term: str):
@@ -227,7 +244,7 @@ def _fetch_kiwix(term: str):
     logger.info(f"[Fetch] {url}")
     start_kiwix = time.perf_counter()
     try:
-        r = requests.get(url, timeout=KIWIX_TIMEOUT)
+        r = requests.get(url, timeout=_get_settings().timeout)
         return r.status_code, r
     except Exception as e:
         logger.error(f"[FetchError] {e}")
@@ -242,11 +259,12 @@ def _fetch_kiwix(term: str):
 
 def _fetch_online(term: str):
     """Fetches a short text from the configured live Wikipedia (REST Summary API)."""
-    url = f"{ONLINE_BASE_URL}/api/rest_v1/page/summary/{term}"
+    s = _get_settings()
+    url = f"{s.online_base_url}/api/rest_v1/page/summary/{term}"
     logger.info(f"[FetchOnline] {url}")
     try:
         r = requests.get(
-            url, timeout=ONLINE_TIMEOUT, headers={"User-Agent": "LeahWikiProxy/1.0"}
+            url, timeout=s.timeout, headers={"User-Agent": "LeahWikiProxy/1.0"}
         )
         if r.status_code != 200:
             return r.status_code, None
@@ -358,7 +376,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             # Target link & UI hint
             link = _build_user_visible_link(self, search_term, online)
             source = "online" if online else "local"
-            wiki_hint = _build_wiki_hint(config, online, persona, link)
+            wiki_hint = _build_wiki_hint(_get_settings().config, online, persona, link)
 
             # Return JSON
             payload = {
@@ -387,8 +405,9 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
 
 
 def run():
-    logger.info(f"Starting local Wikipedia text proxy at http://localhost:{PROXY_PORT}")
-    server = HTTPServer(("", PROXY_PORT), WikiRequestHandler)
+    proxy_port = _get_settings().proxy_port
+    logger.info(f"Starting local Wikipedia text proxy at http://localhost:{proxy_port}")
+    server = HTTPServer(("", proxy_port), WikiRequestHandler)
     server.serve_forever()
 
 
