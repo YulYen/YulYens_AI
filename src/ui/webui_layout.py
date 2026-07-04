@@ -40,10 +40,21 @@ def build_ui(
                     border-radius:10px;
                     padding:12px;
                     text-align:center;
+                    height:100%;
                 }
+                /* Gradio-Group wickelt Inhalte in .styler; dort das Flex-Layout setzen,
+                   damit die Buttons aller Karten unten bündig abschließen. */
+                .persona-card > .styler {
+                    display:flex;
+                    flex-direction:column;
+                    height:100%;
+                }
+                .persona-card > .styler > button { margin-top:auto; }
+                /* !important: Gradios komponenten-eigene img-Styles sind spezifischer */
                 .persona-card img {
                     max-width: 100%;
-                    height: auto;
+                    height: 150px !important;
+                    object-fit: contain;
                     display:inline-block;
                 }
                 .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
@@ -51,9 +62,13 @@ def build_ui(
                 .chat-input-row { align-items: stretch; gap:12px; }
                 .new-chat-btn button { margin-top: 12px; }
                 .ask-all-btn button { height: 100%; font-size: 1rem; padding: 14px 18px; }
-                .ask-all-strip { justify-content: center; gap: 12px; }
-                .ask-all-strip img { max-width: 250px; max-height: 250px; object-fit: contain; }
+                .ask-all-strip { justify-content: center; align-items: center; gap: 12px; }
+                .ask-all-strip img { max-width: 250px; max-height: 160px; object-fit: contain; }
                 .persona-header-row { justify-content: space-between; align-items: center; }
+                /* Chat-Header: Abstand zwischen Bild und Text, Text vertikal mittig.
+                   !important nötig, weil Gradios Row-Styles (gap:1px) sonst gewinnen. */
+                .focus-row { gap:16px !important; }
+                .focus-row > div { justify-content: center; }
                 </style>
             """
         )
@@ -65,12 +80,14 @@ def build_ui(
             with gr.Row(elem_classes="persona-row", equal_height=True):
                 persona_buttons = []
                 for key, p in persona_info.items():
-                    with gr.Column(scale=1, min_width=220):
+                    with gr.Column(scale=1, min_width=170):
                         with gr.Group(elem_classes="persona-card"):
                             gr.Image(
                                 persona_thumbnail_path_fn(p["name"]),
                                 show_label=False,
                                 container=False,
+                                show_download_button=False,
+                                show_fullscreen_button=False,
                                 elem_classes="persona-img",
                             )
                             gr.Markdown(
@@ -82,12 +99,14 @@ def build_ui(
                                 variant="secondary",
                             )
                             persona_buttons.append((key, btn))
-                with gr.Column(scale=1, min_width=220):
+                with gr.Column(scale=1, min_width=170):
                     with gr.Group(elem_classes="persona-card"):
                         gr.Image(
                             "static/ST.png",
                             show_label=False,
                             container=False,
+                            show_download_button=False,
+                            show_fullscreen_button=False,
                             elem_classes="persona-img",
                         )
                         gr.Markdown(
@@ -99,12 +118,14 @@ def build_ui(
                         )
 
                 if broadcast_enabled:
-                    with gr.Column(scale=1, min_width=220):
+                    with gr.Column(scale=1, min_width=170):
                         with gr.Group(elem_classes="persona-card"):
                             gr.Image(
                                 "static/ALL.png",
                                 show_label=False,
                                 container=False,
+                                show_download_button=False,
+                                show_fullscreen_button=False,
                                 elem_classes="persona-img",
                             )
                             gr.Markdown(
@@ -128,9 +149,14 @@ def build_ui(
                     load_status = gr.Markdown("", visible=False)
 
         with gr.Group(visible=False) as focus_group:
-            with gr.Row():
+            with gr.Row(elem_classes="focus-row"):
                 with gr.Column(scale=1):
-                    focus_img = gr.Image(show_label=False, container=False)
+                    focus_img = gr.Image(
+                        show_label=False,
+                        container=False,
+                        show_download_button=False,
+                        show_fullscreen_button=False,
+                    )
                 with gr.Column(scale=3):
                     focus_md = gr.Markdown("")
             gr.Markdown("---")
@@ -151,12 +177,15 @@ def build_ui(
                 placeholder=input_placeholder,
                 visible=False,
                 interactive=False,
+                scale=5,
             )
             send_btn = gr.Button(
                 send_button_label,
                 variant="primary",
                 visible=False,
                 interactive=False,
+                scale=1,
+                min_width=140,
             )
         new_chat_btn = gr.Button(
             new_chat_label, visible=False, elem_classes="new-chat-btn"
@@ -191,12 +220,16 @@ def build_ui(
                         "static/ALL.png",
                         show_label=False,
                         container=False,
+                        show_download_button=False,
+                        show_fullscreen_button=False,
                     )
                 for p in persona_info.values():
                     gr.Image(
                         persona_thumbnail_path_fn(p["name"]),
                         show_label=False,
                         container=False,
+                        show_download_button=False,
+                        show_fullscreen_button=False,
                     )
             ask_all_status = gr.Markdown("", visible=False)
             ask_all_question = gr.Textbox(
@@ -216,8 +249,9 @@ def build_ui(
             ask_all_results = gr.Dataframe(
                 headers=[broadcast_table_persona_label, broadcast_table_answer_label],
                 visible=False,
-                datatype=["str", "str"],
+                datatype=["str", "markdown"],
                 wrap=True,
+                interactive=False,
             )
         history_state = gr.State([])
         meta_state = gr.State({})

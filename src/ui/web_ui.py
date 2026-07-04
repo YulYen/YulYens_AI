@@ -388,6 +388,9 @@ class WebUI:
         self.self_talk_runner = None
         updates = self._reset_updates()
         updates.update(
+            grid_group=gr.update(visible=False),
+            # Rückweg zur Startseite, solange noch kein Dialog läuft
+            new_chat_btn=gr.update(visible=True),
             self_talk_group=gr.update(visible=True),
             self_talk_prompt=gr.update(
                 value="",
@@ -542,6 +545,15 @@ class WebUI:
                 gr.update(visible=False, interactive=False),
                 gr.update(visible=True),
             )
+
+        # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
+        yield (
+            gr.update(value=question, interactive=True, visible=True),
+            gr.update(value="", visible=False),
+            gr.update(value=table_rows, visible=True),
+            gr.update(visible=True, interactive=True),
+            gr.update(visible=True),
+        )
 
     @staticmethod
     def _normalize_ask_all_rows(current_rows: Any) -> list:
