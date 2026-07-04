@@ -11,8 +11,6 @@ def build_ui(
     persona_btn_suffix,
     input_placeholder,
     new_chat_label,
-    broadcast_table_persona_label,
-    broadcast_table_answer_label,
     send_button_label,
     ask_all_button_label,
     ask_all_title,
@@ -69,6 +67,14 @@ def build_ui(
                    !important nötig, weil Gradios Row-Styles (gap:1px) sonst gewinnen. */
                 .focus-row { gap:16px !important; }
                 .focus-row > div { justify-content: center; }
+                /* Ask-All-Ergebnisse: Abschnitt pro Persona, dezent gerahmt */
+                .ask-all-results {
+                    border: 1px solid #e3e7ed;
+                    border-radius: 10px;
+                    padding: 4px 16px 12px;
+                    background: var(--background-fill-primary, #fff);
+                }
+                .ask-all-results h3 { margin: 14px 0 6px; }
                 </style>
             """
         )
@@ -246,12 +252,13 @@ def build_ui(
                     new_chat_label,
                     elem_classes="new-chat-btn",
                 )
-            ask_all_results = gr.Dataframe(
-                headers=[broadcast_table_persona_label, broadcast_table_answer_label],
+            # Bewusst Markdown statt gr.Dataframe: die Dataframe-Komponente
+            # verliert in Gradio 4.44 Streaming-Updates aus Generatoren
+            # (Frontend friert nach den ersten Yields ein).
+            ask_all_results = gr.Markdown(
+                "",
                 visible=False,
-                datatype=["str", "markdown"],
-                wrap=True,
-                interactive=False,
+                elem_classes="ask-all-results",
             )
         history_state = gr.State([])
         meta_state = gr.State({})

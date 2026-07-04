@@ -3,15 +3,16 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
+import time
 from collections.abc import Iterator
 from datetime import datetime
 from functools import partial
 from typing import TYPE_CHECKING, Any
 
 import gradio as gr
-from config.personas import _load_system_prompts, get_drink
+from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
-from core.orchestrator import iter_broadcast
+from core.orchestrator import iter_broadcast_events
 from core.utils import is_broadcast_enabled
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
@@ -276,7 +277,7 @@ class WebUI:
             "history_state": self._reset_conversation_state(),
             "meta_state": self._reset_meta_state(),
             "ask_all_group": gr.update(visible=False),
-            "ask_all_results": gr.update(value=[], visible=False),
+            "ask_all_results": gr.update(value="", visible=False),
             "ask_all_question": gr.update(
                 value=self.ask_all_placeholder, visible=False, interactive=True
             ),
@@ -494,79 +495,90 @@ class WebUI:
             if should_stop:
                 break
 
-    def _on_submit_ask_all(
-        self, question: str | None, current_rows: Any = None
-    ) -> Iterator[tuple]:
-        question = (question or "").strip()
-        existing_rows = self._normalize_ask_all_rows(current_rows)
-
-        if not self.broadcast_enabled:
-            warning = self._t("ask_all_disabled")
-            yield (
-                gr.update(value=question, visible=True, interactive=True),
-                gr.update(value=warning, visible=True),
-                gr.update(value=existing_rows, visible=bool(existing_rows)),
-                gr.update(visible=True, interactive=False),
-                gr.update(visible=True),
-            )
-            return
-
-        if not question:
-            warn = self._t("empty_question")
-            yield (
-                gr.update(
-                    value="",
-                    visible=True,
-                    interactive=True,
-                    placeholder=self.ask_all_placeholder,
-                ),
-                gr.update(value=warn, visible=True),
-                gr.update(value=existing_rows, visible=bool(existing_rows)),
-                gr.update(visible=True, interactive=True),
-                gr.update(visible=True),
-            )
-            return
-
-        table_rows: list[list[str]] = []
-        yield (
-            gr.update(value=question, interactive=False, visible=True),
-            gr.update(value="", visible=False),
-            gr.update(value=table_rows, visible=True),
-            gr.update(visible=False, interactive=False),
-            gr.update(visible=True),
-        )
-
-        for result in iter_broadcast(self.factory, question):
-            table_rows.append([result["persona"], result["reply"]])
-            yield (
-                gr.update(value=question, interactive=False, visible=True),
-                gr.update(value="", visible=False),
-                gr.update(value=table_rows, visible=True),
-                gr.update(visible=False, interactive=False),
-                gr.update(visible=True),
-            )
-
-        # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
-        yield (
-            gr.update(value=question, interactive=True, visible=True),
-            gr.update(value="", visible=False),
-            gr.update(value=table_rows, visible=True),
-            gr.update(visible=True, interactive=True),
+    def _ask_all_state(
+        self,
+        question: str,
+        results_md: str,
+        *,
+        editable: bool,
+        submit_visible: bool = True,
+        submit_interactive: bool = True,
+        status: str = "",
+    ) -> tuple:
+        """Builds the 5-tuple of updates every Ask-All yield consists of."""
+        return (
+            gr.update(
+                value=question,
+                visible=True,
+                interactive=editable,
+                placeholder=self.ask_all_placeholder,
+            ),
+            gr.update(value=status, visible=bool(status)),
+            gr.update(value=results_md, visible=bool(results_md)),
+            gr.update(visible=submit_visible, interactive=submit_interactive),
             gr.update(visible=True),
         )
 
     @staticmethod
-    def _normalize_ask_all_rows(current_rows: Any) -> list:
-        if current_rows is None:
-            return []
-        if isinstance(current_rows, list):
-            return current_rows
-        if hasattr(current_rows, "values"):
-            try:
-                return current_rows.values.tolist()
-            except Exception:
-                return list(current_rows)
-        return list(current_rows)
+    def _format_ask_all_results(replies: dict[str, str]) -> str:
+        """One markdown section per persona, separated by horizontal rules."""
+        return "\n\n---\n\n".join(
+            f"### {persona}\n\n{reply}" for persona, reply in replies.items()
+        )
+
+    def _on_submit_ask_all(
+        self, question: str | None, current_results: str | None = None
+    ) -> Iterator[tuple]:
+        question = (question or "").strip()
+        existing = current_results or ""
+
+        if not self.broadcast_enabled:
+            yield self._ask_all_state(
+                question,
+                existing,
+                editable=True,
+                submit_interactive=False,
+                status=self._t("ask_all_disabled"),
+            )
+            return
+
+        if not question:
+            yield self._ask_all_state(
+                "",
+                existing,
+                editable=True,
+                status=self._t("empty_question"),
+            )
+            return
+
+        # Alle Personas vorab mit Platzhalter anlegen, dann Token für Token
+        # hineinstreamen; gedrosselt, damit nicht jedes Token den kompletten
+        # Markdown-Block über den Socket schickt.
+        replies = {name: "…" for name in get_all_persona_names()}
+        running = {
+            "editable": False,
+            "submit_visible": False,
+            "submit_interactive": False,
+        }
+        yield self._ask_all_state(
+            question, self._format_ask_all_results(replies), **running
+        )
+
+        last_flush = 0.0
+        for event in iter_broadcast_events(self.factory, question):
+            replies[event["persona"]] = event["reply"] or "…"
+
+            now = time.monotonic()
+            if event["type"] == "done" or now - last_flush >= 0.1:
+                last_flush = now
+                yield self._ask_all_state(
+                    question, self._format_ask_all_results(replies), **running
+                )
+
+        # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
+        yield self._ask_all_state(
+            question, self._format_ask_all_results(replies), editable=True
+        )
 
     def _load_failure_updates(self, message: str) -> tuple:
         updates = self._reset_updates()
@@ -921,12 +933,6 @@ class WebUI:
             persona_btn_suffix=persona_btn_suffix,
             input_placeholder=input_placeholder,
             new_chat_label=new_chat_label,
-            broadcast_table_persona_label=ui.get(
-                "broadcast_table_persona_header", "Persona"
-            ),
-            broadcast_table_answer_label=ui.get(
-                "broadcast_table_answer_header", "Answer"
-            ),
             send_button_label=send_button_label,
             ask_all_button_label=ask_all_button_label,
             ask_all_title=ask_all_title,

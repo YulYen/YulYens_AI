@@ -9,13 +9,14 @@ from config.personas import get_all_persona_names
 from core.streaming_provider import YulYenStreamingProvider
 
 
-def iter_broadcast(
+def iter_broadcast_events(
     factory,
     user_input: str,
     persona_names: Iterable[str] | None = None,
-    on_token: Callable[[str, str], None] | None = None,
 ) -> Iterator[dict[str, str]]:
-    """Runs the same prompt sequentially for every persona, yielding per persona.
+    """Runs the same prompt sequentially for every persona, yielding per token.
+
+    Lowest-level broadcast primitive; the other broadcast helpers build on it.
 
     Args:
         factory: Object that can build a :class:`YulYenStreamingProvider` via
@@ -23,12 +24,12 @@ def iter_broadcast(
         user_input: Prompt to send to every persona.
         persona_names: Optional custom subset. Defaults to all personas in the
             active ensemble.
-        on_token: Optional callback that receives ``(persona, token)`` for
-            streaming progress reporting.
 
     Yields:
-        One dictionary per persona with the persona name and the collected
-        reply text, as soon as that persona has finished.
+        ``{"type": "token", "persona": ..., "token": ..., "reply": ...}`` for
+        every streamed token (``reply`` is the cumulative text so far) and
+        ``{"type": "done", "persona": ..., "reply": ...}`` once a persona has
+        finished (``reply`` is the full, stripped text).
     """
 
     personas = (
@@ -37,16 +38,40 @@ def iter_broadcast(
 
     for persona in personas:
         streamer: YulYenStreamingProvider = factory.get_streamer_for_persona(persona)
-        reply_parts: list[str] = []
+        reply_so_far = ""
 
         for token in streamer.stream(
             messages=[{"role": "user", "content": user_input}]
         ):
-            reply_parts.append(token)
-            if on_token:
-                on_token(persona, token)
+            reply_so_far += token
+            yield {
+                "type": "token",
+                "persona": persona,
+                "token": token,
+                "reply": reply_so_far,
+            }
 
-        yield {"persona": persona, "reply": "".join(reply_parts).strip()}
+        yield {"type": "done", "persona": persona, "reply": reply_so_far.strip()}
+
+
+def iter_broadcast(
+    factory,
+    user_input: str,
+    persona_names: Iterable[str] | None = None,
+    on_token: Callable[[str, str], None] | None = None,
+) -> Iterator[dict[str, str]]:
+    """Like :func:`iter_broadcast_events`, but yields once per finished persona.
+
+    ``on_token`` optionally receives ``(persona, token)`` for streaming
+    progress reporting.
+    """
+
+    for event in iter_broadcast_events(factory, user_input, persona_names):
+        if event["type"] == "token":
+            if on_token:
+                on_token(event["persona"], event["token"])
+        else:
+            yield {"persona": event["persona"], "reply": event["reply"]}
 
 
 def broadcast_to_ensemble(
