@@ -225,6 +225,26 @@ class TerminalUI:
             print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
             return
 
+        # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
+        # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
+        context_messages: list[dict[str, str]] = []
+        if self.keyword_finder:
+            wiki_hints, contexts = lookup_wiki_snippet(
+                question,
+                "ask_all",
+                self.keyword_finder,
+                self.wiki_mode,
+                self.proxy_port,
+                self.wiki_snippet_limit,
+                self.wiki_timeout,
+                self.max_wiki_snippets,
+            )
+            for wiki_hint in wiki_hints:
+                if wiki_hint:
+                    print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
+            if contexts:
+                inject_wiki_context(context_messages, contexts)
+
         print(
             f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}"
         )
@@ -240,7 +260,12 @@ class TerminalUI:
                 last_persona = persona
             print(token, end="", flush=True)
 
-        broadcast_to_ensemble(self.factory, question, on_token=_on_token)
+        broadcast_to_ensemble(
+            self.factory,
+            question,
+            on_token=_on_token,
+            context_messages=context_messages,
+        )
 
         if last_persona is not None:
             print("\n")

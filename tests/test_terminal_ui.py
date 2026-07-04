@@ -133,8 +133,12 @@ def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> No
 
     monkeypatch.setattr("builtins.input", lambda _: question)
 
-    def fake_broadcast(factory, question_input, on_token):  # type: ignore[no-redef]
+    def fake_broadcast(  # type: ignore[no-redef]
+        factory, question_input, on_token, *, context_messages=None
+    ):
         assert question_input == question
+        # Ohne keyword_finder darf kein Wiki-Kontext mitgegeben werden
+        assert context_messages == []
         on_token("LEAH", "Hallo")
         on_token("MAX", "Hi")
 
@@ -147,6 +151,36 @@ def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> No
     assert ui.texts["terminal_askall_block_end"] in out
     assert "[LEAH]" in out
     assert "[MAX]" in out
+
+
+def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.factory = SimpleNamespace()
+    ui.keyword_finder = object()
+
+    monkeypatch.setattr("builtins.input", lambda _: "Frage")
+    monkeypatch.setattr(
+        "ui.terminal_ui.lookup_wiki_snippet",
+        lambda *args, **kwargs: (["🕵️ Hinweis"], [("Thema", "Snippet")]),
+    )
+
+    def fake_inject(history, contexts):
+        history.append({"role": "system", "content": "WIKI"})
+
+    monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", fake_inject)
+
+    captured: dict = {}
+
+    def fake_broadcast(factory, question, on_token, *, context_messages=None):
+        captured["context_messages"] = context_messages
+
+    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", fake_broadcast)
+
+    ui._run_ask_all_flow()
+
+    out = capsys.readouterr().out
+    assert "🕵️ Hinweis" in out
+    assert captured["context_messages"] == [{"role": "system", "content": "WIKI"}]
 
 
 def test_terminal_ui_run_ask_all_flow_requires_question(monkeypatch, capsys) -> None:

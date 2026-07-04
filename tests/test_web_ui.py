@@ -269,6 +269,64 @@ def test_respond_streaming_appends_final_history_entries():
     ]
 
 
+def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
+    web_ui = _create_web_ui()
+    captured: dict = {}
+
+    def fake_iter_broadcast_events(factory, question, *, context_messages=None):
+        captured["context_messages"] = list(context_messages or [])
+        yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
+
+    def fake_inject(history, contexts):
+        history.append({"role": "system", "content": "WIKI"})
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch(
+            "ui.web_ui.lookup_wiki_snippet",
+            return_value=(["🕵️ Hinweis"], [("Thema", "Snippet")]),
+        ) as mock_lookup,
+        patch("ui.web_ui.inject_wiki_context", side_effect=fake_inject),
+        patch(
+            "ui.web_ui.iter_broadcast_events",
+            side_effect=fake_iter_broadcast_events,
+        ),
+    ):
+        outputs = list(web_ui._on_submit_ask_all("Frage"))
+
+    # Lookup läuft genau einmal (nicht pro Persona), Kontext erreicht den Broadcast
+    mock_lookup.assert_called_once()
+    assert captured["context_messages"] == [{"role": "system", "content": "WIKI"}]
+
+    # Der Wiki-Hint landet im Status-Feld (Index 1 des Ask-All-Update-Tupels)
+    final_status = outputs[-1][1]
+    assert final_status["value"] == "🕵️ Hinweis"
+    assert final_status["visible"] is True
+
+
+def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
+    web_ui = _create_web_ui()
+    captured: dict = {}
+
+    def fake_iter_broadcast_events(factory, question, *, context_messages=None):
+        captured["context_messages"] = list(context_messages or [])
+        yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "ui.web_ui.iter_broadcast_events",
+            side_effect=fake_iter_broadcast_events,
+        ),
+    ):
+        outputs = list(web_ui._on_submit_ask_all("Frage"))
+
+    assert captured["context_messages"] == []
+    final_status = outputs[-1][1]
+    assert final_status["visible"] is False
+
+
 def test_on_start_self_talk_validates_distinct_personas():
     web_ui = _create_web_ui()
 

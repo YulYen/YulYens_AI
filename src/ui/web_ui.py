@@ -564,20 +564,52 @@ class WebUI:
             question, self._format_ask_all_results(replies), **running
         )
 
+        # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
+        # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
+        wiki_hints, contexts = lookup_wiki_snippet(
+            question,
+            "ask_all",
+            self.keyword_finder,
+            self.wiki_mode,
+            self.proxy_port,
+            self.wiki_snippet_limit,
+            self.wiki_timeout,
+            self.max_wiki_snippets,
+        )
+        context_messages: list[Message] = []
+        if contexts:
+            inject_wiki_context(context_messages, contexts)
+        wiki_status = "\n\n".join(hint for hint in wiki_hints if hint)
+        if wiki_status:
+            yield self._ask_all_state(
+                question,
+                self._format_ask_all_results(replies),
+                status=wiki_status,
+                **running,
+            )
+
         last_flush = 0.0
-        for event in iter_broadcast_events(self.factory, question):
+        for event in iter_broadcast_events(
+            self.factory, question, context_messages=context_messages
+        ):
             replies[event["persona"]] = event["reply"] or "…"
 
             now = time.monotonic()
             if event["type"] == "done" or now - last_flush >= 0.1:
                 last_flush = now
                 yield self._ask_all_state(
-                    question, self._format_ask_all_results(replies), **running
+                    question,
+                    self._format_ask_all_results(replies),
+                    status=wiki_status,
+                    **running,
                 )
 
         # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
         yield self._ask_all_state(
-            question, self._format_ask_all_results(replies), editable=True
+            question,
+            self._format_ask_all_results(replies),
+            status=wiki_status,
+            editable=True,
         )
 
     def _load_failure_updates(self, message: str) -> tuple:
@@ -758,14 +790,14 @@ class WebUI:
             queue=False,
         )
 
-        input_box.submit(
+        input_submit_evt = input_box.submit(
             fn=self.respond_streaming,
             inputs=[input_box, chatbot, history_state],
             outputs=[input_box, chatbot, history_state],
             queue=True,
         )
 
-        send_btn.click(
+        send_click_evt = send_btn.click(
             fn=self.respond_streaming,
             inputs=[input_box, chatbot, history_state],
             outputs=[input_box, chatbot, history_state],
@@ -776,13 +808,6 @@ class WebUI:
             fn=self._on_download_conversation,
             inputs=[history_state, meta_state],
             outputs=[download_file, save_status],
-            queue=False,
-        )
-
-        new_chat_btn.click(
-            fn=self._on_reset_to_start,
-            inputs=[],
-            outputs=persona_outputs,
             queue=False,
         )
 
@@ -802,7 +827,7 @@ class WebUI:
                 queue=False,
             )
 
-        self_talk_start_btn.click(
+        self_talk_stream_evt = self_talk_start_btn.click(
             fn=self._on_start_self_talk,
             inputs=[self_talk_persona_a, self_talk_persona_b, self_talk_prompt],
             outputs=[
@@ -823,7 +848,7 @@ class WebUI:
             queue=True,
         )
 
-        ask_all_submit.click(
+        ask_all_submit_evt = ask_all_submit.click(
             fn=self._on_submit_ask_all,
             inputs=[ask_all_question, ask_all_results],
             outputs=[
@@ -836,7 +861,7 @@ class WebUI:
             queue=True,
         )
 
-        ask_all_question.submit(
+        ask_all_question_evt = ask_all_question.submit(
             fn=self._on_submit_ask_all,
             inputs=[ask_all_question, ask_all_results],
             outputs=[
@@ -847,6 +872,17 @@ class WebUI:
                 ask_all_new_chat,
             ],
             queue=True,
+        )
+
+        # "New conversation" bricht laufende Streams aktiv ab (#2): das Schließen
+        # des Generators löst über GeneratorExit das finally in
+        # YulYenStreamingProvider.stream aus, das den LLM-Stream beendet.
+        new_chat_btn.click(
+            fn=self._on_reset_to_start,
+            inputs=[],
+            outputs=persona_outputs,
+            queue=False,
+            cancels=[input_submit_evt, send_click_evt, self_talk_stream_evt],
         )
 
         ask_all_new_chat.click(
@@ -854,6 +890,7 @@ class WebUI:
             inputs=[],
             outputs=persona_outputs,
             queue=False,
+            cancels=[ask_all_submit_evt, ask_all_question_evt],
         )
 
     def _start_server(self, demo: gr.Blocks) -> None:
