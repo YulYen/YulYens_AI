@@ -73,7 +73,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 18 Testmodule
+│   └── test_*.py                # 23 Testmodule
 ├── locales/
 │   ├── de.yaml                  # 83+ UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
@@ -230,17 +230,31 @@ bewusst `python -m black`/`python -m ruff` auf.
 |---|---|
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
-| **Broadcast/Ask-All** | Eine Frage an alle Personas, Ergebnisse als Tabelle |
+| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona (`iter_broadcast_events`) |
+
+### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
+Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
+friert nach den ersten Yields ein (gilt für `gr.update` wie Rohwerte, `str` wie
+`markdown`-datatype; per Minimal-Repro bestätigt). Zusätzlich: fester 500px-Scroll-
+Viewport und eine virtualisierte Tabelle, deren Mess-Klon-Zeilen DOM-Selektoren in
+Browser-Tests verfälschen. **Für live wachsende Ausgaben `gr.Markdown` (Voll-Ersatz
+pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
+Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
+Gradio 4.44 crashen).
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights:
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-04):
 
-- **#9** Ask-All: Wiki-Unterstützung fehlt noch, WebUI-Streaming
-- **#12** Karl: Context-Kompressor (LLM-basiert)
+- **#9** Ask-All: WebUI-Streaming erledigt; offen bleibt Wiki-Kontext im Broadcast
+- **#2** Web-UI "New conversation": bricht einen aktiven Stream noch nicht ab (~80 %)
+- **#22** Kiwix/ZIM aktualisieren + Install-/Update-Anleitung
+- **#17** Faster first token: Warm-up, Prompt-Diät, Stream-Buffer
 - **#13** STT MVP: Spracheingabe
-- **#18** Wrongdoing-Guardrail: Waffen-/Gewaltfilter mit Session-Lock
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
+
+Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
+#5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht.
 
 ## Sprachstrategie
 

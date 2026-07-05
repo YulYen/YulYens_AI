@@ -10,7 +10,7 @@ Alle Ensembles liegen im Verzeichnis [`ensembles/`](../../ensembles). Ein Ensemb
 - `locales/<sprache>/personas.yaml` – Sprachabhängige Beschreibungen, Prompts und Metadaten
 - `static/personas/<NAME>/{thumb.webp,full.webp}` – (optional) Web-UI-Avatare
 
-> 💡 Tipp: Das Beispiel-Ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) zeigt die Minimalstruktur ohne Lokalisierungsdateien oder Bilder.
+> 💡 Tipp: Das Beispiel-Ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) zeigt eine vollständige Beispielstruktur mit Lokalisierung (de/en) und Avatar-Bildern. Starten lässt es sich per `python src/launch.py -e examples/spaceship_crew`.
 
 ## Schritt-für-Schritt-Anleitung
 
