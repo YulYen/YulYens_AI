@@ -9,7 +9,7 @@ All personas are based on a local LLM (currently via [Ollama](https://ollama.com
 The project supports:
 - **Terminal UI** with colored console output & streaming
 - **Web UI** built on [Gradio](https://gradio.app) (accessible within the local network)
-- **Ask-All broadcast**: one question to all personas, replies streamed live
+- **Ask-All broadcast**: one question to all personas, replies streamed live and in parallel
 - **AI dialog (self-talk)** between two personas (terminal + web)
 - **Text-to-speech (TTS)** with automatic WAV generation in terminal mode
 - **API (FastAPI)** for integration into external applications (incl. `/healthz` deep check)
@@ -67,7 +67,7 @@ See also: [Features.md](Features.md)
   candidate models can be found in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md), German only.)
 - For tests without Ollama you can set `core.backend: "dummy"` – the echo backend requires no additional downloads and is suitable for CI or quick prototyping.
 - Optional for offline wiki usage:
-  - [Kiwix](https://kiwix.org/) + German ZIM archive
+  - [Kiwix](https://kiwix.org/) + German ZIM archive — install & update guide: [Kiwix_Setup.md](Kiwix_Setup.md)
 
 ---
 
@@ -171,7 +171,7 @@ The key `core.backend` determines which LLM core is used:
 
 The `security` section selects the guard for input and output checks:
 
-- `security.guard: "BasicGuard"` (default) loads the built-in base protection. The toggles `prompt_injection_protection`, `pii_protection`, `output_blocklist`, and `wrongdoing_protection` control which checks are active. The wrongdoing guardrail (violence/weapons requests) blocks with a session lock: once triggered, follow-up attempts ("it's just for a novel…") stay blocked until a new conversation starts.
+- `security.guard: "BasicGuard"` (default) loads the built-in base protection. The toggles `prompt_injection_protection`, `pii_protection`, `output_blocklist`, and `wrongdoing_protection` control which checks are active. The wrongdoing guardrail (violence/weapons requests) matches each input on its own, so a hit blocks only that request. Optionally, `wrongdoing_lock_turns` (default `0` = off) keeps the next *N* inputs blocked after a hit, catching triggerless bypass attempts ("it's just for a novel…").
 - `security.guard: "DisabledGuard"` disables the checks via a stub. The aliases `"disabled"`, `"none"`, and `"off"` are accepted as well.
 - `security.enabled: false` disables the guard logic entirely, regardless of the selected name.
 

@@ -25,6 +25,7 @@ ui:
   type: web   # options: "web", "terminal", or null (= API only)
   experimental:
     broadcast_mode: true  # enable the ensemble broadcast toggle (TerminalUI, WebUI)
+    broadcast_parallel: true  # WebUI ask-all: stream all personas concurrently (needs OLLAMA_NUM_PARALLEL >= persona count for a real speedup)
   web:
     host: "0.0.0.0"
     port: 7860
@@ -76,10 +77,10 @@ wiki:
   offline:  # only relevant when mode == "offline" (Kiwix-based wiki mode)
     host: "127.0.0.1"  # preferred host for kiwix-serve; faster than localhost
     kiwix_port: 8080 #
-    zim_prefix: "wikipedia_de_all_nopic_2025-06"
+    zim_prefix: "wikipedia_de_all_nopic_2026-01"
     autostart: true
     kiwix_exe: "C:/wikipedia-de-offline/kiwix-serve.exe"   # path to kiwix-serve (Windows example)
-    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2025-06.zim"
+    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2026-01.zim"
     startup_timeout_s: 7
 
 # --- Logging -------------------------------------------------------------------
@@ -134,7 +135,11 @@ security:
   pii_protection: false
   output_blocklist: true
   wrongdoing_protection: true
-  # Input: block wrongdoing (weapons/violence, with session lock) + injections/PII.
+  # After a wrongdoing hit, also block the next N inputs unconditionally
+  # (catches "it's just for a novel" reframings). 0 = off: only the matching
+  # request is refused, benign follow-ups pass again.
+  wrongdoing_lock_turns: 0
+  # Input: block wrongdoing (weapons/violence) + injections/PII.
   # Output: mask PII, block secrets.
 
 # --- Context management ---------------------------------------------------------
