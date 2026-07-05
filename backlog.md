@@ -2,7 +2,7 @@
 
 Priorisiert nach Aufwand/Nutzen, Risiko und Reifegrad. Die Reihenfolge ist von
 oben (zuerst angehen) nach unten (später) gruppiert. Die `No.`-Spalte ist eine
-stabile ID und ändert sich nicht beim Umsortieren.
+stabile ID und ändert sich nicht beim Umsortieren. (Stand: 2026-07-04)
 
 ## Tier A — Sicherheit & Korrektheit (zuerst)
 
@@ -16,8 +16,8 @@ stabile ID und ändert sich nicht beim Umsortieren.
 | No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
 | 2 | Web-UI "New conversation" in stream | End streaming cleanly so that the "New conversation" button works. **Stand: ~80 % — Button + Reset funktionieren, aber ein aktiver Stream wird beim Klick nicht aktiv abgebrochen (nur UI-State reset).** | M | L | Bugfix |
-| 9 | Ask-all (broadcast): WebUI Wiki + Streaming | TerminalUI-Flow läuft. Offen: Wiki-Kontext im Broadcast (orchestrator.py kennt kein Wiki), Live-Streaming im WebUI (aktuell erst nach Completion sichtbar). | S | M | Orchestration |
-| 20 | Ask-all results table polish | Ergebnis-Tabelle der Broadcast-Ansicht hübscher/robuster: read-only statt editierbare `gr.Dataframe` (kein "New row/New column"), Markdown in Zellen rendern (aktuell literale `*Sternchen*`), ggf. Persona-Avatare. Nebenbei Console-Warnung `Too many arguments provided for the endpoint` aufklären. | S | S | UX/Technology |
+| 9 | Ask-all (broadcast): WebUI Wiki + Streaming | TerminalUI-Flow läuft. **Live-Streaming im WebUI DONE (2026-07-04): `iter_broadcast_events` in `orchestrator.py` streamt tokenweise, Antworten erscheinen live in Markdown-Sektionen.** Offen bleibt: Wiki-Kontext im Broadcast (der Orchestrator kennt kein Wiki). | S | M | Orchestration |
+| 20 | Ask-all results table polish | **DONE (2026-07-04, anders als geplant): Die editierbare `gr.Dataframe` wurde komplett durch live gestreamte `gr.Markdown`-Sektionen ersetzt — die Dataframe-Komponente verliert in Gradio 4.44 Streaming-Updates aus Generatoren (per Minimal-Repro bestätigt) und hatte einen festen 500px-Scroll-Viewport. Ergebnis: read-only, Markdown sauber gerendert, keine Scrollbalken. Persona-Avatare entfallen (kein Tabellen-Layout mehr). Die Console-Warnung `Too many arguments provided for the endpoint` tritt weiterhin vereinzelt auf (Gradio-intern, keine beobachtete Auswirkung).** | S | S | UX/Technology |
 | 5 | Health checks/monitoring | Status page (Ollama/VRAM), simple `/healthz` endpoint plus VRAM probe. **DONE: `/healthz` (FastAPI) liefert aggregierten Status (ok/degraded/error, HTTP 503 bei kritischem Ausfall) aus gemeinsamem `core/system_checks.py` (Ollama erreichbar, Modell gepullt, spaCy, Kiwix, VRAM via nvidia-smi). `/health` bleibt als günstiger Liveness-Stub.** | S | M | Technical foundation |
 | 21 | Setup-Doktor / Preflight-Check | `python src/launch.py --doctor`: prüft Ollama-Erreichbarkeit, ob das konfigurierte Modell gepullt ist, spaCy-Modell, Kiwix, VRAM — mit konkreten Fix-Hinweisen statt kryptischer Tracebacks. **DONE: nutzt dasselbe `core/system_checks.py` wie #5, farbiger Report (colorama), Exit-Code 1 bei kritischem Ausfall. Schwere Imports (gradio/uvicorn) lazy gemacht, damit der Doktor auch bei kaputtem UI-Stack läuft.** | S | L | Technical foundation |
 | 14 | Email to/from AI | DONE (MVP): `src/email_adapter/service.py` auf main, end-to-end live getestet (KAS-Postfach, LEAH antwortet via IMAP/SMTP). Helfer-Skript `scripts/mail_smoketest.py` (Login-Check). Default `enabled: false`. Offen: (a) `processed_mailbox` mit KAS/Dovecot-Punkt-Trenner (`INBOX.YulYenProcessed`) scharf testen; (b) Dauerbetrieb via `launch.py` verifizieren; (c) Postfach-Passwort rotieren (stand im Chat). | S | M | Integration |
@@ -29,7 +29,7 @@ stabile ID und ändert sich nicht beim Umsortieren.
 | --- | --- | --- | --- | --- | --- |
 | 7 | LoRA fine-tuning pipeline | IN PROGRESS → LoRA adapter for LeoLM13B | L | XL | Research/Quality |
 | 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
-| 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach | L | L | Technical foundation |
+| 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach. **DONE (MVP): `KarlSummarizer` in `src/core/context_summarizer.py`, opt-in via `context_management.strategy: "karl"` (Standard bleibt `heuristic`), Fallback auf Heuristik bei Fehlern, Tests in `tests/test_context_summarizer.py`. Offen: Qualität der Zusammenfassungen am echten LLM bewerten.** | L | L | Technical foundation |
 
 ## Tier D — Nice-to-have / Cool features (später)
 

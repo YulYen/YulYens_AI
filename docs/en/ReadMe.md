@@ -1,6 +1,6 @@
 # Yul Yen's AI Orchestra
 
-> _Translation note (2025-10-30): This document is an English translation of [`docs/de/ReadMe.md`](../de/ReadMe.md) at commit `8d8c4b7d30a63adb857a251be6b1331529267e69`._
+> _Translation note (2026-07-04): This document is an English translation of [`docs/de/ReadMe.md`](../de/ReadMe.md). The German file is the authoritative source._
 
 **Yul Yen's AI Orchestra** is a locally running AI environment that combines multiple **personas** (Leah, Doris, Peter, Popcorn).
 
@@ -9,11 +9,14 @@ All personas are based on a local LLM (currently via [Ollama](https://ollama.com
 The project supports:
 - **Terminal UI** with colored console output & streaming
 - **Web UI** built on [Gradio](https://gradio.app) (accessible within the local network)
+- **Ask-All broadcast**: one question to all personas, replies streamed live
 - **AI dialog (self-talk)** between two personas (terminal + web)
 - **Text-to-speech (TTS)** with automatic WAV generation in terminal mode
-- **API (FastAPI)** for integration into external applications
+- **API (FastAPI)** for integration into external applications (incl. `/healthz` deep check)
+- **Email adapter** (opt-in): personas answer mails via IMAP/SMTP
 - **Wikipedia integration** (online or offline via Kiwix proxy)
-- **Security filters** (prompt-injection protection & PII detection)
+- **Security filters** (prompt-injection protection, PII detection, wrongdoing guardrail)
+- **Setup doctor** (`--doctor`) for preflight checks with concrete fix hints
 - **Logging & tests** for stable usage
 
 See also: [Features.md](Features.md)
@@ -43,8 +46,10 @@ See also: [Features.md](Features.md)
 - **UI**:
   - `TerminalUI` for the CLI
   - `WebUI` (Gradio) with persona selection & avatars
-  - Optional ask-all broadcast mode (enable `ui.experimental.broadcast_mode`) via the Ask-All option in the terminal start menu and the Ask-All card in the web UI
-- **API**: FastAPI server (`/ask` endpoint for one-shot questions)
+  - Optional ask-all broadcast mode (enable `ui.experimental.broadcast_mode`) via the Ask-All option in the terminal start menu and the Ask-All card in the web UI — replies are streamed token by token
+- **API**: FastAPI server (`/ask` endpoint for one-shot questions, `/health` as liveness stub, `/healthz` as deep check)
+- **Context management**: long chat histories are compressed automatically — heuristically (default) or via LLM summarization ("Karl", `context_management.strategy: "karl"`)
+- **Email adapter**: optional IMAP/SMTP service that routes incoming mails to a persona and replies (details in [Features.md](Features.md))
 - **Logging**:
   - Chat transcripts and system logs in `logs/`
   - Wiki proxy writes separate log files
@@ -56,8 +61,10 @@ See also: [Features.md](Features.md)
 - **Python 3.10+**
 - **Ollama** (or another compatible backend) with an installed model, for example:
   ```bash
-  ollama pull leo-hessianai-13b-chat:Q5
+  ollama pull ministral-3:8b
   ```
+  (The default model is set in `config.yaml` under `core.model_name`; a comparison of
+  candidate models can be found in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md), German only.)
 - For tests without Ollama you can set `core.backend: "dummy"` – the echo backend requires no additional downloads and is suitable for CI or quick prototyping.
 - Optional for offline wiki usage:
   - [Kiwix](https://kiwix.org/) + German ZIM archive
@@ -126,7 +133,7 @@ core:
   # Choose backend: "ollama" (default) or "dummy" (echo backend for tests)
   backend: "ollama"
   # Default model for Ollama
-  model_name: "leo-hessianai-13b-chat.Q5"
+  model_name: "ministral-3:8b"
   # URL of the locally running Ollama server (protocol + host + port).
   # This value must be set explicitly – there is no silent default.
   ollama_url: "http://127.0.0.1:11434"
@@ -134,7 +141,7 @@ core:
   warm_up: false
 
 ui:
-  type: "terminal"   # Alternatives: "web" or null (API only)
+  type: "web"        # Alternatives: "terminal" or null (API only)
   web:
     host: "0.0.0.0"
     port: 7860
@@ -144,9 +151,14 @@ wiki:
   mode: "offline"    # "offline", "online" or false (disabled)
   spacy_model_variant: "large"  # Alternatives: "medium" or direct model name
   proxy_port: 8042
-  snippet_limit: 1600           # Maximum length of a single snippet in characters
+  snippet_limit: 1200           # Maximum length of a single snippet in characters
   max_wiki_snippets: 2          # Cap for how many different snippets can be injected per question
 ```
+
+> 💡 **Local overrides:** An optional `config.local.yaml` (gitignored, next to
+> `config.yaml`) is deep-merged over the main configuration. This keeps personal
+> values (e.g., real mail credentials for the email adapter) out of the public
+> repository. Use `env:NAME` placeholders for passwords on top of that.
 
 #### LLM backends
 
@@ -159,7 +171,7 @@ The key `core.backend` determines which LLM core is used:
 
 The `security` section selects the guard for input and output checks:
 
-- `security.guard: "BasicGuard"` (default) loads the built-in base protection. The toggles `prompt_injection_protection`, `pii_protection`, and `output_blocklist` control which checks are active.
+- `security.guard: "BasicGuard"` (default) loads the built-in base protection. The toggles `prompt_injection_protection`, `pii_protection`, `output_blocklist`, and `wrongdoing_protection` control which checks are active. The wrongdoing guardrail (violence/weapons requests) blocks with a session lock: once triggered, follow-up attempts ("it's just for a novel…") stay blocked until a new conversation starts.
 - `security.guard: "DisabledGuard"` disables the checks via a stub. The aliases `"disabled"`, `"none"`, and `"off"` are accepted as well.
 - `security.enabled: false` disables the guard logic entirely, regardless of the selected name.
 
@@ -194,10 +206,23 @@ ensemble parameter, for example:
 python src/launch.py -e classic --config path/to/config.yaml
 ```
 
+#### Setup doctor (preflight check)
+
+Before the first launch (or when troubleshooting), the setup doctor checks the whole
+environment — Ollama reachability, pulled model, spaCy model, Kiwix, and VRAM — with
+concrete fix hints instead of cryptic tracebacks:
+
+```bash
+python src/launch.py --doctor
+```
+
+Exit code 1 signals a critical failure (handy for scripts).
+
 - **Terminal UI**
   - Use in the terminal when `ui.type: "terminal"`
+  - Start menu: new conversation, load conversation (JSON), self-talk, ask-all
   - Input: simply type your questions
-  - Commands: `exit` (quit), `clear` (start a new conversation)
+  - Commands: `exit` (quit), `clear` (start a new conversation), `/save <path>` (save the conversation as JSON)
 
 - **Web UI**
   - With `ui.type: "web"`, a web interface starts automatically
@@ -210,6 +235,8 @@ python src/launch.py -e classic --config path/to/config.yaml
 
 - **API (FastAPI)**
   - Automatically active when `api.enabled: true`
+  - `GET /health` — fast liveness check (`{"status": "ok"}`)
+  - `GET /healthz` — deep check (Ollama, model, spaCy, Kiwix, VRAM); HTTP 503 on critical failure
   - Example request using `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \
@@ -219,22 +246,25 @@ python src/launch.py -e classic --config path/to/config.yaml
 
 ---
 
-## Example
+## Example: Wikipedia beats the training cutoff
 
-**Question (Leah):**
-> Who is Angela Merkel?
+The default model has a training cutoff of late 2023 — it cannot know anything about the
+2025 German chancellor election. With the offline Wikipedia feature, PETER still answers
+the question correctly and cites his source:
 
-**Answer (streamed):**
-> Angela Merkel is a German politician (CDU) who served as the Chancellor of the Federal Republic of Germany from 2005 to 2021. …
+![PETER answers a post-cutoff question using Wikipedia context](../screenshot_wiki_feature.png)
 
 ---
 
 ## Tests
 
-Run with [pytest](https://docs.pytest.org/):
+Fast local run (dummy backend, without slow tests):
 ```bash
-pytest tests/
+pytest -q -m "not slow and not ollama"    # same as: make test
 ```
+
+More variants (see `Makefile`): `make test-all` (full suite),
+`make coverage` (with coverage report), `make lint` / `make format` (Ruff/Black).
 
 ---
 

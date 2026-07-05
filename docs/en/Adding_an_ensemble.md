@@ -1,5 +1,7 @@
 # Adding a custom ensemble
 
+> ℹ️ **Translation notice (2026-07-04):** This document is an English translation of [`docs/de/Ensemble_hinzufuegen.md`](../de/Ensemble_hinzufuegen.md). For the authoritative German source, please refer to that file.
+
 This guide explains how to create a new persona ensemble for Yul Yen's AI Orchestra. An ensemble bundles personas, their language-specific prompts, and optional media assets. You can tweak existing characters or introduce entirely new ones.
 
 ## Understand the directory layout
@@ -10,7 +12,7 @@ All ensembles live in [`ensembles/`](../../ensembles). A typical ensemble contai
 - `locales/<language>/personas.yaml` – Language-specific descriptions, prompts, and metadata
 - `static/personas/<NAME>/{thumb.webp,full.webp}` – (optional) avatar images for the web UI
 
-> 💡 Tip: The sample ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) shows the minimal setup without locale files or images.
+> 💡 Tip: The sample ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) shows a complete example structure with localization (de/en) and avatar images. Launch it via `python src/launch.py -e examples/spaceship_crew`.
 
 ## Step-by-step instructions
 

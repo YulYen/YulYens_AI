@@ -6,11 +6,14 @@ Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.c
 Das Projekt unterstützt:
 - **Terminal-UI** mit farbiger Konsolenausgabe & Streaming
 - **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)
+- **Ask-All/Broadcast**: eine Frage an alle Personas, Antworten live gestreamt
 - **AI-Dialog (Self-Talk)** zwischen zwei Personas (Terminal + Web)
 - **Text-to-Speech (TTS)** mit automatischer WAV-Erstellung im Terminal-Modus
-- **API (FastAPI)** zur Integration in externe Anwendungen
+- **API (FastAPI)** zur Integration in externe Anwendungen (inkl. `/healthz`-Deep-Check)
+- **E-Mail-Adapter** (opt-in): Personas beantworten Mails per IMAP/SMTP
 - **Wikipedia-Integration** (online oder offline via Kiwix-Proxy)
-- **Sicherheits-Filter** (Prompt-Injection-Schutz & PII-Erkennung)
+- **Sicherheits-Filter** (Prompt-Injection-Schutz, PII-Erkennung, Wrongdoing-Guardrail)
+- **Setup-Doktor** (`--doctor`) für Preflight-Checks mit konkreten Fix-Hinweisen
 - **Logging & Tests** für stabile Nutzung
 
 
@@ -41,8 +44,10 @@ siehe auch: [Features.md](Features.md)
 - **UI**:
   - `TerminalUI` für CLI
   - `WebUI` (Gradio) mit Persona-Auswahl & Avataren
-  - Optionaler Ask-All/Broadcast-Modus (per `ui.experimental.broadcast_mode`) über die Ask-All-Option im Terminal-Startmenü und die Ask-All-Kachel in der Web-UI
-- **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen)
+  - Optionaler Ask-All/Broadcast-Modus (per `ui.experimental.broadcast_mode`) über die Ask-All-Option im Terminal-Startmenü und die Ask-All-Kachel in der Web-UI — die Antworten werden tokenweise live gestreamt
+- **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen, `/health` als Liveness-Stub, `/healthz` als Deep-Check)
+- **Kontext-Management**: bei langen Chats wird die History automatisch komprimiert — heuristisch (Standard) oder per LLM-Zusammenfassung („Karl", `context_management.strategy: "karl"`)
+- **E-Mail-Adapter**: optionaler IMAP/SMTP-Dienst, der eingehende Mails einer Persona zuordnet und beantwortet (Details in [Features.md](Features.md))
 - **Logging**:
   - Chatverläufe und Systemlogs in `logs/`
   - Wiki-Proxy schreibt separate Logdateien
@@ -54,8 +59,10 @@ siehe auch: [Features.md](Features.md)
 - **Python 3.10+**
 - **Ollama** (oder anderes kompatibles Backend) mit installiertem Modell, z. B.:
   ```bash
-  ollama pull leo-hessianai-13b-chat:Q5
+  ollama pull ministral-3:8b
   ```
+  (Das Default-Modell steht in `config.yaml` unter `core.model_name`; eine Bewertung
+  verschiedener Modelle findet sich in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md).)
 - Für Tests ohne Ollama kann `core.backend: "dummy"` gesetzt werden – das Echo-Backend kommt ohne
   zusätzliche Downloads aus und eignet sich für CI oder schnelles Prototyping.
 - Optional für Offline-Wiki:
@@ -125,7 +132,7 @@ core:
   # Backend auswählen: "ollama" (Standard) oder "dummy" (Echo-Backend für Tests)
   backend: "ollama"
   # Standardmodell für Ollama
-  model_name: "leo-hessianai-13b-chat.Q5"
+  model_name: "ministral-3:8b"
   # URL des lokal laufenden Ollama-Servers (Protokoll + Host + Port).
   # Dieser Wert muss explizit gesetzt werden – es gibt keinen stillen Default.
   ollama_url: "http://127.0.0.1:11434"
@@ -133,7 +140,7 @@ core:
   warm_up: false
 
 ui:
-  type: "terminal"   # Alternativen: "web" oder null (nur API)
+  type: "web"        # Alternativen: "terminal" oder null (nur API)
   web:
     host: "0.0.0.0"
     port: 7860
@@ -143,9 +150,14 @@ wiki:
   mode: "offline"    # "offline", "online" oder false (deaktiviert)
   spacy_model_variant: "large"  # Alternativen: "medium" oder direkter Modellname
   proxy_port: 8042
-  snippet_limit: 1600           # Maximale Länge eines einzelnen Snippets in Zeichen
+  snippet_limit: 1200           # Maximale Länge eines einzelnen Snippets in Zeichen
   max_wiki_snippets: 2          # Wie viele verschiedene Snippets maximal in den Prompt injiziert werden dürfen
 ```
+
+> 💡 **Lokale Overrides:** Eine optionale `config.local.yaml` (gitignored, neben der
+> `config.yaml`) wird per Deep-Merge über die Hauptkonfiguration gelegt. So bleiben
+> persönliche Werte (z. B. echte Mail-Zugangsdaten für den E-Mail-Adapter) aus dem
+> öffentlichen Repository heraus. Passwörter zusätzlich via `env:NAME`-Platzhalter.
 
 #### LLM-Backends
 
@@ -163,8 +175,10 @@ Der Schlüssel `core.backend` entscheidet, welcher LLM-Core zum Einsatz kommt:
 Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
 
 - `security.guard: "BasicGuard"` (Standard) lädt den eingebauten Basisschutz. Die Schalter
-  `prompt_injection_protection`, `pii_protection` und `output_blocklist` bestimmen, welche
-  Prüfungen aktiv sind.
+  `prompt_injection_protection`, `pii_protection`, `output_blocklist` und
+  `wrongdoing_protection` bestimmen, welche Prüfungen aktiv sind. Der Wrongdoing-Guardrail
+  (Gewalt-/Waffenanfragen) blockiert mit Session-Lock: Nach einem Treffer bleiben auch
+  Folgeanfragen („ist nur für einen Roman…") bis zur neuen Unterhaltung gesperrt.
 - `security.guard: "DisabledGuard"` deaktiviert die Prüfungen über einen Stub. Die Aliasse
   `"disabled"`, `"none"` und `"off"` werden ebenfalls akzeptiert.
 - `security.enabled: false` deaktiviert die Guard-Logik vollständig, unabhängig vom gewählten Namen.
@@ -198,10 +212,23 @@ Optional kann zusätzlich eine alternative Konfigurationsdatei per `--config` (K
 python src/launch.py -e classic --config pfad/zur/config.yaml
 ```
 
+#### Setup-Doktor (Preflight-Check)
+
+Vor dem ersten Start (oder bei Problemen) prüft der Setup-Doktor die gesamte Umgebung —
+Ollama-Erreichbarkeit, gepulltes Modell, spaCy-Modell, Kiwix und VRAM — mit konkreten
+Fix-Hinweisen statt kryptischer Tracebacks:
+
+```bash
+python src/launch.py --doctor
+```
+
+Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
+
 - **Terminal-UI**
   - Bei `ui.type: "terminal"` im Terminal nutzen
+  - Startmenü: neue Unterhaltung, Konversation laden (JSON), Self-Talk, Ask-All
   - Eingabe: Fragen einfach eintippen
-  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten)
+  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern)
 
 - **Web-UI**
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
@@ -214,6 +241,8 @@ python src/launch.py -e classic --config pfad/zur/config.yaml
 
 - **API (FastAPI)**
   - Automatisch aktiv bei `api.enabled: true`
+  - `GET /health` — schneller Liveness-Check (`{"status": "ok"}`)
+  - `GET /healthz` — Deep-Check (Ollama, Modell, spaCy, Kiwix, VRAM); HTTP 503 bei kritischem Ausfall
   - Beispielaufruf per `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \
@@ -223,22 +252,25 @@ python src/launch.py -e classic --config pfad/zur/config.yaml
 
 ---
 
-## Beispiel
+## Beispiel: Wikipedia schlägt den Trainings-Cutoff
 
-**Frage (Leah):**
-> Wer ist Angela Merkel?
+Das Default-Modell hat einen Trainings-Cutoff von Ende 2023 — von der Kanzlerwahl 2025
+kann es nichts wissen. Mit dem Offline-Wikipedia-Feature beantwortet PETER die Frage
+trotzdem korrekt und nennt seine Quelle:
 
-**Antwort (gestreamt):**
-> Angela Merkel ist eine deutsche Politikerin (CDU) und war von 2005 bis 2021 Bundeskanzlerin der Bundesrepublik Deutschland. …
+![PETER beantwortet eine Frage nach dem Trainings-Cutoff mit Wikipedia-Kontext](../screenshot_wiki_feature.png)
 
 ---
 
 ## Tests
 
-Mit [pytest](https://docs.pytest.org/) ausführen:
+Schneller lokaler Durchlauf (Dummy-Backend, ohne langsame Tests):
 ```bash
-pytest tests/
+pytest -q -m "not slow and not ollama"    # entspricht: make test
 ```
+
+Weitere Varianten (siehe `Makefile`): `make test-all` (komplette Suite),
+`make coverage` (mit Coverage-Report), `make lint` / `make format` (Ruff/Black).
 
 ---
 
