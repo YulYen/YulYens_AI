@@ -4,6 +4,7 @@ starlette==0.37.2
 uvicorn[standard]==0.30.6
 gradio==4.44.1           # bewusst fixiert (passt zu client 1.3.0)
 gradio_client==1.3.0     # explizit pinnen, um Versionskonflikte zu vermeiden
+huggingface_hub>=0.19.3,<1.0  # gradio 4.44 importiert HfFolder (in hf_hub 1.0 entfernt)
 ollama>=0.1,<1.0         # Python-Client für Ollama
 requests>=2.31,<3.0
 pydantic==2.9.2          # >2.10 erzeugte bool-Schema → Crash in gradio_client

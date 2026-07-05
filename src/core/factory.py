@@ -61,7 +61,9 @@ class AppFactory:
         persona_prompt = _system_prompt_with_date(persona_name, self._cfg)
         options = personas.get_options(persona_name)
         log_prefix = self._cfg.logging["conversation_prefix"]
-        conv_log_file = f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M')}.json"
+        conv_log_file = (
+            f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
+        )
 
         base_url = core_cfg.get("ollama_url")
         backend = self._determine_backend(core_cfg)

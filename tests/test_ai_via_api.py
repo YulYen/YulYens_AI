@@ -73,10 +73,13 @@ def test_persona_name_normalized(client, monkeypatch):
     logs_dir = Path(cfg.logging["dir"])
     if not logs_dir.is_absolute():
         logs_dir = Path.cwd() / logs_dir
+    # Größen statt nur Datei-Menge merken: läuft der Test zweimal innerhalb
+    # desselben Zeitstempel-Fensters, wächst die bestehende Log-Datei nur —
+    # dann darf der Test nicht an "neue Datei existiert" scheitern.
     if logs_dir.exists():
-        before_files = set(logs_dir.glob("*.json"))
+        before_sizes = {p: p.stat().st_size for p in logs_dir.glob("*.json")}
     else:
-        before_files = set()
+        before_sizes = {}
 
     captured: dict[str, str] = {}
 
@@ -111,9 +114,15 @@ def test_persona_name_normalized(client, monkeypatch):
     else:
         after_files = set()
 
-    new_files = list(after_files - before_files)
-    assert new_files, "No new conversation JSON log file was created."
-    target = max(new_files, key=lambda path: path.stat().st_mtime)
+    new_files = [p for p in after_files if p not in before_sizes]
+    grown_files = [
+        p
+        for p in after_files
+        if p in before_sizes and p.stat().st_size > before_sizes[p]
+    ]
+    written_files = new_files + grown_files
+    assert written_files, "No conversation JSON log entry was written."
+    target = max(written_files, key=lambda path: path.stat().st_mtime)
 
     try:
         lines = target.read_text(encoding="utf-8").strip().splitlines()
@@ -121,6 +130,7 @@ def test_persona_name_normalized(client, monkeypatch):
         last_entry = json.loads(lines[-1])
         assert last_entry.get("bot") == "LEAH"
     finally:
+        # Nur selbst erzeugte Dateien aufräumen, gewachsene vorbestehende behalten
         for path in new_files:
             try:
                 path.unlink()
