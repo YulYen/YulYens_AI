@@ -51,11 +51,17 @@ class BasicGuard:
     No network calls, no external dependencies.
 
     The wrongdoing check is a pre-LLM input filter for violent wrongdoing
-    requests (weapons/explosives/attack instructions). Once it fires it sets a
-    per-instance session lock so follow-ups keep getting refused (e.g. the
-    classic "but it's for a novel" reframing). The guard lives for the duration
-    of one conversation/streamer, so the lock resets automatically on a new
-    conversation; call reset_session() to clear it explicitly.
+    requests (weapons/explosives/attack instructions). Each input is matched on
+    its own, so a single hit only blocks that request; benign follow-ups are
+    checked normally again.
+
+    Optionally, ``wrongdoing_lock_turns`` (default 0) arms a short session lock
+    after a hit: the next N inputs are refused unconditionally regardless of
+    content. This catches "but it's just for a novel" reframings that carry no
+    trigger word themselves. With the default 0 the lock is off. The guard lives
+    for the duration of one conversation/streamer, so any lock resets
+    automatically on a new conversation; call reset_session() to clear it
+    explicitly.
     """
 
     def __init__(
@@ -65,6 +71,7 @@ class BasicGuard:
         pii_protection: bool,
         output_blocklist: bool,
         wrongdoing_protection: bool = True,
+        wrongdoing_lock_turns: int = 0,
         custom_patterns: dict[str, list[str]] | None = None,
         texts: Mapping[str, str] | None = None,
     ):
@@ -75,8 +82,13 @@ class BasicGuard:
             "output_blocklist": output_blocklist,
             "wrongdoing_protection": wrongdoing_protection,
         }
-        # Session lock: set once a wrongdoing request is seen, blocks follow-ups.
-        self._wrongdoing_locked = False
+        # Session lock: how many follow-up inputs stay blocked after a hit.
+        # 0 (default) means no lock — every input is matched on its own.
+        try:
+            self.wrongdoing_lock_turns = max(0, int(wrongdoing_lock_turns))
+        except (TypeError, ValueError):
+            self.wrongdoing_lock_turns = 0
+        self._wrongdoing_lock_remaining = 0
 
         self.texts = _load_texts(texts)
         for key in _SECURITY_KEYS:
@@ -191,14 +203,17 @@ class BasicGuard:
         if not self.enabled:
             return self._ok()
 
-        # Wrongdoing first: once the session is locked, every follow-up is
-        # refused regardless of how harmless it looks ("it's for a novel").
+        # Wrongdoing first. A hit blocks the request itself and, if a lock
+        # window is configured, the next N inputs regardless of content
+        # ("it's for a novel"). With the default (0 turns) only the matching
+        # input is refused.
         if self.flags.get("wrongdoing_protection"):
-            if self._wrongdoing_locked:
+            if self._wrongdoing_lock_remaining > 0:
+                self._wrongdoing_lock_remaining -= 1
                 return self._bad("wrongdoing", "session_locked")
             m = self._first_match(self._wrong, text)
             if m:
-                self._wrongdoing_locked = True
+                self._wrongdoing_lock_remaining = self.wrongdoing_lock_turns
                 return self._bad("wrongdoing", m)
 
         if self.flags.get("prompt_injection_protection"):
@@ -268,7 +283,7 @@ class BasicGuard:
 
     def reset_session(self) -> None:
         """Clear the wrongdoing session lock (e.g. on a new conversation)."""
-        self._wrongdoing_locked = False
+        self._wrongdoing_lock_remaining = 0
 
     # ---- Helpers ----------------------------------------------------------
 
@@ -323,6 +338,7 @@ def create_guard(name: str, settings: dict[str, Any]) -> BasicGuard:
             pii_protection=bool(settings.get("pii_protection", True)),
             output_blocklist=bool(settings.get("output_blocklist", True)),
             wrongdoing_protection=bool(settings.get("wrongdoing_protection", True)),
+            wrongdoing_lock_turns=settings.get("wrongdoing_lock_turns", 0),
             custom_patterns=settings.get("custom_patterns"),
         )
 
