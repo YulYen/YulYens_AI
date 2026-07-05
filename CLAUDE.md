@@ -230,7 +230,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 |---|---|
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
-| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona (`iter_broadcast_events`) |
+| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
 Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
@@ -242,19 +242,30 @@ pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
 Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
 Gradio 4.44 crashen).
 
+### ⚠️ Stolperfalle: Gradio `cancels` schließt Generatoren nicht (Gradio 4.44)
+`cancels=[...]` bricht nur den **asyncio-Task** ab (`task.cancel()` in
+`gradio/utils.py`); `reset_iterators` löscht bloß die Referenz — das `finally`
+eines laufenden Generator-Handlers wird **nicht zuverlässig ausgeführt**, im
+Backend gestartete Arbeit (LLM-Streams, Threads) läuft weiter (live gemessen:
+Streams liefen nach Cancel komplett durch). **Lösung im Projekt:** expliziter
+Kill-Switch — `WebUI._ask_all_stop` (`threading.Event`) wird vom Reset-Handler
+(eigenes, zuverlässig laufendes Gradio-Event) gesetzt und stoppt die
+Broadcast-Worker direkt (`stop_event`-Parameter von `iter_broadcast_events_parallel`).
+Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` bauen.
+
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-04):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-05):
 
-- **#9** Ask-All: WebUI-Streaming erledigt; offen bleibt Wiki-Kontext im Broadcast
-- **#2** Web-UI "New conversation": bricht einen aktiven Stream noch nicht ab (~80 %)
-- **#22** Kiwix/ZIM aktualisieren + Install-/Update-Anleitung
 - **#17** Faster first token: Warm-up, Prompt-Diät, Stream-Buffer
 - **#13** STT MVP: Spracheingabe
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
+- **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
 
 Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
-#5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht.
+#5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
+#2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update (`docs/{de,en}/Kiwix_Setup.md`),
+#23 Paralleler Broadcast.
 
 ## Sprachstrategie
 

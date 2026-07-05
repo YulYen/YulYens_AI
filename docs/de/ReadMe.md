@@ -6,7 +6,7 @@ Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.c
 Das Projekt unterstützt:
 - **Terminal-UI** mit farbiger Konsolenausgabe & Streaming
 - **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)
-- **Ask-All/Broadcast**: eine Frage an alle Personas, Antworten live gestreamt
+- **Ask-All/Broadcast**: eine Frage an alle Personas, Antworten live und parallel gestreamt
 - **AI-Dialog (Self-Talk)** zwischen zwei Personas (Terminal + Web)
 - **Text-to-Speech (TTS)** mit automatischer WAV-Erstellung im Terminal-Modus
 - **API (FastAPI)** zur Integration in externe Anwendungen (inkl. `/healthz`-Deep-Check)
@@ -66,7 +66,7 @@ siehe auch: [Features.md](Features.md)
 - Für Tests ohne Ollama kann `core.backend: "dummy"` gesetzt werden – das Echo-Backend kommt ohne
   zusätzliche Downloads aus und eignet sich für CI oder schnelles Prototyping.
 - Optional für Offline-Wiki:
-  - [Kiwix](https://kiwix.org/) + deutsches ZIM-Archiv
+  - [Kiwix](https://kiwix.org/) + deutsches ZIM-Archiv — Installation & Update: [Kiwix_Setup.md](Kiwix_Setup.md)
 
 ---
 
@@ -177,8 +177,10 @@ Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
 - `security.guard: "BasicGuard"` (Standard) lädt den eingebauten Basisschutz. Die Schalter
   `prompt_injection_protection`, `pii_protection`, `output_blocklist` und
   `wrongdoing_protection` bestimmen, welche Prüfungen aktiv sind. Der Wrongdoing-Guardrail
-  (Gewalt-/Waffenanfragen) blockiert mit Session-Lock: Nach einem Treffer bleiben auch
-  Folgeanfragen („ist nur für einen Roman…") bis zur neuen Unterhaltung gesperrt.
+  (Gewalt-/Waffenanfragen) prüft jede Eingabe für sich; ein Treffer blockt nur diese Anfrage.
+  Optional hält `wrongdoing_lock_turns` (Standard `0` = aus) nach einem Treffer die nächsten
+  *N* Eingaben gesperrt und fängt so Umgehungsversuche ohne Triggerwort ab („ist nur für
+  einen Roman…").
 - `security.guard: "DisabledGuard"` deaktiviert die Prüfungen über einen Stub. Die Aliasse
   `"disabled"`, `"none"` und `"off"` werden ebenfalls akzeptiert.
 - `security.enabled: false` deaktiviert die Guard-Logik vollständig, unabhängig vom gewählten Namen.

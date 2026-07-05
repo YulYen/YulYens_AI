@@ -181,6 +181,9 @@ def _run_doctor(config_path: str | None) -> int:
     from core.system_checks import overall_status, run_checks
 
     colorama_init()
+    # Redirected stdout falls back to cp1252 on Windows and would crash on ✓/✗.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     cfg = _load_config_for_cli(config_path)
     results = run_checks(cfg)
 
