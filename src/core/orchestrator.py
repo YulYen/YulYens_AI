@@ -13,6 +13,8 @@ def iter_broadcast_events(
     factory,
     user_input: str,
     persona_names: Iterable[str] | None = None,
+    *,
+    context_messages: Iterable[dict[str, str]] | None = None,
 ) -> Iterator[dict[str, str]]:
     """Runs the same prompt sequentially for every persona, yielding per token.
 
@@ -24,6 +26,8 @@ def iter_broadcast_events(
         user_input: Prompt to send to every persona.
         persona_names: Optional custom subset. Defaults to all personas in the
             active ensemble.
+        context_messages: Optional messages (e.g. injected wiki snippets)
+            placed before the user prompt for every persona.
 
     Yields:
         ``{"type": "token", "persona": ..., "token": ..., "reply": ...}`` for
@@ -35,13 +39,14 @@ def iter_broadcast_events(
     personas = (
         list(persona_names) if persona_names is not None else get_all_persona_names()
     )
+    base_messages = list(context_messages or [])
 
     for persona in personas:
         streamer: YulYenStreamingProvider = factory.get_streamer_for_persona(persona)
         reply_so_far = ""
 
         for token in streamer.stream(
-            messages=[{"role": "user", "content": user_input}]
+            messages=base_messages + [{"role": "user", "content": user_input}]
         ):
             reply_so_far += token
             yield {
@@ -59,6 +64,8 @@ def iter_broadcast(
     user_input: str,
     persona_names: Iterable[str] | None = None,
     on_token: Callable[[str, str], None] | None = None,
+    *,
+    context_messages: Iterable[dict[str, str]] | None = None,
 ) -> Iterator[dict[str, str]]:
     """Like :func:`iter_broadcast_events`, but yields once per finished persona.
 
@@ -66,7 +73,9 @@ def iter_broadcast(
     progress reporting.
     """
 
-    for event in iter_broadcast_events(factory, user_input, persona_names):
+    for event in iter_broadcast_events(
+        factory, user_input, persona_names, context_messages=context_messages
+    ):
         if event["type"] == "token":
             if on_token:
                 on_token(event["persona"], event["token"])
@@ -79,7 +88,17 @@ def broadcast_to_ensemble(
     user_input: str,
     persona_names: Iterable[str] | None = None,
     on_token: Callable[[str, str], None] | None = None,
+    *,
+    context_messages: Iterable[dict[str, str]] | None = None,
 ) -> list[dict[str, str]]:
     """Like :func:`iter_broadcast`, but collects all results into a list."""
 
-    return list(iter_broadcast(factory, user_input, persona_names, on_token))
+    return list(
+        iter_broadcast(
+            factory,
+            user_input,
+            persona_names,
+            on_token,
+            context_messages=context_messages,
+        )
+    )

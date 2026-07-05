@@ -48,6 +48,52 @@ def test_broadcast_to_ensemble_streams_tokens_in_order():
     assert all(isinstance(item[1], str) for item in captured)
 
 
+class _RecordingFactory:
+    """Factory whose streamers record the exact messages they receive."""
+
+    def __init__(self):
+        self.seen_messages: dict[str, list[dict[str, str]]] = {}
+
+    def get_streamer_for_persona(self, persona: str):
+        factory = self
+
+        class _Streamer:
+            def stream(self, messages):
+                factory.seen_messages[persona] = [m.copy() for m in messages]
+                yield f"ECHO: {messages[-1]['content']}"
+
+        return _Streamer()
+
+
+def test_broadcast_passes_context_messages_before_user_prompt():
+    factory = _RecordingFactory()
+    context = [
+        {"role": "system", "content": "Guardrail"},
+        {"role": "system", "content": "WIKI SNIPPET"},
+    ]
+
+    responses = broadcast_to_ensemble(
+        factory,
+        "Ping",
+        persona_names=["Alpha", "Beta"],
+        context_messages=context,
+    )
+
+    assert [r["reply"] for r in responses] == ["ECHO: Ping", "ECHO: Ping"]
+    for persona in ("Alpha", "Beta"):
+        assert factory.seen_messages[persona] == context + [
+            {"role": "user", "content": "Ping"}
+        ]
+
+
+def test_broadcast_without_context_messages_sends_only_user_prompt():
+    factory = _RecordingFactory()
+
+    broadcast_to_ensemble(factory, "Ping", persona_names=["Alpha"])
+
+    assert factory.seen_messages["Alpha"] == [{"role": "user", "content": "Ping"}]
+
+
 def test_iter_broadcast_events_yields_tokens_and_done_per_persona():
     factory = _DummyFactory()
     events = list(
