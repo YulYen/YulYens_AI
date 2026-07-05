@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import tempfile
+import threading
 import time
 from collections.abc import Iterator
 from datetime import datetime
@@ -12,8 +13,8 @@ from typing import TYPE_CHECKING, Any
 import gradio as gr
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
-from core.orchestrator import iter_broadcast_events
-from core.utils import is_broadcast_enabled
+from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
+from core.utils import is_broadcast_enabled, is_broadcast_parallel
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
@@ -99,6 +100,12 @@ class WebUI:
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
+        self.broadcast_parallel = is_broadcast_parallel(self.cfg)
+        # Kill switch für den laufenden Ask-All-Broadcast: Gradio cancels
+        # schließt den Handler-Generator nicht zuverlässig (bricht nur den
+        # asyncio-Task ab), daher muss der Reset-Handler die Worker direkt
+        # über dieses Event stoppen.
+        self._ask_all_stop: threading.Event | None = None
         self.ask_all_placeholder = ""
         self.self_talk_runner = None
         self.self_talk_prompt_placeholder = ""
@@ -360,7 +367,15 @@ class WebUI:
             key, persona, greeting_template, model_name, input_placeholder
         )
 
+    def _cancel_ask_all_broadcast(self) -> None:
+        """Stops the workers of a running ask-all broadcast (if any)."""
+        stop = self._ask_all_stop
+        if stop is not None:
+            stop.set()
+            self._ask_all_stop = None
+
     def _on_reset_to_start(self) -> tuple:
+        self._cancel_ask_all_broadcast()
         self.bot = None
         self.streamer = None
         return self._reset_ui_updates()
@@ -588,10 +603,23 @@ class WebUI:
                 **running,
             )
 
+        # Parallel: alle Personas streamen gleichzeitig in ihre Sektionen;
+        # sequenzieller Fallback per ui.experimental.broadcast_parallel: false.
+        if self.broadcast_parallel:
+            stop = threading.Event()
+            self._ask_all_stop = stop
+            events_iter = iter_broadcast_events_parallel(
+                self.factory,
+                question,
+                context_messages=context_messages,
+                stop_event=stop,
+            )
+        else:
+            events_iter = iter_broadcast_events(
+                self.factory, question, context_messages=context_messages
+            )
         last_flush = 0.0
-        for event in iter_broadcast_events(
-            self.factory, question, context_messages=context_messages
-        ):
+        for event in events_iter:
             replies[event["persona"]] = event["reply"] or "…"
 
             now = time.monotonic()
@@ -604,6 +632,7 @@ class WebUI:
                     **running,
                 )
 
+        self._ask_all_stop = None
         # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
         yield self._ask_all_state(
             question,

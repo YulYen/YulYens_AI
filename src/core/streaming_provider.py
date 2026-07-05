@@ -14,6 +14,7 @@ import hashlib
 import json
 import logging
 import os
+import threading
 import time
 from collections.abc import Iterator, Mapping
 from typing import Any
@@ -27,6 +28,10 @@ from core.utils import ensure_dir_exists, is_ollama_module_not_found
 
 # Import the LLM interface
 from .llm_core import LLMCore
+
+# Parallel broadcasts can hand several streamers the same second-resolution
+# log file name; serialize appends so concurrent entries never interleave.
+_conversation_log_lock = threading.Lock()
 
 
 def _get_config() -> Config:
@@ -222,8 +227,9 @@ class YulYenStreamingProvider:
                 "role": role,
                 "content": content,
             }
-            with open(self.conversation_log_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            with _conversation_log_lock:
+                with open(self.conversation_log_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except (OSError, TypeError, ValueError):
             # Logging must never break the stream; file or serialization issues
             # are reported with a full traceback instead of failing the reply.

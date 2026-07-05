@@ -92,6 +92,16 @@ def is_broadcast_enabled(config) -> bool:
     return bool(experimental_cfg.get("broadcast_mode"))
 
 
+def is_broadcast_parallel(config) -> bool:
+    """Return True when ask-all should stream all personas concurrently (default)."""
+    ui_cfg = getattr(config, "ui", {}) or {}
+    try:
+        experimental_cfg = ui_cfg.get("experimental") or {}
+    except AttributeError:
+        experimental_cfg = getattr(ui_cfg, "experimental", {}) or {}
+    return bool(experimental_cfg.get("broadcast_parallel", True))
+
+
 def ensure_dir_exists(path: str | Path) -> None:
     """Create a directory if it does not already exist."""
     Path(path).mkdir(parents=True, exist_ok=True)

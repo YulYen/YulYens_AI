@@ -1,6 +1,7 @@
 """Tests for the WebUI-specific server configuration."""
 
 import logging
+import threading
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -273,7 +274,9 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
     web_ui = _create_web_ui()
     captured: dict = {}
 
-    def fake_iter_broadcast_events(factory, question, *, context_messages=None):
+    def fake_iter_broadcast_events(
+        factory, question, *, context_messages=None, stop_event=None
+    ):
         captured["context_messages"] = list(context_messages or [])
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
 
@@ -288,7 +291,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
         ) as mock_lookup,
         patch("ui.web_ui.inject_wiki_context", side_effect=fake_inject),
         patch(
-            "ui.web_ui.iter_broadcast_events",
+            "ui.web_ui.iter_broadcast_events_parallel",
             side_effect=fake_iter_broadcast_events,
         ),
     ):
@@ -308,7 +311,9 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
     web_ui = _create_web_ui()
     captured: dict = {}
 
-    def fake_iter_broadcast_events(factory, question, *, context_messages=None):
+    def fake_iter_broadcast_events(
+        factory, question, *, context_messages=None, stop_event=None
+    ):
         captured["context_messages"] = list(context_messages or [])
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
 
@@ -316,7 +321,7 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.web_ui.iter_broadcast_events",
+            "ui.web_ui.iter_broadcast_events_parallel",
             side_effect=fake_iter_broadcast_events,
         ),
     ):
@@ -325,6 +330,43 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
     assert captured["context_messages"] == []
     final_status = outputs[-1][1]
     assert final_status["visible"] is False
+
+
+def test_reset_to_start_cancels_running_ask_all_broadcast():
+    web_ui = _create_web_ui()
+    stop = threading.Event()
+    web_ui._ask_all_stop = stop
+
+    web_ui._on_reset_to_start()
+
+    assert stop.is_set()
+    assert web_ui._ask_all_stop is None
+
+
+def test_on_submit_ask_all_sequential_fallback_via_config():
+    web_ui = _create_web_ui(
+        ui_config={
+            "experimental": {"broadcast_mode": True, "broadcast_parallel": False}
+        }
+    )
+
+    def fake_iter_broadcast_events(factory, question, *, context_messages=None):
+        yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "ui.web_ui.iter_broadcast_events",
+            side_effect=fake_iter_broadcast_events,
+        ) as mock_sequential,
+        patch("ui.web_ui.iter_broadcast_events_parallel") as mock_parallel,
+    ):
+        outputs = list(web_ui._on_submit_ask_all("Frage"))
+
+    mock_sequential.assert_called_once()
+    mock_parallel.assert_not_called()
+    assert "Antwort" in outputs[-1][2]["value"]
 
 
 def test_on_start_self_talk_validates_distinct_personas():
