@@ -75,9 +75,30 @@ def test_warm_up_uses_dummy_prompt(
     call_kwargs = fake_client.calls[0]
     assert call_kwargs == {
         "model": "test-model",
+        "keep_alive": 600,
         "messages": [{"role": "user", "content": "..."}],
+        "options": {},
     }
     assert "stream" not in call_kwargs
+
+
+def test_warm_up_forwards_options_and_keep_alive(
+    fake_client_factory: Callable[[], RecordingClient],
+) -> None:
+    core = OllamaLLMCore(base_url="http://example")
+    fake_client = fake_client_factory()
+    options = {"num_ctx": 8192, "num_predict": 1}
+
+    core.warm_up("test-model", options=options, keep_alive=-1)
+
+    assert len(fake_client.calls) == 1
+    call_kwargs = fake_client.calls[0]
+    assert call_kwargs == {
+        "model": "test-model",
+        "keep_alive": -1,
+        "messages": [{"role": "user", "content": "..."}],
+        "options": options,
+    }
 
 
 def test_stream_chat_forwards_all_arguments(

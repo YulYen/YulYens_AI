@@ -2,7 +2,7 @@
 
 Priorisiert nach Aufwand/Nutzen, Risiko und Reifegrad. Die Reihenfolge ist von
 oben (zuerst angehen) nach unten (später) gruppiert. Die `No.`-Spalte ist eine
-stabile ID und ändert sich nicht beim Umsortieren. (Stand: 2026-07-05)
+stabile ID und ändert sich nicht beim Umsortieren. (Stand: 2026-07-07)
 
 ## Tier A — Sicherheit & Korrektheit (zuerst)
 
@@ -29,7 +29,7 @@ stabile ID und ändert sich nicht beim Umsortieren. (Stand: 2026-07-05)
 | No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
 | 7 | LoRA fine-tuning pipeline | IN PROGRESS → LoRA adapter for LeoLM13B | L | XL | Research/Quality |
-| 17 | Faster first token | Warm-up, prompt diet, stream buffer | M | L | Performance |
+| 17 | Faster first token | Warm-up, prompt diet, stream buffer. **DONE (2026-07-07, schlanke Variante — nur Maßnahmen ohne Nebenwirkungen aufs Modellverhalten): (1) Warm-up repariert: lief vorher pro Streamer-Instanz (= bei jedem Persona-Wechsel) und ohne Optionen — jetzt einmaliger Hintergrund-Preload beim Start (`AppFactory.warm_up_model()`, Daemon-Thread in `launch.py`), mit echtem `num_ctx` (Maximum aller Personas) + `keep_alive`, damit Ollama nicht mit falschem KV-Cache lädt; fehlertolerant (App startet auch ohne Ollama); Default `core.warm_up: true`. (2) Neu `core.keep_alive` (Default 600, `-1` = für immer) statt Hardcode — durchgefädelt bis Karl. (3) Stream-Drossel im WebUI: Single-Chat + Self-Talk koaleszieren Updates auf ~10/s (0.1-s-Muster aus Ask-All) statt ein Websocket-Frame pro Token; erster Chunk geht sofort durch, finaler Zustand garantiert. (4) SHA-256-Payload-Hash läuft nur noch bei aktivem DEBUG-Level. Bewusst NICHT gemacht: Prompt-Diät (Persona-Qualität), Wiki-Lookup-Umbau. Latenz-Verifikation am echten Ollama steht aus (lokal: `t_first_ms` im Log vergleichen, `ollama ps` nach Start).** | M | L | Performance |
 | 12 | Karl (context summarizer) | Compress history on demand with an LLM summary instead of the current approach. **DONE (MVP): `KarlSummarizer` in `src/core/context_summarizer.py`, opt-in via `context_management.strategy: "karl"` (Standard bleibt `heuristic`), Fallback auf Heuristik bei Fehlern, Tests in `tests/test_context_summarizer.py`. Offen: Qualität der Zusammenfassungen am echten LLM bewerten.** | L | L | Technical foundation |
 
 ## Tier D — Nice-to-have / Cool features (später)

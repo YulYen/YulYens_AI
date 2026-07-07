@@ -16,11 +16,19 @@ class LLMCore(ABC):
     """Interface for accessing a large language model."""
 
     @abstractmethod
-    def warm_up(self, model_name: str) -> None:
+    def warm_up(
+        self,
+        model_name: str,
+        options: dict[str, Any] | None = None,
+        keep_alive: int = 600,
+    ) -> None:
         """
         Warms up the model so the first token is available faster.
 
         :param model_name: Name of the model to warm up
+        :param options: Generation options (num_ctx, …) — should match real
+            requests so the model is loaded with the right KV-cache size
+        :param keep_alive: Keep-alive timeout in seconds
         """
         raise NotImplementedError
 

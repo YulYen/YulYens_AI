@@ -17,9 +17,11 @@ class KarlSummarizer:
         llm_core,
         config: dict[str, Any],
         chat_model_name: str,
+        keep_alive: int = 600,
     ) -> None:
         self._llm_core = llm_core
         self._chat_model_name = chat_model_name
+        self._keep_alive = keep_alive
         self._model_name = self._resolve_model_name(config)
         self._summary_max_tokens = self._require_positive_int(
             config, "summary_max_tokens"
@@ -58,7 +60,7 @@ class KarlSummarizer:
                 model_name=self._model_name,
                 messages=prompt_messages,
                 options={"num_predict": self._summary_max_tokens},
-                keep_alive=600,
+                keep_alive=self._keep_alive,
             )
             summary = "".join(
                 chunk.get("message", {}).get("content", "") for chunk in stream

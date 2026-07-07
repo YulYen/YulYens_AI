@@ -49,6 +49,27 @@ def test_karl_summarize_reduces_history_and_keeps_tail(tmp_path):
     assert original == frozen
     assert fake.calls[0]["model_name"] == "chat-model"
     assert fake.calls[0]["options"] == {"num_predict": 512}
+    assert fake.calls[0]["keep_alive"] == 600
+
+
+def test_karl_summarize_forwards_keep_alive(tmp_path):
+    fake = _FakeLLMCore([{"message": {"content": "Kurzfassung"}}])
+    cfg = {
+        "model": "karl-model",
+        "summary_max_tokens": 256,
+        "keep_last_messages": 1,
+        "log_dir": str(tmp_path),
+    }
+    summarizer = KarlSummarizer(fake, cfg, chat_model_name="chat-model", keep_alive=-1)
+
+    summarizer.summarize(
+        [
+            {"role": "user", "content": "A"},
+            {"role": "assistant", "content": "B"},
+        ]
+    )
+
+    assert fake.calls[0]["keep_alive"] == -1
 
 
 def test_karl_summarize_creates_daily_log_file(tmp_path):

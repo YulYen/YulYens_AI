@@ -7,7 +7,12 @@ core:
   backend: "ollama"
   # Default model name at startup
   model_name: "ministral-3:8b" # e.g. "gptoss20b-q4ks", "mistral7b-local", or "leo-hessianai-13b-chat.Q5" or  "ministral-3:8b"
-  warm_up: false
+  # Preload the model in a background thread at startup so the first question
+  # hits a warm model. The app starts fine even if Ollama is not running.
+  warm_up: true
+  # How long Ollama keeps the model in memory after a request (seconds).
+  # -1 = keep loaded forever, 0 = unload immediately (Ollama semantics).
+  keep_alive: 600
   # Base URL for Ollama (protocol + host + port), e.g. http://127.0.0.1:11434
   ollama_url: "http://127.0.0.1:11434"
   include_date: true  # master switch for the "three timestamps" prompt block

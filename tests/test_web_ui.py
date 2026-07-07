@@ -67,6 +67,44 @@ def _create_web_ui(ui_config=None):
     )
 
 
+def test_stream_reply_throttles_updates():
+    """Tokens are coalesced: far fewer yields than tokens, full text at the end."""
+
+    web_ui = _create_web_ui()
+    tokens = [f"t{i} " for i in range(50)]
+    full_text = "".join(tokens)
+    streamer = Mock()
+    streamer.stream.return_value = iter(tokens)
+    web_ui.streamer = streamer
+
+    # 10 ms per token → with the 0.1 s throttle only every ~10th token flushes.
+    clock = iter(1000.0 + i * 0.01 for i in range(len(tokens) + 5))
+    with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
+        outputs = list(web_ui._stream_reply([], []))
+
+    assert len(outputs) < len(tokens) / 2
+    final_chat = outputs[-1][1]
+    assert final_chat[-1] == (None, full_text)
+
+
+def test_stream_reply_always_flushes_final_state():
+    """Even if the throttle suppresses every update, the final yield is complete."""
+
+    web_ui = _create_web_ui()
+    tokens = ["Hallo ", "Welt", "!"]
+    streamer = Mock()
+    streamer.stream.return_value = iter(tokens)
+    web_ui.streamer = streamer
+
+    # Frozen clock: after the first flush no throttle window ever elapses.
+    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui._stream_reply([], []))
+
+    final_chat = outputs[-1][1]
+    assert final_chat[-1] == (None, "Hallo Welt!")
+    assert outputs[-1][2][-1] == {"role": "assistant", "content": "Hallo Welt!"}
+
+
 def test_respond_streaming_prepares_history_with_valid_num_ctx():
     web_ui = _create_web_ui()
     web_ui.bot = "Karl"

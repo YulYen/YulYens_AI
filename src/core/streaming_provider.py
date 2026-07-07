@@ -162,13 +162,14 @@ class YulYenStreamingProvider:
         persona_prompt: str,
         persona_options: dict[str, Any],
         model_name: str = "plain",
-        warm_up: bool = False,
+        keep_alive: int = 600,
         log_file: str = "conversation.json",
         guard: BasicGuard | None = None,
         *,
         llm_core: LLMCore | None = None,
     ) -> None:
         self.model_name = model_name
+        self.keep_alive = keep_alive
         self.persona = persona
         self.persona_prompt = persona_prompt
         self.persona_options = persona_options
@@ -196,23 +197,9 @@ class YulYenStreamingProvider:
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
         self.guard: BasicGuard | None = guard
 
-        if warm_up:
-            logging.info("Starting model warm-up: %s", model_name)
-            self._warm_up()
-
     def set_guard(self, guard: BasicGuard) -> None:
         """Sets the security guard for later checks."""
         self.guard = guard
-
-    def _warm_up(self) -> None:
-        """Calls the LLM once to warm it up."""
-        logging.info("Sending dummy request to activate the model: %s", self.model_name)
-        try:
-            self._llm_core.warm_up(self.model_name)
-            logging.info("Model warmed up successfully.")
-        except Exception:
-            # Warm-up is an optimization; startup must survive any backend error.
-            logging.exception("Warm-up failed for model %s", self.model_name)
 
     def _append_conversation_log(self, role: str, content: str) -> None:
         """Writes an entry to the conversation JSON log."""
@@ -245,17 +232,20 @@ class YulYenStreamingProvider:
         KISS principle: minimal error handling — logging must never disrupt execution.
         """
 
-        # 1) Compute a deterministic hash / preview of the payload (best effort)
-        payload = {"messages": messages, "options": options}
-        try:
-            canon = json.dumps(
-                payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
-            )
-        except (TypeError, ValueError):
-            # Fallback if serialization fails due to non-JSON types
-            canon = f"<unserializable payload: messages={type(messages)!r}, options={type(options)!r}>"
-        sha = hashlib.sha256(canon.encode("utf-8")).hexdigest()
-        logging.debug("[LLM INPUT] sha256=%s payload=%s", sha, canon)
+        # 1) Compute a deterministic hash / preview of the payload (best effort).
+        # Only when DEBUG is active — canonical JSON + SHA-256 over the full
+        # payload is wasted work on the critical path if the log line is dropped.
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            payload = {"messages": messages, "options": options}
+            try:
+                canon = json.dumps(
+                    payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+                )
+            except (TypeError, ValueError):
+                # Fallback if serialization fails due to non-JSON types
+                canon = f"<unserializable payload: messages={type(messages)!r}, options={type(options)!r}>"
+            sha = hashlib.sha256(canon.encode("utf-8")).hexdigest()
+            logging.debug("[LLM INPUT] sha256=%s payload=%s", sha, canon)
 
         # 2) Estimate token count (non-critical)
         try:
@@ -335,7 +325,7 @@ class YulYenStreamingProvider:
                 model_name=self.model_name,
                 messages=messages,
                 options=options,
-                keep_alive=600,
+                keep_alive=self.keep_alive,
             )
 
             log_raw_chunks = _log_flag("log_raw_chunks")

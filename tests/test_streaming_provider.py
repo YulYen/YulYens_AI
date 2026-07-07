@@ -46,7 +46,6 @@ def create_streaming_provider(
         "persona_prompt": "Dies ist ein System-Prompt.",
         "persona_options": {},
         "model_name": "dummy-model",
-        "warm_up": False,
     }
     params.update(overrides)
 
@@ -84,6 +83,36 @@ def test_streaming_provider_with_dummy_llm() -> None:
 
     assert len(out) == 1
     assert "ECHO: Ping" in out[0]
+
+
+class RecordingCore(FakeTokenCore):
+    """FakeTokenCore that additionally records the stream_chat kwargs."""
+
+    def __init__(self, tokens: list[str]) -> None:
+        super().__init__(tokens)
+        self.last_kwargs: dict[str, Any] = {}
+
+    def stream_chat(self, **kwargs: Any):
+        self.last_kwargs = kwargs
+        return super().stream_chat(**kwargs)
+
+
+def test_stream_forwards_configured_keep_alive() -> None:
+    core = RecordingCore(["Hi"])
+    provider = create_streaming_provider(llm_core=core, keep_alive=42)
+
+    list(provider.stream([{"role": "user", "content": "Hallo"}]))
+
+    assert core.last_kwargs["keep_alive"] == 42
+
+
+def test_stream_defaults_keep_alive_to_600() -> None:
+    core = RecordingCore(["Hi"])
+    provider = create_streaming_provider(llm_core=core)
+
+    list(provider.stream([{"role": "user", "content": "Hallo"}]))
+
+    assert core.last_kwargs["keep_alive"] == 600
 
 
 def test_streaming_writes_conversation_json_log(tmp_path) -> None:

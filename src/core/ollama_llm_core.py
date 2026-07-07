@@ -21,14 +21,25 @@ class OllamaLLMCore(LLMCore):
         """
         self._client = Client(host=base_url)
 
-    def warm_up(self, model_name: str) -> None:
+    def warm_up(
+        self,
+        model_name: str,
+        options: dict[str, Any] | None = None,
+        keep_alive: int = 600,
+    ) -> None:
         """
         Performs a dummy call to preload the model.
 
         :param model_name: Name of the model to warm up
+        :param options: Generation options (num_ctx, …) so the model loads
+            with the same KV-cache size as real requests
+        :param keep_alive: Keep-alive timeout in seconds
         """
         self._client.chat(
-            model=model_name, messages=[{"role": "user", "content": "..."}]
+            model=model_name,
+            keep_alive=keep_alive,
+            messages=[{"role": "user", "content": "..."}],
+            options=options or {},
         )
 
     def stream_chat(

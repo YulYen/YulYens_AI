@@ -141,6 +141,8 @@ Wichtige Schalter:
 core:
   backend: "ollama"          # oder "dummy" für Tests
   model_name: "ministral-3:8b"
+  warm_up: true              # Modell beim Start im Hintergrund vorladen
+  keep_alive: 600            # Sekunden im Speicher nach Request (-1 = für immer)
   include_date: true         # Datum in System-Prompts
 
 ui:
@@ -255,9 +257,8 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-05):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-07):
 
-- **#17** Faster first token: Warm-up, Prompt-Diät, Stream-Buffer
 - **#13** STT MVP: Spracheingabe
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
 - **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
@@ -265,7 +266,8 @@ Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matri
 Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
 #2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update (`docs/{de,en}/Kiwix_Setup.md`),
-#23 Paralleler Broadcast.
+#23 Paralleler Broadcast, #17 Faster first token (Startup-Warm-up, `core.keep_alive`,
+WebUI-Stream-Drossel; bewusst ohne Prompt-Diät).
 
 ## Sprachstrategie
 
