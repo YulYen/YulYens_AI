@@ -233,6 +233,7 @@ Exit code 1 signals a critical failure (handy for scripts).
   - Open in the browser: `http://<host>:<port>` according to the `ui.web` settings (default: `http://127.0.0.1:7860`)
   - Optional: enable Gradio share via `ui.web.share: true`; credentials come from `ui.web.share_auth`
   - Pick a persona and start chatting
+  - Pro option: the collapsed "Advanced" section at the bottom of the start screen lets you switch the model for the current session (choices = installed Ollama models). Session-only — after a restart, `core.model_name` from `config.yaml` applies again
 
 - **API only (no UI)**
   - Set `ui.type: null` – FastAPI keeps running and serves `/ask`

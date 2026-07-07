@@ -241,6 +241,7 @@ Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
   - Im Browser öffnen: `http://<host>:<port>` entsprechend der Einstellungen unter `ui.web` (Standard: `http://127.0.0.1:7860`)
   - Optional: Gradio-Share per `ui.web.share: true` aktivieren; Zugangsdaten kommen aus `ui.web.share_auth`
   - Persona auswählen und loschatten
+  - Profi-Option: Im zugeklappten „Erweitert"-Bereich unten am Startbildschirm lässt sich das Modell für die laufende Sitzung wechseln (Liste = installierte Ollama-Modelle). Gilt nur bis zum Neustart — danach greift wieder `core.model_name` aus der `config.yaml`
 
 - **Nur API (ohne UI)**
   - `ui.type: null` setzen – die FastAPI läuft weiter und bedient `/ask`

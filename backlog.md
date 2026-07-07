@@ -36,7 +36,7 @@ stabile ID und ändert sich nicht beim Umsortieren. (Stand: 2026-07-07)
 
 | No. | Name | Description | Effort | Benefit | Category |
 | --- | --- | --- | --- | --- | --- |
-| 6 | Model selection in the UI | Dropdown/radio for available models, explicitly selectable per persona and run | S | S | UX/Technology |
+| 6 | Model selection in the UI | Dropdown/radio for available models, explicitly selectable per persona and run. **DONE (2026-07-07, bewusst verengt auf User-Wunsch: ein globaler Session-Override statt „pro Persona", und sehr dezent als Profi-Option): zugeklapptes „Erweitert"-Accordion unten am WebUI-Startbildschirm mit `gr.Dropdown` der installierten Ollama-Modelle (`fetch_model_names` via `/api/tags`, jetzt public in `system_checks.py`), Default `core.model_name` vorausgewählt. Wechsel = `Config.override("core", ...)` (session-only, `config.yaml` unangetastet, Neustart = Default zurück) + Rebuild des aktiven Streamers; Ask-All/Self-Talk/Karl/Cutoff-Zeile/Conversation-Meta folgen automatisch, weil sie frisch aus der Config lesen. Greeting liest das Modell jetzt live statt beim Start eingefroren. Ollama down/dummy-Backend → Dropdown inert mit nur dem Default. 10 neue Tests (test_web_ui, test_system_checks). Live-Test am echten Ollama steht aus.** | S | S | UX/Technology |
 | 13 | STT MVP | Simple speech Input | M | M | Cool feature |
 | 15 | Daily briefing (IoT + RSS) | Daily short updates | M | M | Cool feature |
 | 16 | Sandbox/PDF functions | Local documentation sandbox | L | M | Cool feature |

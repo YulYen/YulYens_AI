@@ -5,6 +5,7 @@ import threading
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import requests
 from ui.web_ui import WebUI
 
 
@@ -462,3 +463,89 @@ def test_on_start_self_talk_clears_stale_runner_on_validation_error():
     web_ui._on_start_self_talk("Karl", "Karl", "Prompt")
 
     assert web_ui.self_talk_runner is None
+
+
+# ---- Modell-Auswahl (Profi-Option, #6) -------------------------------------
+
+
+def test_available_models_falls_back_to_default_when_ollama_down():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"backend": "ollama", "ollama_url": "http://x:1"}
+
+    with patch(
+        "ui.web_ui.fetch_model_names",
+        side_effect=requests.ConnectionError("refused"),
+    ):
+        assert web_ui._available_models("standard:1") == ["standard:1"]
+
+
+def test_available_models_unions_default_first():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"backend": "ollama", "ollama_url": "http://x:1"}
+
+    with patch("ui.web_ui.fetch_model_names", return_value=["a:1", "b:2"]):
+        choices = web_ui._available_models("standard:1")
+
+    assert choices == ["standard:1", "a:1", "b:2"]
+
+
+def test_available_models_dummy_backend_skips_request():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"backend": "dummy"}
+
+    with patch("ui.web_ui.fetch_model_names") as mock_fetch:
+        assert web_ui._available_models("standard:1") == ["standard:1"]
+
+    mock_fetch.assert_not_called()
+
+
+def test_on_model_selected_overrides_config_and_rebuilds_streamer():
+    web_ui = _create_web_ui()
+    web_ui.cfg.override = Mock()
+    web_ui.bot = "Karl"
+
+    update = web_ui._on_model_selected("neu:1")
+
+    web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
+    web_ui.factory.get_streamer_for_persona.assert_called_once_with("Karl")
+    assert update["visible"] is True
+
+
+def test_on_model_selected_without_persona_keeps_streamer_none():
+    web_ui = _create_web_ui()
+    web_ui.cfg.override = Mock()
+    web_ui.bot = None
+
+    update = web_ui._on_model_selected("neu:1")
+
+    web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
+    web_ui.factory.get_streamer_for_persona.assert_not_called()
+    assert web_ui.streamer is None
+    assert update["visible"] is True
+
+
+def test_on_model_selected_empty_choice_is_noop():
+    web_ui = _create_web_ui()
+    web_ui.cfg.override = Mock()
+
+    update = web_ui._on_model_selected("")
+
+    web_ui.cfg.override.assert_not_called()
+    assert update["visible"] is False
+
+
+def test_persona_selected_updates_reads_current_model_from_cfg():
+    """Das Greeting muss das aktuell wirksame Modell zeigen, nicht das vom Start."""
+
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"model_name": "override:1"}
+    web_ui.cfg.ensemble = "test"
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    updates = web_ui._persona_selected_updates(
+        "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+    )
+
+    assert len(updates) == 28
+    greeting_update = updates[5]
+    assert "override:1" in greeting_update["value"]

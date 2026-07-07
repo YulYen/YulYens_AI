@@ -11,9 +11,11 @@ from functools import partial
 from typing import TYPE_CHECKING, Any
 
 import gradio as gr
+import requests
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
+from core.system_checks import fetch_model_names
 from core.utils import is_broadcast_enabled, is_broadcast_parallel
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
@@ -316,10 +318,11 @@ class WebUI:
         persona_key: str,
         persona: dict[str, Any],
         greeting_template: str,
-        model_name: str,
         input_placeholder: str,
     ) -> tuple:
         display_name = persona["name"].title()
+        # Modell live aus der Config lesen (kann per Profi-Option gewechselt sein)
+        model_name = str(self.cfg.core.get("model_name", ""))
         greeting = greeting_template.format(
             persona_name=display_name, model_name=model_name
         )
@@ -358,7 +361,6 @@ class WebUI:
         key: str,
         persona_info: dict[str, dict[str, Any]],
         greeting_template: str,
-        model_name: str,
         input_placeholder: str,
     ) -> tuple:
         persona = persona_info.get(key)
@@ -370,7 +372,7 @@ class WebUI:
         self.bot = persona["name"]
         self.streamer = self.factory.get_streamer_for_persona(self.bot)
         return self._persona_selected_updates(
-            key, persona, greeting_template, model_name, input_placeholder
+            key, persona, greeting_template, input_placeholder
         )
 
     def _cancel_ask_all_broadcast(self) -> None:
@@ -385,6 +387,39 @@ class WebUI:
         self.bot = None
         self.streamer = None
         return self._reset_ui_updates()
+
+    def _available_models(self, default_model: str) -> list[str]:
+        """Installierte Ollama-Modelle für das Profi-Dropdown; Fallback: Default."""
+        backend = str(self.cfg.core.get("backend", "ollama")).strip().lower()
+        if backend != "ollama":
+            return [default_model]
+        try:
+            names = fetch_model_names(self.cfg.core.get("ollama_url", ""), timeout=2.0)
+        except (requests.RequestException, ValueError) as exc:
+            logging.warning(
+                "Modellliste nicht abrufbar (%s) — Dropdown zeigt nur den Standard.",
+                exc,
+            )
+            return [default_model]
+        choices = [n for n in names if n]
+        if default_model and default_model not in choices:
+            choices.insert(0, default_model)
+        return choices or [default_model]
+
+    def _on_model_selected(self, choice: str | None):
+        """Session-Override des Modells; config.yaml bleibt unangetastet."""
+        choice = (choice or "").strip()
+        if not choice:
+            return gr.update(value="", visible=False)
+        self.cfg.override("core", {"model_name": choice})
+        if self.bot:
+            # Laufendes Gespräch: Streamer neu bauen (History lebt im gr.State),
+            # damit auch die Cutoff-Zeile im System-Prompt zum Modell passt.
+            self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        logging.info("Modell per UI gewechselt: %s", choice)
+        return gr.update(
+            value=self._t("web_model_switched", model_name=choice), visible=True
+        )
 
     def _on_show_ask_all(self) -> tuple:
         self.bot = None
@@ -776,7 +811,6 @@ class WebUI:
         self,
         components: dict[str, Any],
         persona_info: dict[str, dict[str, Any]],
-        model_name: str,
         greeting_template: str,
         input_placeholder: str,
     ) -> None:
@@ -803,6 +837,8 @@ class WebUI:
         self_talk_start_btn = components["self_talk_start_btn"]
         load_input = components["load_input"]
         load_status = components["load_status"]
+        model_dropdown = components["model_dropdown"]
+        model_status = components["model_status"]
 
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
@@ -814,7 +850,6 @@ class WebUI:
                     key=key,
                     persona_info=persona_info,
                     greeting_template=greeting_template,
-                    model_name=model_name,
                     input_placeholder=input_placeholder,
                 ),
                 inputs=[],
@@ -830,6 +865,15 @@ class WebUI:
             ),
             inputs=[load_input],
             outputs=persona_outputs,
+            queue=False,
+        )
+
+        # Profi-Option: .change feuert nur bei Nutzer-Interaktion, nicht beim
+        # Initialwert; bewusst außerhalb der PERSONA_OUTPUT_KEYS gehalten.
+        model_dropdown.change(
+            fn=self._on_model_selected,
+            inputs=[model_dropdown],
+            outputs=[model_status],
             queue=False,
         )
 
@@ -971,7 +1015,7 @@ class WebUI:
 
     def launch(self) -> None:
         ui = self.texts
-        model_name = self.cfg.core.get("model_name")
+        default_model = str(self.cfg.core.get("model_name", ""))
         project_title = ui.get("project_name")
         choose_persona_txt = ui.get("choose_persona")
         new_chat_label = ui.get("new_chat")
@@ -998,6 +1042,10 @@ class WebUI:
             "self_talk_prompt_placeholder", "Gib den Start-Prompt ein …"
         )
         save_button_label = ui.get("web_save_button", "Gespräch herunterladen (JSON)")
+        advanced_label = ui.get("web_advanced_label", "Erweitert")
+        model_dropdown_label = ui.get("web_model_dropdown_label", "Modell")
+        model_hint = ui.get("web_model_hint", "")
+        model_choices = self._available_models(default_model)
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1027,6 +1075,11 @@ class WebUI:
             self_talk_prompt_placeholder=self_talk_prompt_placeholder,
             load_label=load_label,
             save_button_label=save_button_label,
+            advanced_label=advanced_label,
+            model_dropdown_label=model_dropdown_label,
+            model_hint=model_hint,
+            model_choices=model_choices,
+            model_value=default_model,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
@@ -1035,7 +1088,6 @@ class WebUI:
             self._bind_events(
                 components,
                 persona_info,
-                model_name,
                 greeting_template,
                 input_placeholder,
             )

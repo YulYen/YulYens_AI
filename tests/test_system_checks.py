@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import core.system_checks as sc
+import pytest
 import requests
 
 
@@ -83,6 +84,21 @@ def test_model_available_request_fails(monkeypatch):
 
     _patch_get(monkeypatch, boom)
     assert sc.check_model_available("http://x:1", "ministral-3:8b").ok is False
+
+
+# ---- Model listing (fetch_model_names, used by the WebUI dropdown) --------
+
+
+def test_fetch_model_names_returns_tagged_names(monkeypatch):
+    payload = {"models": [{"name": "ministral-3:8b"}, {"name": "llama3:latest"}]}
+    _patch_get(monkeypatch, lambda *a, **k: FakeResp(200, payload))
+    assert sc.fetch_model_names("http://x:1") == ["ministral-3:8b", "llama3:latest"]
+
+
+def test_fetch_model_names_raises_on_http_error(monkeypatch):
+    _patch_get(monkeypatch, lambda *a, **k: FakeResp(500))
+    with pytest.raises(requests.HTTPError):
+        sc.fetch_model_names("http://x:1")
 
 
 # ---- spaCy model ----------------------------------------------------------
