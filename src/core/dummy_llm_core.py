@@ -16,7 +16,12 @@ from .llm_core import LLMCore
 class DummyLLMCore(LLMCore):
     """An LLM core implementation that simply returns the user input."""
 
-    def warm_up(self, model_name: str) -> None:
+    def warm_up(
+        self,
+        model_name: str,
+        options: dict[str, Any] | None = None,
+        keep_alive: int = 600,
+    ) -> None:
         """No warm-up required for the dummy."""
 
     def stream_chat(

@@ -201,6 +201,7 @@ def apply_karl_context_summary(
     llm_core,
     chat_model_name: str,
     persona_name: str | None = None,
+    keep_alive: int = 600,
 ) -> list[Message]:
     """Compress the history via Karl; falls back to the heuristic trim if configured."""
 
@@ -208,6 +209,7 @@ def apply_karl_context_summary(
         llm_core=llm_core,
         config=karl_cfg,
         chat_model_name=chat_model_name,
+        keep_alive=keep_alive,
     )
     try:
         return summarizer.summarize(history)
@@ -234,6 +236,7 @@ def shrink_history_for_context(
     context_management = require_context_management_config(cfg)
 
     if context_management["strategy"] == "karl":
+        core_cfg = getattr(cfg, "core", None) or {}
         return apply_karl_context_summary(
             history,
             context_management["karl"],
@@ -241,6 +244,7 @@ def shrink_history_for_context(
             llm_core=llm_core,
             chat_model_name=chat_model_name,
             persona_name=persona_name,
+            keep_alive=int(core_cfg.get("keep_alive", 600)),
         )
 
     return apply_heuristic_context_trim(

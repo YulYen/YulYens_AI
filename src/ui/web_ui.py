@@ -191,10 +191,16 @@ class WebUI:
     def _stream_reply(
         self, message_history: list[Message], chat_history: list[ChatPair]
     ) -> Iterator[tuple[None, list[ChatPair], list[Message]]]:
+        # Gedrosselt wie in der Ask-All-Ansicht: nicht jedes Token einzeln über
+        # den Socket schicken; last_flush=0.0 lässt den ersten Chunk sofort durch.
         reply = ""
+        last_flush = 0.0
         for token in self.streamer.stream(messages=message_history):
             reply += token
-            yield None, chat_history + [(None, reply)], message_history
+            now = time.monotonic()
+            if now - last_flush >= 0.1:
+                last_flush = now
+                yield None, chat_history + [(None, reply)], message_history
 
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
@@ -500,10 +506,18 @@ class WebUI:
         while True:
             persona_name, reply, should_stop, _ = self.self_talk_runner.run_turn()
             shown_reply = f"{persona_name}: {reply}"
+            # run_turn() liefert die Antwort bereits komplett; die Zeichen-Schleife
+            # war reine Schreibmaschinen-Animation (ein Websocket-Frame pro
+            # Zeichen). Mit der 0.1-s-Drossel erscheint die Nachricht in wenigen
+            # großen Updates statt in len(reply) Frames.
             progressive = ""
+            last_flush = 0.0
             for token in shown_reply:
                 progressive += token
-                yield chat_history + [(None, progressive)], history_state
+                now = time.monotonic()
+                if now - last_flush >= 0.1:
+                    last_flush = now
+                    yield chat_history + [(None, progressive)], history_state
             chat_history.append((None, shown_reply))
             history_state.append({"role": "assistant", "content": shown_reply})
             yield chat_history, history_state

@@ -136,8 +136,12 @@ core:
   # URL des lokal laufenden Ollama-Servers (Protokoll + Host + Port).
   # Dieser Wert muss explizit gesetzt werden – es gibt keinen stillen Default.
   ollama_url: "http://127.0.0.1:11434"
-  # Warm-up: ob beim Start ein Dummy-Aufruf zum Modell geschickt wird.
-  warm_up: false
+  # Warm-up: Modell beim Start im Hintergrund vorladen, damit die erste Frage
+  # ein warmes Modell trifft. Die App startet auch, wenn Ollama nicht läuft.
+  warm_up: true
+  # Wie lange Ollama das Modell nach einem Request im Speicher hält (Sekunden).
+  # -1 = für immer geladen lassen, 0 = sofort entladen.
+  keep_alive: 600
 
 ui:
   type: "web"        # Alternativen: "terminal" oder null (nur API)

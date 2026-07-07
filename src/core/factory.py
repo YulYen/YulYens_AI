@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 
 import config.personas as personas
@@ -33,6 +34,7 @@ class AppFactory:
         self._api_provider = None
         self._one_shot_provider = None
         self._ui = None  # TerminalUI or WebUI
+        self._warmed_up = False
 
     # --------- Lazy‑Singleton Getter ---------
     def get_config(self) -> Config:
@@ -54,6 +56,57 @@ class AppFactory:
             else:
                 self._keyword_finder = None
         return self._keyword_finder
+
+    def warm_up_model(self) -> None:
+        """One-time model preload so the first real request hits a warm model.
+
+        Synchronous by design (SRP: no threads here — launch.py wraps this in a
+        daemon thread). Never raises: the app must start even if Ollama is down.
+        """
+        if self._warmed_up:
+            return
+        self._warmed_up = True
+
+        core_cfg = self._cfg.core
+        backend = self._determine_backend(core_cfg)
+        if backend == "dummy":
+            logging.debug("Warm-up skipped: dummy backend needs no preload.")
+            return
+
+        model_name = core_cfg["model_name"]
+        try:
+            llm_core = self._create_llm_core(backend, core_cfg.get("ollama_url"))
+        except Exception:
+            logging.exception("Warm-up skipped: could not create LLM core.")
+            return
+
+        # Warm with the largest persona num_ctx so the KV cache fits every
+        # persona and Ollama does not reload on the first real request.
+        num_ctx_values = []
+        for name in personas.get_all_persona_names():
+            opts = personas.get_options(name) or {}
+            try:
+                num_ctx_values.append(int(opts["num_ctx"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+        options: dict | None = {"num_predict": 1}
+        if num_ctx_values:
+            options["num_ctx"] = max(num_ctx_values)
+
+        keep_alive = int(core_cfg.get("keep_alive", 600))
+        t0 = time.monotonic()
+        try:
+            llm_core.warm_up(model_name, options=options, keep_alive=keep_alive)
+        except Exception:
+            logging.exception("Warm-up failed for model %s", model_name)
+            return
+        logging.info(
+            "Warm-up for model %s done (num_ctx=%s, keep_alive=%s) in %d ms",
+            model_name,
+            options.get("num_ctx"),
+            keep_alive,
+            (time.monotonic() - t0) * 1000,
+        )
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Creates a new LLM streamer for the given persona."""
@@ -78,7 +131,7 @@ class AppFactory:
         streamer = YulYenStreamingProvider(
             base_url=streamer_base_url,
             model_name=core_cfg["model_name"],
-            warm_up=bool(core_cfg.get("warm_up", False)),
+            keep_alive=int(core_cfg.get("keep_alive", 600)),
             persona=persona_name,
             persona_prompt=persona_prompt,
             persona_options=options,

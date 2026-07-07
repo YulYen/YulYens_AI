@@ -125,6 +125,14 @@ def main():
     from core.factory import AppFactory
 
     factory = AppFactory()
+
+    # 3b) Warm up the model in the background so the first question hits a
+    # loaded model; the daemon thread never blocks or breaks startup.
+    if bool(cfg.core.get("warm_up", False)):
+        threading.Thread(
+            target=factory.warm_up_model, name="ModelWarmUp", daemon=True
+        ).start()
+
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
     email_cfg = getattr(cfg, "email_adapter", {})
