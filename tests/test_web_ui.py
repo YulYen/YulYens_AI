@@ -442,7 +442,7 @@ def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
 
     updates = web_ui._on_show_self_talk()
 
-    assert len(updates) == 28
+    assert len(updates) == 29
     assert updates[22]["visible"] is True
     assert updates[27]["interactive"] is True
 
@@ -546,6 +546,87 @@ def test_persona_selected_updates_reads_current_model_from_cfg():
         "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
     )
 
-    assert len(updates) == 28
+    assert len(updates) == 29
     greeting_update = updates[5]
     assert "override:1" in greeting_update["value"]
+
+
+# ---- Spracheingabe (STT MVP, #13) -------------------------------------------
+
+
+def test_stt_unavailable_by_default_config():
+    """SimpleNamespace-Config ohne stt-Sektion → Mikro aus, kein Crash."""
+
+    web_ui = _create_web_ui()
+
+    assert web_ui.stt_available is False
+    assert web_ui.stt_cfg == {}
+
+
+def test_on_mic_recorded_without_audio_is_noop():
+    web_ui = _create_web_ui()
+
+    input_update, mic_update = web_ui._on_mic_recorded(None, "bestehender Text")
+
+    assert "value" not in input_update
+    assert "value" not in mic_update
+
+
+def test_on_mic_recorded_appends_transcript_and_clears_mic():
+    web_ui = _create_web_ui()
+
+    with patch("ui.web_ui.transcribe_wav", return_value="Hallo Welt"):
+        input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
+
+    assert input_update["value"] == "Schon da Hallo Welt"
+    assert mic_update["value"] is None
+
+
+def test_on_mic_recorded_error_warns_and_keeps_text():
+    web_ui = _create_web_ui()
+
+    with (
+        patch("ui.web_ui.transcribe_wav", side_effect=RuntimeError("kaputt")),
+        patch("ui.web_ui.gr.Warning") as mock_warning,
+    ):
+        input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
+
+    mock_warning.assert_called_once()
+    assert "value" not in input_update
+    assert mic_update["value"] is None
+
+
+def test_on_mic_recorded_empty_transcript_is_noop_but_clears_mic():
+    web_ui = _create_web_ui()
+
+    with patch("ui.web_ui.transcribe_wav", return_value=""):
+        input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
+
+    assert "value" not in input_update
+    assert mic_update["value"] is None
+
+
+def test_persona_selected_updates_shows_mic_only_when_stt_available():
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    for available, expected in ((True, True), (False, False)):
+        web_ui = _create_web_ui()
+        web_ui.cfg.core = {"model_name": "m:1"}
+        web_ui.cfg.ensemble = "test"
+        web_ui.stt_available = available
+
+        updates = web_ui._persona_selected_updates(
+            "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+        )
+
+        assert updates[28]["visible"] is expected
+
+
+def test_reset_updates_hides_mic():
+    web_ui = _create_web_ui()
+    web_ui.stt_available = True
+
+    updates = web_ui._reset_ui_updates()
+
+    assert updates[28]["visible"] is False
+    assert updates[28]["value"] is None

@@ -20,6 +20,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
 | TTS | Piper (ONNX, Windows) |
+| STT | faster-whisper (optional, WebUI-Mikro) |
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
 | Formatting | Black (88), Ruff |
@@ -64,9 +65,11 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── kiwix_autostart.py
 │   ├── security/
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
-│   └── tts/
-│       ├── piper_tts.py         # TTS-Wrapper
-│       └── audio_player.py      # winsound (Windows-only, plattform-sicher)
+│   ├── tts/
+│   │   ├── piper_tts.py         # TTS-Wrapper
+│   │   └── audio_player.py      # winsound (Windows-only, plattform-sicher)
+│   └── stt/
+│       └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -158,6 +161,11 @@ tts:
   enabled: true
   features:
     terminal_auto_create_wav: true  # WAV in out/ bei jeder Antwort
+
+stt:
+  enabled: true              # WebUI-Mikro; braucht zusätzlich `pip install faster-whisper`
+  model: "small"             # tiny | base | small | medium | large-v3
+  language: "de"             # null = Auto-Erkennung
 
 api:
   enabled: true
@@ -257,9 +265,8 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-07):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-08):
 
-- **#13** STT MVP: Spracheingabe
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
 - **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
 
@@ -267,7 +274,8 @@ Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitst
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
 #2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update (`docs/{de,en}/Kiwix_Setup.md`),
 #23 Paralleler Broadcast, #17 Faster first token (Startup-Warm-up, `core.keep_alive`,
-WebUI-Stream-Drossel; bewusst ohne Prompt-Diät).
+WebUI-Stream-Drossel; bewusst ohne Prompt-Diät), #6 Modell-Auswahl (WebUI, session-only),
+#13 STT MVP (WebUI-Mikro via faster-whisper, `src/stt/ReadMe.md`).
 
 ## Sprachstrategie
 

@@ -30,6 +30,7 @@ def build_ui(
     model_hint,
     model_choices,
     model_value,
+    mic_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -83,6 +84,8 @@ def build_ui(
                 /* Profi-Option (Modell-Wechsel): bewusst dezent gehalten */
                 .advanced-accordion { margin-top: 8px; }
                 .advanced-hint { font-size: 0.85rem; opacity: 0.7; }
+                /* Mikrofon (STT) kompakt neben dem Eingabefeld halten */
+                .mic-input { max-height: 110px; }
                 </style>
             """
         )
@@ -214,6 +217,19 @@ def build_ui(
                 scale=1,
                 min_width=140,
             )
+            # Spracheingabe (STT, optional): unsichtbar bis eine Persona gewählt
+            # ist UND faster-whisper installiert ist (WebUI.stt_available).
+            mic_audio = gr.Audio(
+                sources=["microphone"],
+                type="filepath",
+                label=mic_label,
+                visible=False,
+                scale=2,
+                min_width=200,
+                show_download_button=False,
+                waveform_options=gr.WaveformOptions(show_recording_waveform=False),
+                elem_classes="mic-input",
+            )
         new_chat_btn = gr.Button(
             new_chat_label, visible=False, elem_classes="new-chat-btn"
         )
@@ -320,5 +336,6 @@ def build_ui(
         "load_status": load_status,
         "model_dropdown": model_dropdown,
         "model_status": model_status,
+        "mic_audio": mic_audio,
     }
     return demo, components

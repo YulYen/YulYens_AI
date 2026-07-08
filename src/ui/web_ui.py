@@ -17,6 +17,7 @@ from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.system_checks import fetch_model_names
 from core.utils import is_broadcast_enabled, is_broadcast_parallel
+from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
@@ -63,6 +64,7 @@ PERSONA_OUTPUT_KEYS = (
     "self_talk_persona_b",
     "self_talk_prompt",
     "self_talk_start_btn",
+    "mic_audio",
 )
 
 
@@ -111,6 +113,15 @@ class WebUI:
         self.ask_all_placeholder = ""
         self.self_talk_runner = None
         self.self_talk_prompt_placeholder = ""
+        # STT nur anbieten, wenn eingeschaltet UND faster-whisper installiert
+        # ist — sonst bleibt das Mikro unsichtbar und die App läuft normal.
+        self.stt_cfg = getattr(config, "stt", {}) or {}
+        self.stt_available = bool(self.stt_cfg.get("enabled")) and is_stt_available()
+        if self.stt_cfg.get("enabled") and not self.stt_available:
+            logging.info(
+                "STT aktiviert, aber faster-whisper ist nicht installiert — "
+                "Mikrofon bleibt ausgeblendet (pip install faster-whisper)."
+            )
         if self._t is None:
             self._t = lambda key, **kwargs: key
 
@@ -311,6 +322,7 @@ class WebUI:
                 placeholder=self.self_talk_prompt_placeholder,
             ),
             "self_talk_start_btn": gr.update(visible=False, interactive=True),
+            "mic_audio": gr.update(value=None, visible=False),
         }
 
     def _persona_selected_updates(
@@ -350,6 +362,7 @@ class WebUI:
                 interactive=True,
                 placeholder=self.ask_all_placeholder,
             ),
+            mic_audio=gr.update(value=None, visible=self.stt_available),
         )
         return self._as_persona_outputs(updates)
 
@@ -420,6 +433,22 @@ class WebUI:
         return gr.update(
             value=self._t("web_model_switched", model_name=choice), visible=True
         )
+
+    def _on_mic_recorded(self, audio_path: str | None, current_text: str | None):
+        """Transkribiert die Aufnahme und hängt den Text ans Eingabefeld an."""
+        if not audio_path:
+            # feuert z. B. auch beim Leeren der Komponente
+            return gr.update(), gr.update()
+        try:
+            transcript = transcribe_wav(audio_path, stt_cfg=self.stt_cfg)
+        except Exception as exc:
+            logging.warning("STT: Transkription fehlgeschlagen: %s", exc)
+            gr.Warning(self._t("stt_error", reason=str(exc)))
+            return gr.update(), gr.update(value=None)
+        if not transcript:
+            return gr.update(), gr.update(value=None)
+        combined = f"{current_text or ''} {transcript}".strip()
+        return gr.update(value=combined), gr.update(value=None)
 
     def _on_show_ask_all(self) -> tuple:
         self.bot = None
@@ -839,6 +868,7 @@ class WebUI:
         load_status = components["load_status"]
         model_dropdown = components["model_dropdown"]
         model_status = components["model_status"]
+        mic_audio = components["mic_audio"]
 
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
@@ -875,6 +905,15 @@ class WebUI:
             inputs=[model_dropdown],
             outputs=[model_status],
             queue=False,
+        )
+
+        # queue=True: die Whisper-Transkription dauert Sekunden (erste
+        # Aufnahme lädt zusätzlich das Modell).
+        mic_audio.stop_recording(
+            fn=self._on_mic_recorded,
+            inputs=[mic_audio, input_box],
+            outputs=[input_box, mic_audio],
+            queue=True,
         )
 
         input_submit_evt = input_box.submit(
@@ -1046,6 +1085,7 @@ class WebUI:
         model_dropdown_label = ui.get("web_model_dropdown_label", "Modell")
         model_hint = ui.get("web_model_hint", "")
         model_choices = self._available_models(default_model)
+        mic_label = ui.get("web_mic_label", "Spracheingabe (Mikrofon)")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1080,6 +1120,7 @@ class WebUI:
             model_hint=model_hint,
             model_choices=model_choices,
             model_value=default_model,
+            mic_label=mic_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
