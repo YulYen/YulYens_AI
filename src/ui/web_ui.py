@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import gradio as gr
 import requests
+from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
@@ -65,6 +66,7 @@ PERSONA_OUTPUT_KEYS = (
     "self_talk_prompt",
     "self_talk_start_btn",
     "mic_audio",
+    "briefing_btn",
 )
 
 
@@ -117,6 +119,11 @@ class WebUI:
         # ist — sonst bleibt das Mikro unsichtbar und die App läuft normal.
         self.stt_cfg = getattr(config, "stt", {}) or {}
         self.stt_available = bool(self.stt_cfg.get("enabled")) and is_stt_available()
+        # Briefing (RSS): Button nur zeigen, wenn eingeschaltet und Feeds da sind
+        self.briefing_cfg = getattr(config, "briefing", {}) or {}
+        self.briefing_enabled = bool(self.briefing_cfg.get("enabled")) and bool(
+            self.briefing_cfg.get("feeds")
+        )
         if self.stt_cfg.get("enabled") and not self.stt_available:
             logging.info(
                 "STT aktiviert, aber faster-whisper ist nicht installiert — "
@@ -277,6 +284,45 @@ class WebUI:
             for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
 
+    def respond_briefing(
+        self, chat_history: list[ChatPair], history_state: list[Message] | None
+    ) -> Iterator[tuple[Any, list[ChatPair], list[Message]]]:
+        """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
+        if not self.bot or not self.briefing_enabled:
+            yield gr.update(), chat_history, history_state
+            return
+
+        llm_history = list(history_state or [])
+        briefing_prompt = self._t("briefing_user_prompt")
+        chat_history.append((briefing_prompt, None))
+        yield gr.update(), chat_history, llm_history
+
+        timeout = (
+            float(self.briefing_cfg.get("timeout_connect", 5.0)),
+            float(self.briefing_cfg.get("timeout_read", 8.0)),
+        )
+        hints, items = fetch_briefing_items(self.briefing_cfg, self.bot, timeout)
+
+        for hint in hints:
+            if hint:
+                chat_history.append((None, hint))
+        if hints:
+            yield None, chat_history, llm_history
+
+        if not items:
+            chat_history.append((None, self._t("briefing_empty")))
+            yield None, chat_history, llm_history
+            return
+
+        # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
+        inject_briefing_context(llm_history, items)
+        llm_history.append({"role": "user", "content": briefing_prompt})
+
+        if self._handle_context_warning(llm_history, chat_history):
+            yield None, chat_history, llm_history
+
+        yield from self._stream_reply(llm_history, chat_history)
+
     def _as_persona_outputs(self, updates: dict) -> tuple:
         """Resolve a named update dict into the tuple order of PERSONA_OUTPUT_KEYS."""
         unknown = set(updates) - set(PERSONA_OUTPUT_KEYS)
@@ -323,6 +369,7 @@ class WebUI:
             ),
             "self_talk_start_btn": gr.update(visible=False, interactive=True),
             "mic_audio": gr.update(value=None, visible=False),
+            "briefing_btn": gr.update(visible=False),
         }
 
     def _persona_selected_updates(
@@ -355,6 +402,7 @@ class WebUI:
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
             download_btn=gr.update(visible=True),
+            briefing_btn=gr.update(visible=self.briefing_enabled),
             meta_state=self._build_meta(persona["name"]),
             ask_all_question=gr.update(
                 value="",
@@ -753,6 +801,7 @@ class WebUI:
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
             download_btn=gr.update(visible=True),
+            briefing_btn=gr.update(visible=self.briefing_enabled),
             history_state=messages,
             meta_state=meta,
             ask_all_question=gr.update(
@@ -869,6 +918,7 @@ class WebUI:
         model_dropdown = components["model_dropdown"]
         model_status = components["model_status"]
         mic_audio = components["mic_audio"]
+        briefing_btn = components["briefing_btn"]
 
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
@@ -935,6 +985,13 @@ class WebUI:
             inputs=[history_state, meta_state],
             outputs=[download_file, save_status],
             queue=False,
+        )
+
+        briefing_evt = briefing_btn.click(
+            fn=self.respond_briefing,
+            inputs=[chatbot, history_state],
+            outputs=[input_box, chatbot, history_state],
+            queue=True,
         )
 
         if ask_all_card_btn is not None:
@@ -1008,7 +1065,12 @@ class WebUI:
             inputs=[],
             outputs=persona_outputs,
             queue=False,
-            cancels=[input_submit_evt, send_click_evt, self_talk_stream_evt],
+            cancels=[
+                input_submit_evt,
+                send_click_evt,
+                self_talk_stream_evt,
+                briefing_evt,
+            ],
         )
 
         ask_all_new_chat.click(
@@ -1086,6 +1148,7 @@ class WebUI:
         model_hint = ui.get("web_model_hint", "")
         model_choices = self._available_models(default_model)
         mic_label = ui.get("web_mic_label", "Spracheingabe (Mikrofon)")
+        briefing_label = ui.get("web_briefing_button", "Briefing 📰")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1121,6 +1184,7 @@ class WebUI:
             model_choices=model_choices,
             model_value=default_model,
             mic_label=mic_label,
+            briefing_label=briefing_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

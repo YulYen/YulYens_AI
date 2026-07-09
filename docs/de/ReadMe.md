@@ -234,7 +234,7 @@ Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
   - Bei `ui.type: "terminal"` im Terminal nutzen
   - Startmenü: neue Unterhaltung, Konversation laden (JSON), Self-Talk, Ask-All
   - Eingabe: Fragen einfach eintippen
-  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern)
+  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern), `/briefing` (Persona fasst die konfigurierten RSS-Feeds zusammen)
 
 - **Web-UI**
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
@@ -243,6 +243,7 @@ Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
   - Persona auswählen und loschatten
   - Profi-Option: Im zugeklappten „Erweitert"-Bereich unten am Startbildschirm lässt sich das Modell für die laufende Sitzung wechseln (Liste = installierte Ollama-Modelle). Gilt nur bis zum Neustart — danach greift wieder `core.model_name` aus der `config.yaml`
   - Spracheingabe (opt-in): Nach `pip install faster-whisper` erscheint im Persona-Chat ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird ans Eingabefeld angehängt und kann vor dem Senden editiert werden. Die erste Aufnahme lädt das Whisper-Modell (einmalig inkl. Download) und dauert daher etwas. Details und Modellwahl: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
+  - Briefing (RSS): Der Button „Briefing 📰" im Persona-Chat lässt die gewählte Persona die in `config.yaml` unter `briefing.feeds` konfigurierten RSS/Atom-Feeds zusammenfassen (Default: tagesschau + heise). Braucht Internet; Netzzugriff passiert nur beim Klick. Abschalten per `briefing.enabled: false`
 
 - **Nur API (ohne UI)**
   - `ui.type: null` setzen – die FastAPI läuft weiter und bedient `/ask`

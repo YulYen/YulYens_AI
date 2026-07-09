@@ -63,6 +63,18 @@ stt:
   compute_type: "auto"     # auto | int8 | float16 …
   language: "de"           # null = Auto-Erkennung
 
+# --- Briefing (RSS): Persona fasst konfigurierte Feeds zusammen -------------------------------------------------
+briefing:
+  enabled: true            # Briefing-Button (WebUI) + /briefing (Terminal); Netz-Fetch nur auf Klick/Kommando
+  max_items_per_feed: 4
+  timeout_connect: 5.0
+  timeout_read: 8.0
+  feeds:
+    - name: "tagesschau"
+      url: "https://www.tagesschau.de/index~rss2.xml"
+    - name: "heise online"
+      url: "https://www.heise.de/rss/heise-atom.xml"
+
 # --- Wiki settings (including spaCy-Keyword-Finder) -------------------------------------------------------------
 wiki:
   # offline uses Kiwix, online calls Wikipedia, false disables wiki snippets

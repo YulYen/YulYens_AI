@@ -31,6 +31,7 @@ def build_ui(
     model_choices,
     model_value,
     mic_label,
+    briefing_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -199,6 +200,11 @@ def build_ui(
                 variant="secondary",
                 visible=False,
             )
+            briefing_btn = gr.Button(
+                briefing_label,
+                variant="secondary",
+                visible=False,
+            )
             download_file = gr.File(visible=False)
         save_status = gr.Markdown("", visible=False)
         with gr.Row(elem_classes="chat-input-row"):
@@ -337,5 +343,6 @@ def build_ui(
         "model_dropdown": model_dropdown,
         "model_status": model_status,
         "mic_audio": mic_audio,
+        "briefing_btn": briefing_btn,
     }
     return demo, components

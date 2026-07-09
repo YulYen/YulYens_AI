@@ -68,8 +68,10 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── tts/
 │   │   ├── piper_tts.py         # TTS-Wrapper
 │   │   └── audio_player.py      # winsound (Windows-only, plattform-sicher)
-│   └── stt/
-│       └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
+│   ├── stt/
+│   │   └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
+│   └── briefing/
+│       └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -167,6 +169,12 @@ stt:
   model: "small"             # tiny | base | small | medium | large-v3
   language: "de"             # null = Auto-Erkennung
 
+briefing:
+  enabled: true              # WebUI-Button + /briefing (Terminal); Netz nur auf Klick
+  feeds:                     # Liste von {name, url} (RSS 2.0 oder Atom)
+    - name: "tagesschau"
+      url: "https://www.tagesschau.de/index~rss2.xml"
+
 api:
   enabled: true
   port: 8013
@@ -241,6 +249,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
+| **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
 Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
@@ -265,7 +274,7 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-08):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-09):
 
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
 - **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
@@ -275,7 +284,8 @@ Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitst
 #2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update (`docs/{de,en}/Kiwix_Setup.md`),
 #23 Paralleler Broadcast, #17 Faster first token (Startup-Warm-up, `core.keep_alive`,
 WebUI-Stream-Drossel; bewusst ohne Prompt-Diät), #6 Modell-Auswahl (WebUI, session-only),
-#13 STT MVP (WebUI-Mikro via faster-whisper, `src/stt/ReadMe.md`).
+#13 STT MVP (WebUI-Mikro via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP,
+IoT-Teil offen).
 
 ## Sprachstrategie
 

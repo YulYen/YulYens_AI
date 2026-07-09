@@ -442,7 +442,7 @@ def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
 
     updates = web_ui._on_show_self_talk()
 
-    assert len(updates) == 29
+    assert len(updates) == 30
     assert updates[22]["visible"] is True
     assert updates[27]["interactive"] is True
 
@@ -546,7 +546,7 @@ def test_persona_selected_updates_reads_current_model_from_cfg():
         "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
     )
 
-    assert len(updates) == 29
+    assert len(updates) == 30
     greeting_update = updates[5]
     assert "override:1" in greeting_update["value"]
 
@@ -630,3 +630,100 @@ def test_reset_updates_hides_mic():
 
     assert updates[28]["visible"] is False
     assert updates[28]["value"] is None
+
+
+# ---- Briefing (RSS MVP, #15) ------------------------------------------------
+
+
+def _briefing_web_ui():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    web_ui.briefing_enabled = True
+    web_ui.briefing_cfg = {
+        "enabled": True,
+        "timeout_connect": 1.0,
+        "timeout_read": 1.0,
+        "feeds": [{"name": "quelle", "url": "https://example.org/rss"}],
+    }
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Ant", "wort"])
+    web_ui.streamer = streamer
+    return web_ui
+
+
+def test_briefing_disabled_by_default_config():
+    web_ui = _create_web_ui()
+
+    assert web_ui.briefing_enabled is False
+
+    outputs = list(web_ui.respond_briefing([], []))
+    assert len(outputs) == 1
+    web_ui.factory.get_streamer_for_persona.assert_not_called()
+
+
+def test_respond_briefing_streams_summary_with_injected_context():
+    web_ui = _briefing_web_ui()
+    history_state = [{"role": "user", "content": "früher"}]
+
+    with (
+        patch(
+            "ui.web_ui.fetch_briefing_items",
+            return_value=(["📰 hint"], [("quelle: Titel", "Text")]),
+        ) as mock_fetch,
+        patch("ui.web_ui.inject_briefing_context") as mock_inject,
+        patch("ui.web_ui.context_near_limit", return_value=False),
+    ):
+        outputs = list(web_ui.respond_briefing([], history_state))
+
+    mock_fetch.assert_called_once()
+    assert mock_fetch.call_args[0][2] == (1.0, 1.0)  # Timeout-Tuple aus der Config
+    mock_inject.assert_called_once()
+    injected_history, injected_items = mock_inject.call_args[0]
+    assert injected_items == [("quelle: Titel", "Text")]
+
+    final_chat, final_state = outputs[-1][1], outputs[-1][2]
+    # User-Bubble (Prompt), Hint-Bubble, gestreamte Antwort
+    assert final_chat[0] == ("briefing_user_prompt", None)
+    assert final_chat[1] == (None, "📰 hint")
+    assert final_chat[-1] == (None, "Antwort")
+    assert final_state[-2] == {"role": "user", "content": "briefing_user_prompt"}
+    assert final_state[-1] == {"role": "assistant", "content": "Antwort"}
+    # Copy-Disziplin: das übergebene gr.State-Objekt bleibt unangetastet
+    assert history_state == [{"role": "user", "content": "früher"}]
+
+
+def test_respond_briefing_without_items_shows_empty_note_and_skips_stream():
+    web_ui = _briefing_web_ui()
+
+    with patch("ui.web_ui.fetch_briefing_items", return_value=(["📰 down"], [])):
+        outputs = list(web_ui.respond_briefing([], []))
+
+    final_chat = outputs[-1][1]
+    assert final_chat[-1] == (None, "briefing_empty")
+    web_ui.streamer.stream.assert_not_called()
+
+
+def test_persona_selected_updates_toggles_briefing_button():
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    for enabled in (True, False):
+        web_ui = _create_web_ui()
+        web_ui.cfg.core = {"model_name": "m:1"}
+        web_ui.cfg.ensemble = "test"
+        web_ui.briefing_enabled = enabled
+
+        updates = web_ui._persona_selected_updates(
+            "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+        )
+
+        assert updates[29]["visible"] is enabled
+
+
+def test_reset_updates_hides_briefing_button():
+    web_ui = _create_web_ui()
+    web_ui.briefing_enabled = True
+
+    updates = web_ui._reset_ui_updates()
+
+    assert updates[29]["visible"] is False

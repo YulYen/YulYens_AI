@@ -226,7 +226,7 @@ Exit code 1 signals a critical failure (handy for scripts).
   - Use in the terminal when `ui.type: "terminal"`
   - Start menu: new conversation, load conversation (JSON), self-talk, ask-all
   - Input: simply type your questions
-  - Commands: `exit` (quit), `clear` (start a new conversation), `/save <path>` (save the conversation as JSON)
+  - Commands: `exit` (quit), `clear` (start a new conversation), `/save <path>` (save the conversation as JSON), `/briefing` (persona summarizes the configured RSS feeds)
 
 - **Web UI**
   - With `ui.type: "web"`, a web interface starts automatically
@@ -235,6 +235,7 @@ Exit code 1 signals a critical failure (handy for scripts).
   - Pick a persona and start chatting
   - Pro option: the collapsed "Advanced" section at the bottom of the start screen lets you switch the model for the current session (choices = installed Ollama models). Session-only — after a restart, `core.model_name` from `config.yaml` applies again
   - Voice input (opt-in): after `pip install faster-whisper`, a microphone appears next to the input field in the persona chat. Record → stop → the transcript is appended to the input field and can be edited before sending. The first recording loads the Whisper model (including a one-time download), so it takes a moment. Details and model choice: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
+  - Briefing (RSS): the "Briefing 📰" button in the persona chat makes the selected persona summarize the RSS/Atom feeds configured under `briefing.feeds` in `config.yaml` (default: tagesschau + heise). Requires internet; the network is only accessed on click. Disable via `briefing.enabled: false`
 
 - **API only (no UI)**
   - Set `ui.type: null` – FastAPI keeps running and serves `/ask`
