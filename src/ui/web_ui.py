@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import tempfile
@@ -8,13 +9,18 @@ import time
 from collections.abc import Iterator
 from datetime import datetime
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import gradio as gr
+import requests
+from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
+from core.system_checks import fetch_model_names
 from core.utils import is_broadcast_enabled, is_broadcast_parallel
+from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
@@ -61,6 +67,10 @@ PERSONA_OUTPUT_KEYS = (
     "self_talk_persona_b",
     "self_talk_prompt",
     "self_talk_start_btn",
+    "mic_audio",
+    "briefing_btn",
+    "read_aloud_btn",
+    "tts_audio",
 )
 
 
@@ -109,6 +119,37 @@ class WebUI:
         self.ask_all_placeholder = ""
         self.self_talk_runner = None
         self.self_talk_prompt_placeholder = ""
+        # STT nur anbieten, wenn eingeschaltet UND faster-whisper installiert
+        # ist — sonst bleibt das Mikro unsichtbar und die App läuft normal.
+        self.stt_cfg = getattr(config, "stt", {}) or {}
+        self.stt_available = bool(self.stt_cfg.get("enabled")) and is_stt_available()
+        # Briefing (RSS): Button nur zeigen, wenn eingeschaltet und Feeds da sind
+        self.briefing_cfg = getattr(config, "briefing", {}) or {}
+        self.briefing_enabled = bool(self.briefing_cfg.get("enabled")) and bool(
+            self.briefing_cfg.get("feeds")
+        )
+        # Vorlesen (TTS): wie beim Mikro nur anbieten, wenn Piper installiert ist
+        self.tts_cfg = getattr(config, "tts", {}) or {}
+        tts_features = self.tts_cfg.get("features", {}) or {}
+        self.tts_web_enabled = (
+            bool(self.tts_cfg.get("enabled"))
+            and bool(tts_features.get("web_read_aloud"))
+            and importlib.util.find_spec("piper") is not None
+        )
+        if (
+            self.tts_cfg.get("enabled")
+            and tts_features.get("web_read_aloud")
+            and not self.tts_web_enabled
+        ):
+            logging.info(
+                "TTS-Vorlesen aktiviert, aber piper ist nicht installiert — "
+                "Button bleibt ausgeblendet (pip install piper-tts)."
+            )
+        if self.stt_cfg.get("enabled") and not self.stt_available:
+            logging.info(
+                "STT aktiviert, aber faster-whisper ist nicht installiert — "
+                "Mikrofon bleibt ausgeblendet (pip install faster-whisper)."
+            )
         if self._t is None:
             self._t = lambda key, **kwargs: key
 
@@ -264,6 +305,45 @@ class WebUI:
             for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
 
+    def respond_briefing(
+        self, chat_history: list[ChatPair], history_state: list[Message] | None
+    ) -> Iterator[tuple[Any, list[ChatPair], list[Message]]]:
+        """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
+        if not self.bot or not self.briefing_enabled:
+            yield gr.update(), chat_history, history_state
+            return
+
+        llm_history = list(history_state or [])
+        briefing_prompt = self._t("briefing_user_prompt")
+        chat_history.append((briefing_prompt, None))
+        yield gr.update(), chat_history, llm_history
+
+        timeout = (
+            float(self.briefing_cfg.get("timeout_connect", 5.0)),
+            float(self.briefing_cfg.get("timeout_read", 8.0)),
+        )
+        hints, items = fetch_briefing_items(self.briefing_cfg, self.bot, timeout)
+
+        for hint in hints:
+            if hint:
+                chat_history.append((None, hint))
+        if hints:
+            yield None, chat_history, llm_history
+
+        if not items:
+            chat_history.append((None, self._t("briefing_empty")))
+            yield None, chat_history, llm_history
+            return
+
+        # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
+        inject_briefing_context(llm_history, items)
+        llm_history.append({"role": "user", "content": briefing_prompt})
+
+        if self._handle_context_warning(llm_history, chat_history):
+            yield None, chat_history, llm_history
+
+        yield from self._stream_reply(llm_history, chat_history)
+
     def _as_persona_outputs(self, updates: dict) -> tuple:
         """Resolve a named update dict into the tuple order of PERSONA_OUTPUT_KEYS."""
         unknown = set(updates) - set(PERSONA_OUTPUT_KEYS)
@@ -309,6 +389,10 @@ class WebUI:
                 placeholder=self.self_talk_prompt_placeholder,
             ),
             "self_talk_start_btn": gr.update(visible=False, interactive=True),
+            "mic_audio": gr.update(value=None, visible=False),
+            "briefing_btn": gr.update(visible=False),
+            "read_aloud_btn": gr.update(visible=False),
+            "tts_audio": gr.update(value=None, visible=False),
         }
 
     def _persona_selected_updates(
@@ -316,10 +400,11 @@ class WebUI:
         persona_key: str,
         persona: dict[str, Any],
         greeting_template: str,
-        model_name: str,
         input_placeholder: str,
     ) -> tuple:
         display_name = persona["name"].title()
+        # Modell live aus der Config lesen (kann per Profi-Option gewechselt sein)
+        model_name = str(self.cfg.core.get("model_name", ""))
         greeting = greeting_template.format(
             persona_name=display_name, model_name=model_name
         )
@@ -340,6 +425,8 @@ class WebUI:
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
             download_btn=gr.update(visible=True),
+            briefing_btn=gr.update(visible=self.briefing_enabled),
+            read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             meta_state=self._build_meta(persona["name"]),
             ask_all_question=gr.update(
                 value="",
@@ -347,6 +434,7 @@ class WebUI:
                 interactive=True,
                 placeholder=self.ask_all_placeholder,
             ),
+            mic_audio=gr.update(value=None, visible=self.stt_available),
         )
         return self._as_persona_outputs(updates)
 
@@ -358,7 +446,6 @@ class WebUI:
         key: str,
         persona_info: dict[str, dict[str, Any]],
         greeting_template: str,
-        model_name: str,
         input_placeholder: str,
     ) -> tuple:
         persona = persona_info.get(key)
@@ -370,7 +457,7 @@ class WebUI:
         self.bot = persona["name"]
         self.streamer = self.factory.get_streamer_for_persona(self.bot)
         return self._persona_selected_updates(
-            key, persona, greeting_template, model_name, input_placeholder
+            key, persona, greeting_template, input_placeholder
         )
 
     def _cancel_ask_all_broadcast(self) -> None:
@@ -385,6 +472,88 @@ class WebUI:
         self.bot = None
         self.streamer = None
         return self._reset_ui_updates()
+
+    def _available_models(self, default_model: str) -> list[str]:
+        """Installierte Ollama-Modelle für das Profi-Dropdown; Fallback: Default."""
+        backend = str(self.cfg.core.get("backend", "ollama")).strip().lower()
+        if backend != "ollama":
+            return [default_model]
+        try:
+            names = fetch_model_names(self.cfg.core.get("ollama_url", ""), timeout=2.0)
+        except (requests.RequestException, ValueError) as exc:
+            logging.warning(
+                "Modellliste nicht abrufbar (%s) — Dropdown zeigt nur den Standard.",
+                exc,
+            )
+            return [default_model]
+        choices = [n for n in names if n]
+        if default_model and default_model not in choices:
+            choices.insert(0, default_model)
+        return choices or [default_model]
+
+    def _on_model_selected(self, choice: str | None):
+        """Session-Override des Modells; config.yaml bleibt unangetastet."""
+        choice = (choice or "").strip()
+        if not choice:
+            return gr.update(value="", visible=False)
+        self.cfg.override("core", {"model_name": choice})
+        if self.bot:
+            # Laufendes Gespräch: Streamer neu bauen (History lebt im gr.State),
+            # damit auch die Cutoff-Zeile im System-Prompt zum Modell passt.
+            self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        logging.info("Modell per UI gewechselt: %s", choice)
+        return gr.update(
+            value=self._t("web_model_switched", model_name=choice), visible=True
+        )
+
+    def _on_mic_recorded(self, audio_path: str | None, current_text: str | None):
+        """Transkribiert die Aufnahme und hängt den Text ans Eingabefeld an."""
+        if not audio_path:
+            # feuert z. B. auch beim Leeren der Komponente
+            return gr.update(), gr.update()
+        try:
+            transcript = transcribe_wav(audio_path, stt_cfg=self.stt_cfg)
+        except Exception as exc:
+            logging.warning("STT: Transkription fehlgeschlagen: %s", exc)
+            gr.Warning(self._t("stt_error", reason=str(exc)))
+            return gr.update(), gr.update(value=None)
+        if not transcript:
+            return gr.update(), gr.update(value=None)
+        combined = f"{current_text or ''} {transcript}".strip()
+        return gr.update(value=combined), gr.update(value=None)
+
+    def _on_read_aloud(self, history_state: list[Message] | None):
+        """Liest die letzte Antwort mit der Piper-Stimme der Persona vor."""
+        last_reply = next(
+            (
+                m.get("content", "")
+                for m in reversed(history_state or [])
+                if m.get("role") == "assistant"
+            ),
+            "",
+        )
+        if not self.bot or not last_reply.strip():
+            gr.Warning(self._t("tts_no_reply"))
+            return gr.update(value=None, visible=False)
+        try:
+            # Lazy wie im Terminal: piper_tts importiert piper auf Modulebene
+            from tts.piper_tts import create_wav
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                out_wav = Path(tmp.name)
+            create_wav(
+                last_reply,
+                self.bot,
+                voices_dir=Path("voices"),
+                out_wav=out_wav,
+                tts_cfg=self.tts_cfg,
+                language=getattr(self.cfg, "language", "de"),
+            )
+        except Exception as exc:
+            logging.warning("TTS: Vorlesen fehlgeschlagen: %s", exc)
+            gr.Warning(self._t("tts_error", reason=str(exc)))
+            return gr.update(value=None, visible=False)
+        return gr.update(value=str(out_wav), visible=True)
 
     def _on_show_ask_all(self) -> tuple:
         self.bot = None
@@ -689,6 +858,8 @@ class WebUI:
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
             download_btn=gr.update(visible=True),
+            briefing_btn=gr.update(visible=self.briefing_enabled),
+            read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             history_state=messages,
             meta_state=meta,
             ask_all_question=gr.update(
@@ -776,7 +947,6 @@ class WebUI:
         self,
         components: dict[str, Any],
         persona_info: dict[str, dict[str, Any]],
-        model_name: str,
         greeting_template: str,
         input_placeholder: str,
     ) -> None:
@@ -803,6 +973,12 @@ class WebUI:
         self_talk_start_btn = components["self_talk_start_btn"]
         load_input = components["load_input"]
         load_status = components["load_status"]
+        model_dropdown = components["model_dropdown"]
+        model_status = components["model_status"]
+        mic_audio = components["mic_audio"]
+        briefing_btn = components["briefing_btn"]
+        read_aloud_btn = components["read_aloud_btn"]
+        tts_audio = components["tts_audio"]
 
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
@@ -814,7 +990,6 @@ class WebUI:
                     key=key,
                     persona_info=persona_info,
                     greeting_template=greeting_template,
-                    model_name=model_name,
                     input_placeholder=input_placeholder,
                 ),
                 inputs=[],
@@ -831,6 +1006,24 @@ class WebUI:
             inputs=[load_input],
             outputs=persona_outputs,
             queue=False,
+        )
+
+        # Profi-Option: .change feuert nur bei Nutzer-Interaktion, nicht beim
+        # Initialwert; bewusst außerhalb der PERSONA_OUTPUT_KEYS gehalten.
+        model_dropdown.change(
+            fn=self._on_model_selected,
+            inputs=[model_dropdown],
+            outputs=[model_status],
+            queue=False,
+        )
+
+        # queue=True: die Whisper-Transkription dauert Sekunden (erste
+        # Aufnahme lädt zusätzlich das Modell).
+        mic_audio.stop_recording(
+            fn=self._on_mic_recorded,
+            inputs=[mic_audio, input_box],
+            outputs=[input_box, mic_audio],
+            queue=True,
         )
 
         input_submit_evt = input_box.submit(
@@ -852,6 +1045,21 @@ class WebUI:
             inputs=[history_state, meta_state],
             outputs=[download_file, save_status],
             queue=False,
+        )
+
+        briefing_evt = briefing_btn.click(
+            fn=self.respond_briefing,
+            inputs=[chatbot, history_state],
+            outputs=[input_box, chatbot, history_state],
+            queue=True,
+        )
+
+        # queue=True: die Piper-Synthese längerer Antworten dauert Sekunden
+        read_aloud_btn.click(
+            fn=self._on_read_aloud,
+            inputs=[history_state],
+            outputs=[tts_audio],
+            queue=True,
         )
 
         if ask_all_card_btn is not None:
@@ -925,7 +1133,12 @@ class WebUI:
             inputs=[],
             outputs=persona_outputs,
             queue=False,
-            cancels=[input_submit_evt, send_click_evt, self_talk_stream_evt],
+            cancels=[
+                input_submit_evt,
+                send_click_evt,
+                self_talk_stream_evt,
+                briefing_evt,
+            ],
         )
 
         ask_all_new_chat.click(
@@ -971,7 +1184,7 @@ class WebUI:
 
     def launch(self) -> None:
         ui = self.texts
-        model_name = self.cfg.core.get("model_name")
+        default_model = str(self.cfg.core.get("model_name", ""))
         project_title = ui.get("project_name")
         choose_persona_txt = ui.get("choose_persona")
         new_chat_label = ui.get("new_chat")
@@ -998,6 +1211,13 @@ class WebUI:
             "self_talk_prompt_placeholder", "Gib den Start-Prompt ein …"
         )
         save_button_label = ui.get("web_save_button", "Gespräch herunterladen (JSON)")
+        advanced_label = ui.get("web_advanced_label", "Erweitert")
+        model_dropdown_label = ui.get("web_model_dropdown_label", "Modell")
+        model_hint = ui.get("web_model_hint", "")
+        model_choices = self._available_models(default_model)
+        mic_label = ui.get("web_mic_label", "Spracheingabe (Mikrofon)")
+        briefing_label = ui.get("web_briefing_button", "Briefing 📰")
+        read_aloud_label = ui.get("web_read_aloud_button", "Vorlesen 🔊")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1027,6 +1247,14 @@ class WebUI:
             self_talk_prompt_placeholder=self_talk_prompt_placeholder,
             load_label=load_label,
             save_button_label=save_button_label,
+            advanced_label=advanced_label,
+            model_dropdown_label=model_dropdown_label,
+            model_hint=model_hint,
+            model_choices=model_choices,
+            model_value=default_model,
+            mic_label=mic_label,
+            briefing_label=briefing_label,
+            read_aloud_label=read_aloud_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
@@ -1035,7 +1263,6 @@ class WebUI:
             self._bind_events(
                 components,
                 persona_info,
-                model_name,
                 greeting_template,
                 input_placeholder,
             )

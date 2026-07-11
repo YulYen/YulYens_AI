@@ -1,10 +1,13 @@
 """Tests for the WebUI-specific server configuration."""
 
 import logging
+import sys
 import threading
+import types
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import requests
 from ui.web_ui import WebUI
 
 
@@ -441,7 +444,7 @@ def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
 
     updates = web_ui._on_show_self_talk()
 
-    assert len(updates) == 28
+    assert len(updates) == 32
     assert updates[22]["visible"] is True
     assert updates[27]["interactive"] is True
 
@@ -462,3 +465,371 @@ def test_on_start_self_talk_clears_stale_runner_on_validation_error():
     web_ui._on_start_self_talk("Karl", "Karl", "Prompt")
 
     assert web_ui.self_talk_runner is None
+
+
+# ---- Modell-Auswahl (Profi-Option, #6) -------------------------------------
+
+
+def test_available_models_falls_back_to_default_when_ollama_down():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"backend": "ollama", "ollama_url": "http://x:1"}
+
+    with patch(
+        "ui.web_ui.fetch_model_names",
+        side_effect=requests.ConnectionError("refused"),
+    ):
+        assert web_ui._available_models("standard:1") == ["standard:1"]
+
+
+def test_available_models_unions_default_first():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"backend": "ollama", "ollama_url": "http://x:1"}
+
+    with patch("ui.web_ui.fetch_model_names", return_value=["a:1", "b:2"]):
+        choices = web_ui._available_models("standard:1")
+
+    assert choices == ["standard:1", "a:1", "b:2"]
+
+
+def test_available_models_dummy_backend_skips_request():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"backend": "dummy"}
+
+    with patch("ui.web_ui.fetch_model_names") as mock_fetch:
+        assert web_ui._available_models("standard:1") == ["standard:1"]
+
+    mock_fetch.assert_not_called()
+
+
+def test_on_model_selected_overrides_config_and_rebuilds_streamer():
+    web_ui = _create_web_ui()
+    web_ui.cfg.override = Mock()
+    web_ui.bot = "Karl"
+
+    update = web_ui._on_model_selected("neu:1")
+
+    web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
+    web_ui.factory.get_streamer_for_persona.assert_called_once_with("Karl")
+    assert update["visible"] is True
+
+
+def test_on_model_selected_without_persona_keeps_streamer_none():
+    web_ui = _create_web_ui()
+    web_ui.cfg.override = Mock()
+    web_ui.bot = None
+
+    update = web_ui._on_model_selected("neu:1")
+
+    web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
+    web_ui.factory.get_streamer_for_persona.assert_not_called()
+    assert web_ui.streamer is None
+    assert update["visible"] is True
+
+
+def test_on_model_selected_empty_choice_is_noop():
+    web_ui = _create_web_ui()
+    web_ui.cfg.override = Mock()
+
+    update = web_ui._on_model_selected("")
+
+    web_ui.cfg.override.assert_not_called()
+    assert update["visible"] is False
+
+
+def test_persona_selected_updates_reads_current_model_from_cfg():
+    """Das Greeting muss das aktuell wirksame Modell zeigen, nicht das vom Start."""
+
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"model_name": "override:1"}
+    web_ui.cfg.ensemble = "test"
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    updates = web_ui._persona_selected_updates(
+        "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+    )
+
+    assert len(updates) == 32
+    greeting_update = updates[5]
+    assert "override:1" in greeting_update["value"]
+
+
+# ---- Spracheingabe (STT MVP, #13) -------------------------------------------
+
+
+def test_stt_unavailable_by_default_config():
+    """SimpleNamespace-Config ohne stt-Sektion → Mikro aus, kein Crash."""
+
+    web_ui = _create_web_ui()
+
+    assert web_ui.stt_available is False
+    assert web_ui.stt_cfg == {}
+
+
+def test_on_mic_recorded_without_audio_is_noop():
+    web_ui = _create_web_ui()
+
+    input_update, mic_update = web_ui._on_mic_recorded(None, "bestehender Text")
+
+    assert "value" not in input_update
+    assert "value" not in mic_update
+
+
+def test_on_mic_recorded_appends_transcript_and_clears_mic():
+    web_ui = _create_web_ui()
+
+    with patch("ui.web_ui.transcribe_wav", return_value="Hallo Welt"):
+        input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
+
+    assert input_update["value"] == "Schon da Hallo Welt"
+    assert mic_update["value"] is None
+
+
+def test_on_mic_recorded_error_warns_and_keeps_text():
+    web_ui = _create_web_ui()
+
+    with (
+        patch("ui.web_ui.transcribe_wav", side_effect=RuntimeError("kaputt")),
+        patch("ui.web_ui.gr.Warning") as mock_warning,
+    ):
+        input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
+
+    mock_warning.assert_called_once()
+    assert "value" not in input_update
+    assert mic_update["value"] is None
+
+
+def test_on_mic_recorded_empty_transcript_is_noop_but_clears_mic():
+    web_ui = _create_web_ui()
+
+    with patch("ui.web_ui.transcribe_wav", return_value=""):
+        input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
+
+    assert "value" not in input_update
+    assert mic_update["value"] is None
+
+
+def test_persona_selected_updates_shows_mic_only_when_stt_available():
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    for available, expected in ((True, True), (False, False)):
+        web_ui = _create_web_ui()
+        web_ui.cfg.core = {"model_name": "m:1"}
+        web_ui.cfg.ensemble = "test"
+        web_ui.stt_available = available
+
+        updates = web_ui._persona_selected_updates(
+            "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+        )
+
+        assert updates[28]["visible"] is expected
+
+
+def test_reset_updates_hides_mic():
+    web_ui = _create_web_ui()
+    web_ui.stt_available = True
+
+    updates = web_ui._reset_ui_updates()
+
+    assert updates[28]["visible"] is False
+    assert updates[28]["value"] is None
+
+
+# ---- Briefing (RSS MVP, #15) ------------------------------------------------
+
+
+def _briefing_web_ui():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    web_ui.briefing_enabled = True
+    web_ui.briefing_cfg = {
+        "enabled": True,
+        "timeout_connect": 1.0,
+        "timeout_read": 1.0,
+        "feeds": [{"name": "quelle", "url": "https://example.org/rss"}],
+    }
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Ant", "wort"])
+    web_ui.streamer = streamer
+    return web_ui
+
+
+def test_briefing_disabled_by_default_config():
+    web_ui = _create_web_ui()
+
+    assert web_ui.briefing_enabled is False
+
+    outputs = list(web_ui.respond_briefing([], []))
+    assert len(outputs) == 1
+    web_ui.factory.get_streamer_for_persona.assert_not_called()
+
+
+def test_respond_briefing_streams_summary_with_injected_context():
+    web_ui = _briefing_web_ui()
+    history_state = [{"role": "user", "content": "früher"}]
+
+    with (
+        patch(
+            "ui.web_ui.fetch_briefing_items",
+            return_value=(["📰 hint"], [("quelle: Titel", "Text")]),
+        ) as mock_fetch,
+        patch("ui.web_ui.inject_briefing_context") as mock_inject,
+        patch("ui.web_ui.context_near_limit", return_value=False),
+    ):
+        outputs = list(web_ui.respond_briefing([], history_state))
+
+    mock_fetch.assert_called_once()
+    assert mock_fetch.call_args[0][2] == (1.0, 1.0)  # Timeout-Tuple aus der Config
+    mock_inject.assert_called_once()
+    injected_history, injected_items = mock_inject.call_args[0]
+    assert injected_items == [("quelle: Titel", "Text")]
+
+    final_chat, final_state = outputs[-1][1], outputs[-1][2]
+    # User-Bubble (Prompt), Hint-Bubble, gestreamte Antwort
+    assert final_chat[0] == ("briefing_user_prompt", None)
+    assert final_chat[1] == (None, "📰 hint")
+    assert final_chat[-1] == (None, "Antwort")
+    assert final_state[-2] == {"role": "user", "content": "briefing_user_prompt"}
+    assert final_state[-1] == {"role": "assistant", "content": "Antwort"}
+    # Copy-Disziplin: das übergebene gr.State-Objekt bleibt unangetastet
+    assert history_state == [{"role": "user", "content": "früher"}]
+
+
+def test_respond_briefing_without_items_shows_empty_note_and_skips_stream():
+    web_ui = _briefing_web_ui()
+
+    with patch("ui.web_ui.fetch_briefing_items", return_value=(["📰 down"], [])):
+        outputs = list(web_ui.respond_briefing([], []))
+
+    final_chat = outputs[-1][1]
+    assert final_chat[-1] == (None, "briefing_empty")
+    web_ui.streamer.stream.assert_not_called()
+
+
+def test_persona_selected_updates_toggles_briefing_button():
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    for enabled in (True, False):
+        web_ui = _create_web_ui()
+        web_ui.cfg.core = {"model_name": "m:1"}
+        web_ui.cfg.ensemble = "test"
+        web_ui.briefing_enabled = enabled
+
+        updates = web_ui._persona_selected_updates(
+            "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+        )
+
+        assert updates[29]["visible"] is enabled
+
+
+def test_reset_updates_hides_briefing_button():
+    web_ui = _create_web_ui()
+    web_ui.briefing_enabled = True
+
+    updates = web_ui._reset_ui_updates()
+
+    assert updates[29]["visible"] is False
+
+
+# ---- Vorlesen (TTS im WebUI, #25) --------------------------------------------
+
+
+def _install_fake_piper(monkeypatch):
+    piper_module = types.ModuleType("piper")
+    voice_module = types.ModuleType("piper.voice")
+
+    class _Voice:
+        @staticmethod
+        def load(path):
+            return object()
+
+    voice_module.PiperVoice = _Voice
+    monkeypatch.setitem(sys.modules, "piper", piper_module)
+    monkeypatch.setitem(sys.modules, "piper.voice", voice_module)
+
+
+def test_tts_web_disabled_by_default_config():
+    """SimpleNamespace-Config ohne tts-Sektion → Button aus, kein Crash."""
+
+    web_ui = _create_web_ui()
+
+    assert web_ui.tts_web_enabled is False
+
+
+def test_on_read_aloud_without_reply_warns_and_stays_hidden():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+
+    with patch("ui.web_ui.gr.Warning") as mock_warning:
+        update = web_ui._on_read_aloud([{"role": "user", "content": "Hallo"}])
+
+    mock_warning.assert_called_once()
+    assert update["visible"] is False
+
+
+def test_on_read_aloud_synthesizes_last_assistant_reply(monkeypatch):
+    _install_fake_piper(monkeypatch)
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    web_ui.tts_cfg = {"voices": {"default": {"de": "stimme"}}}
+    history = [
+        {"role": "assistant", "content": "Alte Antwort"},
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Neueste Antwort"},
+    ]
+
+    with patch("tts.piper_tts.create_wav") as mock_create:
+        update = web_ui._on_read_aloud(history)
+
+    mock_create.assert_called_once()
+    args, kwargs = mock_create.call_args
+    assert args[0] == "Neueste Antwort"
+    assert args[1] == "Karl"
+    assert kwargs["tts_cfg"] == web_ui.tts_cfg
+    assert update["visible"] is True
+    assert update["value"].endswith(".wav")
+
+
+def test_on_read_aloud_error_warns_and_stays_hidden(monkeypatch):
+    _install_fake_piper(monkeypatch)
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+
+    with (
+        patch(
+            "tts.piper_tts.create_wav",
+            side_effect=FileNotFoundError("voices/stimme.onnx"),
+        ),
+        patch("ui.web_ui.gr.Warning") as mock_warning,
+    ):
+        update = web_ui._on_read_aloud([{"role": "assistant", "content": "Hi"}])
+
+    mock_warning.assert_called_once()
+    assert update["visible"] is False
+
+
+def test_persona_selected_updates_toggles_read_aloud_button():
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    for enabled in (True, False):
+        web_ui = _create_web_ui()
+        web_ui.cfg.core = {"model_name": "m:1"}
+        web_ui.cfg.ensemble = "test"
+        web_ui.tts_web_enabled = enabled
+
+        updates = web_ui._persona_selected_updates(
+            "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+        )
+
+        assert updates[30]["visible"] is enabled
+
+
+def test_reset_updates_hides_read_aloud_button_and_player():
+    web_ui = _create_web_ui()
+    web_ui.tts_web_enabled = True
+
+    updates = web_ui._reset_ui_updates()
+
+    assert updates[30]["visible"] is False
+    assert updates[31]["visible"] is False
+    assert updates[31]["value"] is None

@@ -45,6 +45,7 @@ tts:
   enabled: true
   features:
     terminal_auto_create_wav: true  # creates a wav-file in "out" directory for every AI-Answer
+    web_read_aloud: true            # "Vorlesen"-Button in der Web-UI (braucht pip install piper-tts + Stimmen)
   voices:
     default:
       de: "de_DE-thorsten-high"
@@ -54,6 +55,26 @@ tts:
       POPCORN: "de_DE-pavoque-low"
       LEAH: "de_DE-kerstin-low"
       PETER: "de_DE-thorsten-high"
+
+# --- Speech-to-Text settings (faster-whisper, optional: pip install faster-whisper) -----------------------------
+stt:
+  enabled: true            # Mikro in der Web-UI erscheint nur, wenn zusätzlich faster-whisper installiert ist
+  model: "small"           # tiny | base | small | medium | large-v3
+  device: "auto"           # auto | cpu | cuda
+  compute_type: "auto"     # auto | int8 | float16 …
+  language: "de"           # null = Auto-Erkennung
+
+# --- Briefing (RSS): Persona fasst konfigurierte Feeds zusammen -------------------------------------------------
+briefing:
+  enabled: true            # Briefing-Button (WebUI) + /briefing (Terminal); Netz-Fetch nur auf Klick/Kommando
+  max_items_per_feed: 4
+  timeout_connect: 5.0
+  timeout_read: 8.0
+  feeds:
+    - name: "tagesschau"
+      url: "https://www.tagesschau.de/index~rss2.xml"
+    - name: "heise online"
+      url: "https://www.heise.de/rss/heise-atom.xml"
 
 # --- Wiki settings (including spaCy-Keyword-Finder) -------------------------------------------------------------
 wiki:

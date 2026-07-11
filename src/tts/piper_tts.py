@@ -3,6 +3,16 @@ from pathlib import Path
 
 from piper.voice import PiperVoice
 
+# Stimmen sind teuer zu laden — pro Modellpfad genau einmal (Terminal + WebUI).
+_voice_cache: dict[str, PiperVoice] = {}
+
+
+def _load_voice(model_path: Path) -> PiperVoice:
+    key = str(model_path)
+    if key not in _voice_cache:
+        _voice_cache[key] = PiperVoice.load(key)
+    return _voice_cache[key]
+
 
 def _resolve_model_name(persona: str, language: str, tts_cfg: dict) -> str:
     voices_cfg = tts_cfg["voices"]
@@ -35,7 +45,7 @@ def create_wav(
 
     out_wav.parent.mkdir(parents=True, exist_ok=True)
 
-    voice = PiperVoice.load(str(model_path))
+    voice = _load_voice(model_path)
 
     # WICHTIG: Piper setzt Header selbst – wave nur als Container
     with wave.open(str(out_wav), "wb") as wav_file:

@@ -25,6 +25,14 @@ def build_ui(
     self_talk_prompt_placeholder,
     load_label,
     save_button_label,
+    advanced_label,
+    model_dropdown_label,
+    model_hint,
+    model_choices,
+    model_value,
+    mic_label,
+    briefing_label,
+    read_aloud_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -75,6 +83,13 @@ def build_ui(
                     background: var(--background-fill-primary, #fff);
                 }
                 .ask-all-results h3 { margin: 14px 0 6px; }
+                /* Profi-Option (Modell-Wechsel): bewusst dezent gehalten */
+                .advanced-accordion { margin-top: 8px; }
+                .advanced-hint { font-size: 0.85rem; opacity: 0.7; }
+                /* Mikrofon (STT) kompakt neben dem Eingabefeld halten */
+                .mic-input { max-height: 110px; }
+                /* Vorlesen-Player (TTS): schmal, ohne Beschriftung */
+                .tts-audio { max-height: 80px; }
                 </style>
             """
         )
@@ -154,6 +169,19 @@ def build_ui(
                 with gr.Column(scale=3, min_width=300):
                     load_status = gr.Markdown("", visible=False)
 
+            # Profi-Option, zugeklappt: Modell nur für diese Sitzung wechseln.
+            with gr.Accordion(
+                advanced_label, open=False, elem_classes="advanced-accordion"
+            ):
+                model_dropdown = gr.Dropdown(
+                    choices=model_choices,
+                    value=model_value,
+                    label=model_dropdown_label,
+                    interactive=len(model_choices) > 1,
+                )
+                gr.Markdown(model_hint, elem_classes="advanced-hint")
+                model_status = gr.Markdown("", visible=False)
+
         with gr.Group(visible=False) as focus_group:
             with gr.Row(elem_classes="focus-row"):
                 with gr.Column(scale=1):
@@ -175,8 +203,26 @@ def build_ui(
                 variant="secondary",
                 visible=False,
             )
+            briefing_btn = gr.Button(
+                briefing_label,
+                variant="secondary",
+                visible=False,
+            )
+            read_aloud_btn = gr.Button(
+                read_aloud_label,
+                variant="secondary",
+                visible=False,
+            )
             download_file = gr.File(visible=False)
         save_status = gr.Markdown("", visible=False)
+        tts_audio = gr.Audio(
+            visible=False,
+            autoplay=True,
+            interactive=False,
+            show_label=False,
+            show_download_button=False,
+            elem_classes="tts-audio",
+        )
         with gr.Row(elem_classes="chat-input-row"):
             input_box = gr.Textbox(
                 show_label=False,
@@ -192,6 +238,19 @@ def build_ui(
                 interactive=False,
                 scale=1,
                 min_width=140,
+            )
+            # Spracheingabe (STT, optional): unsichtbar bis eine Persona gewählt
+            # ist UND faster-whisper installiert ist (WebUI.stt_available).
+            mic_audio = gr.Audio(
+                sources=["microphone"],
+                type="filepath",
+                label=mic_label,
+                visible=False,
+                scale=2,
+                min_width=200,
+                show_download_button=False,
+                waveform_options=gr.WaveformOptions(show_recording_waveform=False),
+                elem_classes="mic-input",
             )
         new_chat_btn = gr.Button(
             new_chat_label, visible=False, elem_classes="new-chat-btn"
@@ -297,5 +356,11 @@ def build_ui(
         "self_talk_start_btn": self_talk_start_btn,
         "load_input": load_input,
         "load_status": load_status,
+        "model_dropdown": model_dropdown,
+        "model_status": model_status,
+        "mic_audio": mic_audio,
+        "briefing_btn": briefing_btn,
+        "read_aloud_btn": read_aloud_btn,
+        "tts_audio": tts_audio,
     }
     return demo, components

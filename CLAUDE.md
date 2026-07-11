@@ -19,7 +19,8 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Web-UI | Gradio 4.44 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
-| TTS | Piper (ONNX, Windows) |
+| TTS | Piper (ONNX; Terminal: Windows-Autoplay, WebUI: Browser-Playback) |
+| STT | faster-whisper (optional, WebUI-Mikro) |
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
 | Formatting | Black (88), Ruff |
@@ -64,9 +65,13 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── kiwix_autostart.py
 │   ├── security/
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
-│   └── tts/
-│       ├── piper_tts.py         # TTS-Wrapper
-│       └── audio_player.py      # winsound (Windows-only, plattform-sicher)
+│   ├── tts/
+│   │   ├── piper_tts.py         # TTS-Wrapper
+│   │   └── audio_player.py      # winsound (Windows-only, plattform-sicher)
+│   ├── stt/
+│   │   └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
+│   └── briefing/
+│       └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -158,6 +163,18 @@ tts:
   enabled: true
   features:
     terminal_auto_create_wav: true  # WAV in out/ bei jeder Antwort
+    web_read_aloud: true            # "Vorlesen"-Button im WebUI (braucht piper-tts)
+
+stt:
+  enabled: true              # WebUI-Mikro; braucht zusätzlich `pip install faster-whisper`
+  model: "small"             # tiny | base | small | medium | large-v3
+  language: "de"             # null = Auto-Erkennung
+
+briefing:
+  enabled: true              # WebUI-Button + /briefing (Terminal); Netz nur auf Klick
+  feeds:                     # Liste von {name, url} (RSS 2.0 oder Atom)
+    - name: "tagesschau"
+      url: "https://www.tagesschau.de/index~rss2.xml"
 
 api:
   enabled: true
@@ -233,6 +250,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
+| **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
 Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
@@ -257,9 +275,8 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-07):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-11):
 
-- **#13** STT MVP: Spracheingabe
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
 - **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
 
@@ -267,7 +284,9 @@ Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitst
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
 #2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update (`docs/{de,en}/Kiwix_Setup.md`),
 #23 Paralleler Broadcast, #17 Faster first token (Startup-Warm-up, `core.keep_alive`,
-WebUI-Stream-Drossel; bewusst ohne Prompt-Diät).
+WebUI-Stream-Drossel; bewusst ohne Prompt-Diät), #6 Modell-Auswahl (WebUI, session-only),
+#13 STT MVP (WebUI-Mikro via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP,
+IoT-Teil offen), #25 TTS im WebUI (Vorlesen-Button, Browser-Playback).
 
 ## Sprachstrategie
 
