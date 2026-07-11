@@ -19,7 +19,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Web-UI | Gradio 4.44 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
-| TTS | Piper (ONNX, Windows) |
+| TTS | Piper (ONNX; Terminal: Windows-Autoplay, WebUI: Browser-Playback) |
 | STT | faster-whisper (optional, WebUI-Mikro) |
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
@@ -163,6 +163,7 @@ tts:
   enabled: true
   features:
     terminal_auto_create_wav: true  # WAV in out/ bei jeder Antwort
+    web_read_aloud: true            # "Vorlesen"-Button im WebUI (braucht piper-tts)
 
 stt:
   enabled: true              # WebUI-Mikro; braucht zusätzlich `pip install faster-whisper`
@@ -274,7 +275,7 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-09):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-11):
 
 - **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
 - **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
@@ -285,7 +286,7 @@ Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitst
 #23 Paralleler Broadcast, #17 Faster first token (Startup-Warm-up, `core.keep_alive`,
 WebUI-Stream-Drossel; bewusst ohne Prompt-Diät), #6 Modell-Auswahl (WebUI, session-only),
 #13 STT MVP (WebUI-Mikro via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP,
-IoT-Teil offen).
+IoT-Teil offen), #25 TTS im WebUI (Vorlesen-Button, Browser-Playback).
 
 ## Sprachstrategie
 

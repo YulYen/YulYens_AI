@@ -236,6 +236,7 @@ Exit code 1 signals a critical failure (handy for scripts).
   - Pro option: the collapsed "Advanced" section at the bottom of the start screen lets you switch the model for the current session (choices = installed Ollama models). Session-only — after a restart, `core.model_name` from `config.yaml` applies again
   - Voice input (opt-in): after `pip install faster-whisper`, a microphone appears next to the input field in the persona chat. Record → stop → the transcript is appended to the input field and can be edited before sending. The first recording loads the Whisper model (including a one-time download), so it takes a moment. Details and model choice: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
   - Briefing (RSS): the "Briefing 📰" button in the persona chat makes the selected persona summarize the RSS/Atom feeds configured under `briefing.feeds` in `config.yaml` (default: tagesschau + heise). Requires internet; the network is only accessed on click. Disable via `briefing.enabled: false`
+  - Read aloud (TTS): the "Read aloud 🔊" button in the persona chat plays the latest reply with the persona's Piper voice in the browser (platform-independent, unlike the Windows-only terminal autoplay). Only appears when `pip install piper-tts` is done and voices exist in the `voices/` folder; disable via `tts.features.web_read_aloud: false`. Setup: [src/tts/ReadMe.md](../../src/tts/ReadMe.md)
 
 - **API only (no UI)**
   - Set `ui.type: null` – FastAPI keeps running and serves `/ask`

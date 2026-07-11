@@ -32,6 +32,7 @@ def build_ui(
     model_value,
     mic_label,
     briefing_label,
+    read_aloud_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -87,6 +88,8 @@ def build_ui(
                 .advanced-hint { font-size: 0.85rem; opacity: 0.7; }
                 /* Mikrofon (STT) kompakt neben dem Eingabefeld halten */
                 .mic-input { max-height: 110px; }
+                /* Vorlesen-Player (TTS): schmal, ohne Beschriftung */
+                .tts-audio { max-height: 80px; }
                 </style>
             """
         )
@@ -205,8 +208,21 @@ def build_ui(
                 variant="secondary",
                 visible=False,
             )
+            read_aloud_btn = gr.Button(
+                read_aloud_label,
+                variant="secondary",
+                visible=False,
+            )
             download_file = gr.File(visible=False)
         save_status = gr.Markdown("", visible=False)
+        tts_audio = gr.Audio(
+            visible=False,
+            autoplay=True,
+            interactive=False,
+            show_label=False,
+            show_download_button=False,
+            elem_classes="tts-audio",
+        )
         with gr.Row(elem_classes="chat-input-row"):
             input_box = gr.Textbox(
                 show_label=False,
@@ -344,5 +360,7 @@ def build_ui(
         "model_status": model_status,
         "mic_audio": mic_audio,
         "briefing_btn": briefing_btn,
+        "read_aloud_btn": read_aloud_btn,
+        "tts_audio": tts_audio,
     }
     return demo, components

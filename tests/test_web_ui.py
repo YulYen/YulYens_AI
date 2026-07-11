@@ -1,7 +1,9 @@
 """Tests for the WebUI-specific server configuration."""
 
 import logging
+import sys
 import threading
+import types
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -442,7 +444,7 @@ def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
 
     updates = web_ui._on_show_self_talk()
 
-    assert len(updates) == 30
+    assert len(updates) == 32
     assert updates[22]["visible"] is True
     assert updates[27]["interactive"] is True
 
@@ -546,7 +548,7 @@ def test_persona_selected_updates_reads_current_model_from_cfg():
         "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
     )
 
-    assert len(updates) == 30
+    assert len(updates) == 32
     greeting_update = updates[5]
     assert "override:1" in greeting_update["value"]
 
@@ -727,3 +729,107 @@ def test_reset_updates_hides_briefing_button():
     updates = web_ui._reset_ui_updates()
 
     assert updates[29]["visible"] is False
+
+
+# ---- Vorlesen (TTS im WebUI, #25) --------------------------------------------
+
+
+def _install_fake_piper(monkeypatch):
+    piper_module = types.ModuleType("piper")
+    voice_module = types.ModuleType("piper.voice")
+
+    class _Voice:
+        @staticmethod
+        def load(path):
+            return object()
+
+    voice_module.PiperVoice = _Voice
+    monkeypatch.setitem(sys.modules, "piper", piper_module)
+    monkeypatch.setitem(sys.modules, "piper.voice", voice_module)
+
+
+def test_tts_web_disabled_by_default_config():
+    """SimpleNamespace-Config ohne tts-Sektion → Button aus, kein Crash."""
+
+    web_ui = _create_web_ui()
+
+    assert web_ui.tts_web_enabled is False
+
+
+def test_on_read_aloud_without_reply_warns_and_stays_hidden():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+
+    with patch("ui.web_ui.gr.Warning") as mock_warning:
+        update = web_ui._on_read_aloud([{"role": "user", "content": "Hallo"}])
+
+    mock_warning.assert_called_once()
+    assert update["visible"] is False
+
+
+def test_on_read_aloud_synthesizes_last_assistant_reply(monkeypatch):
+    _install_fake_piper(monkeypatch)
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    web_ui.tts_cfg = {"voices": {"default": {"de": "stimme"}}}
+    history = [
+        {"role": "assistant", "content": "Alte Antwort"},
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Neueste Antwort"},
+    ]
+
+    with patch("tts.piper_tts.create_wav") as mock_create:
+        update = web_ui._on_read_aloud(history)
+
+    mock_create.assert_called_once()
+    args, kwargs = mock_create.call_args
+    assert args[0] == "Neueste Antwort"
+    assert args[1] == "Karl"
+    assert kwargs["tts_cfg"] == web_ui.tts_cfg
+    assert update["visible"] is True
+    assert update["value"].endswith(".wav")
+
+
+def test_on_read_aloud_error_warns_and_stays_hidden(monkeypatch):
+    _install_fake_piper(monkeypatch)
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+
+    with (
+        patch(
+            "tts.piper_tts.create_wav",
+            side_effect=FileNotFoundError("voices/stimme.onnx"),
+        ),
+        patch("ui.web_ui.gr.Warning") as mock_warning,
+    ):
+        update = web_ui._on_read_aloud([{"role": "assistant", "content": "Hi"}])
+
+    mock_warning.assert_called_once()
+    assert update["visible"] is False
+
+
+def test_persona_selected_updates_toggles_read_aloud_button():
+    persona = {"name": "Karl", "description": "Testpersona"}
+
+    for enabled in (True, False):
+        web_ui = _create_web_ui()
+        web_ui.cfg.core = {"model_name": "m:1"}
+        web_ui.cfg.ensemble = "test"
+        web_ui.tts_web_enabled = enabled
+
+        updates = web_ui._persona_selected_updates(
+            "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
+        )
+
+        assert updates[30]["visible"] is enabled
+
+
+def test_reset_updates_hides_read_aloud_button_and_player():
+    web_ui = _create_web_ui()
+    web_ui.tts_web_enabled = True
+
+    updates = web_ui._reset_ui_updates()
+
+    assert updates[30]["visible"] is False
+    assert updates[31]["visible"] is False
+    assert updates[31]["value"] is None

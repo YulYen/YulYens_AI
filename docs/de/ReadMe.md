@@ -244,6 +244,7 @@ Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
   - Profi-Option: Im zugeklappten „Erweitert"-Bereich unten am Startbildschirm lässt sich das Modell für die laufende Sitzung wechseln (Liste = installierte Ollama-Modelle). Gilt nur bis zum Neustart — danach greift wieder `core.model_name` aus der `config.yaml`
   - Spracheingabe (opt-in): Nach `pip install faster-whisper` erscheint im Persona-Chat ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird ans Eingabefeld angehängt und kann vor dem Senden editiert werden. Die erste Aufnahme lädt das Whisper-Modell (einmalig inkl. Download) und dauert daher etwas. Details und Modellwahl: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
   - Briefing (RSS): Der Button „Briefing 📰" im Persona-Chat lässt die gewählte Persona die in `config.yaml` unter `briefing.feeds` konfigurierten RSS/Atom-Feeds zusammenfassen (Default: tagesschau + heise). Braucht Internet; Netzzugriff passiert nur beim Klick. Abschalten per `briefing.enabled: false`
+  - Vorlesen (TTS): Der Button „Vorlesen 🔊" im Persona-Chat spielt die letzte Antwort mit der Piper-Stimme der Persona im Browser ab (plattformunabhängig, im Gegensatz zum Windows-only-Autoplay des Terminals). Erscheint nur, wenn `pip install piper-tts` erfolgt ist und Stimmen im `voices/`-Ordner liegen; abschalten per `tts.features.web_read_aloud: false`. Setup: [src/tts/ReadMe.md](../../src/tts/ReadMe.md)
 
 - **Nur API (ohne UI)**
   - `ui.type: null` setzen – die FastAPI läuft weiter und bedient `/ask`

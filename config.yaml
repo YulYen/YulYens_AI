@@ -45,6 +45,7 @@ tts:
   enabled: true
   features:
     terminal_auto_create_wav: true  # creates a wav-file in "out" directory for every AI-Answer
+    web_read_aloud: true            # "Vorlesen"-Button in der Web-UI (braucht pip install piper-tts + Stimmen)
   voices:
     default:
       de: "de_DE-thorsten-high"

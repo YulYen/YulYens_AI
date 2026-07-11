@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import tempfile
@@ -8,6 +9,7 @@ import time
 from collections.abc import Iterator
 from datetime import datetime
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import gradio as gr
@@ -67,6 +69,8 @@ PERSONA_OUTPUT_KEYS = (
     "self_talk_start_btn",
     "mic_audio",
     "briefing_btn",
+    "read_aloud_btn",
+    "tts_audio",
 )
 
 
@@ -124,6 +128,23 @@ class WebUI:
         self.briefing_enabled = bool(self.briefing_cfg.get("enabled")) and bool(
             self.briefing_cfg.get("feeds")
         )
+        # Vorlesen (TTS): wie beim Mikro nur anbieten, wenn Piper installiert ist
+        self.tts_cfg = getattr(config, "tts", {}) or {}
+        tts_features = self.tts_cfg.get("features", {}) or {}
+        self.tts_web_enabled = (
+            bool(self.tts_cfg.get("enabled"))
+            and bool(tts_features.get("web_read_aloud"))
+            and importlib.util.find_spec("piper") is not None
+        )
+        if (
+            self.tts_cfg.get("enabled")
+            and tts_features.get("web_read_aloud")
+            and not self.tts_web_enabled
+        ):
+            logging.info(
+                "TTS-Vorlesen aktiviert, aber piper ist nicht installiert — "
+                "Button bleibt ausgeblendet (pip install piper-tts)."
+            )
         if self.stt_cfg.get("enabled") and not self.stt_available:
             logging.info(
                 "STT aktiviert, aber faster-whisper ist nicht installiert — "
@@ -370,6 +391,8 @@ class WebUI:
             "self_talk_start_btn": gr.update(visible=False, interactive=True),
             "mic_audio": gr.update(value=None, visible=False),
             "briefing_btn": gr.update(visible=False),
+            "read_aloud_btn": gr.update(visible=False),
+            "tts_audio": gr.update(value=None, visible=False),
         }
 
     def _persona_selected_updates(
@@ -403,6 +426,7 @@ class WebUI:
             new_chat_btn=gr.update(visible=True),
             download_btn=gr.update(visible=True),
             briefing_btn=gr.update(visible=self.briefing_enabled),
+            read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             meta_state=self._build_meta(persona["name"]),
             ask_all_question=gr.update(
                 value="",
@@ -497,6 +521,39 @@ class WebUI:
             return gr.update(), gr.update(value=None)
         combined = f"{current_text or ''} {transcript}".strip()
         return gr.update(value=combined), gr.update(value=None)
+
+    def _on_read_aloud(self, history_state: list[Message] | None):
+        """Liest die letzte Antwort mit der Piper-Stimme der Persona vor."""
+        last_reply = next(
+            (
+                m.get("content", "")
+                for m in reversed(history_state or [])
+                if m.get("role") == "assistant"
+            ),
+            "",
+        )
+        if not self.bot or not last_reply.strip():
+            gr.Warning(self._t("tts_no_reply"))
+            return gr.update(value=None, visible=False)
+        try:
+            # Lazy wie im Terminal: piper_tts importiert piper auf Modulebene
+            from tts.piper_tts import create_wav
+
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                out_wav = Path(tmp.name)
+            create_wav(
+                last_reply,
+                self.bot,
+                voices_dir=Path("voices"),
+                out_wav=out_wav,
+                tts_cfg=self.tts_cfg,
+                language=getattr(self.cfg, "language", "de"),
+            )
+        except Exception as exc:
+            logging.warning("TTS: Vorlesen fehlgeschlagen: %s", exc)
+            gr.Warning(self._t("tts_error", reason=str(exc)))
+            return gr.update(value=None, visible=False)
+        return gr.update(value=str(out_wav), visible=True)
 
     def _on_show_ask_all(self) -> tuple:
         self.bot = None
@@ -802,6 +859,7 @@ class WebUI:
             new_chat_btn=gr.update(visible=True),
             download_btn=gr.update(visible=True),
             briefing_btn=gr.update(visible=self.briefing_enabled),
+            read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             history_state=messages,
             meta_state=meta,
             ask_all_question=gr.update(
@@ -919,6 +977,8 @@ class WebUI:
         model_status = components["model_status"]
         mic_audio = components["mic_audio"]
         briefing_btn = components["briefing_btn"]
+        read_aloud_btn = components["read_aloud_btn"]
+        tts_audio = components["tts_audio"]
 
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
@@ -991,6 +1051,14 @@ class WebUI:
             fn=self.respond_briefing,
             inputs=[chatbot, history_state],
             outputs=[input_box, chatbot, history_state],
+            queue=True,
+        )
+
+        # queue=True: die Piper-Synthese längerer Antworten dauert Sekunden
+        read_aloud_btn.click(
+            fn=self._on_read_aloud,
+            inputs=[history_state],
+            outputs=[tts_audio],
             queue=True,
         )
 
@@ -1149,6 +1217,7 @@ class WebUI:
         model_choices = self._available_models(default_model)
         mic_label = ui.get("web_mic_label", "Spracheingabe (Mikrofon)")
         briefing_label = ui.get("web_briefing_button", "Briefing 📰")
+        read_aloud_label = ui.get("web_read_aloud_button", "Vorlesen 🔊")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1185,6 +1254,7 @@ class WebUI:
             model_value=default_model,
             mic_label=mic_label,
             briefing_label=briefing_label,
+            read_aloud_label=read_aloud_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
