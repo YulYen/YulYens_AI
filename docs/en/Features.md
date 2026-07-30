@@ -39,6 +39,20 @@ An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcas
 
 Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link using credentials from `ui.web.share_auth`.
 
+### Stream control: stop and retry
+
+While a reply is being generated, a **“Stop ⏹”** button takes the place of the send
+button in the web UI. Clicking it ends generation immediately and **keeps the partial
+answer** in the history, marked with `…[stopped]` — you usually stop precisely
+because the opening already tells you where this is going. Stop is token-accurate in
+the single chat and for the briefing; in the AI dialog it takes effect between
+speaker turns, because each reply there is fetched in one go.
+
+**“Retry 🔄”** discards the last answer and has the same question answered again.
+The context stays untouched — the variation comes purely from the persona's
+temperature, so POPCORN (0.8) varies far more than PETER (0.1). Wiki and briefing
+hints above the answer stay in place.
+
 ## AI dialog (self-talk)
 
 The project includes an **AI dialog mode** in which two personas talk to each other automatically to solve a given task:

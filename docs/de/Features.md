@@ -37,6 +37,21 @@ Optional kann ein **Ask-All/Broadcast-Modus** aktiviert werden (`ui.experimental
 
 Zusätzlich kann `ui.type` auch auf `null` gesetzt werden, um ausschließlich die API zu betreiben; die Web-UI unterstützt außerdem einen optionalen Gradio-Share-Link mit Zugangsdaten aus `ui.web.share_auth`.
 
+### Stream-Steuerung: Stop und Nochmal
+
+Während eine Antwort generiert wird, tritt in der Web-UI ein **„Stop ⏹"**-Button an
+die Stelle des Senden-Buttons. Ein Klick beendet die Generierung sofort und **behält
+die bereits geschriebene Teilantwort** im Verlauf, gekennzeichnet mit
+`…[abgebrochen]` — meist bricht man ja gerade ab, weil der Anfang schon zeigt,
+wohin es geht. Der Stop wirkt im Einzelchat und beim Briefing tokengenau; im
+AI-Dialog greift er zwischen zwei Sprecherwechseln, weil dort jede Antwort in
+einem Zug geholt wird.
+
+**„Nochmal 🔄"** verwirft die letzte Antwort und lässt dieselbe Frage neu
+beantworten. Der Kontext bleibt unverändert — die Abwechslung kommt allein aus der
+Temperatur der Persona, POPCORN (0.8) variiert also deutlich stärker als PETER
+(0.1). Wiki- und Briefing-Hinweise über der Antwort bleiben stehen.
+
 ## AI-Dialog (Self-Talk)
 
 Das Projekt unterstützt einen **AI-Dialog-Modus**, in dem zwei Personas automatisiert miteinander sprechen, um eine vorgegebene Aufgabe zu lösen:

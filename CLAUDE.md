@@ -288,6 +288,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
+| **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
 Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
@@ -298,6 +299,20 @@ Browser-Tests verfälschen. **Für live wachsende Ausgaben `gr.Markdown` (Voll-E
 pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
 Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
 Gradio 4.44 crashen).
+
+### ⚠️ Stolperfalle: Button-Updates nie als eigenes Event vor den Stream hängen
+Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor dem
+Stream-Handler (`btn.click(toggle).then(stream)`). **Kostet ~3,5 s bis zum ersten
+Token** — das gequeuete `.then()` startet erst nach einem vollen Roundtrip des
+ersten Events. Stattdessen die Button-Updates **in denselben Yields** des
+Stream-Generators mitschicken (`WebUI._with_stream_controls`, #35): Stop erscheint
+dann nach 0,16 s. Achtung beim Schluss-Yield: für `gr.State` müssen die echten
+Werte erneut mitgeschickt werden, `gr.update()` würde den Update-Marker als
+Zustand speichern.
+
+Verwandt: **`cancels` kann nur gequeuete Events abbrechen.** Zeigt die Liste auf
+ein `queue=False`-Event (z. B. das letzte Glied einer `.then()`-Kette), verweigert
+Gradio den Start der App komplett mit „Queue needs to be enabled!".
 
 ### ⚠️ Stolperfalle: Gradio `cancels` schließt Generatoren nicht (Gradio 4.44)
 `cancels=[...]` bricht nur den **asyncio-Task** ab (`task.cancel()` in
