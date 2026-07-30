@@ -30,6 +30,28 @@ class WikiSnippet:
         return self.full_length > len(self.snippet)
 
 
+def format_snippet_meta(snippet: WikiSnippet, t) -> str:
+    """„Offline-Archiv · 1200 von 9800 Zeichen injiziert (gekürzt)" (#32a).
+
+    Geteilt von WebUI und Terminal, damit die Auswahl der Locale-Keys
+    (online/offline × gekürzt/vollständig) nur an einer Stelle steht und in
+    beiden Oberflächen wortgleich dasselbe erscheint. ``t`` ist der
+    Text-Formatter der Config.
+    """
+    origin = t(
+        "wiki_source_online" if snippet.source == "online" else "wiki_source_local"
+    )
+    key = (
+        "wiki_sources_meta_truncated" if snippet.truncated else "wiki_sources_meta_full"
+    )
+    return t(
+        key,
+        source=origin,
+        shown=len(snippet.snippet),
+        total=snippet.full_length,
+    )
+
+
 def lookup_wiki_snippet(
     question: str,
     persona_name: str,
