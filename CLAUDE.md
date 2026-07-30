@@ -55,8 +55,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
 │   ├── api/
-│   │   ├── app.py               # FastAPI: /ask, /health, /healthz
-│   │   └── provider.py
+│   │   ├── app.py               # FastAPI: /ask, /health, /healthz + /v1-Router
+│   │   ├── openai_compat.py     # OpenAI-kompatible Endpunkte (#37)
+│   │   └── provider.py          # One-Shot + stream_messages (Client-History)
 │   ├── email_adapter/
 │   │   └── service.py           # opt-in IMAP/SMTP-Bridge (Personas per Mail)
 │   ├── wiki/
@@ -212,6 +213,10 @@ briefing:
 api:
   enabled: true
   port: 8013
+  openai_compatible:         # /v1/models + /v1/chat/completions (#37)
+    enabled: true
+    api_key: ""              # leer = offen; besser "env:YULYEN_API_KEY"
+    rate_limit_per_minute: 60
 
 security:
   enabled: true
@@ -359,7 +364,28 @@ POST http://127.0.0.1:8013/ask
 
 GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet)
 GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler)
+
+# OpenAI-kompatibel (#37) — "model" ist der Persona-Name
+GET  http://127.0.0.1:8013/v1/models
+POST http://127.0.0.1:8013/v1/chat/completions
+  Body: { "model": "DORIS", "messages": [...], "stream": true|false }
 ```
+
+### OpenAI-Kompatibilität: worauf zu achten ist
+- **`model` = Persona**, nicht LLM. `/v1/models` listet Personas; das echte Modell
+  bleibt Serversache (`core.model_name`).
+- **Fehler-Bodies müssen `{"error": {...}}` auf oberster Ebene haben.** FastAPIs
+  `HTTPException(detail=…)` erzeugt `{"detail": {"error": …}}` — eine Ebene zu tief,
+  das offizielle openai-SDK findet die Felder dann nicht. Deshalb eigene
+  `OpenAIError` + Exception-Handler (`api/openai_compat.py`), und
+  `RequestValidationError` wird unter `/v1` auf 400 + OpenAI-Form gemappt (`/ask`
+  behält FastAPIs Standardform).
+- **`temperature`/`top_p`/`max_tokens` werden angenommen und ignoriert** — Sampling
+  gehört zur Persona, sonst kann jeder Aufrufer den Charakter plattmachen.
+- **Client-History wird durchgereicht**, Karl/Heuristik greifen hier nicht
+  (OpenAI-Semantik: der Client besitzt sein Kontextfenster).
+- Verifikation gegen das echte SDK: `pip install openai`, dann `base_url` auf
+  `http://127.0.0.1:8013/v1` zeigen. Bewusst **keine** Dependency im Projekt.
 
 Dieselben Deep-Checks gibt es auch ohne laufenden Server: `python src/launch.py --doctor`.
 

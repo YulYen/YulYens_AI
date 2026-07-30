@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
+from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
 
 
 class UnknownPersonaError(ValueError):
@@ -37,6 +39,64 @@ class AiApiProvider:
         self._known_personas = tuple(get_all_persona_names())
         self._persona_lookup = {name.lower(): name for name in self._known_personas}
 
+    def known_personas(self) -> tuple[str, ...]:
+        return self._known_personas
+
+    def resolve_persona(self, persona: str) -> str:
+        """Canonical persona name, case-insensitive. Raises on unknown names."""
+        persona_key = (persona or "").strip().lower()
+        if persona_key not in self._persona_lookup:
+            known = ", ".join(self._known_personas)
+            raise UnknownPersonaError(
+                f"Unknown persona '{(persona or '').strip()}'. "
+                f"Available personas: {known}."
+            )
+        return self._persona_lookup[persona_key]
+
+    def stream_messages(
+        self, messages: list[dict[str, Any]], persona: str
+    ) -> Iterator[str]:
+        """Token stream for a client-supplied history (OpenAI semantics, #37).
+
+        The history is passed through as the client sent it — no Karl, no
+        heuristic trimming: an OpenAI client owns its context window. Guard,
+        wiki injection and conversation logging come along because they live in
+        the streamer, which is the same one the UI uses.
+        """
+        canonical_persona = self.resolve_persona(persona)
+        history = [dict(m) for m in messages or []]
+
+        last_user_index = next(
+            (
+                i
+                for i in range(len(history) - 1, -1, -1)
+                if history[i].get("role") == "user"
+            ),
+            None,
+        )
+        if last_user_index is not None:
+            question = str(history[last_user_index].get("content") or "")
+            _hints, contexts = lookup_wiki_snippet(
+                question,
+                canonical_persona,
+                self.keyword_finder,
+                self.wiki_mode,
+                self.wiki_proxy_port,
+                self.wiki_snippet_limit,
+                self.wiki_timeout,
+                self.max_wiki_snippets,
+            )
+            if contexts:
+                # Wie im UI: die Kontext-System-Messages stehen unmittelbar vor
+                # dem User-Turn, auf den sie sich beziehen.
+                tail = history[last_user_index:]
+                del history[last_user_index:]
+                inject_wiki_context(history, contexts)
+                history.extend(tail)
+
+        streamer = self.factory.get_streamer_for_persona(canonical_persona)
+        yield from streamer.stream(messages=history)
+
     def answer(self, question: str, persona: str) -> str:
         """Handles a question for the given persona and returns the answer as text."""
 
@@ -45,15 +105,7 @@ class AiApiProvider:
         if len(frage) == 0:
             return self.cfg.texts["empty_question"]
 
-        persona_name = (persona or "").strip()
-        persona_key = persona_name.lower()
-        if persona_key not in self._persona_lookup:
-            known = ", ".join(self._known_personas)
-            raise UnknownPersonaError(
-                f"Unknown persona '{persona_name}'. Available personas: {known}."
-            )
-
-        canonical_persona = self._persona_lookup[persona_key]
+        canonical_persona = self.resolve_persona(persona)
 
         streamer = self.factory.get_streamer_for_persona(canonical_persona)
 

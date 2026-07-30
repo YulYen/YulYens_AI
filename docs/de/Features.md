@@ -78,6 +78,67 @@ So kann die KI-Antwort nicht nur gelesen, sondern unmittelbar auch als Audio aus
 
 Parallel zur UI kann das System auch über eine REST-API angesprochen werden (z. B. für Integrationen oder Tests). Ein FastAPI-Server stellt einen **`/ask`-Endpoint** bereit, über den per HTTP-POST einzelne Fragen gestellt werden können. Die Anfrage nimmt ein JSON entgegen (mit Feldern für die **Frage** und die gewünschte **Persona**) und liefert die KI-Antwort als JSON-Antwort zurück. Für das Monitoring existieren zwei Endpunkte: **`/health`** als schneller Liveness-Check und **`/healthz`** als Deep-Check, der Ollama-Erreichbarkeit, gepulltes Modell, spaCy, Kiwix und VRAM prüft (HTTP 503 bei kritischem Ausfall). Dieselben Prüfungen laufen auch per CLI über `python src/launch.py --doctor` als farbiger Preflight-Report. Diese API ermöglicht es, die KI-Funktionalität in externe Anwendungen einzubinden oder automatisiert zu nutzen.
 
+## OpenAI-kompatible API
+
+Zusätzlich sprechen die Personas das **OpenAI-Protokoll**. Damit lässt sich jeder
+Client benutzen, der mit OpenAI reden kann — Open WebUI, Handy-Apps,
+Editor-Plugins — nur eben mit LEAH, DORIS, PETER und POPCORN statt mit einem
+Cloud-Modell. Anders als rohes Ollama läuft dabei alles durch Guard,
+Wiki-Injektion und Gesprächslog, weil derselbe Streamer arbeitet wie in der UI.
+
+Der Trick ist die Zuordnung: **`model` ist der Persona-Name.** `/v1/models`
+listet daher die Personas und nicht die LLMs — welches Modell darunter läuft,
+bleibt Serversache (`core.model_name`).
+
+```bash
+# Verfügbare Personas
+curl http://127.0.0.1:8013/v1/models
+
+# Frage an DORIS
+curl http://127.0.0.1:8013/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "DORIS", "messages": [{"role": "user", "content": "Was ist Kaffee?"}]}'
+```
+
+Mit dem offiziellen Python-SDK:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8013/v1", api_key="dein-key")
+stream = client.chat.completions.create(
+    model="POPCORN",                      # Persona statt Modell
+    messages=[{"role": "user", "content": "Erklär mir Rekursion"}],
+    stream=True,
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+Einstellungen unter `api.openai_compatible`:
+
+| Schlüssel | Bedeutung |
+|---|---|
+| `enabled` | Endpunkte an/aus. Aus = HTTP 404, als gäbe es sie nicht |
+| `api_key` | Optionaler Bearer-Key. Leer = offen. Besser als `env:YULYEN_API_KEY` setzen als im Klartext |
+| `rate_limit_per_minute` | Anfragen pro Client und Minute, `0` schaltet das Limit ab |
+
+Zu wissen:
+
+- **Streaming** läuft als Server-Sent Events wie beim Original, inklusive
+  abschließendem `data: [DONE]`.
+- **`temperature`, `top_p`, `max_tokens`** werden angenommen und **ignoriert**.
+  Die Sampling-Werte gehören zur Persona (`personas_base.yaml`) — würde man sie
+  überschreiben lassen, könnte jeder Aufrufer POPCORNs Verspieltheit oder PETERs
+  Präzision plattmachen. Clients, die diese Felder immer mitsenden, funktionieren
+  trotzdem.
+- **Die Gesprächshistorie kommt vom Client**, so wie es das OpenAI-Protokoll
+  vorsieht. Karl und die heuristische Kürzung greifen hier bewusst nicht: wer die
+  Historie schickt, verwaltet auch das Kontextfenster. Eine zu lange Historie
+  läuft also ins `num_ctx`-Limit — genau wie bei OpenAI selbst.
+- **Solange `api.host` auf `127.0.0.1` steht**, ist der Server nur lokal
+  erreichbar. Erst wenn er im LAN hängt, wird der `api_key` wirklich wichtig.
+
 ## E-Mail-Adapter für Personas
 
 Optional kann ein schlanker **E-Mail-Adapter** aktiviert werden (`email_adapter.enabled: true`). Er ruft regelmäßig neue Nachrichten aus einem konfigurierten IMAP-Postfach ab, ordnet Empfängeradressen über `email_adapter.address_persona_map` einer Persona zu und beantwortet die Anfrage mit derselben One-Shot-Logik, die auch die HTTP-API nutzt. Die Antwort wird per SMTP an den ursprünglichen Absender zurückgesendet.

@@ -154,6 +154,20 @@ api:
   host: "127.0.0.1"
   port: 8013
 
+  # OpenAI-kompatible Endpunkte (#37): /v1/models und /v1/chat/completions.
+  # "model" ist der Persona-Name, nicht das LLM — /v1/models listet daher die
+  # Personas. Damit sprechen Open WebUI, Handy-Apps und Editor-Plugins mit den
+  # Personas, inklusive Guard, Wiki-Injection und Gesprächslog.
+  openai_compatible:
+    enabled: true
+    # Optionaler Bearer-Key. Leer = offen (nur sinnvoll, solange host auf
+    # 127.0.0.1 steht!). Sobald der Server im LAN hängt: setzen, am besten als
+    # "env:YULYEN_API_KEY" statt im Klartext.
+    api_key: ""
+    # Fixed-Window-Limit pro Client und Minute; 0 schaltet es ab. Klein
+    # angesetzt, weil ein einzelnes Ollama die Anfragen ohnehin serialisiert.
+    rate_limit_per_minute: 60
+
 security:
   enabled: true
   guard: BasicGuard
