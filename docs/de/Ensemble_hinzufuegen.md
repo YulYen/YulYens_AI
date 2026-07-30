@@ -51,7 +51,7 @@ Alle Ensembles liegen im Verzeichnis [`ensembles/`](../../ensembles). Ein Ensemb
      ```bash
      python src/launch.py -e mein_ensemble
      ```
-   - Alternativ kannst du in `config.yaml` den Eintrag `ensemble: "mein_ensemble"` hinzufügen, wenn du das CLI-Flag nicht setzen möchtest.
+   - Alternativ kannst du in `config.yaml` den Eintrag `ensemble: "mein_ensemble"` hinzufügen, wenn du das CLI-Flag nicht setzen möchtest. `-e` hat Vorrang, wenn beides gesetzt ist.
    - Prüfe sowohl Terminal- als auch Web-UI (falls aktiviert), ob alle Personas erscheinen und Antworten liefern.
 
 6. **Automatisierte Tests prüfen (optional)**

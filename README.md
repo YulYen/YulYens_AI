@@ -21,6 +21,8 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 - **Text-to-Speech** mit Piper (persona-eigene Stimmen)
 - **E-Mail-Adapter** (opt-in): Personas per IMAP/SMTP anschreiben
 - **Security-Guard**: Prompt-Injection-Schutz, PII-Filter, Wrongdoing-Guardrail mit Session-Lock
+- **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python src/launch.py --list-ensembles`
+- **Antwort-Feedback**: 👍/👎 pro Antwort, gesammelt in `logs/feedback_votes.jsonl` als Datenbasis für Auswertung und Finetuning
 - **Setup-Doktor**: `python src/launch.py --doctor` prüft Ollama, Modell, spaCy, Kiwix und VRAM mit konkreten Fix-Hinweisen
 
 ---
@@ -64,6 +66,28 @@ ollama pull ministral-3:8b
 python src/launch.py --doctor        # Preflight-Check: läuft alles?
 python src/launch.py -e classic     # Start (Web-UI auf http://127.0.0.1:7860)
 ```
+
+---
+
+## 🎭 Mitgelieferte Ensembles
+
+Ein *Ensemble* ist ein Satz Personas mit eigenen Prompts, LLM-Optionen und Avataren.
+Welches gestartet wird, entscheidet `-e`. Zwei Ensembles liegen im Repo:
+
+| Name für `-e` | Personas | Charakter |
+|---|---|---|
+| `classic` | LEAH, DORIS, PETER, POPCORN | Standard-Besetzung: warmherzig, bodenständig, sachlich, verspielt |
+| `examples/spaceship_crew` | CAPTAIN_SELINA, ZETA_FLUX, ELIAS_MOREL, LYRA_VEX | Crew des Raumschiffs *Aurora-One* — Kommandantin, Chefingenieurin, Navigator, Diplomatin |
+
+```bash
+python src/launch.py --list-ensembles              # welche gibt es?
+python src/launch.py -e examples/spaceship_crew    # Beispiel-Crew starten
+```
+
+![Spaceship-Crew: Persona-Auswahl mit der Crew der Aurora-One](docs/screenshot_spaceship_crew.png)
+
+Eigene Ensembles brauchen keinen Code, nur YAML und Bilder —
+siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 
 ---
 

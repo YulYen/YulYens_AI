@@ -30,7 +30,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 ```
 <repo-root>/
 ├── src/
-│   ├── launch.py              # Haupteinstiegspunkt (inkl. --doctor Systemcheck)
+│   ├── launch.py              # Haupteinstiegspunkt (inkl. --doctor Systemcheck, --list-ensembles)
 │   ├── core/
 │   │   ├── llm_core.py        # Abstrakte LLM-Schnittstelle
 │   │   ├── ollama_llm_core.py # Ollama-Implementierung
@@ -275,18 +275,20 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix. Highlights (Stand 2026-07-11):
+Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix
+(Generalüberholung 2026-07-30: neue Tickets #24–#48, Erledigtes in Archiv-Sektion).
+Highlights:
 
-- **#7** LoRA-Finetuning: In Arbeit (LeoLM13B)
-- **#14** E-Mail-Adapter: Rest-Punkte (processed_mailbox scharf testen, Dauerbetrieb, PW rotieren)
+- **Tier A (LoRA-Strecke, Reihenfolge wichtig):** #40 Feedback-Daumen → #41 Eval-Suite → #7 LoRA-Finetuning (in Arbeit, LeoLM13B)
+- **Quick Wins:** #29 Spaceship-Crew sichtbar machen (XS), #35 Stop/Regenerate, #32 Wiki-Quellen, #14 E-Mail-Restpunkte
+- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
-Bereits erledigt (Details im Backlog): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
+Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
-#2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update (`docs/{de,en}/Kiwix_Setup.md`),
-#23 Paralleler Broadcast, #17 Faster first token (Startup-Warm-up, `core.keep_alive`,
-WebUI-Stream-Drossel; bewusst ohne Prompt-Diät), #6 Modell-Auswahl (WebUI, session-only),
-#13 STT MVP (WebUI-Mikro via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP,
-IoT-Teil offen), #25 TTS im WebUI (Vorlesen-Button, Browser-Playback).
+#2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update, #23 Paralleler Broadcast,
+#17 Faster first token, #6 Modell-Auswahl (WebUI, session-only), #13 STT MVP (WebUI-Mikro
+via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen),
+#25 TTS im WebUI (Vorlesen-Button, Browser-Playback).
 
 ## Sprachstrategie
 
@@ -314,3 +316,4 @@ Alle Logs in `logs/`:
 - `yulyen_ai_YYYY-MM-DD_HH-MM.log` — Systemlog
 - `conversation_[PERSONA]_[TIMESTAMP].json` — Gesprächslog (JSON)
 - `wiki_proxy_[TIMESTAMP].log` — Wiki-Proxy-Log
+- `feedback_votes.jsonl` — 👍/👎-Bewertungen (#40), append-only, eine Zeile pro Vote

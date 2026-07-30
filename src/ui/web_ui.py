@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
+import os
 import tempfile
 import threading
 import time
@@ -19,7 +20,7 @@ from config.personas import _load_system_prompts, get_all_persona_names, get_dri
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.system_checks import fetch_model_names
-from core.utils import is_broadcast_enabled, is_broadcast_parallel
+from core.utils import ensure_dir_exists, is_broadcast_enabled, is_broadcast_parallel
 from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
@@ -34,6 +35,10 @@ if TYPE_CHECKING:
 # One chatbot entry: (user_text, bot_text) — either side may be None.
 ChatPair = tuple[str | None, str | None]
 Message = dict[str, str]
+
+# Feedback votes (#40) are appended from Gradio event handlers that may run
+# concurrently for multiple browser sessions sharing one WebUI instance.
+_feedback_log_lock = threading.Lock()
 
 # Single source of truth for the order of the "switch view" output components.
 # Every handler bound to these outputs builds a dict keyed by these names and
@@ -150,6 +155,8 @@ class WebUI:
                 "STT aktiviert, aber faster-whisper ist nicht installiert — "
                 "Mikrofon bleibt ausgeblendet (pip install faster-whisper)."
             )
+        # Lazily resolved on first vote; tests may pre-set an explicit path.
+        self.feedback_log_path: str | None = None
         if self._t is None:
             self._t = lambda key, **kwargs: key
 
@@ -943,6 +950,71 @@ class WebUI:
             value=success, visible=True
         )
 
+    def _resolve_feedback_log_path(self) -> str:
+        if self.feedback_log_path:
+            return self.feedback_log_path
+        log_cfg = getattr(self.cfg, "logging", None)
+        log_dir = log_cfg.get("dir", "logs") if isinstance(log_cfg, dict) else "logs"
+        ensure_dir_exists(log_dir)
+        self.feedback_log_path = os.path.join(log_dir, "feedback_votes.jsonl")
+        return self.feedback_log_path
+
+    @staticmethod
+    def _find_question_for_row(chat_history: list[ChatPair] | None, row: int) -> str:
+        # Live chat appends (question, None) and (None, answer) as separate rows
+        # (with optional (None, wiki_hint) rows in between), while loaded
+        # conversations pair (question, answer) — walking backwards from the
+        # liked row to the nearest user text covers both layouts.
+        if not chat_history:
+            return ""
+        row = min(row, len(chat_history) - 1)
+        for r in range(row, -1, -1):
+            pair = chat_history[r]
+            if pair and pair[0] is not None:
+                return str(pair[0])
+        return ""
+
+    def _on_chat_like(
+        self,
+        chat_history: list[ChatPair] | None,
+        meta: dict | None,
+        evt: gr.LikeData,
+    ) -> None:
+        # Votes must never break the UI: any failure is logged and swallowed.
+        try:
+            row, col = -1, 1
+            answer = str(evt.value)
+            try:
+                row, col = int(evt.index[0]), int(evt.index[1])
+                answer = str(chat_history[row][col])
+            except (TypeError, ValueError, IndexError):
+                logging.warning("Feedback vote with unexpected index %r", evt.index)
+
+            # Gradio 4.44 renders the thumbs on the user row as well (live
+            # verified). A vote on one's own question is no training signal,
+            # so only bot answers (column 1) are recorded.
+            if col != 1:
+                logging.debug("Ignoring feedback vote on a user message (row %s)", row)
+                return
+
+            meta = meta if isinstance(meta, dict) else {}
+            entry = {
+                "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+                "app": meta.get("app", "web"),
+                "persona": meta.get("persona") or self.bot or "",
+                "model": meta.get("model", ""),
+                "vote": "up" if evt.liked else "down",
+                "question": self._find_question_for_row(chat_history, row),
+                "answer": answer,
+                "index": [row, col],
+            }
+            path = self._resolve_feedback_log_path()
+            with _feedback_log_lock:
+                with open(path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except (OSError, TypeError, ValueError, AttributeError):
+            logging.exception("Could not write feedback log %s", self.feedback_log_path)
+
     def _bind_events(
         self,
         components: dict[str, Any],
@@ -1060,6 +1132,14 @@ class WebUI:
             inputs=[history_state],
             outputs=[tts_audio],
             queue=True,
+        )
+
+        # Binding .like() auto-enables the thumb buttons on the chatbot (#40).
+        chatbot.like(
+            fn=self._on_chat_like,
+            inputs=[chatbot, meta_state],
+            outputs=[],
+            queue=False,
         )
 
         if ask_all_card_btn is not None:

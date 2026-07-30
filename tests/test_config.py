@@ -306,3 +306,55 @@ def test_system_prompt_includes_three_timestamps(monkeypatch):
         assert result == f"BASE | {expected_suffix}"
     finally:
         Config.reset_instance()
+
+
+def test_spaceship_crew_ensemble_resolves_with_forward_slashes():
+    """The path-like ensemble name advertised in the docs must load (#29)."""
+    from config import personas as personas_mod
+
+    Config.reset_instance()
+    try:
+        cfg = Config("config.yaml")
+        cfg.ensemble = "examples/spaceship_crew"
+        personas_mod._parse_persona_files.cache_clear()
+        personas = personas_mod._load_system_prompts()
+
+        names = [p["name"] for p in personas]
+        assert names == [
+            "CAPTAIN_SELINA",
+            "ZETA_FLUX",
+            "ELIAS_MOREL",
+            "LYRA_VEX",
+        ]
+        assert all(p["prompt"] for p in personas)
+    finally:
+        personas_mod._parse_persona_files.cache_clear()
+        Config.reset_instance()
+
+
+def test_config_yaml_ensemble_key_is_preserved(tmp_path):
+    """An `ensemble:` key in config.yaml survives loading (documented -e fallback)."""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        'language: "de"\nensemble: "examples/spaceship_crew"\n', encoding="utf-8"
+    )
+
+    Config.reset_instance()
+    try:
+        cfg = Config(str(cfg_file))
+        assert cfg.ensemble == "examples/spaceship_crew"
+    finally:
+        Config.reset_instance()
+
+
+def test_config_without_ensemble_key_still_has_attribute(tmp_path):
+    """Without the key the attribute exists, so callers can fall back safely."""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text('language: "de"\n', encoding="utf-8")
+
+    Config.reset_instance()
+    try:
+        cfg = Config(str(cfg_file))
+        assert hasattr(cfg, "ensemble")
+    finally:
+        Config.reset_instance()

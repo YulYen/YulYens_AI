@@ -53,7 +53,7 @@ All ensembles live in [`ensembles/`](../../ensembles). A typical ensemble contai
      ```bash
      python src/launch.py -e my_ensemble
      ```
-   - Alternatively, set `ensemble: "my_ensemble"` in `config.yaml` if you prefer not to pass the flag.
+   - Alternatively, set `ensemble: "my_ensemble"` in `config.yaml` if you prefer not to pass the flag. When both are set, `-e` wins.
    - Verify that all personas show up and answer in both terminal and web UI (if enabled).
 
 6. **Run automated tests (optional)**

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from launch import (
     _email_adapter_enabled,
+    _list_ensembles,
     _run_doctor,
     _wait_for_port,
     _with_localized_quotes,
@@ -103,3 +104,53 @@ def test_wait_for_port_detects_open_and_closed_port():
     closed_port = closed.getsockname()[1]
     closed.close()
     assert _wait_for_port("127.0.0.1", closed_port, timeout=0.3) is False
+
+
+# --- --list-ensembles (#29) -------------------------------------------------
+
+
+def test_list_ensembles_reports_bundled_ensembles(capsys):
+    """Both committed ensembles show up with the exact name that -e expects."""
+
+    exit_code = _list_ensembles()
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "classic" in out
+    assert "examples/spaceship_crew" in out
+    assert "LEAH (featured)" in out
+    assert "CAPTAIN_SELINA (featured)" in out
+    assert "de, en" in out
+    assert "-e examples/spaceship_crew" in out
+
+
+def test_list_ensembles_handles_empty_dir(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr("launch._ENSEMBLES_DIR", tmp_path)
+
+    exit_code = _list_ensembles()
+
+    out = capsys.readouterr().out
+    assert exit_code == 1
+    assert "Keine Ensembles gefunden" in out
+
+
+def test_list_ensembles_skips_broken_yaml(monkeypatch, tmp_path, capsys):
+    good = tmp_path / "good"
+    (good / "locales" / "de").mkdir(parents=True)
+    (good / "locales" / "de" / "personas.yaml").write_text("KARL: {}", encoding="utf-8")
+    (good / "personas_base.yaml").write_text(
+        "personas:\n  - name: KARL\n", encoding="utf-8"
+    )
+
+    broken = tmp_path / "broken"
+    broken.mkdir()
+    (broken / "personas_base.yaml").write_text("personas: [unclosed", encoding="utf-8")
+
+    monkeypatch.setattr("launch._ENSEMBLES_DIR", tmp_path)
+
+    exit_code = _list_ensembles()
+
+    out = capsys.readouterr().out
+    assert exit_code == 0
+    assert "KARL" in out
+    assert "übersprungen" in out

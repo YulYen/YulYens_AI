@@ -1,5 +1,6 @@
 """Tests for the WebUI-specific server configuration."""
 
+import json
 import logging
 import sys
 import threading
@@ -833,3 +834,125 @@ def test_reset_updates_hides_read_aloud_button_and_player():
     assert updates[30]["visible"] is False
     assert updates[31]["visible"] is False
     assert updates[31]["value"] is None
+
+
+# --- Feedback votes (#40) ---------------------------------------------------
+
+
+def _fake_like(index=(2, 1), value="Antwort!", liked=True):
+    return SimpleNamespace(index=index, value=value, liked=liked)
+
+
+def _read_votes(path):
+    with open(path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f]
+
+
+def test_chat_like_appends_upvote_jsonl(tmp_path):
+    """The backwards walk skips UI-only rows (wiki hint) to find the question."""
+
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [("Hallo?", None), (None, "wiki hint"), (None, "Antwort!")]
+    meta = {"persona": "DORIS", "model": "m1", "app": "web"}
+
+    web_ui._on_chat_like(history, meta, _fake_like(index=(2, 1), liked=True))
+
+    votes = _read_votes(web_ui.feedback_log_path)
+    assert len(votes) == 1
+    vote = votes[0]
+    assert vote["vote"] == "up"
+    assert vote["question"] == "Hallo?"
+    assert vote["answer"] == "Antwort!"
+    assert vote["persona"] == "DORIS"
+    assert vote["model"] == "m1"
+    assert vote["index"] == [2, 1]
+    assert vote["ts"]
+
+
+def test_chat_like_downvote_on_paired_history(tmp_path):
+    """Loaded conversations pair (question, answer) in a single row."""
+
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [("Frage", "Antwort")]
+
+    web_ui._on_chat_like(
+        history, {}, _fake_like(index=(0, 1), value="Antwort", liked=False)
+    )
+
+    vote = _read_votes(web_ui.feedback_log_path)[0]
+    assert vote["vote"] == "down"
+    assert vote["question"] == "Frage"
+    assert vote["answer"] == "Antwort"
+
+
+def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [("Prompt", None), (None, "LEAH: Hi"), (None, "DORIS: Na?")]
+    meta = {"persona": "self-talk:LEAH,DORIS", "model": "m1", "app": "web"}
+
+    web_ui._on_chat_like(history, meta, _fake_like(index=(2, 1), value="DORIS: Na?"))
+
+    vote = _read_votes(web_ui.feedback_log_path)[0]
+    assert vote["question"] == "Prompt"
+    assert vote["persona"] == "self-talk:LEAH,DORIS"
+    assert vote["answer"] == "DORIS: Na?"
+
+
+def test_chat_like_two_votes_append_two_lines(tmp_path):
+    """Append-only event log: a revote adds a line, consumers dedup by index."""
+
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [("Frage", None), (None, "Antwort")]
+
+    web_ui._on_chat_like(history, {}, _fake_like(index=(1, 1), liked=True))
+    web_ui._on_chat_like(history, {}, _fake_like(index=(1, 1), liked=False))
+
+    votes = _read_votes(web_ui.feedback_log_path)
+    assert [v["vote"] for v in votes] == ["up", "down"]
+
+
+def test_chat_like_never_raises_on_write_error(tmp_path, caplog):
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path)  # a directory → OSError on open
+
+    with caplog.at_level(logging.ERROR):
+        web_ui._on_chat_like([("F", None), (None, "A")], {}, _fake_like(index=(1, 1)))
+
+    assert "Could not write feedback log" in caplog.text
+
+
+def test_chat_like_handles_garbage_input(tmp_path):
+    """Empty history, missing meta and a broken index still produce a vote line."""
+
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+
+    web_ui._on_chat_like(None, None, _fake_like(index=None, value="Antwort"))
+
+    vote = _read_votes(web_ui.feedback_log_path)[0]
+    assert vote["question"] == ""
+    assert vote["persona"] == ""
+    assert vote["answer"] == "Antwort"
+    assert vote["index"] == [-1, 1]
+
+
+def test_find_question_returns_empty_on_garbage():
+    assert WebUI._find_question_for_row([], 0) == ""
+    assert WebUI._find_question_for_row(None, 3) == ""
+    assert WebUI._find_question_for_row([(None, "nur Bot")], 5) == ""
+
+
+def test_chat_like_ignores_votes_on_user_messages(tmp_path):
+    """Gradio also shows thumbs on the user row — those votes carry no signal."""
+
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [("Frage", None), (None, "Antwort")]
+
+    web_ui._on_chat_like(history, {}, _fake_like(index=(0, 0), value="Frage"))
+
+    assert not (tmp_path / "votes.jsonl").exists()

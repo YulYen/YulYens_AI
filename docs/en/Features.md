@@ -13,6 +13,19 @@ The system comprises four distinct AI personas with their own personalities. Eve
 
 The persona can be selected either at start-up (terminal UI) or via the web interface. Each persona responds to user requests in its characteristic manner.
 
+These four belong to the `classic` ensemble — the default cast. Which personas answer depends on the selected ensemble (see the next section).
+
+## Persona ensembles
+
+An ensemble bundles personas together with their system prompts, LLM options (temperature, `repeat_penalty`, `num_ctx`) and avatars. Which one is loaded at start-up is decided by `--ensemble` / `-e`. Two ensembles ship with the repo:
+
+- **`classic`** — LEAH, DORIS, PETER, POPCORN (default, `python src/launch.py -e classic`)
+- **`examples/spaceship_crew`** — the crew of the starship *Aurora-One*: CAPTAIN_SELINA (composed commander), ZETA_FLUX (sarcastic chief engineer), ELIAS_MOREL (poetic navigator) and LYRA_VEX (alien diplomat). Start with `python src/launch.py -e examples/spaceship_crew`
+
+![Spaceship crew: persona selection showing the crew of the Aurora-One](../screenshot_spaceship_crew.png)
+
+`python src/launch.py --list-ensembles` lists the available ensembles — with personas, bundled locales and the exact name `-e` expects. The ensemble name is a path below `ensembles/` and is always written with forward slashes. Building your own takes no code, just YAML and images: see [Adding a custom ensemble](Adding_an_ensemble.md).
+
 ## User interfaces (UI)
 
 Two different user interfaces are available and can be selected via the configuration (`ui.type`):
@@ -72,6 +85,7 @@ Robust usage is supported by extensive logging and automated tests:
 
 - **Chat logging:** Every conversation is recorded in a JSON file (stored in the `logs/` folder). It captures timestamps, the model in use, the persona, and all user and AI messages. The application also writes a rolling system log file (prefixed `yulyen_ai_...`) that contains internal processes and debug information (info/error).
 - **Wiki proxy logging:** The Wikipedia proxy service keeps its own log files for article requests and results. This makes it possible to trace wiki lookups and any errors separately from the main chat log.
+- **Answer feedback (👍/👎):** Every answer can be rated in the web UI. Each click appends a line to `logs/feedback_votes.jsonl` — with timestamp, persona, model, question, answer and the vote. The file is append-only (changing your mind adds a line rather than replacing the old one), so the history stays auditable. Intended as a data basis for quality comparisons and later finetuning.
 - **Automated tests:** A collection of pytest tests (in the `tests/` directory) verifies core system functions. For example, the tests ensure that personas are initialized correctly, the security filter works, and repeatable responses (such as Doris telling the same jokes) remain consistent. These tests help prevent regressions and maintain reliable orchestration.
 
 ## Security mechanisms

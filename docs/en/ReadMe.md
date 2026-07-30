@@ -198,10 +198,11 @@ default choice for the regular experience. You can try another ensemble, such as
 python src/launch.py -e examples/spaceship_crew
 ```
 
+The name is a path below `ensembles/` and is **always written with forward slashes**, on Windows
+too — it ends up verbatim in the web UI's avatar URLs.
+
 For a complete walkthrough on building your own ensemble, see
 [Adding a custom ensemble](Adding_an_ensemble.md).
-
-On Windows, replace `/` with `\` (`examples\spaceship_crew`).
 
 You can optionally pass an alternative configuration file via `--config` (short `-c`) alongside the
 ensemble parameter, for example:
@@ -209,6 +210,27 @@ ensemble parameter, for example:
 ```bash
 python src/launch.py -e classic --config path/to/config.yaml
 ```
+
+#### Listing ensembles
+
+To see which ensembles ship with the repo — including the exact name `-e` expects — run:
+
+```bash
+python src/launch.py --list-ensembles
+```
+
+```
+Yul Yen — Verfügbare Ensembles
+------------------------------------------------
+  classic
+      Personas: LEAH (featured), DORIS, PETER, POPCORN
+      Sprachen: de, en
+  examples/spaceship_crew
+      Personas: CAPTAIN_SELINA (featured), ZETA_FLUX, ELIAS_MOREL, LYRA_VEX
+      Sprachen: de, en
+```
+
+The command only reads YAML files; it needs neither Ollama nor the UI stack.
 
 #### Setup doctor (preflight check)
 
