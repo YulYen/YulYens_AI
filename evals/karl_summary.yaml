@@ -1,0 +1,59 @@
+name: karl_summary
+description: >-
+  Qualitätsbeweis für Karl (#12, offener Restpunkt): Karl komprimiert alte
+  Gesprächsteile per LLM. Diese Fälle geben ihm eine feste History und prüfen,
+  ob die Zusammenfassung die Dinge behält, auf die es später ankommt — Fakten,
+  offene Aufgaben, Entscheidungen — und nichts hinzuerfindet.
+
+  Läuft nur mit erreichbarem Modell (die Zusammenfassung selbst ist ein
+  LLM-Lauf); ohne Ollama überspringt die Suite diesen Block.
+
+cases:
+  - id: karl_keeps_facts_and_open_task
+    history:
+      - role: user
+        content: "Ich heiße Yul und arbeite an einer lokalen KI namens Orchestra."
+      - role: assistant
+        content: "Schön, dich kennenzulernen, Yul! Erzähl mir mehr über Orchestra."
+      - role: user
+        content: >-
+          Es laufen vier Personas über Ollama. Mein aktuelles Problem: die
+          Offline-Wikipedia über Kiwix liefert manchmal keine Treffer.
+      - role: assistant
+        content: >-
+          Das klingt nach der Titelsuche. Du könntest die Volltextsuche von
+          kiwix-serve nutzen statt Titel zu raten.
+      - role: user
+        content: "Guter Punkt. Das probiere ich morgen aus."
+      - role: assistant
+        content: "Viel Erfolg! Sag Bescheid, ob die Volltextsuche hilft."
+    expect_traits:
+      - "nennt den Namen Yul"
+      - "nennt das Projekt und die vier Personas"
+      - "hält das offene Todo fest, die Kiwix-Volltextsuche auszuprobieren"
+      - "erfindet keine Fakten, die nicht im Verlauf stehen"
+    checks:
+      must_match:
+        - "(?i)yul"
+        - "(?i)kiwix|volltextsuche|wikipedia"
+
+  - id: karl_keeps_constraint
+    history:
+      - role: user
+        content: "Bitte antworte mir ab jetzt immer auf Englisch."
+      - role: assistant
+        content: "Sure, I'll answer in English from now on."
+      - role: user
+        content: "What is the capital of Norway?"
+      - role: assistant
+        content: "Oslo is the capital of Norway."
+      - role: user
+        content: "Thanks. Also remember I dislike bullet lists."
+      - role: assistant
+        content: "Noted — no bullet lists."
+    expect_traits:
+      - "hält die Vorgabe fest, auf Englisch zu antworten"
+      - "hält die Vorgabe fest, keine Bullet-Listen zu verwenden"
+    checks:
+      must_match:
+        - "(?i)english|englisch"

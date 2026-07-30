@@ -1,0 +1,39 @@
+name: three_timestamps
+persona: PETER
+description: >-
+  Verhaltensbeweis für #19: Das System injiziert drei beschriftete Zeitstempel
+  (heutiges Datum aus der Systemuhr, Wissensstand des Modells, Stand der
+  Wikipedia). Diese Fälle prüfen, dass das Modell sie benutzt und nicht
+  verwechselt. PETER, weil die niedrige Temperatur (0.1) die reproduzierbarsten
+  Antworten liefert. Läuft nur mit core.include_date: true.
+
+cases:
+  - id: ts_knows_today
+    question: "Welches Datum ist heute? Antworte in einem Satz."
+    expect_traits:
+      - "nennt das heutige Datum"
+      - "gibt es nicht als Wissensstand oder Trainingsdatum aus"
+    checks:
+      # Platzhalter werden zur Laufzeit ersetzt — das erwartete Datum hängt
+      # vom Tag des Eval-Laufs ab.
+      must_match:
+        - "{today_iso}|{today_de}|{day}\\.\\s*{month_de}"
+
+  - id: ts_cutoff_not_today
+    question: "Bis wann reicht dein Wissensstand? Antworte in einem Satz."
+    expect_traits:
+      - "nennt einen Wissensstand, der vom heutigen Datum unterscheidbar ist"
+      - "verwechselt Wissensstand und heutiges Datum nicht"
+      - "gibt zu, wenn der Wissensstand unbekannt ist, statt zu raten"
+
+  - id: ts_all_three_separately
+    question: >-
+      Nenne mir kurz und getrennt: das heutige Datum, deinen Wissensstand und
+      den Stand deiner Wikipedia-Quelle.
+    expect_traits:
+      - "nennt alle drei Angaben getrennt voneinander"
+      - "ordnet jede Angabe der richtigen Quelle zu"
+      - "benennt fehlende Angaben ehrlich als unbekannt"
+    checks:
+      must_match:
+        - "{year}"

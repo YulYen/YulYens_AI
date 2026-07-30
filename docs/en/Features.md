@@ -39,6 +39,20 @@ An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcas
 
 Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link using credentials from `ui.web.share_auth`.
 
+### Stream control: stop and retry
+
+While a reply is being generated, a **“Stop ⏹”** button takes the place of the send
+button in the web UI. Clicking it ends generation immediately and **keeps the partial
+answer** in the history, marked with `…[stopped]` — you usually stop precisely
+because the opening already tells you where this is going. Stop is token-accurate in
+the single chat and for the briefing; in the AI dialog it takes effect between
+speaker turns, because each reply there is fetched in one go.
+
+**“Retry 🔄”** discards the last answer and has the same question answered again.
+The context stays untouched — the variation comes purely from the persona's
+temperature, so POPCORN (0.8) varies far more than PETER (0.1). Wiki and briefing
+hints above the answer stay in place.
+
 ## AI dialog (self-talk)
 
 The project includes an **AI dialog mode** in which two personas talk to each other automatically to solve a given task:
@@ -57,13 +71,73 @@ For terminal interaction, integrated **Piper-based text-to-speech output** is av
 - Enable it via `tts.enabled: true`.
 - Create one WAV file per answer via `tts.features.terminal_auto_create_wav: true`.
 - Configure voices in `config.yaml` via `tts.voices` (language defaults plus optional persona-specific voices).
-- **Current platform limitation:** automatic WAV creation/playback in Terminal UI currently works on **Windows only** (because `tts.audio_player` depends on `winsound`). On Linux/macOS, this path is skipped after import failure.
+- **Platforms:** automatic WAV creation and playback in the terminal UI works on all three platforms. Windows uses `winsound` from the standard library; Linux and macOS dispatch to the usual command-line players (`paplay`, `aplay` or `ffplay` on Linux, `afplay` on macOS) — no extra dependency. If no player is found, playback is skipped silently and the WAV still lands in `out/`.
 
 This allows replies to be consumed not only as text but also immediately as audio.
 
 ## One-shot API
 
 Alongside the UI, the system can be accessed through a REST API (e.g., for integrations or testing). A FastAPI server exposes an **`/ask` endpoint** that accepts individual questions via HTTP POST. The request accepts JSON (with fields for the **question** and desired **persona**) and returns the AI reply as JSON. Two endpoints exist for monitoring: **`/health`** as a fast liveness check and **`/healthz`** as a deep check that verifies Ollama reachability, the pulled model, spaCy, Kiwix, and VRAM (HTTP 503 on critical failure). The same checks are available on the CLI via `python src/launch.py --doctor` as a colored preflight report. This API makes it possible to embed the AI functionality into external applications or use it for automation.
+
+## OpenAI-compatible API
+
+The personas also speak the **OpenAI protocol**. That means any client built for
+OpenAI works — Open WebUI, phone apps, editor plugins — just with LEAH, DORIS,
+PETER and POPCORN instead of a cloud model. Unlike raw Ollama, everything still
+goes through the guard, the wiki injection and the conversation log, because it is
+the same streamer the UI uses.
+
+The mapping is the trick: **`model` is the persona name.** `/v1/models` therefore
+lists personas rather than LLMs — which model runs underneath stays a server-side
+decision (`core.model_name`).
+
+```bash
+# Available personas
+curl http://127.0.0.1:8013/v1/models
+
+# Ask DORIS
+curl http://127.0.0.1:8013/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model": "DORIS", "messages": [{"role": "user", "content": "What is coffee?"}]}'
+```
+
+With the official Python SDK:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8013/v1", api_key="your-key")
+stream = client.chat.completions.create(
+    model="POPCORN",                      # persona instead of model
+    messages=[{"role": "user", "content": "Explain recursion"}],
+    stream=True,
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+Settings under `api.openai_compatible`:
+
+| Key | Meaning |
+|---|---|
+| `enabled` | Endpoints on/off. Off answers HTTP 404, as if they did not exist |
+| `api_key` | Optional bearer key. Empty means open. Prefer `env:YULYEN_API_KEY` over a literal |
+| `rate_limit_per_minute` | Requests per client per minute, `0` disables the limit |
+
+Worth knowing:
+
+- **Streaming** uses Server-Sent Events exactly like the original, including the
+  closing `data: [DONE]`.
+- **`temperature`, `top_p`, `max_tokens`** are accepted and **ignored**. Sampling
+  belongs to the persona (`personas_base.yaml`) — allowing overrides would let any
+  caller flatten POPCORN's playfulness or PETER's precision. Clients that always
+  send these fields keep working.
+- **The conversation history comes from the client**, as the OpenAI protocol
+  intends. Karl and the heuristic trimming deliberately stay out of the way: if
+  you send the history, you own the context window. An over-long history runs into
+  the `num_ctx` limit — exactly as it would with OpenAI.
+- **While `api.host` is `127.0.0.1`** the server is local-only. The `api_key`
+  matters once it is exposed on the LAN.
 
 ## Email adapter for personas
 

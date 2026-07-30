@@ -33,6 +33,8 @@ def build_ui(
     mic_label,
     briefing_label,
     read_aloud_label,
+    stop_label,
+    regenerate_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -213,6 +215,13 @@ def build_ui(
                 variant="secondary",
                 visible=False,
             )
+            # Regenerate steht bei den Sekundär-Aktionen; Stop gehört in die
+            # Eingabezeile, weil es den laufenden Stream betrifft (#35).
+            regenerate_btn = gr.Button(
+                regenerate_label,
+                variant="secondary",
+                visible=False,
+            )
             download_file = gr.File(visible=False)
         save_status = gr.Markdown("", visible=False)
         tts_audio = gr.Audio(
@@ -236,6 +245,14 @@ def build_ui(
                 variant="primary",
                 visible=False,
                 interactive=False,
+                scale=1,
+                min_width=140,
+            )
+            # Nimmt den Platz von send_btn ein, solange gestreamt wird.
+            stop_btn = gr.Button(
+                stop_label,
+                variant="stop",
+                visible=False,
                 scale=1,
                 min_width=140,
             )
@@ -362,5 +379,7 @@ def build_ui(
         "briefing_btn": briefing_btn,
         "read_aloud_btn": read_aloud_btn,
         "tts_audio": tts_audio,
+        "stop_btn": stop_btn,
+        "regenerate_btn": regenerate_btn,
     }
     return demo, components

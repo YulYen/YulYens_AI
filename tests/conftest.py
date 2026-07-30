@@ -113,6 +113,23 @@ def client(request):
 
 
 @pytest.fixture(scope="function")
+def ollama_config(request):
+    """Config wired to a real Ollama, or skip.
+
+    For @pytest.mark.ollama tests that do not go through the HTTP client
+    fixtures (e.g. the eval suite, which talks to the factory directly).
+    """
+    Config.reset_instance()
+    cfg = Config("config.yaml")
+    cfg.ensemble = "classic"
+    if not _should_use_ollama(request, cfg):
+        pytest.skip("Test needs the 'ollama' marker and a reachable Ollama server")
+    cfg.override("wiki", {"mode": False})
+    yield cfg
+    Config.reset_instance()
+
+
+@pytest.fixture(scope="function")
 def client_with_date_and_wiki(request):
     if not has_spacy_model("de_core_news_lg"):
         pytest.skip("spaCy model de_core_news_lg not installed")

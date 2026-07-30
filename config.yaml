@@ -154,6 +154,20 @@ api:
   host: "127.0.0.1"
   port: 8013
 
+  # OpenAI-kompatible Endpunkte (#37): /v1/models und /v1/chat/completions.
+  # "model" ist der Persona-Name, nicht das LLM — /v1/models listet daher die
+  # Personas. Damit sprechen Open WebUI, Handy-Apps und Editor-Plugins mit den
+  # Personas, inklusive Guard, Wiki-Injection und Gesprächslog.
+  openai_compatible:
+    enabled: true
+    # Optionaler Bearer-Key. Leer = offen (nur sinnvoll, solange host auf
+    # 127.0.0.1 steht!). Sobald der Server im LAN hängt: setzen, am besten als
+    # "env:YULYEN_API_KEY" statt im Klartext.
+    api_key: ""
+    # Fixed-Window-Limit pro Client und Minute; 0 schaltet es ab. Klein
+    # angesetzt, weil ein einzelnes Ollama die Anfragen ohnehin serialisiert.
+    rate_limit_per_minute: 60
+
 security:
   enabled: true
   guard: BasicGuard
@@ -180,3 +194,14 @@ context_management:
     keep_last_messages: 2
     log_dir: "logs"
     fallback_strategy: "heuristic"  # on summarization failure; omit to fail hard
+
+# --- Eval suite (#41) -----------------------------------------------------------
+# Only read by scripts/run_evals.py — the app itself ignores this section.
+# Corpora live as YAML under evals/. See evals/ReadMe.md.
+evals:
+  out_dir: "logs/evals"
+  # Judge model for the character ratings. "same_as_chat" means the chat model
+  # rates its own answers — convenient, but it grades itself generously. Point
+  # this at a different local model when you have one; absolute scores are only
+  # comparable between runs that used the same judge.
+  judge_model: "same_as_chat"

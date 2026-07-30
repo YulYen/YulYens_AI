@@ -76,6 +76,8 @@ PERSONA_OUTPUT_KEYS = (
     "briefing_btn",
     "read_aloud_btn",
     "tts_audio",
+    "stop_btn",
+    "regenerate_btn",
 )
 
 
@@ -121,6 +123,11 @@ class WebUI:
         # asyncio-Task ab), daher muss der Reset-Handler die Worker direkt
         # über dieses Event stoppen.
         self._ask_all_stop: threading.Event | None = None
+        # Kill switch für Einzelchat/Briefing/Self-Talk (#35). Gleiche Begründung
+        # wie bei _ask_all_stop: Gradios `cancels` bricht nur den asyncio-Task
+        # ab, das finally eines laufenden Generators läuft nicht zuverlässig.
+        # Der Stop-Button ist ein eigenes, verlässlich laufendes Event.
+        self._stream_stop: threading.Event | None = None
         self.ask_all_placeholder = ""
         self.self_talk_runner = None
         self.self_talk_prompt_placeholder = ""
@@ -236,6 +243,20 @@ class WebUI:
         return True
 
     # Stream the response (UI updates continuously)
+    def _arm_stream_stop(self) -> threading.Event:
+        """Fresh kill switch for the stream that is about to start (#35)."""
+        stop = threading.Event()
+        self._stream_stop = stop
+        return stop
+
+    def _stop_requested(self, stop: threading.Event) -> bool:
+        """True when *this* stream was asked to stop.
+
+        Identity check on purpose: a newer stream replaces `_stream_stop`, and a
+        stale generator must not react to the new stream's switch.
+        """
+        return self._stream_stop is stop and stop.is_set()
+
     def _stream_reply(
         self, message_history: list[Message], chat_history: list[ChatPair]
     ) -> Iterator[tuple[None, list[ChatPair], list[Message]]]:
@@ -243,12 +264,32 @@ class WebUI:
         # den Socket schicken; last_flush=0.0 lässt den ersten Chunk sofort durch.
         reply = ""
         last_flush = 0.0
-        for token in self.streamer.stream(messages=message_history):
-            reply += token
-            now = time.monotonic()
-            if now - last_flush >= 0.1:
-                last_flush = now
-                yield None, chat_history + [(None, reply)], message_history
+        stop = self._arm_stream_stop()
+        stopped = False
+        # Explizites Iterator-Handle, damit der Stream beim Stop deterministisch
+        # geschlossen wird (close() löst das finally im Streaming-Provider aus und
+        # beendet damit den Ollama-Stream) statt erst irgendwann per GC.
+        tokens = self.streamer.stream(messages=message_history)
+        try:
+            for token in tokens:
+                if self._stop_requested(stop):
+                    stopped = True
+                    break
+                reply += token
+                now = time.monotonic()
+                if now - last_flush >= 0.1:
+                    last_flush = now
+                    yield None, chat_history + [(None, reply)], message_history
+        finally:
+            close = getattr(tokens, "close", None)
+            if close is not None:
+                close()
+            if self._stream_stop is stop:
+                self._stream_stop = None
+
+        if stopped:
+            # Teilantwort behalten — sie ist der Grund, warum man abbricht.
+            reply += self._t("web_stream_stopped_suffix")
 
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
@@ -311,6 +352,106 @@ class WebUI:
             (txt, cb, state)
             for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
         )
+
+    def _streaming_button_updates(self, streaming: bool) -> tuple:
+        """Send ⇄ Stop tauschen; Regenerate währenddessen sperren (#35)."""
+        return (
+            gr.update(visible=not streaming),
+            gr.update(visible=streaming),
+            gr.update(interactive=not streaming),
+        )
+
+    def _with_stream_controls(self, generator: Iterator[tuple]) -> Iterator[tuple]:
+        """Hängt die Button-Updates an die Yields des Stream-Generators an.
+
+        Bewusst im selben Yield statt als eigene `.then()`-Events davor und
+        danach: der Umweg über ein zweites, gequeuetes Event kostete gemessen
+        ~3,5 s bis zum ersten Token und hätte damit #17 zunichte gemacht.
+
+        Der Schlusszustand wird als zusätzlicher Yield mit denselben Chat-/
+        State-Werten geschickt — `gr.update()` ginge hier nicht, weil ein
+        gr.State den Update-Marker als echten Wert übernehmen würde.
+        """
+        streaming = self._streaming_button_updates(streaming=True)
+        unchanged = (gr.update(), gr.update(), gr.update())
+        last: tuple | None = None
+        first = True
+        for item in generator:
+            last = item
+            yield (*item, *(streaming if first else unchanged))
+            first = False
+        if last is not None:
+            yield (*last, *self._streaming_button_updates(streaming=False))
+
+    def respond_streaming_with_controls(
+        self,
+        user_input: str,
+        chat_history: list[ChatPair],
+        history_state: list[Message] | None,
+    ) -> Iterator[tuple]:
+        yield from self._with_stream_controls(
+            self.respond_streaming(user_input, chat_history, history_state)
+        )
+
+    def respond_briefing_with_controls(
+        self, chat_history: list[ChatPair], history_state: list[Message] | None
+    ) -> Iterator[tuple]:
+        yield from self._with_stream_controls(
+            self.respond_briefing(chat_history, history_state)
+        )
+
+    def regenerate_with_controls(
+        self, chat_history: list[ChatPair], history_state: list[Message] | None
+    ) -> Iterator[tuple]:
+        yield from self._with_stream_controls(
+            self._on_regenerate(chat_history, history_state)
+        )
+
+    def _on_stop_stream(self) -> tuple:
+        """Stoppt den laufenden Stream (#35).
+
+        Eigenes Gradio-Event statt `cancels`: nur so läuft der Handler
+        garantiert und der Generator kommt geordnet zum Ende — mit Teilantwort
+        im Verlauf, statt sie wegzuwerfen.
+        """
+        stop = self._stream_stop
+        if stop is not None:
+            stop.set()
+        return self._streaming_button_updates(streaming=False)
+
+    def _on_regenerate(
+        self, chat_history: list[ChatPair], history_state: list[Message] | None
+    ) -> Iterator[tuple[Any, list[ChatPair], list[Message]]]:
+        """Letzte Antwort verwerfen und mit identischem Kontext neu streamen.
+
+        Varianz kommt allein aus der Temperatur der Persona — es wird nichts am
+        Prompt gedreht.
+        """
+        chat_history = list(chat_history or [])
+        llm_history = list(history_state or [])
+
+        if not self.bot or not self.streamer:
+            yield gr.update(), chat_history, llm_history
+            return
+
+        if not llm_history or llm_history[-1].get("role") != "assistant":
+            gr.Warning(self._t("web_regenerate_nothing"))
+            yield gr.update(), chat_history, llm_history
+            return
+
+        llm_history.pop()
+        # In der Anzeige ist die Antwort die letzte Bot-Zeile; Wiki-/Briefing-Hints
+        # sind ebenfalls Bot-Zeilen, stehen aber davor und bleiben stehen.
+        if chat_history and chat_history[-1][0] is None:
+            chat_history.pop()
+        yield gr.update(), chat_history, llm_history
+
+        # gr.update() statt None: ein noch nicht abgeschickter Entwurf im
+        # Eingabefeld soll durch das Neuerzeugen nicht verloren gehen.
+        for _input_value, updated_chat, updated_state in self._stream_reply(
+            llm_history, chat_history
+        ):
+            yield gr.update(), updated_chat, updated_state
 
     def respond_briefing(
         self, chat_history: list[ChatPair], history_state: list[Message] | None
@@ -400,6 +541,8 @@ class WebUI:
             "briefing_btn": gr.update(visible=False),
             "read_aloud_btn": gr.update(visible=False),
             "tts_audio": gr.update(value=None, visible=False),
+            "stop_btn": gr.update(visible=False),
+            "regenerate_btn": gr.update(visible=False, interactive=True),
         }
 
     def _persona_selected_updates(
@@ -442,6 +585,11 @@ class WebUI:
                 placeholder=self.ask_all_placeholder,
             ),
             mic_audio=gr.update(value=None, visible=self.stt_available),
+            # Regenerate ist ab Start sichtbar, aber erst nach einer Antwort
+            # sinnvoll; ein Klick davor bringt nur einen Hinweis-Toast. Stop
+            # erscheint ausschließlich während eines laufenden Streams.
+            regenerate_btn=gr.update(visible=True, interactive=True),
+            stop_btn=gr.update(visible=False),
         )
         return self._as_persona_outputs(updates)
 
@@ -476,6 +624,11 @@ class WebUI:
 
     def _on_reset_to_start(self) -> tuple:
         self._cancel_ask_all_broadcast()
+        # Zusätzlich zum `cancels` am Reset-Button: das cancels bricht nur den
+        # asyncio-Task ab, der Kill-Switch beendet die Arbeit im Backend (#35).
+        stop = self._stream_stop
+        if stop is not None:
+            stop.set()
         self.bot = None
         self.streamer = None
         return self._reset_ui_updates()
@@ -679,26 +832,35 @@ class WebUI:
 
         chat_history = list(chat_history or [])
         history_state = list(history_state or [])
-        while True:
-            persona_name, reply, should_stop, _ = self.self_talk_runner.run_turn()
-            shown_reply = f"{persona_name}: {reply}"
-            # run_turn() liefert die Antwort bereits komplett; die Zeichen-Schleife
-            # war reine Schreibmaschinen-Animation (ein Websocket-Frame pro
-            # Zeichen). Mit der 0.1-s-Drossel erscheint die Nachricht in wenigen
-            # großen Updates statt in len(reply) Frames.
-            progressive = ""
-            last_flush = 0.0
-            for token in shown_reply:
-                progressive += token
-                now = time.monotonic()
-                if now - last_flush >= 0.1:
-                    last_flush = now
-                    yield chat_history + [(None, progressive)], history_state
-            chat_history.append((None, shown_reply))
-            history_state.append({"role": "assistant", "content": shown_reply})
-            yield chat_history, history_state
-            if should_stop:
-                break
+        # Stop wirkt hier zwischen den Turns, nicht mitten drin: run_turn() holt
+        # die Antwort in einem Zug ab, es gibt keinen Token-Strom zum Abbrechen.
+        stop = self._arm_stream_stop()
+        try:
+            while True:
+                if self._stop_requested(stop):
+                    break
+                persona_name, reply, should_stop, _ = self.self_talk_runner.run_turn()
+                shown_reply = f"{persona_name}: {reply}"
+                # run_turn() liefert die Antwort bereits komplett; die
+                # Zeichen-Schleife war reine Schreibmaschinen-Animation (ein
+                # Websocket-Frame pro Zeichen). Mit der 0.1-s-Drossel erscheint
+                # die Nachricht in wenigen großen Updates statt in len(reply).
+                progressive = ""
+                last_flush = 0.0
+                for token in shown_reply:
+                    progressive += token
+                    now = time.monotonic()
+                    if now - last_flush >= 0.1:
+                        last_flush = now
+                        yield chat_history + [(None, progressive)], history_state
+                chat_history.append((None, shown_reply))
+                history_state.append({"role": "assistant", "content": shown_reply})
+                yield chat_history, history_state
+                if should_stop:
+                    break
+        finally:
+            if self._stream_stop is stop:
+                self._stream_stop = None
 
     def _ask_all_state(
         self,
@@ -1051,6 +1213,8 @@ class WebUI:
         briefing_btn = components["briefing_btn"]
         read_aloud_btn = components["read_aloud_btn"]
         tts_audio = components["tts_audio"]
+        stop_btn = components["stop_btn"]
+        regenerate_btn = components["regenerate_btn"]
 
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
@@ -1098,17 +1262,38 @@ class WebUI:
             queue=True,
         )
 
+        # Stream-Steuerung (#35): der Tausch Send ⇄ Stop läuft als eigene,
+        # nicht-streamende Events vor und nach dem Generator (`.then`). So bleibt
+        # die Signatur von respond_streaming unangetastet — sonst müsste jeder
+        # yield zwei zusätzliche Slots mitschleppen.
+        # Stream-Steuerung (#35): die Button-Updates reisen in denselben Yields
+        # mit (siehe _with_stream_controls) — ein vorgeschaltetes Event hätte den
+        # ersten Token um Sekunden verzögert.
+        stream_buttons = [send_btn, stop_btn, regenerate_btn]
+        stream_outputs = [input_box, chatbot, history_state, *stream_buttons]
+
         input_submit_evt = input_box.submit(
-            fn=self.respond_streaming,
+            fn=self.respond_streaming_with_controls,
             inputs=[input_box, chatbot, history_state],
-            outputs=[input_box, chatbot, history_state],
+            outputs=stream_outputs,
             queue=True,
         )
 
         send_click_evt = send_btn.click(
-            fn=self.respond_streaming,
+            fn=self.respond_streaming_with_controls,
             inputs=[input_box, chatbot, history_state],
-            outputs=[input_box, chatbot, history_state],
+            outputs=stream_outputs,
+            queue=True,
+        )
+
+        # Kein `cancels`: der Kill-Switch beendet den Generator geordnet, damit
+        # die Teilantwort im Verlauf bleibt.
+        stop_btn.click(fn=self._on_stop_stream, outputs=stream_buttons, queue=False)
+
+        regenerate_evt = regenerate_btn.click(
+            fn=self.regenerate_with_controls,
+            inputs=[chatbot, history_state],
+            outputs=stream_outputs,
             queue=True,
         )
 
@@ -1120,9 +1305,9 @@ class WebUI:
         )
 
         briefing_evt = briefing_btn.click(
-            fn=self.respond_briefing,
+            fn=self.respond_briefing_with_controls,
             inputs=[chatbot, history_state],
-            outputs=[input_box, chatbot, history_state],
+            outputs=stream_outputs,
             queue=True,
         )
 
@@ -1218,6 +1403,7 @@ class WebUI:
                 send_click_evt,
                 self_talk_stream_evt,
                 briefing_evt,
+                regenerate_evt,
             ],
         )
 
@@ -1298,6 +1484,8 @@ class WebUI:
         mic_label = ui.get("web_mic_label", "Spracheingabe (Mikrofon)")
         briefing_label = ui.get("web_briefing_button", "Briefing 📰")
         read_aloud_label = ui.get("web_read_aloud_button", "Vorlesen 🔊")
+        stop_label = ui.get("web_stop_button", "Stop ⏹")
+        regenerate_label = ui.get("web_regenerate_button", "Nochmal 🔄")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1335,6 +1523,8 @@ class WebUI:
             mic_label=mic_label,
             briefing_label=briefing_label,
             read_aloud_label=read_aloud_label,
+            stop_label=stop_label,
+            regenerate_label=regenerate_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

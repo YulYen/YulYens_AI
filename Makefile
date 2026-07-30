@@ -1,4 +1,4 @@
-.PHONY: setup format lint fix test test-ci test-all coverage clean run
+.PHONY: setup format lint fix test test-ci test-all coverage clean run evals evals-full
 
 setup:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -29,6 +29,13 @@ test-all:
 
 coverage:
 	pytest -q -m "not slow and not ollama" --cov=src --cov-report=term-missing
+
+# Eval-Suite (#41). 'evals' braucht kein Modell, 'evals-full' braucht Ollama.
+evals:
+	python scripts/run_evals.py -e classic --guard-only
+
+evals-full:
+	python scripts/run_evals.py -e classic
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +

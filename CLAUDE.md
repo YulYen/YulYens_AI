@@ -19,7 +19,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Web-UI | Gradio 4.44 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
-| TTS | Piper (ONNX; Terminal: Windows-Autoplay, WebUI: Browser-Playback) |
+| TTS | Piper (ONNX; Terminal: Autoplay über winsound/CLI-Player, WebUI: Browser-Playback) |
 | STT | faster-whisper (optional, WebUI-Mikro) |
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
@@ -55,8 +55,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
 │   ├── api/
-│   │   ├── app.py               # FastAPI: /ask, /health, /healthz
-│   │   └── provider.py
+│   │   ├── app.py               # FastAPI: /ask, /health, /healthz + /v1-Router
+│   │   ├── openai_compat.py     # OpenAI-kompatible Endpunkte (#37)
+│   │   └── provider.py          # One-Shot + stream_messages (Client-History)
 │   ├── email_adapter/
 │   │   └── service.py           # opt-in IMAP/SMTP-Bridge (Personas per Mail)
 │   ├── wiki/
@@ -67,11 +68,19 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
 │   ├── tts/
 │   │   ├── piper_tts.py         # TTS-Wrapper
-│   │   └── audio_player.py      # winsound (Windows-only, plattform-sicher)
+│   │   └── audio_player.py      # WAV-Wiedergabe: winsound / CLI-Player-Dispatch (#34)
 │   ├── stt/
 │   │   └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
-│   └── briefing/
-│       └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
+│   ├── briefing/
+│   │   └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
+│   └── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
+├── evals/                       # Eval-Korpora als YAML (siehe evals/ReadMe.md)
+│   ├── personas/*.yaml          # Goldene Fragen pro Persona
+│   ├── behaviour/*.yaml         # Verhaltensbeweise (drei Zeitstempel)
+│   ├── karl_summary.yaml        # Qualität der Karl-Zusammenfassungen
+│   └── guard_redteam.yaml       # Angriff → erwartetes Guard-Verhalten
+├── scripts/
+│   └── run_evals.py             # Einstieg der Eval-Suite
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -134,9 +143,34 @@ pytest tests/test_ai_via_api.py  # Gezielt
 
 - Test-Fixture `client`: Dummy-Backend, Wiki deaktiviert
 - Test-Fixture `client_with_date_and_wiki`: echte Wiki-Integration (braucht spaCy-Modell)
+- Test-Fixture `ollama_config`: Config gegen echtes Ollama, für `@pytest.mark.ollama`-Tests
+  ohne HTTP-Client (z. B. Eval-Suite)
 - Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar
 - spaCy-Modelle (`python -m spacy download de_core_news_lg`) schalten die
   Keyword-/Wiki-Tests frei; ohne Modell werden sie sauber geskippt
+
+## Eval-Suite (#41)
+
+Messbare Antwort auf „ist das Modell besser geworden?" — das Vergleichsartefakt
+für #7 (LoRA). Details in [evals/ReadMe.md](evals/ReadMe.md).
+
+```bash
+python scripts/run_evals.py -e classic               # voll (braucht Ollama)
+python scripts/run_evals.py -e classic --guard-only  # Guard-Teil, braucht kein Modell
+make evals                                           # Kurzform für --guard-only
+```
+
+- Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
+- `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),
+  `expect_traits` = LLM-as-judge 1–5 (4+ besteht, 3 nicht)
+- **Judge-Bias:** per Default bewertet das Modell sich selbst und ist nachsichtig.
+  Nur der Vergleich zweier Läufe mit gleichem Judge ist aussagekräftig (`report.csv`)
+- Der Guard-Red-Team-Korpus läuft ohne Modell als parametrisierter Test in der CI mit
+  (`tests/test_guard_redteam.py`) — Angriffsmuster gehören in `evals/guard_redteam.yaml`
+- Korpus-Loader ist streng: unbekannte Keys, kaputte Regexe, doppelte IDs und
+  erwartungslose Fälle fliegen beim Laden raus
+- `known_gap: true` markiert eine dokumentierte Guard-Schwäche (gemeldet, kein
+  Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist
 
 ## Konfiguration (config.yaml)
 
@@ -179,6 +213,10 @@ briefing:
 api:
   enabled: true
   port: 8013
+  openai_compatible:         # /v1/models + /v1/chat/completions (#37)
+    enabled: true
+    api_key: ""              # leer = offen; besser "env:YULYEN_API_KEY"
+    rate_limit_per_minute: 60
 
 security:
   enabled: true
@@ -189,6 +227,10 @@ email_adapter:
 
 context_management:
   strategy: "heuristic"      # "heuristic" (Default) | "karl" (LLM-Zusammenfassung)
+
+evals:                       # nur von scripts/run_evals.py gelesen (#41)
+  out_dir: "logs/evals"
+  judge_model: "same_as_chat"  # eigenes Modell = weniger Judge-Bias
 ```
 
 ### Lokales Override: `config.local.yaml` (gitignored)
@@ -210,6 +252,16 @@ in der CI (z. B. würde `api.enabled: false` sonst API-Tests brechen).
 - `make format` → Black + Ruff-Fix
 - `make lint` → Ruff check only
 - Keine Docstrings für einfache Methoden, kurze Inline-Kommentare nur wenn nötig
+
+### CI-Jobs (`.github/workflows/ci.yml`)
+| Job | Was er prüft |
+|---|---|
+| **Format & lint** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten) |
+| **Tests (ubuntu-latest / windows-latest)** | Volle Suite ohne `ollama`-Marker, mit `--cov`. Die Windows-Matrix ist der Punkt: das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf (#45) |
+| **Tests mit spaCy-Modell** | `de_core_news_lg` per `actions/cache` (versionierter Key), dann gezielt `test_spacy_keywords.py` + `test_wiki.py` — die liefen sonst nur als Skips |
+
+Coverage steht als Zahl in der Job-Summary (kein externer Badge-Dienst, der
+Account + Token bräuchte). mypy ist bewusst **nicht** eingehängt → Backlog #52.
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
@@ -251,6 +303,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
+| **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
 Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
@@ -261,6 +314,20 @@ Browser-Tests verfälschen. **Für live wachsende Ausgaben `gr.Markdown` (Voll-E
 pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
 Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
 Gradio 4.44 crashen).
+
+### ⚠️ Stolperfalle: Button-Updates nie als eigenes Event vor den Stream hängen
+Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor dem
+Stream-Handler (`btn.click(toggle).then(stream)`). **Kostet ~3,5 s bis zum ersten
+Token** — das gequeuete `.then()` startet erst nach einem vollen Roundtrip des
+ersten Events. Stattdessen die Button-Updates **in denselben Yields** des
+Stream-Generators mitschicken (`WebUI._with_stream_controls`, #35): Stop erscheint
+dann nach 0,16 s. Achtung beim Schluss-Yield: für `gr.State` müssen die echten
+Werte erneut mitgeschickt werden, `gr.update()` würde den Update-Marker als
+Zustand speichern.
+
+Verwandt: **`cancels` kann nur gequeuete Events abbrechen.** Zeigt die Liste auf
+ein `queue=False`-Event (z. B. das letzte Glied einer `.then()`-Kette), verweigert
+Gradio den Start der App komplett mit „Queue needs to be enabled!".
 
 ### ⚠️ Stolperfalle: Gradio `cancels` schließt Generatoren nicht (Gradio 4.44)
 `cancels=[...]` bricht nur den **asyncio-Task** ab (`task.cancel()` in
@@ -279,8 +346,9 @@ Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matri
 (Generalüberholung 2026-07-30: neue Tickets #24–#48, Erledigtes in Archiv-Sektion).
 Highlights:
 
-- **Tier A (LoRA-Strecke, Reihenfolge wichtig):** #40 Feedback-Daumen → #41 Eval-Suite → #7 LoRA-Finetuning (in Arbeit, LeoLM13B)
-- **Quick Wins:** #29 Spaceship-Crew sichtbar machen (XS), #35 Stop/Regenerate, #32 Wiki-Quellen, #14 E-Mail-Restpunkte
+- **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
+  (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
+- **Quick Wins:** #35 Stop/Regenerate, #32 Wiki-Quellen, #50 Guard-Braces-Lücke, #14 E-Mail-Restpunkte
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -306,13 +374,34 @@ POST http://127.0.0.1:8013/ask
 
 GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet)
 GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler)
+
+# OpenAI-kompatibel (#37) — "model" ist der Persona-Name
+GET  http://127.0.0.1:8013/v1/models
+POST http://127.0.0.1:8013/v1/chat/completions
+  Body: { "model": "DORIS", "messages": [...], "stream": true|false }
 ```
+
+### OpenAI-Kompatibilität: worauf zu achten ist
+- **`model` = Persona**, nicht LLM. `/v1/models` listet Personas; das echte Modell
+  bleibt Serversache (`core.model_name`).
+- **Fehler-Bodies müssen `{"error": {...}}` auf oberster Ebene haben.** FastAPIs
+  `HTTPException(detail=…)` erzeugt `{"detail": {"error": …}}` — eine Ebene zu tief,
+  das offizielle openai-SDK findet die Felder dann nicht. Deshalb eigene
+  `OpenAIError` + Exception-Handler (`api/openai_compat.py`), und
+  `RequestValidationError` wird unter `/v1` auf 400 + OpenAI-Form gemappt (`/ask`
+  behält FastAPIs Standardform).
+- **`temperature`/`top_p`/`max_tokens` werden angenommen und ignoriert** — Sampling
+  gehört zur Persona, sonst kann jeder Aufrufer den Charakter plattmachen.
+- **Client-History wird durchgereicht**, Karl/Heuristik greifen hier nicht
+  (OpenAI-Semantik: der Client besitzt sein Kontextfenster).
+- Verifikation gegen das echte SDK: `pip install openai`, dann `base_url` auf
+  `http://127.0.0.1:8013/v1` zeigen. Bewusst **keine** Dependency im Projekt.
 
 Dieselben Deep-Checks gibt es auch ohne laufenden Server: `python src/launch.py --doctor`.
 
 ## Logging
 
-Alle Logs in `logs/`:
+Alle Logs in `logs/` (Eval-Reports in `logs/evals/`):
 - `yulyen_ai_YYYY-MM-DD_HH-MM.log` — Systemlog
 - `conversation_[PERSONA]_[TIMESTAMP].json` — Gesprächslog (JSON)
 - `wiki_proxy_[TIMESTAMP].log` — Wiki-Proxy-Log

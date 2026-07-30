@@ -20,6 +20,28 @@ This README explains the available pytest fixtures, markers, invocation patterns
 - **LLM usage:** Yes (real model) plus **wiki context** (offline or online depending on the configuration).
 - **Typical usage:** Tests that exercise the end-to-end path API → provider → LLM → optional wiki.
 
+### `ollama_config`
+- Loads the configuration wired to a **real Ollama** and skips the test when the marker is missing or the server is unreachable.
+- No HTTP client — for tests that talk to the factory directly, such as the eval suite (`tests/test_evals_live.py`).
+- **Typical usage:** `@pytest.mark.ollama` tests outside the API surface.
+
+---
+
+## Eval suite tests (#41)
+
+The eval corpora under `evals/` are covered from two sides:
+
+- `test_guard_redteam.py` turns **every case of `evals/guard_redteam.yaml`** into a
+  parametrized test. No LLM involved, so it runs everywhere including CI. New attack
+  patterns belong in the YAML, not in the test file. Cases flagged `known_gap: true`
+  are asserted from the other side — the test fails once a documented gap is closed,
+  as a reminder to drop the flag.
+- `test_evals_corpus.py` / `test_evals_runner.py` / `test_evals_cli.py` cover the loader,
+  the deterministic checks, judge parsing, the runner and the report with injected fakes
+  and the dummy backend — no model needed.
+- `test_evals_live.py` is the only part that needs Ollama (`@pytest.mark.ollama`): it
+  verifies that a real model answers the judge prompt in a parsable format.
+
 ---
 
 ## Markers

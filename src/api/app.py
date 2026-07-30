@@ -3,8 +3,11 @@ import traceback
 
 import core.system_checks as system_checks
 from fastapi import FastAPI, HTTPException, Response
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 
+from .openai_compat import OpenAIError, openai_error_handler, validation_error_handler
+from .openai_compat import router as openai_router
 from .provider import AiApiProvider, UnknownPersonaError
 
 # Global, swappable dependency:
@@ -33,6 +36,16 @@ class AskResponse(BaseModel):
 
 
 app = FastAPI(title="Leah One‑Shot API", version="1.0.0")
+
+# Der /v1-Router wird immer gemountet; ob er antwortet, entscheidet
+# api.openai_compatible.enabled pro Request (#37). Eine Weiche an dieser Stelle
+# wäre nur scheinbar wirksam — zum Import-Zeitpunkt dieses Moduls gibt es die
+# Config-Singleton noch nicht.
+app.include_router(openai_router)
+# Eigene Handler, damit die Fehler-Bodies unter /v1 die OpenAI-Form haben:
+# {"error": {...}} statt FastAPIs {"detail": ...}.
+app.add_exception_handler(OpenAIError, openai_error_handler)
+app.add_exception_handler(RequestValidationError, validation_error_handler)
 
 
 @app.get("/health")

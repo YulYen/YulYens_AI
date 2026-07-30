@@ -8,8 +8,9 @@ import types
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import gradio as gr
 import requests
-from ui.web_ui import WebUI
+from ui.web_ui import PERSONA_OUTPUT_KEYS, WebUI
 
 
 def test_webui_start_server_uses_configured_host_and_port():
@@ -445,7 +446,7 @@ def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
 
     updates = web_ui._on_show_self_talk()
 
-    assert len(updates) == 32
+    assert len(updates) == len(PERSONA_OUTPUT_KEYS)
     assert updates[22]["visible"] is True
     assert updates[27]["interactive"] is True
 
@@ -549,7 +550,7 @@ def test_persona_selected_updates_reads_current_model_from_cfg():
         "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
     )
 
-    assert len(updates) == 32
+    assert len(updates) == len(PERSONA_OUTPUT_KEYS)
     greeting_update = updates[5]
     assert "override:1" in greeting_update["value"]
 
@@ -956,3 +957,274 @@ def test_chat_like_ignores_votes_on_user_messages(tmp_path):
     web_ui._on_chat_like(history, {}, _fake_like(index=(0, 0), value="Frage"))
 
     assert not (tmp_path / "votes.jsonl").exists()
+
+
+# ---- Stream-Steuerung: Stop + Regenerate (#35) -------------------------------
+
+
+class _BlockingStream:
+    """Token source that never ends on its own — only a stop can end it.
+
+    Records whether close() ran, which is what actually terminates the LLM
+    stream in the provider's finally block.
+    """
+
+    def __init__(self, token="tok "):
+        self.token = token
+        self.closed = False
+        self.emitted = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.emitted += 1
+        return self.token
+
+    def close(self):
+        self.closed = True
+
+
+def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
+    web_ui = _create_web_ui()
+    stream = _BlockingStream("Teil ")
+    streamer = Mock()
+    streamer.stream.return_value = stream
+    web_ui.streamer = streamer
+
+    outputs = []
+    generator = web_ui._stream_reply([], [])
+    # Uhr läuft in 1-s-Schritten, damit jeder Token die 0.1-s-Drossel passiert.
+    clock = iter(1000.0 + i for i in range(100))
+    with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
+        outputs.append(next(generator))
+        # Stoppen wie der Button es tut, während der Stream noch läuft.
+        web_ui._on_stop_stream()
+        outputs.extend(generator)
+
+    final_chat = outputs[-1][1]
+    reply = final_chat[-1][1]
+    assert reply.startswith("Teil ")
+    assert "web_stream_stopped_suffix" in reply  # Locale-Key via Test-Stub
+    assert stream.closed, "der Token-Stream muss beim Stop geschlossen werden"
+
+
+def test_stop_clears_the_switch_so_the_next_stream_runs():
+    web_ui = _create_web_ui()
+    web_ui._on_stop_stream()  # Stop ohne laufenden Stream: darf nichts kaputt machen
+
+    streamer = Mock()
+    streamer.stream.return_value = iter(["Hallo ", "Welt"])
+    web_ui.streamer = streamer
+    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui._stream_reply([], []))
+
+    assert outputs[-1][1][-1] == (None, "Hallo Welt")
+    assert web_ui._stream_stop is None
+
+
+def test_stale_generator_ignores_a_newer_streams_stop_switch():
+    """Ein alter Generator darf nicht auf den Kill-Switch des neuen reagieren."""
+    web_ui = _create_web_ui()
+    old_stop = web_ui._arm_stream_stop()
+    new_stop = web_ui._arm_stream_stop()
+
+    old_stop.set()
+    assert web_ui._stop_requested(old_stop) is False
+    new_stop.set()
+    assert web_ui._stop_requested(new_stop) is True
+
+
+def test_streaming_button_updates_swap_send_and_stop():
+    web_ui = _create_web_ui()
+
+    send, stop, regenerate = web_ui._streaming_button_updates(streaming=True)
+    assert send["visible"] is False
+    assert stop["visible"] is True
+    assert regenerate["interactive"] is False
+
+    send, stop, regenerate = web_ui._streaming_button_updates(streaming=False)
+    assert send["visible"] is True
+    assert stop["visible"] is False
+    assert regenerate["interactive"] is True
+
+
+def test_stream_controls_flip_buttons_on_the_first_yield():
+    """Kein vorgeschaltetes Event: der erste Yield trägt die Button-Updates.
+
+    Ein eigenes `.then()`-Event davor kostete gemessen ~3,5 s bis zum ersten
+    Token (Queue-Roundtrip) und hätte #17 zunichte gemacht.
+    """
+    web_ui = _create_web_ui()
+
+    def _fake_stream():
+        yield ("", [("Frage", None)], [])
+        yield (None, [("Frage", None), (None, "Teil")], [])
+
+    outputs = list(web_ui._with_stream_controls(_fake_stream()))
+
+    # Erster Yield: Stop sichtbar, Send weg — ohne zusätzliche Runde.
+    assert outputs[0][4]["visible"] is True
+    assert outputs[0][3]["visible"] is False
+    # Zwischendurch bleiben die Buttons unverändert.
+    assert outputs[1][3] == gr.update()
+    # Letzter Yield: zurück in den Ruhezustand.
+    assert outputs[-1][3]["visible"] is True
+    assert outputs[-1][4]["visible"] is False
+
+
+def test_stream_controls_repeat_real_values_in_the_final_yield():
+    """Der Schluss-Yield darf für gr.State keinen Update-Marker schicken."""
+    web_ui = _create_web_ui()
+    final_state = [{"role": "assistant", "content": "fertig"}]
+
+    def _fake_stream():
+        yield (None, [("Frage", None), (None, "fertig")], final_state)
+
+    outputs = list(web_ui._with_stream_controls(_fake_stream()))
+
+    assert outputs[-1][1] == [("Frage", None), (None, "fertig")]
+    assert outputs[-1][2] is final_state
+
+
+def test_stream_controls_pass_through_an_empty_stream():
+    web_ui = _create_web_ui()
+
+    assert list(web_ui._with_stream_controls(iter(()))) == []
+
+
+def test_regenerate_drops_last_answer_and_streams_again():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    # Snapshot beim Aufruf: _stream_reply hängt die neue Antwort an dieselbe
+    # Liste an, hinterher wäre nicht mehr sichtbar, was gesendet wurde.
+    sent_snapshot = []
+
+    def _stream(*_args, **kwargs):
+        sent_snapshot.extend(dict(m) for m in kwargs["messages"])
+        return iter(["Neue ", "Antwort"])
+
+    streamer.stream.side_effect = _stream
+    web_ui.streamer = streamer
+
+    chat_history = [("Frage", None), (None, "Alte Antwort")]
+    history_state = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Alte Antwort"},
+    ]
+
+    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui._on_regenerate(chat_history, history_state))
+
+    final_chat, final_state = outputs[-1][1], outputs[-1][2]
+    assert final_chat[-1] == (None, "Neue Antwort")
+    assert "Alte Antwort" not in [row[1] for row in final_chat]
+    # Die Frage bleibt im LLM-Kontext, nur die Antwort wurde ersetzt.
+    assert final_state[0] == {"role": "user", "content": "Frage"}
+    assert final_state[-1] == {"role": "assistant", "content": "Neue Antwort"}
+    assert len(final_state) == 2
+    # Der gleiche Kontext geht erneut ans Modell — kein veränderter Prompt und
+    # ohne die verworfene Antwort.
+    assert sent_snapshot == [{"role": "user", "content": "Frage"}]
+
+
+def test_regenerate_keeps_wiki_hint_rows():
+    """Wiki-Hints sind Bot-Zeilen, stehen aber vor der Antwort und bleiben."""
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.stream.return_value = iter(["Neu"])
+    web_ui.streamer = streamer
+
+    chat_history = [("Frage", None), (None, "🕵️ Hinweis"), (None, "Alte Antwort")]
+    history_state = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Alte Antwort"},
+    ]
+
+    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui._on_regenerate(chat_history, history_state))
+
+    rows = [row[1] for row in outputs[-1][1]]
+    assert "🕵️ Hinweis" in rows
+    assert "Alte Antwort" not in rows
+
+
+def test_regenerate_without_an_answer_warns_and_changes_nothing():
+    web_ui = _create_web_ui()
+    web_ui.bot = "Karl"
+    web_ui.streamer = Mock()
+
+    chat_history = [("Frage", None)]
+    history_state = [{"role": "user", "content": "Frage"}]
+
+    with patch("ui.web_ui.gr.Warning") as warning:
+        outputs = list(web_ui._on_regenerate(chat_history, history_state))
+
+    warning.assert_called_once()
+    web_ui.streamer.stream.assert_not_called()
+    assert outputs[-1][1] == chat_history
+    assert outputs[-1][2] == history_state
+
+
+def test_regenerate_without_persona_is_a_no_op():
+    web_ui = _create_web_ui()
+    web_ui.bot = None
+
+    outputs = list(web_ui._on_regenerate([], []))
+
+    assert len(outputs) == 1
+
+
+def test_reset_sets_the_stream_kill_switch():
+    """cancels allein reicht nicht — der Reset muss die Backend-Arbeit stoppen."""
+    web_ui = _create_web_ui()
+    stop = web_ui._arm_stream_stop()
+
+    web_ui._on_reset_to_start()
+
+    assert stop.is_set()
+
+
+def test_reset_updates_hide_stop_and_regenerate():
+    web_ui = _create_web_ui()
+
+    updates = web_ui._reset_ui_updates()
+    stop_index = PERSONA_OUTPUT_KEYS.index("stop_btn")
+    regenerate_index = PERSONA_OUTPUT_KEYS.index("regenerate_btn")
+
+    assert updates[stop_index]["visible"] is False
+    assert updates[regenerate_index]["visible"] is False
+
+
+def test_persona_selection_shows_regenerate_but_not_stop():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "test"
+
+    updates = web_ui._persona_selected_updates(
+        "karl", {"name": "Karl", "description": "d"}, "Hallo {persona_name}", "Tippe"
+    )
+    stop_index = PERSONA_OUTPUT_KEYS.index("stop_btn")
+    regenerate_index = PERSONA_OUTPUT_KEYS.index("regenerate_btn")
+
+    assert updates[stop_index]["visible"] is False
+    assert updates[regenerate_index]["visible"] is True
+
+
+def test_self_talk_stream_stops_between_turns():
+    web_ui = _create_web_ui()
+    runner = Mock()
+    turns = [("A", "erste", False, None), ("B", "zweite", False, None)]
+    runner.run_turn.side_effect = turns
+    web_ui.self_talk_runner = runner
+
+    generator = web_ui._run_self_talk_stream([], [])
+    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
+        next(generator)  # erster Turn läuft
+        web_ui._on_stop_stream()
+        list(generator)
+
+    # Der laufende Turn wird fertig, ein weiterer startet nicht mehr.
+    assert runner.run_turn.call_count == 1
