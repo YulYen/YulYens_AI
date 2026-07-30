@@ -63,10 +63,6 @@ def main():
     if args.list_ensembles:
         sys.exit(_list_ensembles())
 
-    if not args.ensemble:
-        parser.error(
-            "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
-        )
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
@@ -97,7 +93,12 @@ def main():
         )
         sys.exit(3)
 
-    cfg.ensemble = args.ensemble
+    # -e wins; an `ensemble:` key in config.yaml is the documented fallback.
+    cfg.ensemble = args.ensemble or getattr(cfg, "ensemble", None)
+    if not cfg.ensemble:
+        parser.error(
+            "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
+        )
 
     # 1) Initialize logging first
     ensure_dir_exists(cfg.logging["dir"])

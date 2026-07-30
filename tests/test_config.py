@@ -330,3 +330,31 @@ def test_spaceship_crew_ensemble_resolves_with_forward_slashes():
     finally:
         personas_mod._parse_persona_files.cache_clear()
         Config.reset_instance()
+
+
+def test_config_yaml_ensemble_key_is_preserved(tmp_path):
+    """An `ensemble:` key in config.yaml survives loading (documented -e fallback)."""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        'language: "de"\nensemble: "examples/spaceship_crew"\n', encoding="utf-8"
+    )
+
+    Config.reset_instance()
+    try:
+        cfg = Config(str(cfg_file))
+        assert cfg.ensemble == "examples/spaceship_crew"
+    finally:
+        Config.reset_instance()
+
+
+def test_config_without_ensemble_key_still_has_attribute(tmp_path):
+    """Without the key the attribute exists, so callers can fall back safely."""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text('language: "de"\n', encoding="utf-8")
+
+    Config.reset_instance()
+    try:
+        cfg = Config(str(cfg_file))
+        assert hasattr(cfg, "ensemble")
+    finally:
+        Config.reset_instance()

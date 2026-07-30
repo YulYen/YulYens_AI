@@ -87,8 +87,9 @@ class Config:
             setattr(self, section, settings)
 
         # Persona ensembles are selected at runtime (e.g., via CLI parameter).
-        # Ensure the attribute exists even before it is set explicitly.
-        self.ensemble: str | None = None
+        # Ensure the attribute exists even before it is set explicitly — an
+        # `ensemble:` key in the YAML is kept as documented fallback for `-e`.
+        self.ensemble: str | None = getattr(self, "ensemble", None)
 
     def override(self, section: str, updates: dict) -> None:
         """
