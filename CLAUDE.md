@@ -89,11 +89,11 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
 │   └── test_*.py                # 33 Testmodule
 ├── locales/
-│   ├── de.yaml                  # 113 UI-Texte Deutsch
+│   ├── de.yaml                  # 111 UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
-├── Makefile                     # make format / lint / fix / test / test-all / clean / run
+├── Makefile                     # make setup / format / lint / test / test-ci / evals / clean / run
 └── backlog.md                   # Feature-Backlog mit Effort/Benefit
 ```
 
@@ -324,8 +324,14 @@ eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
 | Variante | erster Token sichtbar |
 |---|---|
 | nackte Gradio-App (kein Guard) | 0,95 s |
-| Projekt, `holdback: 96` (Default) | **4,13 s** |
+| Projekt, `holdback: 96` | 4,13 s |
+| Projekt, `holdback: 32` (Default) | **1,91 s** |
 | Projekt, `holdback: 0` | 0,39 s |
+
+Der Default 32 ist kein runder Wert: das längste Blocklist-Muster (AWS-Secret)
+schlägt erst nach Label + 30 Zeichen an, deshalb bleibt Schlüsselmaterial erst
+ab einem Holdback von 30 vollständig verdeckt. Darunter rutscht es mit durch —
+festgenagelt in `test_default_holdback_keeps_key_material_hidden`.
 
 Der Verzug entsteht **serverseitig** — der SSE-Frame auf `/queue/data` geht erst
 bei +4,09 s raus, gerendert wird danach in 40 ms. Beim Suchen also nicht im

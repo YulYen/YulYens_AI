@@ -67,8 +67,13 @@ def _render_prompt_trace(
 # Number of trailing characters held back while streaming so that a PII or
 # secret pattern split across token boundaries is still detected before any
 # part of it reaches the user. Best-effort: patterns longer than this window
-# can still leak their prefix, so keep it above the longest blocklist match.
-_STREAM_HOLDBACK_CHARS = 96
+# can still leak their prefix.
+#
+# This is also the single biggest contributor to the perceived response time
+# (#51): nothing reaches the display before this many characters exist. The
+# default favours a local, single-user setup — see the comment on
+# `security.stream_holdback_chars` in config.yaml for when to raise it.
+_STREAM_HOLDBACK_CHARS = 32
 
 
 def _output_checks_active(guard: BasicGuard | None) -> bool:

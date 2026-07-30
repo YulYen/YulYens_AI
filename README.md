@@ -102,6 +102,7 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 - 👉 Anleitung zum
    [Eigenen Ensemble (DE)](docs/de/Ensemble_hinzufuegen.md) /
    [Custom ensemble (EN)](docs/en/Adding_an_ensemble.md)
+- 👉 [Eval-Suite: Korpora & Judge](evals/ReadMe.md)
 - 👉 [Feature-Backlog](backlog.md)
 
 ---

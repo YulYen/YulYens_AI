@@ -162,7 +162,10 @@ def test_secret_split_across_tokens_is_blocked() -> None:
 
     assert "sk-" not in out
     assert "SECRETTOBLOCK" not in out
-    assert out == guard.texts["security_blocked_keyword"]
+    # Der harmlose Text vor dem Secret darf beim Default-Holdback schon
+    # sichtbar sein — entscheidend ist, dass vom Schlüssel nichts durchkommt
+    # und die Blockmeldung erscheint.
+    assert out.endswith(guard.texts["security_blocked_keyword"])
 
 
 def test_email_split_across_tokens_is_masked() -> None:
@@ -244,7 +247,8 @@ def test_holdback_delays_the_first_visible_output() -> None:
         llm_core=core, guard=BasicGuard(True, True, True, True)
     )
 
-    assert _tokens_until_first_output(provider, core) >= 16
+    # Default-Holdback 32, Tokens à 6 Zeichen -> rund 6 Tokens Vorlauf.
+    assert _tokens_until_first_output(provider, core) >= 5
 
 
 def test_without_holdback_the_first_token_goes_out_at_once() -> None:
@@ -273,7 +277,7 @@ def test_holdback_override_rejects_garbage_and_keeps_the_default() -> None:
 
     provider.set_stream_holdback("keine Zahl")
 
-    assert provider.stream_holdback == 96
+    assert provider.stream_holdback == 32
     provider.set_stream_holdback(-5)
     assert provider.stream_holdback == 0
 
@@ -313,3 +317,58 @@ def test_output_blocklist_alone_keeps_the_holdback() -> None:
     out = "".join(provider.stream([{"role": "user", "content": "key?"}]))
 
     assert "sk-" not in out
+
+
+def test_default_holdback_keeps_key_material_hidden() -> None:
+    """Warum der Default 32 ist und nicht kleiner.
+
+    Das längste Muster der Blocklist (AWS-Secret-Heuristik) schlägt erst an,
+    wenn Label plus 30 Zeichen Schlüsselmaterial da sind. Bis dahin gibt der
+    Moderator alles frei, was weiter als `holdback` zurückliegt. Erst ab einem
+    Holdback von 30 bleibt das Schlüsselmaterial selbst vollständig verdeckt —
+    32 liegt knapp darüber. Wird der Default je darunter gesetzt, schlägt dieser
+    Test an.
+    """
+    guard = BasicGuard(True, True, True, True)
+    block_message = guard.texts["security_blocked_keyword"]
+    label = "aws_secret_access_key = "
+    key_material = "aB3/xY9+" * 5
+
+    core = FakeTokenCore(
+        [
+            (label + key_material)[i : i + 4]
+            for i in range(0, len(label + key_material), 4)
+        ]
+    )
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    emitted = [
+        chunk
+        for chunk in provider.stream([{"role": "user", "content": "key?"}])
+        if chunk != block_message
+    ]
+    leaked = "".join(emitted)
+
+    # Vom Label darf beim schnellen Default etwas sichtbar werden …
+    assert len(leaked) <= len(label)
+    # … vom Schlüssel selbst nichts.
+    assert not any(part in leaked for part in (key_material[:8], key_material[8:16]))
+
+
+def test_raising_the_holdback_hides_even_the_label() -> None:
+    """Gegenprobe: 96 verdeckt auch den Kontext um das Secret herum."""
+    guard = BasicGuard(True, True, True, True)
+    block_message = guard.texts["security_blocked_keyword"]
+    secret = "aws_secret_access_key = " + "aB3/xY9+" * 5
+
+    core = FakeTokenCore([secret[i : i + 4] for i in range(0, len(secret), 4)])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+    provider.set_stream_holdback(96)
+
+    leaked = "".join(
+        chunk
+        for chunk in provider.stream([{"role": "user", "content": "key?"}])
+        if chunk != block_message
+    )
+
+    assert leaked == ""
