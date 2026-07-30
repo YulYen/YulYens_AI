@@ -87,9 +87,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 23 Testmodule
+│   └── test_*.py                # 33 Testmodule
 ├── locales/
-│   ├── de.yaml                  # 83+ UI-Texte Deutsch
+│   ├── de.yaml                  # 113 UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration

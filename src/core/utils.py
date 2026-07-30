@@ -113,3 +113,18 @@ def is_ollama_module_not_found(exc: ModuleNotFoundError) -> bool:
     return missing_name == "ollama" or (
         missing_name is None and "ollama" in str(exc).lower()
     )
+
+
+SAME_AS_CHAT = "same_as_chat"
+
+
+def resolve_model_name(configured: str | None, chat_model_name: str) -> str:
+    """Resolve the ``same_as_chat`` sentinel used by Karl (#12) and the eval judge (#41).
+
+    Both features let you point a helper task at its own model or reuse the chat
+    model. Same sentinel, same meaning — so it lives in one place.
+    """
+    name = (configured or "").strip()
+    if not name or name == SAME_AS_CHAT:
+        return chat_model_name
+    return name

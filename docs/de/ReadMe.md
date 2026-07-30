@@ -123,6 +123,7 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Scha
 - `ui.type`: wählt die Oberfläche (`"terminal"`, `"web"` oder `null` für nur API).
 - `tts.enabled`: schaltet Text-to-Speech ein/aus.
 - `tts.features.terminal_auto_create_wav`: erzeugt im Terminal-Modus pro Antwort eine WAV-Datei und spielt sie ab — Windows über `winsound`, Linux/macOS über `paplay`/`aplay`/`ffplay` bzw. `afplay`. Ohne verfügbaren Player bleibt es bei der Datei in `out/`.
+- `api.openai_compatible`: schaltet die OpenAI-kompatiblen Endpunkte frei (`/v1/models`, `/v1/chat/completions`), mit denen fremde Clients wie Open WebUI mit den Personas sprechen. **Sobald `api.host` nicht mehr auf `127.0.0.1` steht, gehört hier ein `api_key` gesetzt** — am besten als `"env:YULYEN_API_KEY"` statt im Klartext. `rate_limit_per_minute` begrenzt Anfragen pro Client.
 - `security.stream_holdback_chars`: **die Stellschraube, wenn die Antwort „spät losläuft".** Der Ausgangs-Guard hält so viele Zeichen zurück, damit ein Passwort oder eine E-Mail-Adresse nicht schon halb sichtbar ist, bevor er sie erkennt. Der Preis: vor so vielen Zeichen erscheint gar nichts. Im Browser gemessen (24 Zeichen/s): `96` (Standard) → erstes Wort nach ~4 s, `0` → nach ~0,4 s. Wer die Personas ohnehin nur lokal und für sich nutzt, kann den Wert bedenkenlos senken; wer den Server im Netz hat, lässt ihn hoch.
 
 Beispiel:

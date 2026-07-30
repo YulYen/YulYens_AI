@@ -18,11 +18,14 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 
 - **Ask-All**: eine Frage an alle Personas, Antworten erscheinen live gestreamt
 - **AI-Dialog (Self-Talk)**: zwei Personas unterhalten sich automatisch
+- **Stop & Nochmal**: laufende Antworten abbrechen (die Teilantwort bleibt stehen) oder mit demselben Kontext neu erzeugen
+- **OpenAI-kompatible API**: `/v1/chat/completions` mit der Persona als `model` — damit sprechen Open WebUI, Handy-Apps und Editor-Plugins mit LEAH & Co., inklusive Guard und Wiki
 - **Text-to-Speech** mit Piper (persona-eigene Stimmen)
 - **E-Mail-Adapter** (opt-in): Personas per IMAP/SMTP anschreiben
 - **Security-Guard**: Prompt-Injection-Schutz, PII-Filter, Wrongdoing-Guardrail mit Session-Lock
 - **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python src/launch.py --list-ensembles`
 - **Antwort-Feedback**: 👍/👎 pro Antwort, gesammelt in `logs/feedback_votes.jsonl` als Datenbasis für Auswertung und Finetuning
+- **Eval-Suite**: goldene Fragen pro Persona und ein Guard-Red-Team-Korpus als YAML — beantwortet messbar, ob eine Änderung das Modell besser gemacht hat (`python scripts/run_evals.py -e classic`)
 - **Setup-Doktor**: `python src/launch.py --doctor` prüft Ollama, Modell, spaCy, Kiwix und VRAM mit konkreten Fix-Hinweisen
 
 ---
@@ -107,6 +110,8 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 
 - `src/` – Anwendungscode (Web-UI, Terminal-UI, API, Core-Logik, E-Mail-Adapter, TTS, Security)
 - `ensembles/` – Konfiguration der Personas (Prompts, LLM-Optionen, Avatare)
+- `evals/` – Eval-Korpora als YAML (goldene Fragen, Guard-Red-Team)
+- `scripts/` – Hilfsskripte (u. a. `run_evals.py`)
 - `locales/` – UI-Texte (DE/EN)
 - `docs/` – Dokumentation & Screenshots
 - `logs/`, `tests/` – Laufzeitdaten & Pytest-Suite

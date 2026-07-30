@@ -15,7 +15,12 @@ class UnknownPersonaError(ValueError):
 
 
 class AiApiProvider:
-    """Provides AI answers through the API (one-shot)."""
+    """Provides AI answers through the API.
+
+    Two shapes: ``answer()`` for the one-shot ``/ask`` endpoint, and
+    ``stream_messages()`` for the OpenAI-compatible endpoints (#37), which take
+    a client-supplied history and stream tokens back.
+    """
 
     def __init__(
         self,

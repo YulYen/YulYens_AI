@@ -12,6 +12,8 @@ import os
 import sys
 from pathlib import Path
 
+from core.utils import resolve_model_name
+
 from evals import corpus as corpus_mod
 from evals.judge import Judge
 from evals.report import render_csv, render_markdown
@@ -161,16 +163,16 @@ def main(argv: list[str] | None = None) -> int:
 
         judge = None
         if not args.no_judge:
-            judge_model = args.judge_model or evals_cfg.get("judge_model") or model_name
-            # Same sentinel as context_management.karl.model.
-            if str(judge_model) == "same_as_chat":
-                judge_model = model_name
+            # Gleicher "same_as_chat"-Sentinel wie bei context_management.karl.model.
+            judge_model = resolve_model_name(
+                args.judge_model or evals_cfg.get("judge_model"), model_name
+            )
             judge = Judge(
                 llm_core=factory.get_llm_core(),
-                model_name=str(judge_model),
+                model_name=judge_model,
                 keep_alive=int(cfg.core.get("keep_alive", 600)),
             )
-            run.judge_model = str(judge_model)
+            run.judge_model = judge_model
 
         persona_corpora = corpus_mod.load_persona_corpora()
         if args.personas:
