@@ -77,21 +77,45 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-      - name: spaCy-Modell aus dem Cache holen
+      - name: Passende Modellversion aus der installierten spaCy ableiten
+        # Nicht hart pinnen: requirements.txt erlaubt spacy>=3.7,<4.0, und ein
+        # Modell verlangt seinerseits genau die passende Minor-Linie
+        # (de_core_news_lg 3.7.0 will spacy<3.8.0). Eine feste Version bricht
+        # daher, sobald spaCy eine Minor weiterzieht.
+        id: spacy-version
+        run: |
+          ver=$(python -c "import spacy; print('.'.join(spacy.__version__.split('.')[:2]))")
+          echo "model=${ver}.0" >> "$GITHUB_OUTPUT"
+          echo "spacy=${ver}" >> "$GITHUB_OUTPUT"
+      - name: spaCy-Modelle aus dem Cache holen
         id: spacy-cache
         uses: actions/cache@v4
         with:
-          # Der Key nennt die Modellversion — ein Upgrade lädt neu, sonst nie.
+          # Key trägt die Modellversion: eine neue spaCy-Minor lädt neu, sonst nie.
           path: ~/spacy-models
-          key: spacy-de_core_news_lg-3.7.0
-      - name: spaCy-Modell herunterladen (nur bei Cache-Miss)
+          key: spacy-models-${{ steps.spacy-version.outputs.model }}
+      - name: spaCy-Modelle herunterladen (nur bei Cache-Miss)
         if: steps.spacy-cache.outputs.cache-hit != 'true'
+        env:
+          MODEL_VERSION: ${{ steps.spacy-version.outputs.model }}
         run: |
           mkdir -p ~/spacy-models
-          pip download de_core_news_lg==3.7.0 --no-deps -d ~/spacy-models \
-            --find-links https://github.com/explosion/spacy-models/releases/expanded_assets/de_core_news_lg-3.7.0
-      - name: spaCy-Modell installieren
-        run: pip install --no-index --find-links ~/spacy-models de_core_news_lg
+          base=https://github.com/explosion/spacy-models/releases/download
+          # lg für die Keyword-Tests, md für den einen Wiki-Test, der md verlangt.
+          for name in de_core_news_lg de_core_news_md; do
+            url="${base}/${name}-${MODEL_VERSION}/${name}-${MODEL_VERSION}-py3-none-any.whl"
+            curl -fsSL -o "$HOME/spacy-models/${name}-${MODEL_VERSION}-py3-none-any.whl" "$url"
+          done
+      - name: spaCy-Modelle installieren
+        # --no-deps ist der Punkt: die Wheels verlangen ihrerseits eine spaCy-
+        # Version, die längst installiert ist. Ohne das Flag versucht pip sie
+        # aufzulösen und scheitert.
+        run: pip install --no-deps ~/spacy-models/*.whl
+      - name: Modelle sind wirklich importierbar
+        # Sonst würden die Tests einfach wieder skippen und der Job wäre grün,
+        # ohne etwas geprüft zu haben.
+        run: |
+          python -c "import de_core_news_lg, de_core_news_md; print('Modelle da')"
       - name: Keyword- und Wiki-Tests
         # Gezielt die Tests, die das Modell brauchen — der Rest läuft im
         # test-Job und muss hier nicht doppelt laufen.
