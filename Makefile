@@ -1,4 +1,4 @@
-.PHONY: setup format lint fix test test-ci test-all coverage clean run evals evals-full
+.PHONY: setup format lint types fix test test-ci test-all coverage clean run evals evals-full
 
 setup:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -13,6 +13,10 @@ format:
 
 lint:
 	python -m ruff check .
+
+# Typprüfung nur für src/core (#52); Pfade stehen in pyproject.toml.
+types:
+	python -m mypy
 
 fix:
 	python -m ruff check --fix .
@@ -40,7 +44,7 @@ evals-full:
 # Python statt find: das Projekt läuft Windows-primär, dort gibt es kein find.
 clean:
 	python -c "import pathlib, shutil; \
-	[shutil.rmtree(p, ignore_errors=True) for d in ('__pycache__', '.pytest_cache', '.ruff_cache') \
+	[shutil.rmtree(p, ignore_errors=True) for d in ('__pycache__', '.pytest_cache', '.ruff_cache', '.mypy_cache') \
 	 for p in pathlib.Path('.').rglob(d)]; \
 	[p.unlink(missing_ok=True) for p in pathlib.Path('.').rglob('*.pyc')]"
 

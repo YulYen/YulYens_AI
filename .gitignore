@@ -11,6 +11,7 @@ logs/
 
 # Test-/Pytest-Cache
 .pytest_cache/
+.mypy_cache/
 tests/__pycache__/
 
 # Coverage

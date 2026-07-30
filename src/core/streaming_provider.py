@@ -16,7 +16,7 @@ import logging
 import os
 import threading
 import time
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from typing import Any
 
 from config.config_singleton import Config
@@ -123,7 +123,7 @@ class _StreamModerator:
     def _block_message(self, reason: str | None) -> str:
         self.blocked = True
         return zeigefinger_message(
-            {"reason": reason or "blocked_keyword", "detail": ""},
+            {"ok": False, "reason": reason or "blocked_keyword", "detail": ""},
             texts=self.guard_texts,
         )
 
@@ -312,10 +312,14 @@ class YulYenStreamingProvider:
                 "%s", _render_prompt_trace(self.persona, self.model_name, messages)
             )
 
-    def stream(self, messages: list[dict[str, Any]]) -> Iterator[str]:
+    def stream(self, messages: list[dict[str, Any]]) -> Generator[str, None, None]:
         """
         Generator that yields the LLM response token by token.
         Includes logging and security checks.
+
+        Generator, nicht bloß Iterator: Aufrufer schließen den Stream
+        explizit (``close()``), damit das ``finally`` hier den Backend-Stream
+        beendet, statt auf den GC zu warten.
         """
         guard_texts = getattr(self.guard, "texts", None) if self.guard else None
         # Pre-check: validate the latest user message

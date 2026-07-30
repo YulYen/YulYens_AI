@@ -24,6 +24,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
 | Formatting | Black (88), Ruff |
+| Typen | mypy (nur `src/core`) |
 
 ## Verzeichnisstruktur
 
@@ -94,7 +95,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
-├── Makefile                     # make setup / format / lint / test / test-ci / evals / clean / run
+├── Makefile                     # make setup / format / lint / types / test / test-ci / evals / clean / run
 └── backlog.md                   # Feature-Backlog mit Effort/Benefit
 ```
 
@@ -259,10 +260,12 @@ in der CI (z. B. würde `api.enabled: false` sonst API-Tests brechen).
 |---|---|
 | **Format & lint** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten) |
 | **Tests (ubuntu-latest / windows-latest)** | Volle Suite ohne `ollama`-Marker, mit `--cov`. Die Windows-Matrix ist der Punkt: das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf (#45) |
+| **Typen (mypy)** | `python -m mypy` — blockierend, aber bewusst nur über `src/core` (Konfiguration in `pyproject.toml`). `follow_imports = silent` liest den Rest fürs Signatur-Wissen mit, meldet dort aber nichts; Erweiterung Modul für Modul |
 | **Tests mit spaCy-Modell** | `de_core_news_lg` per `actions/cache` (versionierter Key), dann gezielt `test_spacy_keywords.py` + `test_wiki.py` — die liefen sonst nur als Skips |
 
 Coverage steht als Zahl in der Job-Summary (kein externer Badge-Dienst, der
-Account + Token bräuchte). mypy ist bewusst **nicht** eingehängt → Backlog #52.
+Account + Token bräuchte). mypy läuft seit #52 blockierend über `src/core`;
+`make types` ist die lokale Kurzform.
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
@@ -378,6 +381,7 @@ Highlights:
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
 - **Quick Wins:** #27 Ask-All-Moderator, #36 WebUI-Politur, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
+  (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -387,7 +391,7 @@ Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei
 via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen),
 #25 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
-#32/#32a Wiki-Quellen-Transparenz.
+#32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`.
 
 ## Sprachstrategie
 

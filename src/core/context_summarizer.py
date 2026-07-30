@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -33,7 +34,7 @@ class KarlSummarizer:
         )
         self._log_dir = self._require_non_empty_str(config, "log_dir")
 
-    def summarize(self, messages: list[dict]) -> list[dict]:
+    def summarize(self, messages: Sequence[dict]) -> list[dict]:
         items = [dict(message) for message in messages]
         if len(items) <= self._keep_last_messages:
             return items

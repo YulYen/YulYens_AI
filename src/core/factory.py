@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime
+from typing import TYPE_CHECKING, Any
 
 import config.personas as personas
 from config.config_singleton import Config
@@ -14,6 +15,10 @@ from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
 from core.dummy_llm_core import DummyLLMCore
 from core.llm_core import LLMCore
 from core.streaming_provider import YulYenStreamingProvider
+
+if TYPE_CHECKING:  # zur Laufzeit bewusst nicht importiert (optionale Abhängigkeit)
+    from core.ollama_llm_core import OllamaLLMCore
+
 from core.utils import (
     _system_prompt_with_date,
     _wiki_mode_enabled,
@@ -89,7 +94,7 @@ class AppFactory:
                 num_ctx_values.append(int(opts["num_ctx"]))
             except (KeyError, TypeError, ValueError):
                 continue
-        options: dict | None = {"num_predict": 1}
+        options: dict[str, Any] = {"num_predict": 1}
         if num_ctx_values:
             options["num_ctx"] = max(num_ctx_values)
 
@@ -112,7 +117,10 @@ class AppFactory:
         """Creates a new LLM streamer for the given persona."""
         core_cfg = self._cfg.core
         persona_prompt = _system_prompt_with_date(persona_name, self._cfg)
-        options = personas.get_options(persona_name)
+        # get_options liefert None, wenn eine Persona keine llm_options hat;
+        # der Provider erwartet ein dict und würde sonst beim ersten
+        # Kontext-Check über None stolpern (von mypy gefunden, #52).
+        options = personas.get_options(persona_name) or {}
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = (
             f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"
@@ -213,7 +221,7 @@ class AppFactory:
 
         raise ValueError(f"Unsupported backend: {backend!r}")
 
-    def _load_ollama_core_class(self) -> type[LLMCore]:
+    def _load_ollama_core_class(self) -> type[OllamaLLMCore]:
         """Isolated import to encapsulate the optional dependency cleanly."""
 
         from core.ollama_llm_core import OllamaLLMCore

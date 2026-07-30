@@ -24,6 +24,24 @@ jobs:
       - name: Ruff
         run: python -m ruff check .
 
+  types:
+    # Typprüfung nur für src/core (#52). Blockierend — ein Job, der auch gelb
+    # sein darf, wird ignoriert und ist damit wertlos. Konfiguration (Pfade,
+    # follow_imports, Stub-Ausnahmen) steht in pyproject.toml.
+    name: Typen (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install tooling
+        run: pip install -r requirements-dev.txt
+      # 'python -m' wie bei Black/Ruff (PATH-Shadowing-Falle, siehe CLAUDE.md)
+      - name: mypy
+        run: python -m mypy
+
   test:
     # OS-Matrix (#45): Das Projekt läuft Windows-primär, die CI lief bisher nur
     # auf Linux — winsound- und Pfadprobleme wären hier nie aufgefallen.

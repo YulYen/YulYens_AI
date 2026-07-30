@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -21,6 +22,24 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 class Config:
+    # Die YAML-Sektionen landen per setattr auf der Instanz (siehe
+    # _load_config). Ohne diese Deklarationen sieht ein Typprüfer sie nicht —
+    # sie sind reine Annotationen, zur Laufzeit entsteht hier nichts (#52).
+    # Fehlt eine Sektion in der YAML, existiert das Attribut nicht; Aufrufer
+    # nutzen dafür wie bisher `getattr(cfg, "stt", {})`.
+    api: dict[str, Any]
+    briefing: dict[str, Any]
+    context_management: dict[str, Any]
+    core: dict[str, Any]
+    email_adapter: dict[str, Any]
+    evals: dict[str, Any]
+    logging: dict[str, Any]
+    security: dict[str, Any]
+    stt: dict[str, Any]
+    tts: dict[str, Any]
+    ui: dict[str, Any]
+    wiki: dict[str, Any]
+
     _instance: Config | None = None
 
     def __new__(cls, path: str = "config.yaml"):
