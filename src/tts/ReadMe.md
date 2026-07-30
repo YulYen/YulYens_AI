@@ -37,3 +37,7 @@ tts:
 - In Terminal UI, automatic WAV generation/playback is currently supported on Windows only.
 - On Windows, output files are written to `out/<timestamp>_<persona>.wav`.
 - On Linux/macOS, `tts.audio_player` import fails (`winsound` missing), so this auto-create/autoplay path is skipped.
+- In the Web UI, the "Read aloud 🔊" button plays the latest reply in the
+  browser (`tts.features.web_read_aloud`, default on) — platform-independent,
+  since no `winsound` is involved. The button only appears when piper-tts is
+  installed. Voices are loaded once and cached per model path.

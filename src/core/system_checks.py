@@ -63,7 +63,12 @@ def check_ollama_reachable(ollama_url: str, timeout: float = 2.0) -> CheckResult
     return CheckResult("ollama", True, CRITICAL, f"reachable at {base}")
 
 
-def _fetch_model_names(ollama_url: str, timeout: float) -> list[str]:
+def fetch_model_names(ollama_url: str, timeout: float = 2.0) -> list[str]:
+    """Lists the installed Ollama models (names carry the ':tag' suffix).
+
+    Raises ``requests.RequestException``/``ValueError`` on connection or
+    payload errors — callers decide how to degrade.
+    """
     base = _ollama_base(ollama_url)
     resp = requests.get(f"{base}/api/tags", timeout=timeout)
     resp.raise_for_status()
@@ -77,7 +82,7 @@ def check_model_available(
     if not model_name:
         return CheckResult("ollama_model", False, CRITICAL, "core.model_name is empty")
     try:
-        names = _fetch_model_names(ollama_url, timeout)
+        names = fetch_model_names(ollama_url, timeout)
     except (requests.RequestException, ValueError) as exc:
         return CheckResult(
             "ollama_model", False, CRITICAL, f"could not list models: {exc}"

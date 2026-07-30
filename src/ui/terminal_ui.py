@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
@@ -53,6 +54,10 @@ class TerminalUI:
         self.tts_auto_wav_enabled = bool(self.tts_cfg.get("enabled")) and bool(
             self.tts_cfg.get("features", {}).get("terminal_auto_create_wav")
         )
+        self.briefing_cfg = getattr(config, "briefing", {}) or {}
+        self.briefing_enabled = bool(self.briefing_cfg.get("enabled")) and bool(
+            self.briefing_cfg.get("feeds")
+        )
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: list[dict[str, str]] = []
@@ -79,6 +84,9 @@ class TerminalUI:
             "terminal_save_hint", "('/save <pfad> zum Speichern)"
         )
         print(f"{Fore.MAGENTA}{save_hint}{Style.RESET_ALL}")
+        if self.briefing_enabled:
+            briefing_hint = self.texts.get("terminal_briefing_hint", "/briefing")
+            print(f"{Fore.MAGENTA}{briefing_hint}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(
@@ -303,6 +311,12 @@ class TerminalUI:
                     break
                 continue
 
+            # Briefing: summarize the configured RSS feeds
+            if user_input.lower() == "/briefing":
+                if self.briefing_enabled:
+                    self._handle_briefing_command()
+                continue
+
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
             if self.keyword_finder:
                 wiki_hints, contexts = lookup_wiki_snippet(
@@ -330,23 +344,50 @@ class TerminalUI:
 
             self._ensure_context_headroom()
 
-            # --- (3) Stream the answer token by token ---
-            self.print_bot_prefix(self.bot)
-            reply = ""
-            for token in self.streamer.stream(messages=self.history):
-                reply += token
-                self.print_stream(token)
+            # --- (3) + (4) Stream the answer and record it in history ---
+            self._stream_and_record_reply()
 
-            # --- (4) Add the answer to history with a clean finish ---
-            logging.info(f"[Terminal] {self.bot}: {reply}")
+    def _stream_and_record_reply(self) -> None:
+        """Streams the reply token by token, records it and finishes cleanly."""
+        self.print_bot_prefix(self.bot)
+        reply = ""
+        for token in self.streamer.stream(messages=self.history):
+            reply += token
+            self.print_stream(token)
 
-            self.history.append({"role": "assistant", "content": reply})
-            self._maybe_create_tts_wav(reply)
-            # Always ensure two trailing blank lines after the answer:
-            # (If streaming already emitted \n, add only the missing ones.)
-            trailing_nl = len(reply) - len(reply.rstrip("\n"))
-            for _ in range(max(0, 2 - trailing_nl)):
-                print()
+        logging.info(f"[Terminal] {self.bot}: {reply}")
+
+        self.history.append({"role": "assistant", "content": reply})
+        self._maybe_create_tts_wav(reply)
+        # Always ensure two trailing blank lines after the answer:
+        # (If streaming already emitted \n, add only the missing ones.)
+        trailing_nl = len(reply) - len(reply.rstrip("\n"))
+        for _ in range(max(0, 2 - trailing_nl)):
+            print()
+
+    def _handle_briefing_command(self) -> None:
+        """Fetches the configured feeds and lets the persona summarize them."""
+        timeout = (
+            float(self.briefing_cfg.get("timeout_connect", 5.0)),
+            float(self.briefing_cfg.get("timeout_read", 8.0)),
+        )
+        hints, items = fetch_briefing_items(self.briefing_cfg, self.bot, timeout)
+
+        for hint in hints:
+            if hint:
+                print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+
+        if not items:
+            print(f"{Fore.YELLOW}{self._t('briefing_empty')}{Style.RESET_ALL}\n")
+            return
+
+        # Same ordering as the wiki context: system messages first, then user turn
+        inject_briefing_context(self.history, items)
+        self.history.append(
+            {"role": "user", "content": self._t("briefing_user_prompt")}
+        )
+        self._ensure_context_headroom()
+        self._stream_and_record_reply()
 
     def _maybe_create_tts_wav(
         self,
