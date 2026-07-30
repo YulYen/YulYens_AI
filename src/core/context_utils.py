@@ -94,7 +94,10 @@ def approx_token_count(
     overhead_tokens = per_request_overhead + message_count * per_message_overhead
     estimate = max(content_tokens + overhead_tokens, 0)
 
-    logging.info(
+    # DEBUG, nicht INFO: seit der OpenAI-kompatiblen API (#37) läuft das zweimal
+    # pro Request für die usage-Angabe. Auf INFO wäre das reiner Logspam in einem
+    # ganz normalen Betrieb.
+    logging.debug(
         "[approx_token_count] chars_per_token=%s, n_msgs=%s, total_chars=%s, "
         "content_tokens≈%s, overhead=%s, estimate=%s",
         chars_per_token,

@@ -62,8 +62,6 @@ briefing_context_guardrail: "Nutze ausschließlich die folgenden Meldungen aus d
 briefing_context_message: "Meldung aus {source}: {snippet}"
 wiki_lookup_prefix_online: "🕵️ {persona_name} wirft einen Blick in die echte Wikipedia:"
 wiki_lookup_prefix_offline: "🕵️‍♀️ {persona_name} blättert im lokalen Wikipedia-Archiv:"
-broadcast_table_persona_header: "Persona"
-broadcast_table_answer_header: "Antwort"
 terminal_broadcast_disabled: "Broadcast-Modus ist in der config.yaml deaktiviert (experimentell)."
 terminal_persona_prompt: "Nummer der gewünschten Persona:"
 terminal_persona_selected: "Persona {persona_name} ausgewählt."

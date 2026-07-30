@@ -37,10 +37,12 @@ evals:
 evals-full:
 	python scripts/run_evals.py -e classic
 
+# Python statt find: das Projekt läuft Windows-primär, dort gibt es kein find.
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name .pytest_cache -exec rm -rf {} +
-	find . -name "*.pyc" -delete
+	python -c "import pathlib, shutil; \
+	[shutil.rmtree(p, ignore_errors=True) for d in ('__pycache__', '.pytest_cache', '.ruff_cache') \
+	 for p in pathlib.Path('.').rglob(d)]; \
+	[p.unlink(missing_ok=True) for p in pathlib.Path('.').rglob('*.pyc')]"
 
 run:
 	python src/launch.py -e classic

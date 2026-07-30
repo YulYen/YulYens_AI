@@ -145,6 +145,11 @@ class AppFactory:
         if guard:
             streamer.set_guard(guard)
 
+        # Optional: Straddle-Schutz gegen wahrgenommene Latenz abwägen (#51).
+        holdback = (sec_cfg or {}).get("stream_holdback_chars")
+        if holdback is not None:
+            streamer.set_stream_holdback(holdback)
+
         return streamer
 
     def get_llm_core(self) -> LLMCore:

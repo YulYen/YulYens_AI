@@ -36,6 +36,12 @@ if TYPE_CHECKING:
 ChatPair = tuple[str | None, str | None]
 Message = dict[str, str]
 
+# Wie oft gestreamte Updates höchstens an den Browser gehen (Sekunden). Ohne
+# Drossel schickt Gradio ein Websocket-Frame pro Token. Der erste Chunk geht
+# immer sofort durch (last_flush startet bei 0.0). Zweite Timing-Stellschraube
+# neben security.stream_holdback_chars (#51).
+STREAM_FLUSH_INTERVAL_S = 0.1
+
 # Feedback votes (#40) are appended from Gradio event handlers that may run
 # concurrently for multiple browser sessions sharing one WebUI instance.
 _feedback_log_lock = threading.Lock()
@@ -277,7 +283,7 @@ class WebUI:
                     break
                 reply += token
                 now = time.monotonic()
-                if now - last_flush >= 0.1:
+                if now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                     last_flush = now
                     yield None, chat_history + [(None, reply)], message_history
         finally:
@@ -850,7 +856,7 @@ class WebUI:
                 for token in shown_reply:
                     progressive += token
                     now = time.monotonic()
-                    if now - last_flush >= 0.1:
+                    if now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                         last_flush = now
                         yield chat_history + [(None, progressive)], history_state
                 chat_history.append((None, shown_reply))
@@ -975,7 +981,7 @@ class WebUI:
             replies[event["persona"]] = event["reply"] or "…"
 
             now = time.monotonic()
-            if event["type"] == "done" or now - last_flush >= 0.1:
+            if event["type"] == "done" or now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                 last_flush = now
                 yield self._ask_all_state(
                     question,

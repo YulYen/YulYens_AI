@@ -4,6 +4,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from core.utils import resolve_model_name
+
 
 class KarlSummarizationError(RuntimeError):
     """Raised when Karl cannot summarize the current conversation."""
@@ -93,10 +95,10 @@ class KarlSummarizer:
             )
 
     def _resolve_model_name(self, config: dict[str, Any]) -> str:
+        # _require_non_empty_str bleibt: für Karl ist ein fehlender Key ein
+        # Konfigurationsfehler, nicht ein stiller Rückfall auf das Chat-Modell.
         model_name = self._require_non_empty_str(config, "model")
-        if model_name == "same_as_chat":
-            return self._chat_model_name
-        return model_name
+        return resolve_model_name(model_name, self._chat_model_name)
 
     @staticmethod
     def _format_history(messages: list[dict]) -> str:

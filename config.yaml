@@ -181,6 +181,30 @@ security:
   wrongdoing_lock_turns: 0
   # Input: block wrongdoing (weapons/violence) + injections/PII.
   # Output: mask PII, block secrets.
+  #
+  # Wie viele Zeichen am Ende des Streams zurückgehalten werden, damit ein
+  # PII-/Secret-Muster nicht über eine Token-Grenze hinweg durchrutscht.
+  # ⚠️ Das ist DIE Stellschraube für die wahrgenommene Antwortzeit (#51): es
+  # geht nichts an die Anzeige, bevor so viele Zeichen erzeugt sind. Im Browser
+  # gemessen bei 24 Zeichen/s: 96 → ~4,1 s bis zum ersten Wort, 32 → ~1,9 s,
+  # 0 → ~0,4 s.
+  #
+  # Default 32: guter Kompromiss für den typischen Fall — lokal, ein Nutzer,
+  # niemand sonst liest mit. Deckt IBAN, AWS-Access-Key und Telefonnummern
+  # vollständig ab.
+  #
+  # Auf 96 erhöhen, wenn eines davon zutrifft:
+  #   - der Server ist für andere erreichbar (api.host ≠ 127.0.0.1,
+  #     ui.web.host ≠ 127.0.0.1, Gradio-Share-Link, E-Mail-Adapter aktiv)
+  #   - in den Gesprächen tauchen echte Zugangsdaten oder fremde
+  #     personenbezogene Daten auf, die das Modell nachplappern könnte
+  # Denn erst ab ~96 Zeichen liegen auch lange Muster (E-Mail-Adressen,
+  # API-Keys) sicher innerhalb des Fensters, bevor der erste Teil sichtbar wird.
+  #
+  # 0 schaltet den Straddle-Schutz ab. Wirkt ohnehin nur, wenn pii_protection
+  # oder output_blocklist an ist — sonst gibt es ausgangsseitig nichts zu prüfen
+  # und es wird automatisch nichts zurückgehalten.
+  stream_holdback_chars: 32
 
 # --- Context management ---------------------------------------------------------
 # strategy "heuristic" (default): quick token-based trimming of old messages.

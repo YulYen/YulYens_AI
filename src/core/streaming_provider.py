@@ -67,8 +67,25 @@ def _render_prompt_trace(
 # Number of trailing characters held back while streaming so that a PII or
 # secret pattern split across token boundaries is still detected before any
 # part of it reaches the user. Best-effort: patterns longer than this window
-# can still leak their prefix, so keep it above the longest blocklist match.
-_STREAM_HOLDBACK_CHARS = 96
+# can still leak their prefix.
+#
+# This is also the single biggest contributor to the perceived response time
+# (#51): nothing reaches the display before this many characters exist. The
+# default favours a local, single-user setup — see the comment on
+# `security.stream_holdback_chars` in config.yaml for when to raise it.
+_STREAM_HOLDBACK_CHARS = 32
+
+
+def _output_checks_active(guard: BasicGuard | None) -> bool:
+    """True when the guard actually inspects outgoing text.
+
+    Both output-side checks can be switched off in ``config.yaml``. With neither
+    active, ``process_output`` is a no-op and holding tokens back buys nothing.
+    """
+    if guard is None or not getattr(guard, "enabled", False):
+        return False
+    flags = getattr(guard, "flags", {}) or {}
+    return bool(flags.get("pii_protection") or flags.get("output_blocklist"))
 
 
 class _StreamModerator:
@@ -92,7 +109,12 @@ class _StreamModerator:
     ) -> None:
         self.guard = guard
         self.guard_texts = guard_texts
-        self.holdback = holdback
+        # Der Holdback ist der Preis für den Straddle-Schutz und bestimmt direkt
+        # die Zeit bis zum ersten sichtbaren Token: es geht nichts raus, bevor
+        # `holdback` Zeichen da sind (#51 — gemessen 96 Zeichen ≈ 4 s bei
+        # 24 Zeichen/s). Prüft der Guard ausgangsseitig nichts, gibt es auch
+        # nichts zurückzuhalten — dann kostet er nur Latenz.
+        self.holdback = holdback if _output_checks_active(guard) else 0
         self.blocked = False
         self.masked = False
         self._acc = ""
@@ -196,10 +218,22 @@ class YulYenStreamingProvider:
         ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
         self.guard: BasicGuard | None = guard
+        self.stream_holdback: int = _STREAM_HOLDBACK_CHARS
 
     def set_guard(self, guard: BasicGuard) -> None:
         """Sets the security guard for later checks."""
         self.guard = guard
+
+    def set_stream_holdback(self, chars: int) -> None:
+        """Override how many trailing characters the output guard holds back.
+
+        Directly trades perceived latency against straddle protection (#51) —
+        see ``_STREAM_HOLDBACK_CHARS``.
+        """
+        try:
+            self.stream_holdback = max(0, int(chars))
+        except (TypeError, ValueError):
+            self.stream_holdback = _STREAM_HOLDBACK_CHARS
 
     def _append_conversation_log(self, role: str, content: str) -> None:
         """Writes an entry to the conversation JSON log."""
@@ -329,7 +363,9 @@ class YulYenStreamingProvider:
             )
 
             log_raw_chunks = _log_flag("log_raw_chunks")
-            moderator = _StreamModerator(self.guard, guard_texts)
+            moderator = _StreamModerator(
+                self.guard, guard_texts, holdback=self.stream_holdback
+            )
             try:
                 for chunk in stream_obj:
                     if log_raw_chunks:

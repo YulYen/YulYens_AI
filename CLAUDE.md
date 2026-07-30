@@ -87,13 +87,13 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 23 Testmodule
+│   └── test_*.py                # 33 Testmodule
 ├── locales/
-│   ├── de.yaml                  # 83+ UI-Texte Deutsch
+│   ├── de.yaml                  # 111 UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
-├── Makefile                     # make format / lint / fix / test / test-all / clean / run
+├── Makefile                     # make setup / format / lint / test / test-ci / evals / clean / run
 └── backlog.md                   # Feature-Backlog mit Effort/Benefit
 ```
 
@@ -314,6 +314,33 @@ Browser-Tests verfälschen. **Für live wachsende Ausgaben `gr.Markdown` (Voll-E
 pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
 Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
 Gradio 4.44 crashen).
+
+### ⚠️ Der Guard-Holdback bestimmt die wahrgenommene Antwortzeit (#51)
+`_StreamModerator` (`core/streaming_provider.py`) hält die letzten
+`_STREAM_HOLDBACK_CHARS` Zeichen zurück, damit ein PII-/Secret-Muster nicht über
+eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
+überhaupt nichts an die Anzeige.** Im Browser gemessen, 24 Zeichen/s:
+
+| Variante | erster Token sichtbar |
+|---|---|
+| nackte Gradio-App (kein Guard) | 0,95 s |
+| Projekt, `holdback: 96` | 4,13 s |
+| Projekt, `holdback: 32` (Default) | **1,91 s** |
+| Projekt, `holdback: 0` | 0,39 s |
+
+Der Default 32 ist kein runder Wert: das längste Blocklist-Muster (AWS-Secret)
+schlägt erst nach Label + 30 Zeichen an, deshalb bleibt Schlüsselmaterial erst
+ab einem Holdback von 30 vollständig verdeckt. Darunter rutscht es mit durch —
+festgenagelt in `test_default_holdback_keeps_key_material_hidden`.
+
+Der Verzug entsteht **serverseitig** — der SSE-Frame auf `/queue/data` geht erst
+bei +4,09 s raus, gerendert wird danach in 40 ms. Beim Suchen also nicht im
+Frontend anfangen. Einstellbar über `security.stream_holdback_chars`; bei
+abgeschalteten Ausgangs-Checks (`pii_protection` **und** `output_blocklist` aus)
+entfällt der Holdback automatisch, weil es dann nichts zu prüfen gibt.
+
+Wichtig für #17/#42: eine backendseitige Messung von „Zeit bis zum ersten Token"
+sieht diesen Anteil **nicht** — das Modell liefert längst, die Anzeige wartet.
 
 ### ⚠️ Stolperfalle: Button-Updates nie als eigenes Event vor den Stream hängen
 Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor dem
