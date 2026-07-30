@@ -353,6 +353,12 @@ def build_ui(
                 visible=False,
                 elem_classes="ask-all-results",
             )
+            # Eigenes Accordion statt des Einzelchat-Accordions (#32a): das
+            # sitzt außerhalb dieser Gruppe und stünde hier über dem Block.
+            with gr.Accordion(
+                sources_label, open=False, visible=False, elem_classes="wiki-sources"
+            ) as ask_all_sources_accordion:
+                ask_all_sources_md = gr.Markdown("", elem_classes="wiki-sources-body")
         history_state = gr.State([])
         meta_state = gr.State({})
 
@@ -400,5 +406,7 @@ def build_ui(
         "regenerate_btn": regenerate_btn,
         "sources_accordion": sources_accordion,
         "sources_md": sources_md,
+        "ask_all_sources_accordion": ask_all_sources_accordion,
+        "ask_all_sources_md": ask_all_sources_md,
     }
     return demo, components

@@ -14,7 +14,12 @@ from core.utils import _greeting_text, is_broadcast_enabled
 from ui import self_talk
 from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui.persona_chooser import prompt_persona_choice
-from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
+from wiki.lookup import (
+    WikiSnippet,
+    format_snippet_meta,
+    inject_wiki_context,
+    lookup_wiki_snippet,
+)
 
 
 class TerminalUI:
@@ -62,6 +67,8 @@ class TerminalUI:
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
         self.history: list[dict[str, str]] = []
         self.meta: dict[str, str] = {}
+        # Zuletzt injizierte Wiki-Ausschnitte, für /quellen (#32a).
+        self.last_wiki_snippets: list[WikiSnippet] = []
 
     def choose_persona(self) -> None:
         """Asks the user for the desired persona and configures the streamer."""
@@ -87,6 +94,9 @@ class TerminalUI:
         if self.briefing_enabled:
             briefing_hint = self.texts.get("terminal_briefing_hint", "/briefing")
             print(f"{Fore.MAGENTA}{briefing_hint}{Style.RESET_ALL}")
+        if self.keyword_finder:
+            sources_hint = self.texts.get("terminal_sources_hint", "/quellen")
+            print(f"{Fore.MAGENTA}{sources_hint}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(
@@ -123,6 +133,7 @@ class TerminalUI:
 
             if choice in {"1", "n", "new"}:
                 self.history.clear()
+                self.last_wiki_snippets = []
                 self.choose_persona()
                 self._reset_meta()
                 self.print_welcome()
@@ -198,6 +209,7 @@ class TerminalUI:
         self._set_persona(persona_name)
         self.history = messages
         self.meta = meta
+        self.last_wiki_snippets = []
 
         success = self._t("terminal_load_success", persona_name=self.bot)
         print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
@@ -247,6 +259,7 @@ class TerminalUI:
                 self.wiki_timeout,
                 self.max_wiki_snippets,
             )
+            self.last_wiki_snippets = list(contexts)
             for wiki_hint in wiki_hints:
                 if wiki_hint:
                     print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
@@ -317,6 +330,13 @@ class TerminalUI:
                     self._handle_briefing_command()
                 continue
 
+            # Quellen des zuletzt injizierten Wiki-Kontexts (#32a).
+            # Beide Schreibweisen, damit das Kommando auch in der englischen
+            # Locale greift — die Kommandos selbst sind nicht übersetzt.
+            if user_input.lower() in ("/quellen", "/sources"):
+                self._handle_sources_command()
+                continue
+
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
             if self.keyword_finder:
                 wiki_hints, contexts = lookup_wiki_snippet(
@@ -329,6 +349,8 @@ class TerminalUI:
                     self.wiki_timeout,
                     self.max_wiki_snippets,
                 )
+
+                self.last_wiki_snippets = list(contexts)
 
                 # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
                 for wiki_hint in wiki_hints:
@@ -363,6 +385,33 @@ class TerminalUI:
         # (If streaming already emitted \n, add only the missing ones.)
         trailing_nl = len(reply) - len(reply.rstrip("\n"))
         for _ in range(max(0, 2 - trailing_nl)):
+            print()
+
+    def _handle_sources_command(self) -> None:
+        """Zeigt die zuletzt injizierten Wiki-Ausschnitte im Wortlaut (#32a).
+
+        Bewusst ungekürzt: dass der Text vollständig dasteht, ist der Grund für
+        das Kommando — nur so ist erkennbar, worauf die letzte Antwort beruht.
+        """
+        if not self.last_wiki_snippets:
+            empty = self.texts.get(
+                "terminal_sources_empty", "Kein Wikipedia-Kontext im letzten Turn."
+            )
+            print(f"{Fore.YELLOW}{empty}{Style.RESET_ALL}\n")
+            return
+
+        title = self.texts.get(
+            "terminal_sources_title", "Quellen des letzten Kontexts:"
+        )
+        print(f"{Fore.MAGENTA}{title}{Style.RESET_ALL}\n")
+        for idx, snippet in enumerate(self.last_wiki_snippets, start=1):
+            meta = format_snippet_meta(snippet, self._t)
+            print(f"{Fore.CYAN}{idx}. {snippet.topic}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}{meta}{Style.RESET_ALL}")
+            if snippet.link:
+                print(snippet.link)
+            print()
+            print(snippet.snippet)
             print()
 
     def _handle_briefing_command(self) -> None:
