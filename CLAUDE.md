@@ -70,8 +70,16 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── audio_player.py      # winsound (Windows-only, plattform-sicher)
 │   ├── stt/
 │   │   └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
-│   └── briefing/
-│       └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
+│   ├── briefing/
+│   │   └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
+│   └── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
+├── evals/                       # Eval-Korpora als YAML (siehe evals/ReadMe.md)
+│   ├── personas/*.yaml          # Goldene Fragen pro Persona
+│   ├── behaviour/*.yaml         # Verhaltensbeweise (drei Zeitstempel)
+│   ├── karl_summary.yaml        # Qualität der Karl-Zusammenfassungen
+│   └── guard_redteam.yaml       # Angriff → erwartetes Guard-Verhalten
+├── scripts/
+│   └── run_evals.py             # Einstieg der Eval-Suite
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -134,9 +142,34 @@ pytest tests/test_ai_via_api.py  # Gezielt
 
 - Test-Fixture `client`: Dummy-Backend, Wiki deaktiviert
 - Test-Fixture `client_with_date_and_wiki`: echte Wiki-Integration (braucht spaCy-Modell)
+- Test-Fixture `ollama_config`: Config gegen echtes Ollama, für `@pytest.mark.ollama`-Tests
+  ohne HTTP-Client (z. B. Eval-Suite)
 - Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar
 - spaCy-Modelle (`python -m spacy download de_core_news_lg`) schalten die
   Keyword-/Wiki-Tests frei; ohne Modell werden sie sauber geskippt
+
+## Eval-Suite (#41)
+
+Messbare Antwort auf „ist das Modell besser geworden?" — das Vergleichsartefakt
+für #7 (LoRA). Details in [evals/ReadMe.md](evals/ReadMe.md).
+
+```bash
+python scripts/run_evals.py -e classic               # voll (braucht Ollama)
+python scripts/run_evals.py -e classic --guard-only  # Guard-Teil, braucht kein Modell
+make evals                                           # Kurzform für --guard-only
+```
+
+- Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
+- `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),
+  `expect_traits` = LLM-as-judge 1–5 (4+ besteht, 3 nicht)
+- **Judge-Bias:** per Default bewertet das Modell sich selbst und ist nachsichtig.
+  Nur der Vergleich zweier Läufe mit gleichem Judge ist aussagekräftig (`report.csv`)
+- Der Guard-Red-Team-Korpus läuft ohne Modell als parametrisierter Test in der CI mit
+  (`tests/test_guard_redteam.py`) — Angriffsmuster gehören in `evals/guard_redteam.yaml`
+- Korpus-Loader ist streng: unbekannte Keys, kaputte Regexe, doppelte IDs und
+  erwartungslose Fälle fliegen beim Laden raus
+- `known_gap: true` markiert eine dokumentierte Guard-Schwäche (gemeldet, kein
+  Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist
 
 ## Konfiguration (config.yaml)
 
@@ -189,6 +222,10 @@ email_adapter:
 
 context_management:
   strategy: "heuristic"      # "heuristic" (Default) | "karl" (LLM-Zusammenfassung)
+
+evals:                       # nur von scripts/run_evals.py gelesen (#41)
+  out_dir: "logs/evals"
+  judge_model: "same_as_chat"  # eigenes Modell = weniger Judge-Bias
 ```
 
 ### Lokales Override: `config.local.yaml` (gitignored)
@@ -279,8 +316,9 @@ Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matri
 (Generalüberholung 2026-07-30: neue Tickets #24–#48, Erledigtes in Archiv-Sektion).
 Highlights:
 
-- **Tier A (LoRA-Strecke, Reihenfolge wichtig):** #40 Feedback-Daumen → #41 Eval-Suite → #7 LoRA-Finetuning (in Arbeit, LeoLM13B)
-- **Quick Wins:** #29 Spaceship-Crew sichtbar machen (XS), #35 Stop/Regenerate, #32 Wiki-Quellen, #14 E-Mail-Restpunkte
+- **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
+  (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
+- **Quick Wins:** #35 Stop/Regenerate, #32 Wiki-Quellen, #50 Guard-Braces-Lücke, #14 E-Mail-Restpunkte
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -312,7 +350,7 @@ Dieselben Deep-Checks gibt es auch ohne laufenden Server: `python src/launch.py 
 
 ## Logging
 
-Alle Logs in `logs/`:
+Alle Logs in `logs/` (Eval-Reports in `logs/evals/`):
 - `yulyen_ai_YYYY-MM-DD_HH-MM.log` — Systemlog
 - `conversation_[PERSONA]_[TIMESTAMP].json` — Gesprächslog (JSON)
 - `wiki_proxy_[TIMESTAMP].log` — Wiki-Proxy-Log

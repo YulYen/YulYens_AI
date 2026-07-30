@@ -180,3 +180,14 @@ context_management:
     keep_last_messages: 2
     log_dir: "logs"
     fallback_strategy: "heuristic"  # on summarization failure; omit to fail hard
+
+# --- Eval suite (#41) -----------------------------------------------------------
+# Only read by scripts/run_evals.py — the app itself ignores this section.
+# Corpora live as YAML under evals/. See evals/ReadMe.md.
+evals:
+  out_dir: "logs/evals"
+  # Judge model for the character ratings. "same_as_chat" means the chat model
+  # rates its own answers — convenient, but it grades itself generously. Point
+  # this at a different local model when you have one; absolute scores are only
+  # comparable between runs that used the same judge.
+  judge_model: "same_as_chat"

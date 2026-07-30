@@ -147,6 +147,17 @@ class AppFactory:
 
         return streamer
 
+    def get_llm_core(self) -> LLMCore:
+        """Bare LLM core for callers that need raw completions.
+
+        Used by the eval judge (#41), which must not go through a persona
+        prompt or the guard. Not cached: the cores are cheap handles and a
+        session model override must take effect on the next call.
+        """
+        core_cfg = self._cfg.core
+        backend = self._determine_backend(core_cfg)
+        return self._create_llm_core(backend, core_cfg.get("ollama_url"))
+
     def _determine_backend(self, core_cfg: dict) -> str:
         """Reads the desired LLM backend type from the config."""
 
