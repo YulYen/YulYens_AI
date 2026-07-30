@@ -306,3 +306,27 @@ def test_system_prompt_includes_three_timestamps(monkeypatch):
         assert result == f"BASE | {expected_suffix}"
     finally:
         Config.reset_instance()
+
+
+def test_spaceship_crew_ensemble_resolves_with_forward_slashes():
+    """The path-like ensemble name advertised in the docs must load (#29)."""
+    from config import personas as personas_mod
+
+    Config.reset_instance()
+    try:
+        cfg = Config("config.yaml")
+        cfg.ensemble = "examples/spaceship_crew"
+        personas_mod._parse_persona_files.cache_clear()
+        personas = personas_mod._load_system_prompts()
+
+        names = [p["name"] for p in personas]
+        assert names == [
+            "CAPTAIN_SELINA",
+            "ZETA_FLUX",
+            "ELIAS_MOREL",
+            "LYRA_VEX",
+        ]
+        assert all(p["prompt"] for p in personas)
+    finally:
+        personas_mod._parse_persona_files.cache_clear()
+        Config.reset_instance()
