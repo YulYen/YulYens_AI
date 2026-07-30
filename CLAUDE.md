@@ -19,7 +19,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Web-UI | Gradio 4.44 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
-| TTS | Piper (ONNX; Terminal: Windows-Autoplay, WebUI: Browser-Playback) |
+| TTS | Piper (ONNX; Terminal: Autoplay über winsound/CLI-Player, WebUI: Browser-Playback) |
 | STT | faster-whisper (optional, WebUI-Mikro) |
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
@@ -68,7 +68,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
 │   ├── tts/
 │   │   ├── piper_tts.py         # TTS-Wrapper
-│   │   └── audio_player.py      # winsound (Windows-only, plattform-sicher)
+│   │   └── audio_player.py      # WAV-Wiedergabe: winsound / CLI-Player-Dispatch (#34)
 │   ├── stt/
 │   │   └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
 │   ├── briefing/
@@ -252,6 +252,16 @@ in der CI (z. B. würde `api.enabled: false` sonst API-Tests brechen).
 - `make format` → Black + Ruff-Fix
 - `make lint` → Ruff check only
 - Keine Docstrings für einfache Methoden, kurze Inline-Kommentare nur wenn nötig
+
+### CI-Jobs (`.github/workflows/ci.yml`)
+| Job | Was er prüft |
+|---|---|
+| **Format & lint** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten) |
+| **Tests (ubuntu-latest / windows-latest)** | Volle Suite ohne `ollama`-Marker, mit `--cov`. Die Windows-Matrix ist der Punkt: das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf (#45) |
+| **Tests mit spaCy-Modell** | `de_core_news_lg` per `actions/cache` (versionierter Key), dann gezielt `test_spacy_keywords.py` + `test_wiki.py` — die liefen sonst nur als Skips |
+
+Coverage steht als Zahl in der Job-Summary (kein externer Badge-Dienst, der
+Account + Token bräuchte). mypy ist bewusst **nicht** eingehängt → Backlog #52.
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff

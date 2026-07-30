@@ -25,8 +25,16 @@ jobs:
         run: python -m ruff check .
 
   test:
-    name: Tests
-    runs-on: ubuntu-latest
+    # OS-Matrix (#45): Das Projekt läuft Windows-primär, die CI lief bisher nur
+    # auf Linux — winsound- und Pfadprobleme wären hier nie aufgefallen.
+    # fail-fast: false, damit ein Windows-Fehler das Linux-Ergebnis nicht
+    # verschluckt (und umgekehrt).
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -41,4 +49,50 @@ jobs:
         # Deliberately includes the 'slow' marker (locally 'make test' skips it).
         # spaCy- and Ollama-dependent tests skip themselves when the
         # model or server is unavailable (see tests/conftest.py).
-        run: pytest -q -m "not ollama" --cov=src --cov-report=term-missing
+        run: pytest -q -m "not ollama" --cov=src --cov-report=term-missing --cov-report=json
+      - name: Coverage in die Job-Summary schreiben
+        # Statt eines externen Badge-Dienstes (bräuchte Account und Token): die
+        # Zahl steht direkt im Run. Siehe Backlog #45.
+        if: always() && matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          if [ -f coverage.json ]; then
+            pct=$(python -c "import json;print(f\"{json.load(open('coverage.json'))['totals']['percent_covered']:.1f}\")")
+            echo "### Coverage: ${pct}%" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  test-with-spacy:
+    # Eigener Job, damit ein Fehler klar zuzuordnen ist: hier laufen die
+    # Keyword-/Wiki-Tests, die ohne installiertes Modell sauber übersprungen
+    # werden. Das Modell ist ~570 MB, deshalb gecacht (#45).
+    name: Tests mit spaCy-Modell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: spaCy-Modell aus dem Cache holen
+        id: spacy-cache
+        uses: actions/cache@v4
+        with:
+          # Der Key nennt die Modellversion — ein Upgrade lädt neu, sonst nie.
+          path: ~/spacy-models
+          key: spacy-de_core_news_lg-3.7.0
+      - name: spaCy-Modell herunterladen (nur bei Cache-Miss)
+        if: steps.spacy-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/spacy-models
+          pip download de_core_news_lg==3.7.0 --no-deps -d ~/spacy-models \
+            --find-links https://github.com/explosion/spacy-models/releases/expanded_assets/de_core_news_lg-3.7.0
+      - name: spaCy-Modell installieren
+        run: pip install --no-index --find-links ~/spacy-models de_core_news_lg
+      - name: Keyword- und Wiki-Tests
+        # Gezielt die Tests, die das Modell brauchen — der Rest läuft im
+        # test-Job und muss hier nicht doppelt laufen.
+        run: pytest -q -m "not ollama" tests/test_spacy_keywords.py tests/test_wiki.py

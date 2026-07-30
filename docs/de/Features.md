@@ -70,7 +70,7 @@ Für die Terminal-Interaktion ist eine integrierte **Text-to-Speech-Ausgabe mit 
 - Aktivierung über `tts.enabled: true`.
 - Automatische WAV-Erzeugung pro Antwort über `tts.features.terminal_auto_create_wav: true`.
 - Sprachmodelle werden über `tts.voices` in der `config.yaml` konfiguriert (Default je Sprache plus optionale persona-spezifische Stimmen).
-- **Aktuelle Plattform-Einschränkung:** Die automatische WAV-Erzeugung/-Wiedergabe in der Terminal-UI funktioniert derzeit nur unter **Windows** (weil `tts.audio_player` von `winsound` abhängt). Unter Linux/macOS wird dieser Pfad nach Import-Fehler übersprungen.
+- **Plattformen:** Die automatische WAV-Erzeugung und -Wiedergabe in der Terminal-UI läuft auf allen drei Plattformen. Windows nutzt `winsound` aus der Standardbibliothek, Linux und macOS greifen auf die üblichen Kommandozeilen-Player zurück (`paplay`, `aplay` oder `ffplay` unter Linux, `afplay` unter macOS) — ohne zusätzliche Abhängigkeit. Findet sich kein Player, wird die Wiedergabe still übersprungen und die WAV-Datei liegt trotzdem in `out/`.
 
 So kann die KI-Antwort nicht nur gelesen, sondern unmittelbar auch als Audio ausgegeben werden.
 

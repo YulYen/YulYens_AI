@@ -71,7 +71,7 @@ For terminal interaction, integrated **Piper-based text-to-speech output** is av
 - Enable it via `tts.enabled: true`.
 - Create one WAV file per answer via `tts.features.terminal_auto_create_wav: true`.
 - Configure voices in `config.yaml` via `tts.voices` (language defaults plus optional persona-specific voices).
-- **Current platform limitation:** automatic WAV creation/playback in Terminal UI currently works on **Windows only** (because `tts.audio_player` depends on `winsound`). On Linux/macOS, this path is skipped after import failure.
+- **Platforms:** automatic WAV creation and playback in the terminal UI works on all three platforms. Windows uses `winsound` from the standard library; Linux and macOS dispatch to the usual command-line players (`paplay`, `aplay` or `ffplay` on Linux, `afplay` on macOS) — no extra dependency. If no player is found, playback is skipped silently and the WAV still lands in `out/`.
 
 This allows replies to be consumed not only as text but also immediately as audio.
 

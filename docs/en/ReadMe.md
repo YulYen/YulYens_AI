@@ -123,7 +123,7 @@ All central settings are controlled through `config.yaml`. Important toggles:
 - `language`: controls UI texts and persona prompts (`"de"` or `"en"`).
 - `ui.type`: selects the interface (`"terminal"`, `"web"`, or `null` for API only).
 - `tts.enabled`: enables/disables text-to-speech.
-- `tts.features.terminal_auto_create_wav`: attempts to create one WAV file per reply in terminal mode (currently Windows-only due to `winsound` dependency in `tts.audio_player`).
+- `tts.features.terminal_auto_create_wav`: creates one WAV file per reply in terminal mode and plays it — Windows via `winsound`, Linux/macOS via `paplay`/`aplay`/`ffplay` or `afplay`. Without an available player you still get the file in `out/`.
 
 Example:
 
@@ -258,7 +258,7 @@ Exit code 1 signals a critical failure (handy for scripts).
   - Pro option: the collapsed "Advanced" section at the bottom of the start screen lets you switch the model for the current session (choices = installed Ollama models). Session-only — after a restart, `core.model_name` from `config.yaml` applies again
   - Voice input (opt-in): after `pip install faster-whisper`, a microphone appears next to the input field in the persona chat. Record → stop → the transcript is appended to the input field and can be edited before sending. The first recording loads the Whisper model (including a one-time download), so it takes a moment. Details and model choice: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
   - Briefing (RSS): the "Briefing 📰" button in the persona chat makes the selected persona summarize the RSS/Atom feeds configured under `briefing.feeds` in `config.yaml` (default: tagesschau + heise). Requires internet; the network is only accessed on click. Disable via `briefing.enabled: false`
-  - Read aloud (TTS): the "Read aloud 🔊" button in the persona chat plays the latest reply with the persona's Piper voice in the browser (platform-independent, unlike the Windows-only terminal autoplay). Only appears when `pip install piper-tts` is done and voices exist in the `voices/` folder; disable via `tts.features.web_read_aloud: false`. Setup: [src/tts/ReadMe.md](../../src/tts/ReadMe.md)
+  - Read aloud (TTS): the "Read aloud 🔊" button in the persona chat plays the latest reply with the persona's Piper voice in the browser (in the browser rather than through a system player). Only appears when `pip install piper-tts` is done and voices exist in the `voices/` folder; disable via `tts.features.web_read_aloud: false`. Setup: [src/tts/ReadMe.md](../../src/tts/ReadMe.md)
 
 - **API only (no UI)**
   - Set `ui.type: null` – FastAPI keeps running and serves `/ask`
