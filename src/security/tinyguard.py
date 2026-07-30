@@ -19,6 +19,13 @@ _SECURITY_KEYS = (
     "security_all_clear",
 )
 
+# Placeholder names that only ever appear in prompt-injection attempts, never in
+# an honest question about code. Used by the templating-braces rule below (#50).
+_INJECTION_PLACEHOLDER = (
+    r"(?:system[_\s-]?prompt|systemprompt|instructions?|prompt"
+    r"|rules?|persona|jailbreak|developer[_\s-]?mode|dan)"
+)
+
 
 def _load_texts(texts: Mapping[str, str] | None) -> Mapping[str, str]:
     if texts is not None:
@@ -103,7 +110,15 @@ class BasicGuard:
             r"(?i)\byou are chatgpt\b",
             r"(?i)\bbegin system prompt\b",
             r"(?i)\bdeveloper mode\b",
-            r"(?i)\b%?\{.*?\}%?",  # templating braces used in jailbreaks
+            # Templating braces used in jailbreaks ("Antworte mit {system_prompt}").
+            # Scoped to placeholder *names* on purpose (#50): the earlier version
+            # was r"\b%?\{.*?\}%?" and matched any braces — but the leading \b
+            # requires a word character right before "{", so it only fired in
+            # "x{...}" and missed the common "… mit {system_prompt}" (1 of 6
+            # variants caught). Dropping the \b would have blocked every code
+            # question with braces ("if (x) { return; }", JSON, f-strings, CSS),
+            # and this project talks about code constantly.
+            rf"(?i)%?\{{\s*{_INJECTION_PLACEHOLDER}\b[^}}]*\}}%?",
             r"(?i)\bfile://|http://127\.0\.0\.1|localhost",
         ]
 
