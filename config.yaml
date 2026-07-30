@@ -181,6 +181,17 @@ security:
   wrongdoing_lock_turns: 0
   # Input: block wrongdoing (weapons/violence) + injections/PII.
   # Output: mask PII, block secrets.
+  #
+  # Wie viele Zeichen am Ende des Streams zurückgehalten werden, damit ein
+  # PII-/Secret-Muster nicht über eine Token-Grenze hinweg durchrutscht.
+  # ⚠️ Das ist DIE Stellschraube für die wahrgenommene Antwortzeit (#51): es
+  # geht nichts an die Anzeige, bevor so viele Zeichen erzeugt sind. Gemessen
+  # bei 24 Zeichen/s: 96 Zeichen ≈ 4 s bis zum ersten sichtbaren Wort, 0 ≈ 0,4 s.
+  # Niedriger = schnellere Anzeige, aber ein langes Secret kann seinen Anfang
+  # zeigen, bevor der Guard es blockt. 0 schaltet den Straddle-Schutz ab.
+  # Wirkt nur, wenn pii_protection oder output_blocklist an ist — sonst gibt es
+  # ausgangsseitig nichts zu prüfen und es wird ohnehin nichts zurückgehalten.
+  stream_holdback_chars: 96
 
 # --- Context management ---------------------------------------------------------
 # strategy "heuristic" (default): quick token-based trimming of old messages.

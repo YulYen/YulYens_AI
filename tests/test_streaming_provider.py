@@ -207,3 +207,109 @@ def test_plain_text_streams_through_with_guard() -> None:
     out = "".join(provider.stream([{"role": "user", "content": "hi"}]))
 
     assert out == "Hello there, how are you?"
+
+
+# ---- Holdback vs. wahrgenommene Latenz (#51) --------------------------------
+
+
+class CountingTokenCore(FakeTokenCore):
+    """Zählt mit, wie viele Tokens das Modell bis jetzt geliefert hat."""
+
+    def __init__(self, tokens: list[str]) -> None:
+        super().__init__(tokens)
+        self.consumed = 0
+
+    def stream_chat(self, **_kwargs: Any):
+        for token in self._tokens:
+            self.consumed += 1
+            yield {"message": {"content": token}}
+
+
+def _tokens_until_first_output(provider, core) -> int:
+    for chunk in provider.stream([{"role": "user", "content": "frage?"}]):
+        if chunk:
+            return core.consumed
+    return -1
+
+
+def test_holdback_delays_the_first_visible_output() -> None:
+    """Belegt die Ursache aus #51: vor `holdback` Zeichen geht nichts raus.
+
+    Mit 6-Zeichen-Tokens braucht es 96/6 = 16 Tokens, bis überhaupt etwas an die
+    Anzeige geht. Bei den 4 Tokens/s des Messaufbaus waren das die gemessenen
+    ~4 s bis zum ersten sichtbaren Wort im Browser.
+    """
+    core = CountingTokenCore(["Wort%d " % i for i in range(1, 40)])
+    provider = create_streaming_provider(
+        llm_core=core, guard=BasicGuard(True, True, True, True)
+    )
+
+    assert _tokens_until_first_output(provider, core) >= 16
+
+
+def test_without_holdback_the_first_token_goes_out_at_once() -> None:
+    core = CountingTokenCore(["Wort%d " % i for i in range(1, 40)])
+    provider = create_streaming_provider(
+        llm_core=core, guard=BasicGuard(True, True, True, True)
+    )
+    provider.set_stream_holdback(0)
+
+    assert _tokens_until_first_output(provider, core) == 1
+
+
+def test_holdback_override_lets_the_first_token_through_immediately() -> None:
+    guard = BasicGuard(True, True, True, True)
+    core = FakeTokenCore(["Hallo ", "Welt ", "und ", "so"])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+    provider.set_stream_holdback(0)
+
+    chunks = [c for c in provider.stream([{"role": "user", "content": "f?"}]) if c]
+
+    assert chunks[0] == "Hallo "
+
+
+def test_holdback_override_rejects_garbage_and_keeps_the_default() -> None:
+    provider = create_streaming_provider(llm_core=FakeTokenCore(["x"]))
+
+    provider.set_stream_holdback("keine Zahl")
+
+    assert provider.stream_holdback == 96
+    provider.set_stream_holdback(-5)
+    assert provider.stream_holdback == 0
+
+
+def test_no_holdback_when_no_output_check_is_active() -> None:
+    """Ohne PII-Maskierung und ohne Blocklist gibt es nichts zurückzuhalten.
+
+    Der Straddle-Schutz kostete in dieser Konstellation nur Latenz.
+    """
+    guard = BasicGuard(
+        enabled=True,
+        prompt_injection_protection=True,
+        pii_protection=False,
+        output_blocklist=False,
+        wrongdoing_protection=True,
+    )
+    core = FakeTokenCore(["Hallo ", "Welt"])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    chunks = [c for c in provider.stream([{"role": "user", "content": "f?"}]) if c]
+
+    assert chunks[0] == "Hallo "
+
+
+def test_output_blocklist_alone_keeps_the_holdback() -> None:
+    """Umkehrprobe: ist die Blocklist an, bleibt der Schutz aktiv."""
+    guard = BasicGuard(
+        enabled=True,
+        prompt_injection_protection=True,
+        pii_protection=False,
+        output_blocklist=True,
+        wrongdoing_protection=True,
+    )
+    core = FakeTokenCore(["Hier: sk-", "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345", " fertig"])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    out = "".join(provider.stream([{"role": "user", "content": "key?"}]))
+
+    assert "sk-" not in out

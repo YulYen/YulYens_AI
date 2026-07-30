@@ -315,6 +315,27 @@ pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
 Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
 Gradio 4.44 crashen).
 
+### ⚠️ Der Guard-Holdback bestimmt die wahrgenommene Antwortzeit (#51)
+`_StreamModerator` (`core/streaming_provider.py`) hält die letzten
+`_STREAM_HOLDBACK_CHARS` Zeichen zurück, damit ein PII-/Secret-Muster nicht über
+eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
+überhaupt nichts an die Anzeige.** Im Browser gemessen, 24 Zeichen/s:
+
+| Variante | erster Token sichtbar |
+|---|---|
+| nackte Gradio-App (kein Guard) | 0,95 s |
+| Projekt, `holdback: 96` (Default) | **4,13 s** |
+| Projekt, `holdback: 0` | 0,39 s |
+
+Der Verzug entsteht **serverseitig** — der SSE-Frame auf `/queue/data` geht erst
+bei +4,09 s raus, gerendert wird danach in 40 ms. Beim Suchen also nicht im
+Frontend anfangen. Einstellbar über `security.stream_holdback_chars`; bei
+abgeschalteten Ausgangs-Checks (`pii_protection` **und** `output_blocklist` aus)
+entfällt der Holdback automatisch, weil es dann nichts zu prüfen gibt.
+
+Wichtig für #17/#42: eine backendseitige Messung von „Zeit bis zum ersten Token"
+sieht diesen Anteil **nicht** — das Modell liefert längst, die Anzeige wartet.
+
 ### ⚠️ Stolperfalle: Button-Updates nie als eigenes Event vor den Stream hängen
 Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor dem
 Stream-Handler (`btn.click(toggle).then(stream)`). **Kostet ~3,5 s bis zum ersten
