@@ -227,11 +227,132 @@ def test_lookup_wiki_snippet_for_germany():
         if not (wiki_hints and contexts):
             pytest.skip("Offline wiki (proxy/Kiwix on port 8042) not available")
 
-        topic_title, snippet = contexts[0]
-        assert topic_title == "Deutschland"
-        assert snippet, "Wiki proxy did not return any snippet text"
+        top = contexts[0]
+        assert top.topic == "Deutschland"
+        assert top.snippet, "Wiki proxy did not return any snippet text"
 
         # The capital Berlin should appear in the snippet (case-insensitive)
-        assert "berlin" in snippet.lower()
+        assert "berlin" in top.snippet.lower()
+
+        # #32: der Proxy muss Link, Quelle und Originallänge mitliefern —
+        # ohne die kann die UI den injizierten Ausschnitt nicht einordnen.
+        assert top.link, "Proxy did not report a user-visible link"
+        assert top.source == "local"
+        assert top.full_length >= len(top.snippet)
     finally:
         Config.reset_instance()
+
+
+# ---- Snippet-Metadaten (#32) ------------------------------------------------
+
+
+def _proxy_payload(**overrides):
+    payload = {
+        "title": "Deutschland",
+        "text": "Deutschland ist ein Bundesstaat.",
+        "link": "http://127.0.0.1:8080/wiki/Deutschland",
+        "source": "local",
+        "wiki_hint": "🕵️ Hinweis",
+        "full_length": 8432,
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _lookup_against(monkeypatch, payload, *, limit=1200):
+    monkeypatch.setattr(
+        "wiki.lookup.requests.get",
+        lambda *a, **k: SimpleNamespace(status_code=200, json=lambda: payload),
+    )
+    return lookup_wiki_snippet(
+        question="Frage?",
+        persona_name="TEST",
+        keyword_finder=_DummyKeywordFinder("Deutschland"),
+        wiki_mode="offline",
+        proxy_port=9999,
+        limit=limit,
+        timeout=(1.0, 1.0),
+        max_snippets=1,
+    )
+
+
+def test_lookup_keeps_link_source_and_original_length(monkeypatch):
+    _hints, contexts = _lookup_against(monkeypatch, _proxy_payload())
+
+    snippet = contexts[0]
+    assert snippet.topic == "Deutschland"
+    assert snippet.snippet == "Deutschland ist ein Bundesstaat."
+    assert snippet.link == "http://127.0.0.1:8080/wiki/Deutschland"
+    assert snippet.source == "local"
+    assert snippet.full_length == 8432
+    assert snippet.truncated is True
+
+
+def test_lookup_without_full_length_counts_the_snippet_as_complete(monkeypatch):
+    """Ein Proxy ohne das Feld darf nicht fälschlich 'gekürzt' anzeigen."""
+    payload = _proxy_payload()
+    del payload["full_length"]
+
+    _hints, contexts = _lookup_against(monkeypatch, payload)
+
+    assert contexts[0].full_length == len(contexts[0].snippet)
+    assert contexts[0].truncated is False
+
+
+def test_lookup_ignores_a_nonsense_full_length(monkeypatch):
+    _hints, contexts = _lookup_against(monkeypatch, _proxy_payload(full_length="viele"))
+
+    assert contexts[0].truncated is False
+
+
+def test_inject_wiki_context_uses_the_snippet_fields():
+    from wiki.lookup import WikiSnippet, inject_wiki_context
+
+    Config.reset_instance()
+    try:
+        Config("config.yaml")
+        history: list = []
+        inject_wiki_context(
+            history,
+            [WikiSnippet(topic="Berlin", snippet="Hauptstadt", link="http://x")],
+        )
+    finally:
+        Config.reset_instance()
+
+    # Guardrail plus ein Block pro Snippet; der Link gehört nicht in den Prompt.
+    assert len(history) == 2
+    assert "WIKI SNIPPET 1: Berlin" in history[1]["content"]
+    assert "Hauptstadt" in history[1]["content"]
+    assert "http://x" not in history[1]["content"]
+
+
+def test_proxy_apply_limit_reports_the_length_before_truncation():
+    from wiki.wikipedia_proxy import _apply_limit
+
+    article = "Wort " * 400  # 2000 Zeichen
+    text, full_length = _apply_limit("", article, 100)
+
+    assert full_length == len(article)
+    assert len(text) <= 102  # gekürzt am Wortende, plus " …"
+    assert text.endswith(" …")
+
+
+def test_proxy_apply_limit_keeps_short_articles_intact():
+    from wiki.wikipedia_proxy import _apply_limit
+
+    text, full_length = _apply_limit("", "Kurzer Artikel.", 1200)
+
+    assert text == "Kurzer Artikel."
+    assert full_length == len("Kurzer Artikel.")
+
+
+def test_proxy_apply_limit_counts_the_infobox_block_too():
+    """Der Key/Value-Block gehört zum ausgelieferten Text — und zur Länge."""
+    from wiki.wikipedia_proxy import _apply_limit
+
+    kv_line = "Hauptstadt: Berlin"
+    article = "Wort " * 400
+    text, full_length = _apply_limit(kv_line, article, 100)
+
+    assert text.startswith(kv_line)
+    assert full_length == len(kv_line) + 2 + len(article)

@@ -10,6 +10,7 @@ import json
 import pytest
 from api.openai_compat import RateLimiter, reset_rate_limiter, resolve_secret
 from config.config_singleton import Config
+from wiki.lookup import WikiSnippet
 
 
 @pytest.fixture(autouse=True)
@@ -380,12 +381,12 @@ def test_wiki_context_lands_directly_before_the_last_user_turn(client, monkeypat
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     monkeypatch.setattr(
         "api.provider.lookup_wiki_snippet",
-        lambda *a, **k: (["hint"], [("Kiwix", "Ein Schnipsel")]),
+        lambda *a, **k: (["hint"], [WikiSnippet("Kiwix", "Ein Schnipsel")]),
     )
     monkeypatch.setattr(
         "api.provider.inject_wiki_context",
         lambda history, contexts: history.append(
-            {"role": "system", "content": f"WIKI:{contexts[0][0]}"}
+            {"role": "system", "content": f"WIKI:{contexts[0].topic}"}
         ),
     )
 
@@ -429,7 +430,7 @@ def test_stream_messages_does_not_mutate_the_callers_history(client, monkeypatch
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     monkeypatch.setattr(
         "api.provider.lookup_wiki_snippet",
-        lambda *a, **k: ([], [("T", "S")]),
+        lambda *a, **k: ([], [WikiSnippet("T", "S")]),
     )
     monkeypatch.setattr(
         "api.provider.inject_wiki_context",

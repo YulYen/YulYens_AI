@@ -3,10 +3,31 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from urllib.parse import quote
 
 import requests
 from config.config_singleton import Config
+
+
+@dataclass(frozen=True)
+class WikiSnippet:
+    """Ein injizierter Wikipedia-Ausschnitt samt Herkunft (#32).
+
+    ``snippet`` ist exakt der Text, der im Prompt landet — nicht der Artikel.
+    ``full_length`` ist die Länge *vor* dem Kürzen; nur damit lässt sich
+    anzeigen, dass das Modell den Rest des Artikels nie gesehen hat.
+    """
+
+    topic: str
+    snippet: str
+    link: str = ""
+    source: str = ""
+    full_length: int = 0
+
+    @property
+    def truncated(self) -> bool:
+        return self.full_length > len(self.snippet)
 
 
 def lookup_wiki_snippet(
@@ -18,14 +39,14 @@ def lookup_wiki_snippet(
     limit: int,
     timeout: tuple[float, float],
     max_snippets: int,
-) -> tuple[list[str], list[tuple[str, str]]]:
+) -> tuple[list[str], list[WikiSnippet]]:
     """
     Helper function: fetches up to ``max_snippets`` Wikipedia snippets via a local proxy.
-    Returns UI hints (only when snippets are found) and (topic, snippet) pairs for
+    Returns UI hints (only when snippets are found) and ``WikiSnippet`` objects for
     context injection.
     """
     wiki_hints: list[str] = []
-    contexts: list[tuple[str, str]] = []
+    contexts: list[WikiSnippet] = []
     proxy_base = "http://localhost:" + str(proxy_port)
 
     if not keyword_finder or max_snippets <= 0:
@@ -58,7 +79,15 @@ def lookup_wiki_snippet(
                 if wiki_hint:
                     wiki_hints.append(wiki_hint)
                 if snippet:
-                    contexts.append((topic_title, snippet))
+                    contexts.append(
+                        WikiSnippet(
+                            topic=topic_title,
+                            snippet=snippet,
+                            link=str(data.get("link") or ""),
+                            source=str(data.get("source") or ""),
+                            full_length=_full_length(data, snippet),
+                        )
+                    )
             elif proxy_response.status_code == 404:
                 logging.info("[WIKI] No entry found for topic '%s'", topic)
             else:
@@ -79,7 +108,21 @@ def lookup_wiki_snippet(
     return (wiki_hints, contexts)
 
 
-def inject_wiki_context(history: list, contexts: list[tuple[str, str]]) -> None:
+def _full_length(data: dict, snippet: str) -> int:
+    """Originallänge des Artikeltexts laut Proxy, sonst die des Snippets.
+
+    Gekürzt wird bereits im Proxy, deshalb liefert der die Länge vorher separat
+    mit. Fehlt das Feld (alter Proxy, Testdouble), ist der Snippet das Beste,
+    was wir wissen — dann gilt er als vollständig statt fälschlich als gekürzt.
+    """
+    try:
+        reported = int(data.get("full_length") or 0)
+    except (TypeError, ValueError):
+        reported = 0
+    return max(reported, len(snippet))
+
+
+def inject_wiki_context(history: list, contexts: list[WikiSnippet]) -> None:
     """
     If Wikipedia snippets are available, append a guardrail message and one
     system message per snippet. Each snippet block is clearly delimited.
@@ -90,10 +133,10 @@ def inject_wiki_context(history: list, contexts: list[tuple[str, str]]) -> None:
     guardrail = cfg.t("wiki_context_guardrail")
     history.append({"role": "system", "content": guardrail})
 
-    for idx, (topic, snippet) in enumerate(contexts, start=1):
-        topic_clean = topic.replace("_", " ")
+    for idx, ctx in enumerate(contexts, start=1):
+        topic_clean = ctx.topic.replace("_", " ")
         context_message = cfg.t(
-            "wiki_context_message", topic=topic_clean, snippet=snippet
+            "wiki_context_message", topic=topic_clean, snippet=ctx.snippet
         )
         formatted_context = (
             f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"

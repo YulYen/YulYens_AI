@@ -35,6 +35,7 @@ def build_ui(
     read_aloud_label,
     stop_label,
     regenerate_label,
+    sources_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -92,6 +93,14 @@ def build_ui(
                 .mic-input { max-height: 110px; }
                 /* Vorlesen-Player (TTS): schmal, ohne Beschriftung */
                 .tts-audio { max-height: 80px; }
+                /* Quellen (#32): der injizierte Text kann lang sein — scrollen
+                   lassen, statt den Chat nach unten zu schieben. */
+                .wiki-sources .wiki-sources-body { max-height: 420px; overflow-y: auto; }
+                .wiki-sources blockquote {
+                    font-size: 0.9rem;
+                    white-space: pre-wrap;
+                    opacity: 0.85;
+                }
                 </style>
             """
         )
@@ -199,6 +208,14 @@ def build_ui(
 
         greeting_md = gr.Markdown("", visible=False)
         chatbot = gr.Chatbot(label="", visible=False)
+        # Quellen-Transparenz (#32): zugeklappt direkt unter dem Chat. Zeigt den
+        # Text, den das Modell tatsächlich als Kontext bekommen hat — inklusive
+        # der Länge, damit ein an wiki.snippet_limit gekürzter Artikel als
+        # solcher erkennbar ist.
+        with gr.Accordion(
+            sources_label, open=False, visible=False, elem_classes="wiki-sources"
+        ) as sources_accordion:
+            sources_md = gr.Markdown("", elem_classes="wiki-sources-body")
         with gr.Row():
             download_btn = gr.Button(
                 save_button_label,
@@ -381,5 +398,7 @@ def build_ui(
         "tts_audio": tts_audio,
         "stop_btn": stop_btn,
         "regenerate_btn": regenerate_btn,
+        "sources_accordion": sources_accordion,
+        "sources_md": sources_md,
     }
     return demo, components

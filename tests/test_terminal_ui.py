@@ -5,6 +5,7 @@ from unittest.mock import Mock
 
 from config.texts import Texts
 from ui.terminal_ui import TerminalUI
+from wiki.lookup import WikiSnippet
 
 
 def _create_terminal_ui() -> TerminalUI:
@@ -161,7 +162,7 @@ def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
     monkeypatch.setattr(
         "ui.terminal_ui.lookup_wiki_snippet",
-        lambda *args, **kwargs: (["🕵️ Hinweis"], [("Thema", "Snippet")]),
+        lambda *args, **kwargs: (["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
     )
 
     def fake_inject(history, contexts):

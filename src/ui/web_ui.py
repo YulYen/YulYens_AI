@@ -25,7 +25,7 @@ from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
-from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
+from wiki.lookup import WikiSnippet, inject_wiki_context, lookup_wiki_snippet
 
 if TYPE_CHECKING:
     from config.config_singleton import Config
@@ -84,7 +84,23 @@ PERSONA_OUTPUT_KEYS = (
     "tts_audio",
     "stop_btn",
     "regenerate_btn",
+    "sources_accordion",
+    "sources_md",
 )
+
+# Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
+# reisen bewusst in denselben Yields mit statt als eigenes .then()-Event davor —
+# das hätte den ersten Token um Sekunden verzögert (siehe _with_stream_controls).
+STREAM_OUTPUT_KEYS = (
+    "input_box",
+    "chatbot",
+    "history_state",
+    "sources_accordion",
+    "sources_md",
+)
+
+# Was _with_stream_controls hinter STREAM_OUTPUT_KEYS anhängt.
+STREAM_CONTROL_KEYS = ("send_btn", "stop_btn", "regenerate_btn")
 
 
 class WebUI:
@@ -248,6 +264,50 @@ class WebUI:
         )
         return True
 
+    # ---------- Wiki-Quellen (#32) ----------
+    def _format_wiki_sources(self, snippets: list[WikiSnippet]) -> str:
+        """Markdown für das Quellen-Accordion.
+
+        Zeigt bewusst den *injizierten* Text und dessen Länge, nicht nur Titel
+        und Link: nur so ist erkennbar, worauf eine Antwort beruht — und ob der
+        Artikel an ``wiki.snippet_limit`` abgeschnitten wurde, das Modell den
+        Rest also nie gesehen hat.
+        """
+        sections = []
+        for idx, snip in enumerate(snippets or [], start=1):
+            title = snip.topic or "?"
+            heading = f"[{title}]({snip.link})" if snip.link else title
+            origin = self._t(
+                "wiki_source_online" if snip.source == "online" else "wiki_source_local"
+            )
+            meta = self._t(
+                (
+                    "wiki_sources_meta_truncated"
+                    if snip.truncated
+                    else "wiki_sources_meta_full"
+                ),
+                source=origin,
+                shown=len(snip.snippet),
+                total=snip.full_length,
+            )
+            # Blockquote: hebt den fremden Text vom Rahmen ab und bleibt auch
+            # bei 1200 Zeichen am Stück lesbar.
+            quoted = "\n".join(
+                f"> {line}" if line.strip() else ">"
+                for line in snip.snippet.splitlines()
+            )
+            sections.append(f"### {idx}. {heading}\n*{meta}*\n\n{quoted}")
+        return "\n\n---\n\n".join(sections)
+
+    def _wiki_source_updates(self, snippets: list[WikiSnippet] | None) -> tuple:
+        """Accordion + Markdown; ohne Treffer bleibt das Accordion unsichtbar."""
+        markdown = self._format_wiki_sources(snippets or [])
+        return gr.update(visible=bool(markdown)), gr.update(value=markdown)
+
+    @staticmethod
+    def _wiki_sources_unchanged() -> tuple:
+        return gr.update(), gr.update()
+
     # Stream the response (UI updates continuously)
     def _arm_stream_stop(self) -> threading.Event:
         """Fresh kill switch for the stream that is about to start (#35)."""
@@ -265,7 +325,10 @@ class WebUI:
 
     def _stream_reply(
         self, message_history: list[Message], chat_history: list[ChatPair]
-    ) -> Iterator[tuple[None, list[ChatPair], list[Message]]]:
+    ) -> Iterator[tuple]:
+        # Die Quellen-Slots stehen vor dem Stream schon fest und bleiben hier
+        # unangetastet — gr.update() ohne Wert ist ein No-op für die Anzeige.
+        keep = self._wiki_sources_unchanged()
         # Gedrosselt wie in der Ask-All-Ansicht: nicht jedes Token einzeln über
         # den Socket schicken; last_flush=0.0 lässt den ersten Chunk sofort durch.
         reply = ""
@@ -285,7 +348,7 @@ class WebUI:
                 now = time.monotonic()
                 if now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                     last_flush = now
-                    yield None, chat_history + [(None, reply)], message_history
+                    yield None, chat_history + [(None, reply)], message_history, *keep
         finally:
             close = getattr(tokens, "close", None)
             if close is not None:
@@ -300,27 +363,29 @@ class WebUI:
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
-        yield None, chat_history, message_history
+        yield None, chat_history, message_history, *keep
 
     def respond_streaming(
         self,
         user_input: str,
         chat_history: list[ChatPair],
         history_state: list[Message] | None,
-    ) -> Iterator[tuple[str | None, list[ChatPair], list[Message]]]:
+    ) -> Iterator[tuple]:
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
-            yield "", chat_history, history_state
+            yield "", chat_history, history_state, *self._wiki_sources_unchanged()
             return
 
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
 
         # 2) Clear the input field and show the user message in the chat window
+        #    Die Quellen der vorigen Antwort gehören nicht zur neuen Frage und
+        #    verschwinden deshalb sofort (#32).
         logging.debug("User input received (%d chars)", len(user_input))
         chat_history.append((user_input, None))
-        yield "", chat_history, llm_history
+        yield "", chat_history, llm_history, *self._wiki_source_updates([])
 
         # 3) Wiki hint and snippet (top hit)
         wiki_hints, contexts = lookup_wiki_snippet(
@@ -334,12 +399,12 @@ class WebUI:
             self.max_wiki_snippets,
         )
 
-        if wiki_hints:
-            # Display the UI hints (do not add them to the LLM context window)
-            for wiki_hint in wiki_hints:
-                if wiki_hint:
-                    chat_history.append((None, wiki_hint))
-            yield None, chat_history, llm_history
+        # Display the UI hints (do not add them to the LLM context window)
+        for wiki_hint in wiki_hints:
+            if wiki_hint:
+                chat_history.append((None, wiki_hint))
+        if wiki_hints or contexts:
+            yield None, chat_history, llm_history, *self._wiki_source_updates(contexts)
 
         # 4) Optional: inject wiki context
         if contexts:
@@ -351,13 +416,10 @@ class WebUI:
 
         # 6) Compress the context if needed and record that in chat history
         if self._handle_context_warning(llm_history, chat_history):
-            yield None, chat_history, llm_history
+            yield None, chat_history, llm_history, *self._wiki_sources_unchanged()
 
         # 7) Stream the answer
-        yield from (
-            (txt, cb, state)
-            for (txt, cb, state) in self._stream_reply(llm_history, chat_history)
-        )
+        yield from self._stream_reply(llm_history, chat_history)
 
     def _streaming_button_updates(self, streaming: bool) -> tuple:
         """Send ⇄ Stop tauschen; Regenerate währenddessen sperren (#35)."""
@@ -427,22 +489,24 @@ class WebUI:
 
     def _on_regenerate(
         self, chat_history: list[ChatPair], history_state: list[Message] | None
-    ) -> Iterator[tuple[Any, list[ChatPair], list[Message]]]:
+    ) -> Iterator[tuple]:
         """Letzte Antwort verwerfen und mit identischem Kontext neu streamen.
 
         Varianz kommt allein aus der Temperatur der Persona — es wird nichts am
-        Prompt gedreht.
+        Prompt gedreht. Die Quellen bleiben aus demselben Grund stehen: gleicher
+        Kontext, gleiche Snippets (#32).
         """
         chat_history = list(chat_history or [])
         llm_history = list(history_state or [])
+        keep = self._wiki_sources_unchanged()
 
         if not self.bot or not self.streamer:
-            yield gr.update(), chat_history, llm_history
+            yield gr.update(), chat_history, llm_history, *keep
             return
 
         if not llm_history or llm_history[-1].get("role") != "assistant":
             gr.Warning(self._t("web_regenerate_nothing"))
-            yield gr.update(), chat_history, llm_history
+            yield gr.update(), chat_history, llm_history, *keep
             return
 
         llm_history.pop()
@@ -450,27 +514,29 @@ class WebUI:
         # sind ebenfalls Bot-Zeilen, stehen aber davor und bleiben stehen.
         if chat_history and chat_history[-1][0] is None:
             chat_history.pop()
-        yield gr.update(), chat_history, llm_history
+        yield gr.update(), chat_history, llm_history, *keep
 
         # gr.update() statt None: ein noch nicht abgeschickter Entwurf im
         # Eingabefeld soll durch das Neuerzeugen nicht verloren gehen.
-        for _input_value, updated_chat, updated_state in self._stream_reply(
+        for _input_value, updated_chat, updated_state, *sources in self._stream_reply(
             llm_history, chat_history
         ):
-            yield gr.update(), updated_chat, updated_state
+            yield gr.update(), updated_chat, updated_state, *sources
 
     def respond_briefing(
         self, chat_history: list[ChatPair], history_state: list[Message] | None
-    ) -> Iterator[tuple[Any, list[ChatPair], list[Message]]]:
+    ) -> Iterator[tuple]:
         """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
+        keep = self._wiki_sources_unchanged()
         if not self.bot or not self.briefing_enabled:
-            yield gr.update(), chat_history, history_state
+            yield gr.update(), chat_history, history_state, *keep
             return
 
         llm_history = list(history_state or [])
         briefing_prompt = self._t("briefing_user_prompt")
         chat_history.append((briefing_prompt, None))
-        yield gr.update(), chat_history, llm_history
+        # Kein Wiki im Spiel — die Quellen der vorigen Antwort sind hier hinfällig.
+        yield gr.update(), chat_history, llm_history, *self._wiki_source_updates([])
 
         timeout = (
             float(self.briefing_cfg.get("timeout_connect", 5.0)),
@@ -482,11 +548,11 @@ class WebUI:
             if hint:
                 chat_history.append((None, hint))
         if hints:
-            yield None, chat_history, llm_history
+            yield None, chat_history, llm_history, *keep
 
         if not items:
             chat_history.append((None, self._t("briefing_empty")))
-            yield None, chat_history, llm_history
+            yield None, chat_history, llm_history, *keep
             return
 
         # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
@@ -494,7 +560,7 @@ class WebUI:
         llm_history.append({"role": "user", "content": briefing_prompt})
 
         if self._handle_context_warning(llm_history, chat_history):
-            yield None, chat_history, llm_history
+            yield None, chat_history, llm_history, *keep
 
         yield from self._stream_reply(llm_history, chat_history)
 
@@ -549,6 +615,8 @@ class WebUI:
             "tts_audio": gr.update(value=None, visible=False),
             "stop_btn": gr.update(visible=False),
             "regenerate_btn": gr.update(visible=False, interactive=True),
+            "sources_accordion": gr.update(visible=False, open=False),
+            "sources_md": gr.update(value=""),
         }
 
     def _persona_selected_updates(
@@ -1268,15 +1336,15 @@ class WebUI:
             queue=True,
         )
 
-        # Stream-Steuerung (#35): der Tausch Send ⇄ Stop läuft als eigene,
-        # nicht-streamende Events vor und nach dem Generator (`.then`). So bleibt
-        # die Signatur von respond_streaming unangetastet — sonst müsste jeder
-        # yield zwei zusätzliche Slots mitschleppen.
         # Stream-Steuerung (#35): die Button-Updates reisen in denselben Yields
         # mit (siehe _with_stream_controls) — ein vorgeschaltetes Event hätte den
-        # ersten Token um Sekunden verzögert.
-        stream_buttons = [send_btn, stop_btn, regenerate_btn]
-        stream_outputs = [input_box, chatbot, history_state, *stream_buttons]
+        # ersten Token um Sekunden verzögert. Aus demselben Grund hängen auch die
+        # Quellen (#32) an denselben Yields.
+        stream_buttons = [components[key] for key in STREAM_CONTROL_KEYS]
+        stream_outputs = [
+            *(components[key] for key in STREAM_OUTPUT_KEYS),
+            *stream_buttons,
+        ]
 
         input_submit_evt = input_box.submit(
             fn=self.respond_streaming_with_controls,
@@ -1492,6 +1560,7 @@ class WebUI:
         read_aloud_label = ui.get("web_read_aloud_button", "Vorlesen 🔊")
         stop_label = ui.get("web_stop_button", "Stop ⏹")
         regenerate_label = ui.get("web_regenerate_button", "Nochmal 🔄")
+        sources_label = ui.get("web_sources_label", "Quellen 📚")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1531,6 +1600,7 @@ class WebUI:
             read_aloud_label=read_aloud_label,
             stop_label=stop_label,
             regenerate_label=regenerate_label,
+            sources_label=sources_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

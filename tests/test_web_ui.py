@@ -10,7 +10,9 @@ from unittest.mock import Mock, patch
 
 import gradio as gr
 import requests
-from ui.web_ui import PERSONA_OUTPUT_KEYS, WebUI
+from config.texts import Texts
+from ui.web_ui import PERSONA_OUTPUT_KEYS, STREAM_OUTPUT_KEYS, WebUI
+from wiki.lookup import WikiSnippet
 
 
 def test_webui_start_server_uses_configured_host_and_port():
@@ -284,7 +286,7 @@ def test_respond_streaming_returns_chat_and_state_updates():
         outputs = list(web_ui.respond_streaming("Hallo", chat_history, history_state))
 
     assert outputs
-    assert all(len(item) == 3 for item in outputs)
+    assert all(len(item) == len(STREAM_OUTPUT_KEYS) for item in outputs)
     assert chat_history[-1] == (None, "Hi")
     assert history_state == []
 
@@ -330,7 +332,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
         patch(
             "ui.web_ui.lookup_wiki_snippet",
-            return_value=(["🕵️ Hinweis"], [("Thema", "Snippet")]),
+            return_value=(["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
         ) as mock_lookup,
         patch("ui.web_ui.inject_wiki_context", side_effect=fake_inject),
         patch(
@@ -1228,3 +1230,163 @@ def test_self_talk_stream_stops_between_turns():
 
     # Der laufende Turn wird fertig, ein weiterer startet nicht mehr.
     assert runner.run_turn.call_count == 1
+
+
+# ---- Wiki-Quellen (#32) -----------------------------------------------------
+# Der Punkt der Anzeige ist nicht "es gab eine Quelle", sondern *welcher Text*
+# im Prompt gelandet ist und ob er an wiki.snippet_limit abgeschnitten wurde.
+
+
+def _web_ui_with_texts():
+    web_ui = _create_web_ui()
+    catalog = Texts("de")
+    web_ui.texts = catalog
+    web_ui._t = catalog.format
+    return web_ui
+
+
+def test_format_wiki_sources_shows_link_length_and_the_injected_text():
+    web_ui = _web_ui_with_texts()
+
+    markdown = web_ui._format_wiki_sources(
+        [
+            WikiSnippet(
+                topic="Deutschland",
+                snippet="Deutschland ist ein Bundesstaat.",
+                link="http://127.0.0.1:8080/wiki/Deutschland",
+                source="local",
+                full_length=8432,
+            )
+        ]
+    )
+
+    assert "[Deutschland](http://127.0.0.1:8080/wiki/Deutschland)" in markdown
+    assert "Offline-Archiv" in markdown
+    # Gekürzt: beide Zahlen müssen dastehen, sonst ist nicht erkennbar, wie viel
+    # des Artikels das Modell nie gesehen hat.
+    assert "32 von 8432 Zeichen" in markdown
+    assert "gekürzt" in markdown
+    assert "> Deutschland ist ein Bundesstaat." in markdown
+
+
+def test_format_wiki_sources_marks_complete_snippets_as_complete():
+    web_ui = _web_ui_with_texts()
+
+    markdown = web_ui._format_wiki_sources(
+        [WikiSnippet(topic="Kiwix", snippet="Kurz.", source="online", full_length=5)]
+    )
+
+    assert "vollständig" in markdown
+    assert "gekürzt" not in markdown
+    assert "Wikipedia (online)" in markdown
+
+
+def test_format_wiki_sources_numbers_every_snippet():
+    web_ui = _web_ui_with_texts()
+
+    markdown = web_ui._format_wiki_sources(
+        [
+            WikiSnippet(topic="Eins", snippet="A", full_length=1),
+            WikiSnippet(topic="Zwei", snippet="B", full_length=1),
+        ]
+    )
+
+    assert "### 1. Eins" in markdown
+    assert "### 2. Zwei" in markdown
+    assert markdown.count("---") == 1
+
+
+def test_format_wiki_sources_is_empty_without_snippets():
+    assert _web_ui_with_texts()._format_wiki_sources([]) == ""
+
+
+def test_wiki_source_updates_hide_the_accordion_without_hits():
+    accordion, markdown = _web_ui_with_texts()._wiki_source_updates([])
+
+    assert accordion["visible"] is False
+    assert markdown["value"] == ""
+
+
+def test_respond_streaming_publishes_the_sources_before_the_first_token():
+    """Die Quellen müssen in denselben Yields mitreisen (kein .then()-Umweg)."""
+    web_ui = _web_ui_with_texts()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Hi"])
+    web_ui.streamer = streamer
+
+    snippet = WikiSnippet(
+        topic="Deutschland",
+        snippet="Berlin ist die Hauptstadt.",
+        link="http://localhost:8080/Deutschland",
+        source="local",
+        full_length=9000,
+    )
+
+    md_index = STREAM_OUTPUT_KEYS.index("sources_md")
+    accordion_index = STREAM_OUTPUT_KEYS.index("sources_accordion")
+
+    # Die Chat-Liste wird in-place mutiert — für die Reihenfolge muss deshalb
+    # pro Yield ein Abzug genommen werden, nicht am Ende die Liste gelesen.
+    snapshots = []
+    with (
+        patch(
+            "ui.web_ui.lookup_wiki_snippet",
+            return_value=(["🕵️ Hinweis"], [snippet]),
+        ),
+        patch("ui.web_ui.inject_wiki_context"),
+        patch("ui.web_ui.context_near_limit", return_value=False),
+    ):
+        for item in web_ui.respond_streaming("Frage", [], []):
+            snapshots.append((item[md_index], item[accordion_index], list(item[1])))
+
+    published = [
+        md["value"]
+        for md, _, _ in snapshots
+        if isinstance(md, dict) and md.get("value")
+    ]
+    assert published, "Der injizierte Snippet-Text wurde nie an die UI geschickt"
+    assert "Berlin ist die Hauptstadt." in published[0]
+    assert any(
+        isinstance(acc, dict) and acc.get("visible") is True for _, acc, _ in snapshots
+    )
+
+    # Der Token-Stream startet erst danach — die Quellen stehen also, bevor die
+    # erste Antwort sichtbar wird.
+    first_source_yield = next(
+        i
+        for i, (md, _, _) in enumerate(snapshots)
+        if isinstance(md, dict) and md.get("value")
+    )
+    first_token_yield = next(
+        i
+        for i, (_, _, chat) in enumerate(snapshots)
+        if chat and chat[-1] == (None, "Hi")
+    )
+    assert first_source_yield < first_token_yield
+
+
+def test_respond_streaming_clears_stale_sources_on_a_new_question():
+    web_ui = _web_ui_with_texts()
+    web_ui.bot = "Karl"
+    streamer = Mock()
+    streamer.persona_options = {}
+    streamer.stream.return_value = iter(["Hi"])
+    web_ui.streamer = streamer
+
+    with (
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.context_near_limit", return_value=False),
+    ):
+        outputs = list(web_ui.respond_streaming("Frage", [], []))
+
+    accordion_index = STREAM_OUTPUT_KEYS.index("sources_accordion")
+    assert outputs[0][accordion_index]["visible"] is False
+
+
+def test_reset_updates_hide_the_sources_accordion():
+    updates = _create_web_ui()._reset_ui_updates()
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("sources_accordion")]["visible"] is False
+    assert updates[PERSONA_OUTPUT_KEYS.index("sources_md")]["value"] == ""

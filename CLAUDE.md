@@ -61,6 +61,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── email_adapter/
 │   │   └── service.py           # opt-in IMAP/SMTP-Bridge (Personas per Mail)
 │   ├── wiki/
+│   │   ├── lookup.py            # Snippet-Abruf (WikiSnippet) + Kontext-Injektion
 │   │   ├── wikipedia_proxy.py   # HTTP-Proxy (Port 8042)
 │   │   ├── spacy_keyword_finder.py  # NLP-Schlüsselwortextraktion
 │   │   └── kiwix_autostart.py
@@ -303,6 +304,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
+| **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Nur Einzelchat, Ask-All und Terminal offen (#32a) |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
@@ -375,7 +377,7 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #35 Stop/Regenerate, #32 Wiki-Quellen, #50 Guard-Braces-Lücke, #14 E-Mail-Restpunkte
+- **Quick Wins:** #32a Quellen für Ask-All/Terminal, #27 Ask-All-Moderator, #36 WebUI-Politur, #14 E-Mail-Restpunkte
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -383,7 +385,9 @@ Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei
 #2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update, #23 Paralleler Broadcast,
 #17 Faster first token, #6 Modell-Auswahl (WebUI, session-only), #13 STT MVP (WebUI-Mikro
 via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen),
-#25 TTS im WebUI (Vorlesen-Button, Browser-Playback).
+#25 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
+#37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
+#32 Wiki-Quellen-Transparenz.
 
 ## Sprachstrategie
 
