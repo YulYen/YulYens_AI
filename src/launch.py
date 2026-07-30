@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 
 # Core and configuration
 from config.config_singleton import Config
@@ -23,6 +24,9 @@ from yaml import YAMLError
 # NOTE: the heavy AppFactory import (→ gradio) and uvicorn are deferred into the
 # functions that need them, so light commands like `--doctor` stay importable
 # even when the UI/web stack is missing or broken.
+
+# Mirrors personas.py; launch.py sits one level higher, hence parents[1].
+_ENSEMBLES_DIR = Path(__file__).resolve().parents[1] / "ensembles"
 
 
 def main():
@@ -45,15 +49,20 @@ def main():
         action="store_true",
         help="Run preflight system checks (Ollama/model/spaCy/Kiwix/VRAM) and exit.",
     )
+    parser.add_argument(
+        "--list-ensembles",
+        action="store_true",
+        dest="list_ensembles",
+        help="List the bundled persona ensembles (name for -e, personas, locales) and exit.",
+    )
     args = parser.parse_args()
 
     if args.doctor:
         sys.exit(_run_doctor(args.config))
 
-    if not args.ensemble:
-        parser.error(
-            "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
-        )
+    if args.list_ensembles:
+        sys.exit(_list_ensembles())
+
     config_path = os.path.abspath(args.config or "config.yaml")
 
     try:
@@ -84,7 +93,12 @@ def main():
         )
         sys.exit(3)
 
-    cfg.ensemble = args.ensemble
+    # -e wins; an `ensemble:` key in config.yaml is the documented fallback.
+    cfg.ensemble = args.ensemble or getattr(cfg, "ensemble", None)
+    if not cfg.ensemble:
+        parser.error(
+            "Missing required parameter: --ensemble / -e. If you are not sure, use 'python src/launch.py -e classic'"
+        )
 
     # 1) Initialize logging first
     ensure_dir_exists(cfg.logging["dir"])
@@ -218,6 +232,58 @@ def _run_doctor(config_path: str | None) -> int:
     print(f"  Status: {status_color}{status.upper()}{Style.RESET_ALL}\n")
 
     return 1 if status == "error" else 0
+
+
+def _list_ensembles() -> int:
+    """List bundled persona ensembles, print a report, return a process exit code."""
+    import yaml
+
+    # Redirected stdout falls back to cp1252 on Windows and would crash on the dash.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
+
+    print("\nYul Yen — Verfügbare Ensembles")
+    print("-" * 48)
+
+    found = 0
+    for base_file in sorted(_ENSEMBLES_DIR.glob("**/personas_base.yaml")):
+        ensemble_dir = base_file.parent
+        # The name is the path fragment that -e expects; always forward slashes,
+        # because it also ends up in the web UI's avatar URLs.
+        name = ensemble_dir.relative_to(_ENSEMBLES_DIR).as_posix()
+        try:
+            data = yaml.safe_load(base_file.read_text(encoding="utf-8")) or {}
+            personas = data.get("personas") or {}
+        except (OSError, YAMLError) as exc:
+            print(f"  {name}\n      (übersprungen: {exc})")
+            continue
+
+        labels = []
+        for entry in personas:
+            entry = entry or {}
+            persona_name = str(entry.get("name") or "?")
+            featured = (entry.get("defaults") or {}).get("featured")
+            labels.append(f"{persona_name} (featured)" if featured else persona_name)
+
+        locales = sorted(
+            path.name
+            for path in (ensemble_dir / "locales").glob("*")
+            if (path / "personas.yaml").is_file()
+        )
+
+        print(f"  {name}")
+        print(f"      Personas: {', '.join(labels) or '—'}")
+        print(f"      Sprachen: {', '.join(locales) or '—'}")
+        found += 1
+
+    print("-" * 48)
+    if not found:
+        print(f"  Keine Ensembles gefunden unter {_ENSEMBLES_DIR}.\n")
+        return 1
+
+    print("  Start:  python src/launch.py -e <name>")
+    print("  z. B.:  python src/launch.py -e examples/spaceship_crew\n")
+    return 0
 
 
 def _email_adapter_enabled(email_cfg) -> bool:

@@ -205,8 +205,11 @@ Mit dem Parameter `--ensemble` (Kurzform `-e`) wird festgelegt, welches Ensemble
 `spaceship_crew` lässt sich der Start wie folgt ausführen:
 
 ```bash
-python src/launch.py -e examples\spaceship_crew
+python src/launch.py -e examples/spaceship_crew
 ```
+
+Der Name ist ein Pfad unterhalb von `ensembles/` und wird **immer mit Schrägstrich** geschrieben,
+auch unter Windows — er landet unverändert in den Avatar-URLs der Web-UI.
 
 Eine detaillierte Anleitung zur Erstellung eigener Ensembles findest du in
 [Eigenes Ensemble hinzufügen](Ensemble_hinzufuegen.md).
@@ -217,6 +220,27 @@ Optional kann zusätzlich eine alternative Konfigurationsdatei per `--config` (K
 ```bash
 python src/launch.py -e classic --config pfad/zur/config.yaml
 ```
+
+#### Ensembles auflisten
+
+Welche Ensembles im Repo liegen — inklusive des Namens, den `-e` erwartet — zeigt:
+
+```bash
+python src/launch.py --list-ensembles
+```
+
+```
+Yul Yen — Verfügbare Ensembles
+------------------------------------------------
+  classic
+      Personas: LEAH (featured), DORIS, PETER, POPCORN
+      Sprachen: de, en
+  examples/spaceship_crew
+      Personas: CAPTAIN_SELINA (featured), ZETA_FLUX, ELIAS_MOREL, LYRA_VEX
+      Sprachen: de, en
+```
+
+Der Befehl liest nur YAML-Dateien und braucht weder Ollama noch den UI-Stack.
 
 #### Setup-Doktor (Preflight-Check)
 

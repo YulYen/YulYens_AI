@@ -29,7 +29,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 ```
 <repo-root>/
 ├── src/
-│   ├── launch.py              # Haupteinstiegspunkt (inkl. --doctor Systemcheck)
+│   ├── launch.py              # Haupteinstiegspunkt (inkl. --doctor Systemcheck, --list-ensembles)
 │   ├── core/
 │   │   ├── llm_core.py        # Abstrakte LLM-Schnittstelle
 │   │   ├── ollama_llm_core.py # Ollama-Implementierung
@@ -296,3 +296,4 @@ Alle Logs in `logs/`:
 - `yulyen_ai_YYYY-MM-DD_HH-MM.log` — Systemlog
 - `conversation_[PERSONA]_[TIMESTAMP].json` — Gesprächslog (JSON)
 - `wiki_proxy_[TIMESTAMP].log` — Wiki-Proxy-Log
+- `feedback_votes.jsonl` — 👍/👎-Bewertungen (#40), append-only, eine Zeile pro Vote

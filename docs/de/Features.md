@@ -11,6 +11,19 @@ Das System umfasst vier unterschiedliche KI-Personas mit eigenen Charakteren. Al
 
 Die Auswahl der Persona erfolgt entweder beim Start (Terminal-UI) oder über die Weboberfläche. Jede Persona reagiert im entsprechenden Stil auf Nutzeranfragen.
 
+Diese vier gehören zum Ensemble `classic` — der Standardbesetzung. Welche Personas antworten, hängt am gewählten Ensemble (siehe nächster Abschnitt).
+
+## Persona-Ensembles
+
+Ein Ensemble bündelt Personas mit ihren System-Prompts, LLM-Optionen (Temperatur, `repeat_penalty`, `num_ctx`) und Avataren. Welches beim Start geladen wird, bestimmt `--ensemble` / `-e`. Zwei Ensembles liegen im Repo:
+
+- **`classic`** — LEAH, DORIS, PETER, POPCORN (Standard, `python src/launch.py -e classic`)
+- **`examples/spaceship_crew`** — die Crew des Raumschiffs *Aurora-One*: CAPTAIN_SELINA (besonnene Kommandantin), ZETA_FLUX (sarkastische Chefingenieurin), ELIAS_MOREL (poetischer Navigator) und LYRA_VEX (außerirdische Diplomatin). Start: `python src/launch.py -e examples/spaceship_crew`
+
+![Spaceship-Crew: Persona-Auswahl mit der Crew der Aurora-One](../screenshot_spaceship_crew.png)
+
+Welche Ensembles verfügbar sind, listet `python src/launch.py --list-ensembles` — mit Personas, vorhandenen Sprachen und dem Namen, den `-e` erwartet. Der Ensemble-Name ist ein Pfad unterhalb von `ensembles/` und wird immer mit Schrägstrich geschrieben. Eigene Ensembles brauchen keinen Code, nur YAML und Bilder: siehe [Eigenes Ensemble hinzufügen](Ensemble_hinzufuegen.md).
+
 ## Benutzeroberflächen (UI)
 
 Zwei verschiedene Benutzeroberflächen stehen zur Verfügung, auswählbar über die Konfiguration (`ui.type`):
@@ -70,6 +83,7 @@ Stabile Nutzung wird durch umfangreiches Logging und automatische Tests unterst�
 
 - **Chat-Logging:** Jede Unterhaltung wird in einer JSON-Datei (im Ordner `logs/`) mitprotokolliert. Darin werden Zeitstempel, verwendetes Modell, Persona sowie alle Nutzer- und KI-Nachrichten festgehalten. Zusätzlich schreibt die Anwendung fortlaufend ein System-Logfile (mit Präfix `yulyen_ai_...`), das interne Abläufe und Debug-Informationen (Info/Fehler) enthält.
 - **Wiki-Proxy Logging:** Der Wikipedia-Proxy-Dienst führt eigene Logdateien über die Artikelanfragen und Ergebnisse. Dadurch lassen sich Wiki-Zugriffe und etwaige Fehler nachvollziehen, getrennt vom Haupt-Chat-Log.
+- **Antwort-Feedback (👍/👎):** In der Web-UI lässt sich jede Antwort bewerten. Jeder Klick schreibt eine Zeile nach `logs/feedback_votes.jsonl` — mit Zeitstempel, Persona, Modell, Frage, Antwort und Bewertung. Die Datei wächst nur an (eine Umbewertung ergänzt eine Zeile, statt die alte zu ersetzen), sodass sich der Verlauf auswerten lässt. Gedacht als Datenbasis für Qualitätsvergleiche und späteres Finetuning.
 - **Automatisierte Tests:** Eine Sammlung von Pytest-Tests (`tests/` Verzeichnis) prüft zentrale Funktionen des Systems. Beispielsweise wird getestet, ob die Personas korrekt initialisiert werden, ob der Sicherheits-Filter greift und ob wiederholbare Antworten (z. B. gleiche Witze von Doris) konsistent bleiben. Diese Tests helfen, Regressionen zu vermeiden und die Zuverlässigkeit der KI-Orchestrierung sicherzustellen.
 
 ## Sicherheitsmechanismen
