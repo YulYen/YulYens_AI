@@ -239,6 +239,36 @@ def _parse_limit(query: dict) -> int:
     return max(0, min(val, snippet_limit))
 
 
+def _apply_limit(kv_line: str, clean_text: str, limit: int) -> tuple[str, int]:
+    """Kürzt den Artikeltext auf ``limit`` und meldet die Länge davor (#32).
+
+    Der Key/Value-Block aus der Infobox bleibt vollständig — gekürzt wird nur
+    der Fließtext dahinter. Die zurückgegebene Originallänge ist die einzige
+    Stelle, an der noch bekannt ist, wie viel des Artikels das Modell nie sieht.
+    """
+    sep = "\n\n"
+    full_length = len(kv_line + sep + clean_text if kv_line else clean_text)
+
+    if kv_line:
+        base = kv_line + sep
+        remaining = max(0, limit - len(base))
+        body = (
+            clean_text
+            if remaining <= 0
+            else (
+                clean_text[:remaining].rsplit(" ", 1)[0] + " …"
+                if len(clean_text) > remaining
+                else clean_text
+            )
+        )
+        return base + body, full_length
+
+    # No key/value block → apply the limit normally
+    if len(clean_text) <= limit:
+        return clean_text, full_length
+    return clean_text[:limit].rsplit(" ", 1)[0] + " …", full_length
+
+
 def _fetch_kiwix(term: str):
     url = _build_kiwix_url(term)
     logger.info(f"[Fetch] {url}")
@@ -348,30 +378,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             # --- One-off limiting logic: keep the key/value block intact, truncate only the body ---
             limit = _parse_limit(query)
 
-            if kv_line:
-                # Key/value block + blank line + body text
-                sep = "\n\n"
-                base = kv_line + sep
-                remaining = max(0, limit - len(base))
-                body = (
-                    clean_text
-                    if remaining <= 0
-                    else (
-                        clean_text[:remaining].rsplit(" ", 1)[0] + " …"
-                        if len(clean_text) > remaining
-                        else clean_text
-                    )
-                )
-                combined_text = base + body
-            else:
-                # No key/value block → apply the limit normally
-                combined_text = (
-                    clean_text
-                    if len(clean_text) <= limit
-                    else (clean_text[:limit].rsplit(" ", 1)[0] + " …")
-                )
-
-            clean_text = combined_text
+            clean_text, full_length = _apply_limit(kv_line, clean_text, limit)
 
             # Target link & UI hint
             link = _build_user_visible_link(self, search_term, online)
@@ -385,6 +392,7 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
                 "link": link,
                 "source": source,
                 "wiki_hint": wiki_hint,
+                "full_length": full_length,
             }
             # Make the actually-served snippet visible (this was the blind spot:
             # request + timing were logged, but never the returned text itself).
