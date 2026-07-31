@@ -89,10 +89,10 @@ class ConversationStore(Protocol):
     ) -> list[ConversationRef]: ...
 
     def load(
-        self, conversation_id: str
+        self, conversation_id: str, *, user: str | None = None
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None: ...
 
-    def delete(self, conversation_id: str) -> bool: ...
+    def delete(self, conversation_id: str, *, user: str | None = None) -> bool: ...
 
 
 class NullStore:
@@ -110,11 +110,11 @@ class NullStore:
         return []
 
     def load(
-        self, conversation_id: str
+        self, conversation_id: str, *, user: str | None = None
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None:
         return None
 
-    def delete(self, conversation_id: str) -> bool:
+    def delete(self, conversation_id: str, *, user: str | None = None) -> bool:
         return False
 
 
@@ -252,15 +252,27 @@ class SqliteStore:
         return [_to_ref(row) for row in rows]
 
     def load(
-        self, conversation_id: str
+        self, conversation_id: str, *, user: str | None = None
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None:
+        """Ein Gespräch samt Nachrichten — optional auf einen Nutzer beschränkt.
+
+        ``user`` ist der Schlüssel gegen den Fund aus dem Review: die Liste im
+        Verlauf filterte nach Nutzer, die Handler dahinter nahmen die ID aber
+        ungeprüft entgegen. Ein fremdes Gespräch sieht so aus wie ein nicht
+        existierendes — bewusst, damit die Antwort nicht verrät, dass es die ID
+        gibt. Terminal und API rufen weiter ohne ``user`` und sehen alles.
+        """
+        query = (
+            "SELECT c.*, (SELECT COUNT(*) FROM messages m "
+            "             WHERE m.conversation_id = c.id) AS message_count "
+            "FROM conversations c WHERE c.id = ?"
+        )
+        params: list[Any] = [conversation_id]
+        if user:
+            query += " AND c.user = ?"
+            params.append(user)
         with self._lock:
-            row = self._conn.execute(
-                "SELECT c.*, (SELECT COUNT(*) FROM messages m "
-                "             WHERE m.conversation_id = c.id) AS message_count "
-                "FROM conversations c WHERE c.id = ?",
-                (conversation_id,),
-            ).fetchone()
+            row = self._conn.execute(query, params).fetchone()
             if row is None:
                 return None
             messages = self._conn.execute(
@@ -272,11 +284,19 @@ class SqliteStore:
             {"role": m["role"], "content": m["content"]} for m in messages
         ]
 
-    def delete(self, conversation_id: str) -> bool:
+    def delete(self, conversation_id: str, *, user: str | None = None) -> bool:
+        """Löscht ein Gespräch — optional nur, wenn es dem Nutzer gehört.
+
+        Der Löschpfad ist der Grund, warum ``user`` kein optionaler Komfort ist:
+        er ist unwiderruflich.
+        """
+        query = "DELETE FROM conversations WHERE id = ?"
+        params: list[Any] = [conversation_id]
+        if user:
+            query += " AND user = ?"
+            params.append(user)
         with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM conversations WHERE id = ?", (conversation_id,)
-            )
+            cursor = self._conn.execute(query, params)
             self._conn.commit()
             return cursor.rowcount > 0
 

@@ -91,6 +91,33 @@ def test_load_of_an_unknown_id_returns_none(store):
     assert store.load("gibtesnicht") is None
 
 
+def test_load_and_delete_can_be_bound_to_a_user(store):
+    """Ein fremdes Gespräch verhält sich wie ein nicht existierendes.
+
+    Ohne diese Bindung reichte die bloße Kenntnis einer Gesprächs-ID, um ein
+    fremdes Gespräch zu lesen, zu exportieren und zu löschen — die Filterung
+    saß nur in der Auswahlliste der Oberfläche, nicht im Store.
+    """
+    fremd = store.start(user="alice", persona="LEAH", model="m", app="web")
+    store.append(fremd, "user", "Alices privates Gespräch")
+
+    assert store.load(fremd, user="bob") is None
+    assert store.delete(fremd, user="bob") is False
+    # …und es ist wirklich noch da:
+    assert store.load(fremd, user="alice") is not None
+
+    assert store.delete(fremd, user="alice") is True
+    assert store.load(fremd) is None
+
+
+def test_without_a_user_the_store_stays_open_for_terminal_and_api(store):
+    """Terminal und API kennen keinen Nutzerbegriff — sie rufen ohne `user`."""
+    cid = store.start(user="alice", persona="LEAH", model="m", app="terminal")
+
+    assert store.load(cid) is not None
+    assert store.delete(cid) is True
+
+
 def test_append_without_a_conversation_is_ignored(store):
     """Ein Streamer ohne gesetztes Gespräch darf nichts kaputt machen."""
     store.append("", "user", "ins Leere")

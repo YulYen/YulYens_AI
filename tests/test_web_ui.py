@@ -1766,6 +1766,43 @@ def test_history_lists_only_the_signed_in_users_conversations(tmp_path):
     assert [cid for _label, cid in choices] == [mine]
 
 
+def test_no_history_handler_touches_a_foreign_conversation(tmp_path):
+    """Die Liste filterte nach Nutzer, die vier Handler dahinter nicht.
+
+    Die Gesprächs-ID kommt aus einem `gr.Dropdown`, und dessen `preprocess`
+    reicht in Gradio 4.44 den Wert des Clients ungeprüft durch — die Auswahl
+    im Browser ist also keine Schranke. Nachgestellt mit zwei angemeldeten
+    Nutzern: „bob" konnte alices Gespräch lesen, exportieren, fortsetzen und
+    **löschen**.
+
+    Bewusst alle vier Wege in einem Test: genau daran, dass eine Regel nur an
+    einem von mehreren Wegen hängt, ist das Projekt zuletzt zweimal gescheitert.
+    """
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    fremd = _fill(store, user="alice", question="Alices privates Gespräch")
+    persona_info = {"leah": {"name": "LEAH", "description": "warm"}}
+
+    # 1) Vorschau
+    assert "privates" not in web_ui._on_history_selected(fremd, "bob")["value"]
+    # 2) Öffnen/Fortsetzen
+    updates = web_ui._on_history_open(session, fremd, "bob", persona_info, "Tippe")
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
+    assert session.bot is None
+    # 3) Export
+    assert web_ui._on_history_export(session, fremd, "bob")["visible"] is False
+    # 4) Löschen — der einzige unwiderrufliche Weg
+    _pick, _prev, status, _file, _confirm = web_ui._on_history_delete(
+        fremd, True, "bob"
+    )
+    assert status["value"] == web_ui._t("history_not_found")
+    assert store.load(fremd) is not None, "bob hat alices Gespräch gelöscht"
+
+    # Gegenprobe: für alice funktioniert alles unverändert.
+    assert "privates" in web_ui._on_history_selected(fremd, "alice")["value"]
+    assert web_ui._on_history_export(session, fremd, "alice")["visible"] is True
+
+
 def test_history_label_shows_date_persona_and_title(tmp_path):
     session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
@@ -1791,7 +1828,7 @@ def test_history_preview_renders_both_roles(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store, question="Frage?")
 
-    preview = web_ui._on_history_selected(cid)["value"]
+    preview = web_ui._on_history_selected(cid, "local")["value"]
 
     assert "Frage?" in preview and "Antwort" in preview
     assert "LEAH" in preview
@@ -1803,7 +1840,7 @@ def test_history_open_makes_the_conversation_continuable(tmp_path):
     cid = _fill(store, persona="LEAH", question="Frage?")
     persona_info = {"leah": {"name": "LEAH", "description": "d"}}
 
-    updates = web_ui._on_history_open(session, cid, persona_info, "Tippe")
+    updates = web_ui._on_history_open(session, cid, "local", persona_info, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
     # Ohne die Gesprächs-ID würde das fortgesetzte Gespräch ins Leere schreiben.
@@ -1818,7 +1855,9 @@ def test_history_open_of_a_gone_persona_stays_readable(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store, persona="Pirat")
 
-    updates = web_ui._on_history_open(session, cid, {"leah": {"name": "LEAH"}}, "Tippe")
+    updates = web_ui._on_history_open(
+        session, cid, "local", {"leah": {"name": "LEAH"}}, "Tippe"
+    )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
@@ -1830,7 +1869,7 @@ def test_history_open_of_an_unknown_id_reports_it(tmp_path):
     session = SessionContext()
     web_ui, _store = _history_web_ui(tmp_path)
 
-    updates = web_ui._on_history_open(session, "gibtesnicht", {}, "Tippe")
+    updates = web_ui._on_history_open(session, "gibtesnicht", "local", {}, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
 
@@ -1840,7 +1879,7 @@ def test_history_export_writes_markdown(tmp_path):
     session = SessionContext()
     cid = _fill(store, question="Frage?")
 
-    update = web_ui._on_history_export(session, cid)
+    update = web_ui._on_history_export(session, cid, "local")
 
     text = Path(update["value"]).read_text(encoding="utf-8")
     assert "Frage?" in text and "Antwort" in text
@@ -2065,7 +2104,10 @@ def test_a_guest_named_like_a_persona_is_not_continued_as_that_persona(tmp_path)
     store.append(cid, "user", "Hallo Gast")
 
     updates = web_ui._on_history_open(
-        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+        session,
+        cid,
+        "local",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
     )
 
     status = updates[PERSONA_OUTPUT_KEYS.index("history_status")]
@@ -2081,7 +2123,10 @@ def test_an_old_guest_row_without_the_marker_is_caught_by_the_name(tmp_path):
     store.append(cid, "user", "Hallo Gast")
 
     updates = web_ui._on_history_open(
-        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+        session,
+        cid,
+        "local",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
     )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
@@ -2094,7 +2139,10 @@ def test_the_real_persona_is_still_continuable(tmp_path):
     cid = _fill(store, persona="LEAH")
 
     web_ui._on_history_open(
-        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+        session,
+        cid,
+        "local",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
     )
 
     assert session.bot == "LEAH"

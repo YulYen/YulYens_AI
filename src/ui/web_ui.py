@@ -972,19 +972,33 @@ class WebUI:
         )
         return as_persona_outputs(updates)
 
-    def _on_history_selected(self, conversation_id: str | None) -> Any:
+    def _on_history_selected(self, conversation_id: str | None, user: str) -> Any:
         """Vorschau des gewählten Gesprächs."""
-        loaded = self._load_from_store(conversation_id)
+        loaded = self._load_from_store(conversation_id, user)
         if loaded is None:
             return gr.update(value="")
         ref, messages = loaded
         return gr.update(value=conversation_markdown(ref, messages, self._t))
 
-    def _load_from_store(self, conversation_id: str | None):
+    def _load_from_store(self, conversation_id: str | None, user: str):
+        """Gespräch aus der Ablage — **nur** das des angemeldeten Nutzers.
+
+        Die Liste in ``_history_choices`` filtert nach Nutzer, die Handler
+        dahinter taten es nicht: die Gesprächs-ID kommt aus einem
+        ``gr.Dropdown``, und dessen ``preprocess`` reicht in Gradio 4.44 den
+        Wert des Clients ungeprüft durch (``type="value"`` → ``return payload``).
+        Wer eine fremde ID kannte, konnte das Gespräch lesen, exportieren,
+        fortsetzen und löschen — nachgestellt mit zwei angemeldeten Nutzern.
+
+        Deshalb liegt die Prüfung jetzt an der Stelle, an der alle vier
+        Handler zwangsläufig vorbeikommen, statt viermal beim Aufrufer.
+        """
         if not conversation_id:
             return None
         try:
-            return self.factory.get_store().load(str(conversation_id))
+            return self.factory.get_store().load(
+                str(conversation_id), user=user or self._fallback_user()
+            )
         except Exception:
             logging.exception("Gespräch %s nicht ladbar", conversation_id)
             return None
@@ -1021,11 +1035,12 @@ class WebUI:
         self,
         session: SessionContext,
         conversation_id: str | None,
+        user: str,
         persona_info: dict[str, dict[str, Any]] | None = None,
         input_placeholder: str = "",
     ) -> tuple:
         """Gespräch in den Chat holen — fortsetzbar, nicht nur ansehbar."""
-        loaded = self._load_from_store(conversation_id)
+        loaded = self._load_from_store(conversation_id, user)
         if loaded is None:
             updates = self._reset_updates()
             updates.update(
@@ -1080,9 +1095,9 @@ class WebUI:
         return as_persona_outputs(as_dict)
 
     def _on_history_export(
-        self, session: SessionContext, conversation_id: str | None
+        self, session: SessionContext, conversation_id: str | None, user: str
     ) -> Any:
-        loaded = self._load_from_store(conversation_id)
+        loaded = self._load_from_store(conversation_id, user)
         if loaded is None:
             return gr.update(value=None, visible=False)
         ref, messages = loaded
@@ -1106,7 +1121,11 @@ class WebUI:
         deleted = False
         if conversation_id:
             try:
-                deleted = self.factory.get_store().delete(str(conversation_id))
+                # Nur eigene Gespräche: das Löschen ist der einzige der vier
+                # Verlauf-Wege, der sich nicht rückgängig machen lässt.
+                deleted = self.factory.get_store().delete(
+                    str(conversation_id), user=user or self._fallback_user()
+                )
             except Exception:
                 logging.exception("Gespräch %s nicht löschbar", conversation_id)
         choices = self._history_choices(user)
@@ -1831,9 +1850,11 @@ class WebUI:
             queue=False,
         )
 
+        # user_state gehört in *jeden* Verlauf-Handler: die Gesprächs-ID kommt
+        # vom Client und wird von Gradio nicht gegen die Auswahlliste geprüft.
         components["history_pick"].change(
             fn=self._on_history_selected,
-            inputs=[components["history_pick"]],
+            inputs=[components["history_pick"], user_state],
             outputs=[components["history_preview"]],
             queue=False,
         )
@@ -1844,14 +1865,14 @@ class WebUI:
                 persona_info=persona_info,
                 input_placeholder=input_placeholder,
             ),
-            inputs=[session_state, components["history_pick"]],
+            inputs=[session_state, components["history_pick"], user_state],
             outputs=persona_outputs,
             queue=False,
         )
 
         components["history_export_btn"].click(
             fn=self._on_history_export,
-            inputs=[session_state, components["history_pick"]],
+            inputs=[session_state, components["history_pick"], user_state],
             outputs=[components["history_file"]],
             queue=False,
         )
