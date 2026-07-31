@@ -12,6 +12,7 @@ from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
 from ui import self_talk
+from ui.continuation import continuable_persona, persona_info_from_names
 from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui.persona_chooser import prompt_persona_choice
 from wiki.lookup import (
@@ -197,6 +198,23 @@ class TerminalUI:
             msg = self._t(
                 "terminal_load_invalid_persona",
                 persona_name=persona_name or "<unbekannt>",
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
+        # Dieselbe Prüfung wie im Verlauf und beim Upload der WebUI: der Name
+        # allein reicht nicht. Ein Gast-Gespräch (`app: web-guest`) trägt einen
+        # Personennamen, aber sein System-Prompt lebte nur in jener Sitzung —
+        # es hier zu laden hieße, es still als die echte Ensemble-Persona
+        # fortzusetzen. #55 hat diese Regel für die beiden WebUI-Wege gebaut
+        # und den dritten übersehen, obwohl er dieselbe Datei liest.
+        if not continuable_persona(
+            persona_name,
+            meta.get("app"),
+            persona_info_from_names(get_all_persona_names()),
+        ):
+            msg = self._t(
+                "terminal_load_guest_not_continuable", persona_name=persona_name
             )
             print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
             return False

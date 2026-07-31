@@ -34,6 +34,8 @@ from core.utils import (
     module_available,
 )
 from stt.whisper_stt import is_stt_available, transcribe_wav
+from ui.continuation import GUEST_APP as _GUEST_APP
+from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
@@ -78,9 +80,10 @@ STREAM_FLUSH_INTERVAL_S = 0.1
 # concurrently for multiple browser sessions sharing one WebUI instance.
 _feedback_log_lock = threading.Lock()
 
-# Gast-Gespräche bekommen ein eigenes `app`, damit der Verlauf sie erkennt:
-# ein Gast namens „Leah" darf nicht als die echte LEAH fortgesetzt werden.
-GUEST_APP = "web-guest"
+# GUEST_APP und die Fortsetzbarkeits-Regel liegen in ui/continuation.py, weil
+# sie das Terminal genauso braucht (es liest dieselben JSON-Dateien). Hier nur
+# re-exportiert, damit bestehende Importe aus web_ui weiter funktionieren.
+GUEST_APP = _GUEST_APP
 
 # Hochgeladene Gespräche ebenfalls: sie sind fortsetzbar wie ein eigenes, aber
 # im Verlauf soll erkennbar bleiben, dass sie von außen kamen.
@@ -1003,33 +1006,9 @@ class WebUI:
             logging.exception("Gespräch %s nicht ladbar", conversation_id)
             return None
 
-    @staticmethod
-    def _continuable_persona(
-        persona_name: str | None,
-        app: str | None,
-        persona_info: dict[str, dict[str, Any]] | None,
-    ) -> dict[str, Any] | None:
-        """Die Ensemble-Persona zu einem Gespräch — oder None.
-
-        Zwei Hürden, weil eine allein nicht reicht: Gast-Gespräche tragen ein
-        eigenes `app`, und der Name muss exakt stimmen. Sonst öffnete ein Gast
-        namens „Leah" das Gespräch still als die echte LEAH weiter, weil die
-        Auflösung über `persona.lower()` läuft — ohne jeden Hinweis, dass ab da
-        ein anderer System-Prompt antwortet. Die Namensprüfung deckt auch
-        Gast-Gespräche ab, die vor dem eigenen `app` entstanden sind.
-
-        Bewusst auf Primitiven statt auf `ConversationRef`: **beide** Wege ins
-        Gespräch müssen dieselbe Prüfung benutzen — der Verlauf aus der Ablage
-        und der Upload einer JSON-Datei. Zwei Varianten derselben Regel waren
-        genau der Fehler (die erste Fassung schloss nur den Verlauf, über den
-        Upload war der Gast weiter als echte Persona fortsetzbar).
-        """
-        if app == GUEST_APP:
-            return None
-        persona = (persona_info or {}).get((persona_name or "").lower())
-        if not persona or persona.get("name") != persona_name:
-            return None
-        return persona
+    # Die Regel selbst steht in ui/continuation.py — sie gilt für alle drei
+    # Wege in ein gespeichertes Gespräch, auch für den im Terminal.
+    _continuable_persona = staticmethod(continuable_persona)
 
     def _on_history_open(
         self,
