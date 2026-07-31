@@ -14,6 +14,7 @@ import pytest
 import requests
 from config.texts import Texts
 from core.streaming_provider import StreamStats
+from ui.session import SessionContext
 from ui.web_ui import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
@@ -86,17 +87,18 @@ def test_stream_reply_throttles_updates():
     """Tokens are coalesced: far fewer yields than tokens, full text at the end."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     tokens = [f"t{i} " for i in range(50)]
     full_text = "".join(tokens)
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     # 10 ms per token → with the 0.1 s throttle only every ~10th token flushes.
     clock = iter(1000.0 + i * 0.01 for i in range(len(tokens) + 5))
     with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
-        outputs = list(web_ui._stream_reply([], []))
+        outputs = list(web_ui._stream_reply(session, [], []))
 
     assert len(outputs) < len(tokens) / 2
     final_chat = outputs[-1][1]
@@ -107,15 +109,16 @@ def test_stream_reply_always_flushes_final_state():
     """Even if the throttle suppresses every update, the final yield is complete."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     tokens = ["Hallo ", "Welt", "!"]
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     # Frozen clock: after the first flush no throttle window ever elapses.
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._stream_reply([], []))
+        outputs = list(web_ui._stream_reply(session, [], []))
 
     final_chat = outputs[-1][1]
     assert final_chat[-1] == (None, "Hallo Welt!")
@@ -124,11 +127,12 @@ def test_stream_reply_always_flushes_final_state():
 
 def test_respond_streaming_prepares_history_with_valid_num_ctx():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {"num_ctx": "4096"}
     streamer.stream.return_value = iter(["Hallo"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     chat_history = []
     history_state = []
@@ -143,7 +147,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
             side_effect=lambda history, limit: history,
         ) as mock_prepare,
     ):
-        list(web_ui.respond_streaming("Hallo", chat_history, history_state))
+        list(web_ui.respond_streaming(session, "Hallo", chat_history, history_state))
 
     mock_prepare.assert_called_once()
     assert mock_prepare.call_args[0][1] == 4096
@@ -152,11 +156,12 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
 
 def test_webui_heuristic_strategy_never_instantiates_karl():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {"num_ctx": "4096"}
     streamer.stream.return_value = iter(["Hallo"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     with (
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
@@ -168,21 +173,22 @@ def test_webui_heuristic_strategy_never_instantiates_karl():
         ),
         patch("core.context_utils.KarlSummarizer") as mock_karl,
     ):
-        list(web_ui.respond_streaming("Hallo", [], []))
+        list(web_ui.respond_streaming(session, "Hallo", [], []))
 
     mock_karl.assert_not_called()
 
 
 def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.cfg.context_management["strategy"] = "karl"
-    web_ui.bot = "Karl"
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {"num_ctx": "4096"}
     streamer.model_name = "chat-model"
     streamer._llm_core = Mock()
     streamer.stream.return_value = iter(["Antwort"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     with (
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
@@ -193,7 +199,7 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
     ):
         instance = mock_karl.return_value
         instance.summarize.return_value = [{"role": "system", "content": "S"}]
-        outputs = list(web_ui.respond_streaming("Hallo", [], []))
+        outputs = list(web_ui.respond_streaming(session, "Hallo", [], []))
 
     mock_prepare.assert_not_called()
     mock_karl.assert_called_once()
@@ -205,11 +211,12 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     caplog.set_level(logging.DEBUG)
 
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     chat_history = []
     history_state = []
@@ -221,7 +228,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
         patch("ui.web_ui.get_drink", return_value="☕"),
         patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
     ):
-        list(web_ui.respond_streaming("Hallo", chat_history, history_state))
+        list(web_ui.respond_streaming(session, "Hallo", chat_history, history_state))
 
     mock_prepare.assert_not_called()
     assert "Skipping 'karl_prepare_quick_and_dirty'" in caplog.text
@@ -230,7 +237,8 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
 
 def test_respond_streaming_keeps_session_histories_isolated():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     responses = [["Antwort 1"], ["Antwort 2"]]
@@ -242,7 +250,7 @@ def test_respond_streaming_keeps_session_histories_isolated():
         return iter(responses.pop(0))
 
     streamer.stream.side_effect = stream_side_effect
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     session_one_state = []
     session_two_state = []
@@ -252,10 +260,10 @@ def test_respond_streaming_keeps_session_histories_isolated():
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         session_one_outputs = list(
-            web_ui.respond_streaming("Frage 1", [], session_one_state)
+            web_ui.respond_streaming(session, "Frage 1", [], session_one_state)
         )
         session_two_outputs = list(
-            web_ui.respond_streaming("Frage 2", [], session_two_state)
+            web_ui.respond_streaming(session, "Frage 2", [], session_two_state)
         )
 
     final_history_one = session_one_outputs[-1][2]
@@ -280,11 +288,12 @@ def test_respond_streaming_keeps_session_histories_isolated():
 
 def test_respond_streaming_returns_chat_and_state_updates():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     chat_history: list = []
     history_state: list = []
@@ -293,7 +302,9 @@ def test_respond_streaming_returns_chat_and_state_updates():
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
-        outputs = list(web_ui.respond_streaming("Hallo", chat_history, history_state))
+        outputs = list(
+            web_ui.respond_streaming(session, "Hallo", chat_history, history_state)
+        )
 
     assert outputs
     assert all(len(item) == len(STREAM_OUTPUT_KEYS) for item in outputs)
@@ -303,20 +314,23 @@ def test_respond_streaming_returns_chat_and_state_updates():
 
 def test_respond_streaming_appends_final_history_entries():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     chat_history: list = []
     history_state: list = []
 
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     with (
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
-        outputs = list(web_ui.respond_streaming("Hallo", chat_history, history_state))
+        outputs = list(
+            web_ui.respond_streaming(session, "Hallo", chat_history, history_state)
+        )
 
     final_state = outputs[-1][2]
     assert final_state == [
@@ -327,6 +341,7 @@ def test_respond_streaming_appends_final_history_entries():
 
 def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
     web_ui = _create_web_ui()
+    session = SessionContext()
     captured: dict = {}
 
     def fake_iter_broadcast_events(
@@ -350,7 +365,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
             side_effect=fake_iter_broadcast_events,
         ),
     ):
-        outputs = list(web_ui._on_submit_ask_all("Frage"))
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
 
     # Lookup läuft genau einmal (nicht pro Persona), Kontext erreicht den Broadcast
     mock_lookup.assert_called_once()
@@ -364,6 +379,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
 
 def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
     web_ui = _create_web_ui()
+    session = SessionContext()
     captured: dict = {}
 
     def fake_iter_broadcast_events(
@@ -380,7 +396,7 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
             side_effect=fake_iter_broadcast_events,
         ),
     ):
-        outputs = list(web_ui._on_submit_ask_all("Frage"))
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
 
     assert captured["context_messages"] == []
     final_status = outputs[-1][1]
@@ -389,13 +405,14 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
 
 def test_reset_to_start_cancels_running_ask_all_broadcast():
     web_ui = _create_web_ui()
+    session = SessionContext()
     stop = threading.Event()
-    web_ui._ask_all_stop = stop
+    session.ask_all_stop = stop
 
-    web_ui._on_reset_to_start()
+    web_ui._on_reset_to_start(session)
 
     assert stop.is_set()
-    assert web_ui._ask_all_stop is None
+    assert session.ask_all_stop is None
 
 
 def test_on_submit_ask_all_sequential_fallback_via_config():
@@ -404,6 +421,7 @@ def test_on_submit_ask_all_sequential_fallback_via_config():
             "experimental": {"broadcast_mode": True, "broadcast_parallel": False}
         }
     )
+    session = SessionContext()
 
     def fake_iter_broadcast_events(factory, question, *, context_messages=None):
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
@@ -417,7 +435,7 @@ def test_on_submit_ask_all_sequential_fallback_via_config():
         ) as mock_sequential,
         patch("ui.web_ui.iter_broadcast_events_parallel") as mock_parallel,
     ):
-        outputs = list(web_ui._on_submit_ask_all("Frage"))
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
 
     mock_sequential.assert_called_once()
     mock_parallel.assert_not_called()
@@ -426,23 +444,25 @@ def test_on_submit_ask_all_sequential_fallback_via_config():
 
 def test_on_start_self_talk_validates_distinct_personas():
     web_ui = _create_web_ui()
+    session = SessionContext()
 
-    updates = web_ui._on_start_self_talk("Karl", "Karl", "Los geht's")
+    updates = web_ui._on_start_self_talk(session, "Karl", "Karl", "Los geht's")
 
     assert updates[0]["visible"] is True
 
 
 def test_run_self_talk_stream_yields_alternating_messages():
     web_ui = _create_web_ui()
+    session = SessionContext()
 
     runner = Mock()
     runner.run_turn.side_effect = [
         ("Karl", "Hallo", False, 1),
         ("Yul", "Hi", True, 2),
     ]
-    web_ui.self_talk_runner = runner
+    session.self_talk_runner = runner
 
-    outputs = list(web_ui._run_self_talk_stream([], []))
+    outputs = list(web_ui._run_self_talk_stream(session, [], []))
 
     assert outputs
     final_chat, final_state = outputs[-1]
@@ -455,8 +475,9 @@ def test_run_self_talk_stream_yields_alternating_messages():
 
 def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
     web_ui = _create_web_ui()
+    session = SessionContext()
 
-    updates = web_ui._on_show_self_talk()
+    updates = web_ui._on_show_self_talk(session)
 
     assert len(updates) == len(PERSONA_OUTPUT_KEYS)
     assert updates[22]["visible"] is True
@@ -474,11 +495,12 @@ def test_load_failure_updates_sets_load_status_slot():
 
 def test_on_start_self_talk_clears_stale_runner_on_validation_error():
     web_ui = _create_web_ui()
-    web_ui.self_talk_runner = Mock()
+    session = SessionContext()
+    session.self_talk_runner = Mock()
 
-    web_ui._on_start_self_talk("Karl", "Karl", "Prompt")
+    web_ui._on_start_self_talk(session, "Karl", "Karl", "Prompt")
 
-    assert web_ui.self_talk_runner is None
+    assert session.self_talk_runner is None
 
 
 # ---- Modell-Auswahl (Profi-Option, #6) -------------------------------------
@@ -517,10 +539,11 @@ def test_available_models_dummy_backend_skips_request():
 
 def test_on_model_selected_overrides_config_and_rebuilds_streamer():
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.cfg.override = Mock()
-    web_ui.bot = "Karl"
+    session.bot = "Karl"
 
-    update = web_ui._on_model_selected("neu:1", "")
+    update = web_ui._on_model_selected(session, "neu:1", "")
 
     web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
     web_ui.factory.get_streamer_for_persona.assert_called_once_with("Karl")
@@ -529,22 +552,24 @@ def test_on_model_selected_overrides_config_and_rebuilds_streamer():
 
 def test_on_model_selected_without_persona_keeps_streamer_none():
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.cfg.override = Mock()
-    web_ui.bot = None
+    session.bot = None
 
-    update = web_ui._on_model_selected("neu:1", "")
+    update = web_ui._on_model_selected(session, "neu:1", "")
 
     web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
     web_ui.factory.get_streamer_for_persona.assert_not_called()
-    assert web_ui.streamer is None
+    assert session.streamer is None
     assert update["visible"] is True
 
 
 def test_on_model_selected_empty_choice_is_noop():
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.cfg.override = Mock()
 
-    update = web_ui._on_model_selected("", "")
+    update = web_ui._on_model_selected(session, "", "")
 
     web_ui.cfg.override.assert_not_called()
     assert update["visible"] is False
@@ -652,8 +677,10 @@ def test_reset_updates_hides_mic():
 
 
 def _briefing_web_ui():
+    """WebUI mit eingeschaltetem Briefing plus die dazugehörige Sitzung."""
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     web_ui.briefing_enabled = True
     web_ui.briefing_cfg = {
         "enabled": True,
@@ -664,22 +691,23 @@ def _briefing_web_ui():
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Ant", "wort"])
-    web_ui.streamer = streamer
-    return web_ui
+    session.streamer = streamer
+    return web_ui, session
 
 
 def test_briefing_disabled_by_default_config():
     web_ui = _create_web_ui()
+    session = SessionContext()
 
     assert web_ui.briefing_enabled is False
 
-    outputs = list(web_ui.respond_briefing([], []))
+    outputs = list(web_ui.respond_briefing(session, [], []))
     assert len(outputs) == 1
     web_ui.factory.get_streamer_for_persona.assert_not_called()
 
 
 def test_respond_briefing_streams_summary_with_injected_context():
-    web_ui = _briefing_web_ui()
+    web_ui, session = _briefing_web_ui()
     history_state = [{"role": "user", "content": "früher"}]
 
     with (
@@ -690,7 +718,7 @@ def test_respond_briefing_streams_summary_with_injected_context():
         patch("ui.web_ui.inject_briefing_context") as mock_inject,
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
-        outputs = list(web_ui.respond_briefing([], history_state))
+        outputs = list(web_ui.respond_briefing(session, [], history_state))
 
     mock_fetch.assert_called_once()
     assert mock_fetch.call_args[0][2] == (1.0, 1.0)  # Timeout-Tuple aus der Config
@@ -710,14 +738,14 @@ def test_respond_briefing_streams_summary_with_injected_context():
 
 
 def test_respond_briefing_without_items_shows_empty_note_and_skips_stream():
-    web_ui = _briefing_web_ui()
+    web_ui, session = _briefing_web_ui()
 
     with patch("ui.web_ui.fetch_briefing_items", return_value=(["📰 down"], [])):
-        outputs = list(web_ui.respond_briefing([], []))
+        outputs = list(web_ui.respond_briefing(session, [], []))
 
     final_chat = outputs[-1][1]
     assert final_chat[-1] == (None, "briefing_empty")
-    web_ui.streamer.stream.assert_not_called()
+    session.streamer.stream.assert_not_called()
 
 
 def test_persona_selected_updates_toggles_briefing_button():
@@ -772,10 +800,11 @@ def test_tts_web_disabled_by_default_config():
 
 def test_on_read_aloud_without_reply_warns_and_stays_hidden():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
 
     with patch("ui.web_ui.gr.Warning") as mock_warning:
-        update = web_ui._on_read_aloud([{"role": "user", "content": "Hallo"}])
+        update = web_ui._on_read_aloud(session, [{"role": "user", "content": "Hallo"}])
 
     mock_warning.assert_called_once()
     assert update["visible"] is False
@@ -784,7 +813,8 @@ def test_on_read_aloud_without_reply_warns_and_stays_hidden():
 def test_on_read_aloud_synthesizes_last_assistant_reply(monkeypatch):
     _install_fake_piper(monkeypatch)
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     web_ui.tts_cfg = {"voices": {"default": {"de": "stimme"}}}
     history = [
         {"role": "assistant", "content": "Alte Antwort"},
@@ -793,7 +823,7 @@ def test_on_read_aloud_synthesizes_last_assistant_reply(monkeypatch):
     ]
 
     with patch("tts.piper_tts.create_wav") as mock_create:
-        update = web_ui._on_read_aloud(history)
+        update = web_ui._on_read_aloud(session, history)
 
     mock_create.assert_called_once()
     args, kwargs = mock_create.call_args
@@ -807,7 +837,8 @@ def test_on_read_aloud_synthesizes_last_assistant_reply(monkeypatch):
 def test_on_read_aloud_error_warns_and_stays_hidden(monkeypatch):
     _install_fake_piper(monkeypatch)
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
 
     with (
         patch(
@@ -816,7 +847,9 @@ def test_on_read_aloud_error_warns_and_stays_hidden(monkeypatch):
         ),
         patch("ui.web_ui.gr.Warning") as mock_warning,
     ):
-        update = web_ui._on_read_aloud([{"role": "assistant", "content": "Hi"}])
+        update = web_ui._on_read_aloud(
+            session, [{"role": "assistant", "content": "Hi"}]
+        )
 
     mock_warning.assert_called_once()
     assert update["visible"] is False
@@ -865,11 +898,12 @@ def test_chat_like_appends_upvote_jsonl(tmp_path):
     """The backwards walk skips UI-only rows (wiki hint) to find the question."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Hallo?", None), (None, "wiki hint"), (None, "Antwort!")]
     meta = {"persona": "DORIS", "model": "m1", "app": "web"}
 
-    web_ui._on_chat_like(history, meta, _fake_like(index=(2, 1), liked=True))
+    web_ui._on_chat_like(session, history, meta, _fake_like(index=(2, 1), liked=True))
 
     votes = _read_votes(web_ui.feedback_log_path)
     assert len(votes) == 1
@@ -887,11 +921,12 @@ def test_chat_like_downvote_on_paired_history(tmp_path):
     """Loaded conversations pair (question, answer) in a single row."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Frage", "Antwort")]
 
     web_ui._on_chat_like(
-        history, {}, _fake_like(index=(0, 1), value="Antwort", liked=False)
+        session, history, {}, _fake_like(index=(0, 1), value="Antwort", liked=False)
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
@@ -902,11 +937,14 @@ def test_chat_like_downvote_on_paired_history(tmp_path):
 
 def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Prompt", None), (None, "LEAH: Hi"), (None, "DORIS: Na?")]
     meta = {"persona": "self-talk:LEAH,DORIS", "model": "m1", "app": "web"}
 
-    web_ui._on_chat_like(history, meta, _fake_like(index=(2, 1), value="DORIS: Na?"))
+    web_ui._on_chat_like(
+        session, history, meta, _fake_like(index=(2, 1), value="DORIS: Na?")
+    )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
     assert vote["question"] == "Prompt"
@@ -918,11 +956,12 @@ def test_chat_like_two_votes_append_two_lines(tmp_path):
     """Append-only event log: a revote adds a line, consumers dedup by index."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Frage", None), (None, "Antwort")]
 
-    web_ui._on_chat_like(history, {}, _fake_like(index=(1, 1), liked=True))
-    web_ui._on_chat_like(history, {}, _fake_like(index=(1, 1), liked=False))
+    web_ui._on_chat_like(session, history, {}, _fake_like(index=(1, 1), liked=True))
+    web_ui._on_chat_like(session, history, {}, _fake_like(index=(1, 1), liked=False))
 
     votes = _read_votes(web_ui.feedback_log_path)
     assert [v["vote"] for v in votes] == ["up", "down"]
@@ -930,10 +969,13 @@ def test_chat_like_two_votes_append_two_lines(tmp_path):
 
 def test_chat_like_never_raises_on_write_error(tmp_path, caplog):
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path)  # a directory → OSError on open
 
     with caplog.at_level(logging.ERROR):
-        web_ui._on_chat_like([("F", None), (None, "A")], {}, _fake_like(index=(1, 1)))
+        web_ui._on_chat_like(
+            session, [("F", None), (None, "A")], {}, _fake_like(index=(1, 1))
+        )
 
     assert "Could not write feedback log" in caplog.text
 
@@ -942,9 +984,10 @@ def test_chat_like_handles_garbage_input(tmp_path):
     """Empty history, missing meta and a broken index still produce a vote line."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
 
-    web_ui._on_chat_like(None, None, _fake_like(index=None, value="Antwort"))
+    web_ui._on_chat_like(session, None, None, _fake_like(index=None, value="Antwort"))
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
     assert vote["question"] == ""
@@ -963,10 +1006,11 @@ def test_chat_like_ignores_votes_on_user_messages(tmp_path):
     """Gradio also shows thumbs on the user row — those votes carry no signal."""
 
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Frage", None), (None, "Antwort")]
 
-    web_ui._on_chat_like(history, {}, _fake_like(index=(0, 0), value="Frage"))
+    web_ui._on_chat_like(session, history, {}, _fake_like(index=(0, 0), value="Frage"))
 
     assert not (tmp_path / "votes.jsonl").exists()
 
@@ -999,20 +1043,21 @@ class _BlockingStream:
 
 def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     web_ui = _create_web_ui()
+    session = SessionContext()
     stream = _BlockingStream("Teil ")
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = stream
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     outputs = []
-    generator = web_ui._stream_reply([], [])
+    generator = web_ui._stream_reply(session, [], [])
     # Uhr läuft in 1-s-Schritten, damit jeder Token die 0.1-s-Drossel passiert.
     clock = iter(1000.0 + i for i in range(100))
     with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
         outputs.append(next(generator))
         # Stoppen wie der Button es tut, während der Stream noch läuft.
-        web_ui._on_stop_stream()
+        web_ui._on_stop_stream(session)
         outputs.extend(generator)
 
     final_chat = outputs[-1][1]
@@ -1024,29 +1069,33 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
 
 def test_stop_clears_the_switch_so_the_next_stream_runs():
     web_ui = _create_web_ui()
-    web_ui._on_stop_stream()  # Stop ohne laufenden Stream: darf nichts kaputt machen
+    session = SessionContext()
+    web_ui._on_stop_stream(
+        session
+    )  # Stop ohne laufenden Stream: darf nichts kaputt machen
 
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._stream_reply([], []))
+        outputs = list(web_ui._stream_reply(session, [], []))
 
     assert outputs[-1][1][-1] == (None, "Hallo Welt")
-    assert web_ui._stream_stop is None
+    assert session.stream_stop is None
 
 
 def test_stale_generator_ignores_a_newer_streams_stop_switch():
     """Ein alter Generator darf nicht auf den Kill-Switch des neuen reagieren."""
     web_ui = _create_web_ui()
-    old_stop = web_ui._arm_stream_stop()
-    new_stop = web_ui._arm_stream_stop()
+    session = SessionContext()
+    old_stop = web_ui._arm_stream_stop(session)
+    new_stop = web_ui._arm_stream_stop(session)
 
     old_stop.set()
-    assert web_ui._stop_requested(old_stop) is False
+    assert web_ui._stop_requested(session, old_stop) is False
     new_stop.set()
-    assert web_ui._stop_requested(new_stop) is True
+    assert web_ui._stop_requested(session, new_stop) is True
 
 
 def test_streaming_button_updates_swap_send_and_stop():
@@ -1109,7 +1158,8 @@ def test_stream_controls_pass_through_an_empty_stream():
 
 def test_regenerate_drops_last_answer_and_streams_again():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     # Snapshot beim Aufruf: _stream_reply hängt die neue Antwort an dieselbe
@@ -1121,7 +1171,7 @@ def test_regenerate_drops_last_answer_and_streams_again():
         return iter(["Neue ", "Antwort"])
 
     streamer.stream.side_effect = _stream
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     chat_history = [("Frage", None), (None, "Alte Antwort")]
     history_state = [
@@ -1130,7 +1180,7 @@ def test_regenerate_drops_last_answer_and_streams_again():
     ]
 
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._on_regenerate(chat_history, history_state))
+        outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
     assert final_chat[-1] == (None, "Neue Antwort")
@@ -1147,11 +1197,12 @@ def test_regenerate_drops_last_answer_and_streams_again():
 def test_regenerate_keeps_wiki_hint_rows():
     """Wiki-Hints sind Bot-Zeilen, stehen aber vor der Antwort und bleiben."""
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Neu"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     chat_history = [("Frage", None), (None, "🕵️ Hinweis"), (None, "Alte Antwort")]
     history_state = [
@@ -1160,7 +1211,7 @@ def test_regenerate_keeps_wiki_hint_rows():
     ]
 
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._on_regenerate(chat_history, history_state))
+        outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
 
     rows = [row[1] for row in outputs[-1][1]]
     assert "🕵️ Hinweis" in rows
@@ -1169,26 +1220,28 @@ def test_regenerate_keeps_wiki_hint_rows():
 
 def test_regenerate_without_an_answer_warns_and_changes_nothing():
     web_ui = _create_web_ui()
-    web_ui.bot = "Karl"
-    web_ui.streamer = Mock()
+    session = SessionContext()
+    session.bot = "Karl"
+    session.streamer = Mock()
 
     chat_history = [("Frage", None)]
     history_state = [{"role": "user", "content": "Frage"}]
 
     with patch("ui.web_ui.gr.Warning") as warning:
-        outputs = list(web_ui._on_regenerate(chat_history, history_state))
+        outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
 
     warning.assert_called_once()
-    web_ui.streamer.stream.assert_not_called()
+    session.streamer.stream.assert_not_called()
     assert outputs[-1][1] == chat_history
     assert outputs[-1][2] == history_state
 
 
 def test_regenerate_without_persona_is_a_no_op():
     web_ui = _create_web_ui()
-    web_ui.bot = None
+    session = SessionContext()
+    session.bot = None
 
-    outputs = list(web_ui._on_regenerate([], []))
+    outputs = list(web_ui._on_regenerate(session, [], []))
 
     assert len(outputs) == 1
 
@@ -1196,9 +1249,10 @@ def test_regenerate_without_persona_is_a_no_op():
 def test_reset_sets_the_stream_kill_switch():
     """cancels allein reicht nicht — der Reset muss die Backend-Arbeit stoppen."""
     web_ui = _create_web_ui()
-    stop = web_ui._arm_stream_stop()
+    session = SessionContext()
+    stop = web_ui._arm_stream_stop(session)
 
-    web_ui._on_reset_to_start()
+    web_ui._on_reset_to_start(session)
 
     assert stop.is_set()
 
@@ -1231,15 +1285,16 @@ def test_persona_selection_shows_regenerate_but_not_stop():
 
 def test_self_talk_stream_stops_between_turns():
     web_ui = _create_web_ui()
+    session = SessionContext()
     runner = Mock()
     turns = [("A", "erste", False, None), ("B", "zweite", False, None)]
     runner.run_turn.side_effect = turns
-    web_ui.self_talk_runner = runner
+    session.self_talk_runner = runner
 
-    generator = web_ui._run_self_talk_stream([], [])
+    generator = web_ui._run_self_talk_stream(session, [], [])
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
         next(generator)  # erster Turn läuft
-        web_ui._on_stop_stream()
+        web_ui._on_stop_stream(session)
         list(generator)
 
     # Der laufende Turn wird fertig, ein weiterer startet nicht mehr.
@@ -1324,11 +1379,12 @@ def test_wiki_source_updates_hide_the_accordion_without_hits():
 def test_respond_streaming_publishes_the_sources_before_the_first_token():
     """Die Quellen müssen in denselben Yields mitreisen (kein .then()-Umweg)."""
     web_ui = _web_ui_with_texts()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     snippet = WikiSnippet(
         topic="Deutschland",
@@ -1352,7 +1408,7 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
-        for item in web_ui.respond_streaming("Frage", [], []):
+        for item in web_ui.respond_streaming(session, "Frage", [], []):
             snapshots.append((item[md_index], item[accordion_index], list(item[1])))
 
     published = [
@@ -1383,17 +1439,18 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
 
 def test_respond_streaming_clears_stale_sources_on_a_new_question():
     web_ui = _web_ui_with_texts()
-    web_ui.bot = "Karl"
+    session = SessionContext()
+    session.bot = "Karl"
     streamer = Mock()
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     with (
         patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
-        outputs = list(web_ui.respond_streaming("Frage", [], []))
+        outputs = list(web_ui.respond_streaming(session, "Frage", [], []))
 
     accordion_index = STREAM_OUTPUT_KEYS.index("sources_accordion")
     assert outputs[0][accordion_index]["visible"] is False
@@ -1422,6 +1479,7 @@ def _ask_all_web_ui():
 
 def test_ask_all_publishes_the_injected_snippet_text():
     web_ui = _ask_all_web_ui()
+    session = SessionContext()
     snippet = WikiSnippet(
         topic="Deutschland",
         snippet="Berlin ist die Hauptstadt.",
@@ -1442,7 +1500,7 @@ def test_ask_all_publishes_the_injected_snippet_text():
             return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),
         ),
     ):
-        outputs = list(web_ui._on_submit_ask_all("Frage"))
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
 
     final = outputs[-1]
     assert final[ASK_ALL_SOURCES_ACCORDION]["visible"] is True
@@ -1455,6 +1513,7 @@ def test_ask_all_publishes_the_injected_snippet_text():
 def test_ask_all_keeps_the_sources_in_every_yield():
     """Der Lookup läuft einmal vorab — danach muss er in jedem Update mitreisen."""
     web_ui = _ask_all_web_ui()
+    session = SessionContext()
     snippet = WikiSnippet(topic="Kiwix", snippet="Kurz.", full_length=5)
     events = [
         {"type": "token", "persona": "LEAH", "reply": "A"},
@@ -1467,7 +1526,7 @@ def test_ask_all_keeps_the_sources_in_every_yield():
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.iter_broadcast_events", return_value=iter(events)),
     ):
-        outputs = list(web_ui._on_submit_ask_all("Frage"))
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
 
     # Erster Yield ist der Platzhalter vor dem Lookup, danach steht die Quelle.
     after_lookup = outputs[1:]
@@ -1477,6 +1536,7 @@ def test_ask_all_keeps_the_sources_in_every_yield():
 
 def test_ask_all_hides_the_accordion_without_wiki_hits():
     web_ui = _ask_all_web_ui()
+    session = SessionContext()
 
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
@@ -1486,7 +1546,7 @@ def test_ask_all_hides_the_accordion_without_wiki_hits():
             return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),
         ),
     ):
-        outputs = list(web_ui._on_submit_ask_all("Frage"))
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
 
     assert all(item[ASK_ALL_SOURCES_ACCORDION]["visible"] is False for item in outputs)
 
@@ -1507,16 +1567,18 @@ STATUS_INDEX = STREAM_OUTPUT_KEYS.index("status_md")
 
 
 def _status_web_ui(num_ctx=8192):
-    web_ui = _web_ui_with_texts()
-    web_ui.streamer = SimpleNamespace(persona_options={"num_ctx": num_ctx})
-    return web_ui
+    """WebUI plus die Sitzung, in der ein Streamer mit num_ctx hängt."""
+    session = SessionContext(
+        streamer=SimpleNamespace(persona_options={"num_ctx": num_ctx})
+    )
+    return _web_ui_with_texts(), session
 
 
 def test_status_line_shows_context_fill():
-    web_ui = _status_web_ui()
+    web_ui, session = _status_web_ui()
     history = [{"role": "user", "content": "x" * 400}]
 
-    line = web_ui._format_status_line(history, None)
+    line = web_ui._format_status_line(session, history, None)
 
     assert "8.192" in line
     assert "%" in line
@@ -1525,19 +1587,19 @@ def test_status_line_shows_context_fill():
 
 def test_status_line_highlights_once_compression_kicks_in():
     """Fett genau ab der Schwelle, ab der shrink_history_for_context greift."""
-    web_ui = _status_web_ui(num_ctx=1000)
+    web_ui, session = _status_web_ui(num_ctx=1000)
     small = [{"role": "user", "content": "kurz"}]
     huge = [{"role": "user", "content": "x" * 4000}]
 
-    assert not web_ui._format_status_line(small, None).startswith("**")
-    assert web_ui._format_status_line(huge, None).startswith("**")
+    assert not web_ui._format_status_line(session, small, None).startswith("**")
+    assert web_ui._format_status_line(session, huge, None).startswith("**")
 
 
 def test_status_line_reports_speed_and_first_token():
-    web_ui = _status_web_ui()
+    web_ui, session = _status_web_ui()
     stats = StreamStats(tokens=120, t_first_ms=1900, t_total_ms=5000)
 
-    line = web_ui._format_status_line([], stats)
+    line = web_ui._format_status_line(session, [], stats)
 
     assert "24.0" in line  # 120 Token in 5 s
     assert "1.9" in line
@@ -1545,31 +1607,33 @@ def test_status_line_reports_speed_and_first_token():
 
 def test_status_line_stays_empty_without_context_limit_and_stats():
     web_ui = _web_ui_with_texts()
-    web_ui.streamer = SimpleNamespace(persona_options={})
+    session = SessionContext()
+    session.streamer = SimpleNamespace(persona_options={})
 
-    assert web_ui._format_status_line([], None) == ""
+    assert web_ui._format_status_line(session, [], None) == ""
 
 
 def test_status_line_ignores_a_streamer_without_real_stats():
     """Testdoubles setzen last_stream_stats nicht — das darf nichts rendern."""
-    web_ui = _status_web_ui()
-    web_ui.streamer = Mock()
-    web_ui.streamer.persona_options = {"num_ctx": 8192}
+    web_ui, session = _status_web_ui()
+    session.streamer = Mock()
+    session.streamer.persona_options = {"num_ctx": 8192}
 
-    assert web_ui._last_stream_stats() is None
+    assert web_ui._last_stream_stats(session) is None
 
 
 def test_stream_reply_publishes_the_status_only_at_the_end():
     web_ui = _web_ui_with_texts()
+    session = SessionContext()
     streamer = Mock()
     streamer.persona_options = {"num_ctx": 8192}
     streamer.last_stream_stats = StreamStats(tokens=10, t_first_ms=500, t_total_ms=1000)
     streamer.stream.return_value = iter(["a", "b", "c"])
-    web_ui.streamer = streamer
+    session.streamer = streamer
 
     clock = iter(1000.0 + i for i in range(10))
     with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
-        outputs = list(web_ui._stream_reply([], []))
+        outputs = list(web_ui._stream_reply(session, [], []))
 
     # Zwischendurch nur der No-op-Marker, am Ende der echte Wert.
     assert all("value" not in item[STATUS_INDEX] for item in outputs[:-1])
@@ -1624,9 +1688,11 @@ def test_persona_selection_stamps_the_user_into_meta():
 
 def test_vote_records_the_user(tmp_path):
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
 
     web_ui._on_chat_like(
+        session,
         [("Frage", "Antwort")],
         {"persona": "DORIS", "user": "yulyen"},
         _fake_like(index=(0, 1), value="Antwort", liked=True),
@@ -1637,10 +1703,11 @@ def test_vote_records_the_user(tmp_path):
 
 def test_vote_without_meta_user_falls_back_instead_of_writing_nothing(tmp_path):
     web_ui = _create_web_ui()
+    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
 
     web_ui._on_chat_like(
-        [("Frage", "Antwort")], {}, _fake_like(index=(0, 1), value="Antwort")
+        session, [("Frage", "Antwort")], {}, _fake_like(index=(0, 1), value="Antwort")
     )
 
     assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "local"
@@ -1711,13 +1778,14 @@ def _guest_web_ui():
 
 def test_guest_start_builds_a_session_only_streamer():
     web_ui = _guest_web_ui()
+    session = SessionContext()
 
-    web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 1.2, "")
+    web_ui._on_start_guest(session, "Pirat", "Du bist ein Pirat.", 1.2, "")
 
     web_ui.factory.get_streamer_for_guest.assert_called_once_with(
         "Pirat", "Du bist ein Pirat.", {"temperature": 1.2}
     )
-    assert web_ui.bot == "Pirat"
+    assert session.bot == "Pirat"
     # Die Ensemble-Personas bleiben unangetastet.
     web_ui.factory.get_streamer_for_persona.assert_not_called()
 
@@ -1725,8 +1793,9 @@ def test_guest_start_builds_a_session_only_streamer():
 def test_guest_start_opens_the_chat_without_an_image():
     """Der Gast hat kein Portrait — lieber leer als ein toter Pfad."""
     web_ui = _guest_web_ui()
+    session = SessionContext()
 
-    updates = web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 0.7, "")
+    updates = web_ui._on_start_guest(session, "Pirat", "Du bist ein Pirat.", 0.7, "")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
     focus_img = updates[PERSONA_OUTPUT_KEYS.index("focus_img")]
@@ -1738,19 +1807,23 @@ def test_guest_start_opens_the_chat_without_an_image():
 @pytest.mark.parametrize("name,prompt", [("", "Prompt"), ("Name", ""), ("   ", "   ")])
 def test_guest_start_refuses_incomplete_forms(name, prompt):
     web_ui = _guest_web_ui()
+    session = SessionContext()
 
-    updates = web_ui._on_start_guest(name, prompt, 0.7, "")
+    updates = web_ui._on_start_guest(session, name, prompt, 0.7, "")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("guest_status")]["visible"] is True
-    assert web_ui.bot is None
+    assert session.bot is None
     web_ui.factory.get_streamer_for_guest.assert_not_called()
 
 
 def test_guest_start_stamps_the_user_into_meta():
     web_ui = _guest_web_ui()
+    session = SessionContext()
 
-    updates = web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 0.7, "yulyen")
+    updates = web_ui._on_start_guest(
+        session, "Pirat", "Du bist ein Pirat.", 0.7, "yulyen"
+    )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["user"] == "yulyen"
     assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["persona"] == "Pirat"
@@ -1758,8 +1831,9 @@ def test_guest_start_stamps_the_user_into_meta():
 
 def test_show_guest_opens_the_form_and_leaves_the_grid():
     web_ui = _guest_web_ui()
+    session = SessionContext()
 
-    updates = web_ui._on_show_guest()
+    updates = web_ui._on_show_guest(session)
 
     assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("grid_group")]["visible"] is False
@@ -1791,31 +1865,34 @@ def _fill(store, *, user="local", persona="LEAH", question="Hallo"):
 
 
 def test_history_lists_only_the_signed_in_users_conversations(tmp_path):
+    session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
     mine = _fill(store, user="yulyen")
     _fill(store, user="jemand_anders")
 
-    updates = web_ui._on_show_history("yulyen")
+    updates = web_ui._on_show_history(session, "yulyen")
 
     choices = updates[PERSONA_OUTPUT_KEYS.index("history_pick")]["choices"]
     assert [cid for _label, cid in choices] == [mine]
 
 
 def test_history_label_shows_date_persona_and_title(tmp_path):
+    session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
     _fill(store, user="local", persona="PETER", question="Wie ist der Status?")
 
-    label = web_ui._on_show_history("local")[PERSONA_OUTPUT_KEYS.index("history_pick")][
-        "choices"
-    ][0][0]
+    label = web_ui._on_show_history(session, "local")[
+        PERSONA_OUTPUT_KEYS.index("history_pick")
+    ]["choices"][0][0]
 
     assert "PETER" in label and "Wie ist der Status?" in label
 
 
 def test_history_says_so_when_there_is_nothing(tmp_path):
+    session = SessionContext()
     web_ui, _store = _history_web_ui(tmp_path)
 
-    updates = web_ui._on_show_history("local")
+    updates = web_ui._on_show_history(session, "local")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
 
@@ -1831,36 +1908,39 @@ def test_history_preview_renders_both_roles(tmp_path):
 
 
 def test_history_open_makes_the_conversation_continuable(tmp_path):
+    session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store, persona="LEAH", question="Frage?")
     persona_info = {"leah": {"name": "LEAH", "description": "d"}}
 
-    updates = web_ui._on_history_open(cid, persona_info, "Tippe")
+    updates = web_ui._on_history_open(session, cid, persona_info, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
     # Ohne die Gesprächs-ID würde das fortgesetzte Gespräch ins Leere schreiben.
     assert updates[PERSONA_OUTPUT_KEYS.index("conversation_state")] == cid
     assert updates[PERSONA_OUTPUT_KEYS.index("history_state")][0]["content"] == "Frage?"
-    assert web_ui.bot == "LEAH"
+    assert session.bot == "LEAH"
 
 
 def test_history_open_of_a_gone_persona_stays_readable(tmp_path):
     """Gast-Personas leben nur in ihrer Sitzung — lesbar ja, fortsetzbar nein."""
+    session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store, persona="Pirat")
 
-    updates = web_ui._on_history_open(cid, {"leah": {"name": "LEAH"}}, "Tippe")
+    updates = web_ui._on_history_open(session, cid, {"leah": {"name": "LEAH"}}, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
     assert "Antwort" in updates[PERSONA_OUTPUT_KEYS.index("history_preview")]["value"]
-    assert web_ui.bot is None
+    assert session.bot is None
 
 
 def test_history_open_of_an_unknown_id_reports_it(tmp_path):
+    session = SessionContext()
     web_ui, _store = _history_web_ui(tmp_path)
 
-    updates = web_ui._on_history_open("gibtesnicht", {}, "Tippe")
+    updates = web_ui._on_history_open(session, "gibtesnicht", {}, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
 
@@ -1913,21 +1993,24 @@ def test_model_switch_keeps_the_same_conversation(tmp_path):
     Über die UI ist der Modellwechsel mitten im Chat derzeit nicht erreichbar
     (Dropdown nur auf der Startseite); der Test hält die Verdrahtung fest.
     """
+    session = SessionContext()
     web_ui, _store = _history_web_ui(tmp_path)
-    web_ui.bot = "LEAH"
+    session.bot = "LEAH"
     new_streamer = Mock()
     web_ui.factory.get_streamer_for_persona.return_value = new_streamer
     web_ui.cfg.override = Mock()
 
-    web_ui._on_model_selected("anderes-modell", "gespraech-1")
+    web_ui._on_model_selected(session, "anderes-modell", "gespraech-1")
 
     new_streamer.set_conversation.assert_called_once_with("gespraech-1")
 
 
 def test_persona_selection_opens_exactly_one_conversation(tmp_path):
+    session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
 
     updates = web_ui._on_persona_selected(
+        session,
         "yulyen",
         key="leah",
         persona_info={"leah": {"name": "LEAH", "description": "d"}},
@@ -1988,3 +2071,85 @@ def test_loaded_conversation_also_respects_the_switch():
     )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("download_btn")]["visible"] is False
+
+
+# ---- Zwei Browser, zwei Sitzungen -------------------------------------------
+
+
+def _persona_info():
+    return {
+        "leah": {"name": "LEAH", "description": "warm"},
+        "doris": {"name": "DORIS", "description": "direkt"},
+    }
+
+
+def test_two_sessions_keep_their_own_persona_and_conversation(tmp_path):
+    """Der Kern von B1: die WebUI ist ein Singleton, die Sitzungen sind es nicht.
+
+    Vorher hingen Persona und Streamer am WebUI-Objekt. Wählte Browser B eine
+    andere Persona, schrieb die *nächste* Frage aus Browser A in B's Gespräch —
+    live nachgestellt und genau so beobachtet.
+    """
+    web_ui, store = _history_web_ui(tmp_path)
+    streamers = {}
+
+    def _streamer_for(name):
+        streamers.setdefault(name, Mock(persona_options={}))
+        return streamers[name]
+
+    web_ui.factory.get_streamer_for_persona.side_effect = _streamer_for
+
+    a, b = SessionContext(), SessionContext()
+    web_ui._on_persona_selected(a, "anna", key="leah", persona_info=_persona_info())
+    web_ui._on_persona_selected(b, "bert", key="doris", persona_info=_persona_info())
+
+    assert (a.bot, b.bot) == ("LEAH", "DORIS")
+    assert a.streamer is streamers["LEAH"]
+    assert b.streamer is streamers["DORIS"]
+
+    # Und die Gespräche in der Ablage gehören dem jeweiligen Nutzer.
+    assert [ref.persona for ref in store.list_conversations(user="anna")] == ["LEAH"]
+    assert [ref.persona for ref in store.list_conversations(user="bert")] == ["DORIS"]
+
+
+def test_a_stop_in_one_session_leaves_the_other_stream_running():
+    """Der Kill-Switch ist sitzungsweit — sonst stoppt ein Klick alle Browser."""
+    web_ui = _create_web_ui()
+    a, b = SessionContext(), SessionContext()
+    stop_a = web_ui._arm_stream_stop(a)
+    stop_b = web_ui._arm_stream_stop(b)
+
+    web_ui._on_stop_stream(a)
+
+    assert web_ui._stop_requested(a, stop_a) is True
+    assert web_ui._stop_requested(b, stop_b) is False
+
+
+def test_reset_in_one_session_does_not_clear_the_other():
+    web_ui = _create_web_ui()
+    a = SessionContext(bot="LEAH", streamer=Mock())
+    b = SessionContext(bot="DORIS", streamer=Mock())
+
+    web_ui._on_reset_to_start(a)
+
+    assert a.bot is None
+    assert b.bot == "DORIS"
+    assert b.streamer is not None
+
+
+def test_the_default_session_state_is_copied_per_browser_session():
+    """Gradio kopiert den Default-Wert je Sitzung — sonst wäre alles geteilt.
+
+    Der Verlass darauf ist der Kern der Lösung, deshalb hier festgenagelt:
+    `SessionState.__getitem__` (gradio/state_holder.py) macht einmalig ein
+    `deepcopy` des Component-Werts. Ein nicht kopierbarer Default würde die
+    Trennung still wieder aufheben.
+    """
+    from copy import deepcopy
+
+    default = SessionContext()
+    a, b = deepcopy(default), deepcopy(default)
+    a.bot = "LEAH"
+
+    assert b.bot is None
+    assert a.tmp_files is not b.tmp_files

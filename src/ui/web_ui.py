@@ -37,6 +37,7 @@ from storage import ConversationRef
 from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
+from ui.session import SessionContext
 from ui.webui_layout import build_ui
 from wiki.lookup import (
     WikiSnippet,
@@ -165,7 +166,6 @@ class WebUI:
         web_port: int | str,
         wiki_timeout: tuple[float, float],
     ) -> None:
-        self.streamer = None  # assigned later
         self.keyword_finder = keyword_finder
         self.cfg = config
         self.factory = factory
@@ -176,7 +176,6 @@ class WebUI:
         self.web_host = web_host
         self.web_port = int(web_port)
         self.wiki_timeout = wiki_timeout
-        self.bot: str | None = None  # assigned later
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         # Wer bedient die UI (#53). Default DisabledAuth = Verhalten wie bisher.
@@ -188,18 +187,11 @@ class WebUI:
         self.file_exchange_enabled = is_file_exchange_enabled(self.cfg)
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
         self.broadcast_parallel = is_broadcast_parallel(self.cfg)
-        # Kill switch für den laufenden Ask-All-Broadcast: Gradio cancels
-        # schließt den Handler-Generator nicht zuverlässig (bricht nur den
-        # asyncio-Task ab), daher muss der Reset-Handler die Worker direkt
-        # über dieses Event stoppen.
-        self._ask_all_stop: threading.Event | None = None
-        # Kill switch für Einzelchat/Briefing/Self-Talk (#35). Gleiche Begründung
-        # wie bei _ask_all_stop: Gradios `cancels` bricht nur den asyncio-Task
-        # ab, das finally eines laufenden Generators läuft nicht zuverlässig.
-        # Der Stop-Button ist ein eigenes, verlässlich laufendes Event.
-        self._stream_stop: threading.Event | None = None
+        # Persona, Streamer, Kill-Switches und der Self-Talk-Runner gehören
+        # *nicht* hierher: die WebUI ist ein Singleton und bedient alle Browser
+        # gleichzeitig. Sie liegen in einem SessionContext pro Sitzung
+        # (`ui/session.py`) und werden als gr.State durchgereicht.
         self.ask_all_placeholder = ""
-        self.self_talk_runner = None
         self.self_talk_prompt_placeholder = ""
         # STT nur anbieten, wenn eingeschaltet UND faster-whisper installiert
         # ist — sonst bleibt das Mikro unsichtbar und die App läuft normal.
@@ -254,18 +246,20 @@ class WebUI:
             persona_name, "web", user or self._fallback_user()
         )
 
-    def _stamp_conversation(self, conversation_id: str) -> None:
-        setter = getattr(self.streamer, "set_conversation", None)
+    def _stamp_conversation(
+        self, session: SessionContext, conversation_id: str
+    ) -> None:
+        setter = getattr(session.streamer, "set_conversation", None)
         if callable(setter):
             setter(conversation_id)
 
-    def _stamp_user(self, user: str) -> None:
+    def _stamp_user(self, session: SessionContext, user: str) -> None:
         """Identität an den frischen Streamer geben (#53).
 
         Sie hängt dadurch am Gespräch in der Ablage — die Grundlage für den
         Verlauf (#25) und später die Suche (#49).
         """
-        setter = getattr(self.streamer, "set_user", None)
+        setter = getattr(session.streamer, "set_user", None)
         if callable(setter):
             setter(user or self._fallback_user())
 
@@ -344,31 +338,37 @@ class WebUI:
         return f"ensembles/{ensemble}/static/personas/{persona_name}/full.webp"
 
     def _handle_context_warning(
-        self, llm_history: list[Message], chat_history: list[ChatPair]
+        self,
+        session: SessionContext,
+        llm_history: list[Message],
+        chat_history: list[ChatPair],
     ) -> bool:
 
-        if not context_near_limit(llm_history, self.streamer.persona_options):
+        if not context_near_limit(llm_history, session.streamer.persona_options):
             return False
 
-        drink = get_drink(self.bot)
-        warn = self._t("context_wait_message", persona_name=self.bot, drink=drink)
+        drink = get_drink(session.bot)
+        warn = self._t("context_wait_message", persona_name=session.bot, drink=drink)
 
         chat_history.append((None, warn))
 
-        persona_options = getattr(self.streamer, "persona_options", {}) or {}
+        persona_options = getattr(session.streamer, "persona_options", {}) or {}
         llm_history[:] = shrink_history_for_context(
             llm_history,
             self.cfg,
             persona_options,
-            llm_core=getattr(self.streamer, "_llm_core", None),
-            chat_model_name=getattr(self.streamer, "model_name", ""),
-            persona_name=self.bot,
+            llm_core=getattr(session.streamer, "_llm_core", None),
+            chat_model_name=getattr(session.streamer, "model_name", ""),
+            persona_name=session.bot,
         )
         return True
 
     # ---------- Statuszeile (#36) ----------
     def _format_status_line(
-        self, history: list[Message] | None, stats: StreamStats | None
+        self,
+        session: SessionContext,
+        history: list[Message] | None,
+        stats: StreamStats | None,
     ) -> str:
         """Kontext-Füllstand und Tempo der letzten Antwort.
 
@@ -378,7 +378,7 @@ class WebUI:
         sie kommt.
         """
         parts: list[str] = []
-        options = getattr(self.streamer, "persona_options", None) or {}
+        options = getattr(session.streamer, "persona_options", None) or {}
         limit = int(options.get("num_ctx") or 0)
         if limit > 0:
             used = approx_token_count(history or [])
@@ -415,20 +415,23 @@ class WebUI:
         filled = max(0, min(width, round(ratio * width)))
         return "█" * filled + "░" * (width - filled)
 
-    def _last_stream_stats(self) -> StreamStats | None:
+    def _last_stream_stats(self, session: SessionContext) -> StreamStats | None:
         """Kennzahlen des Providers — nur, wenn es wirklich welche sind.
 
         Vor dem ersten Stream ist das Attribut None; Testdoubles setzen es gar
         nicht. Die isinstance-Prüfung hält halbe Werte aus der Anzeige heraus,
         statt sie zu formatieren.
         """
-        stats = getattr(self.streamer, "last_stream_stats", None)
+        stats = getattr(session.streamer, "last_stream_stats", None)
         return stats if isinstance(stats, StreamStats) else None
 
     def _status_update(
-        self, history: list[Message] | None, stats: StreamStats | None
+        self,
+        session: SessionContext,
+        history: list[Message] | None,
+        stats: StreamStats | None,
     ) -> Any:
-        line = self._format_status_line(history, stats)
+        line = self._format_status_line(session, history, stats)
         return gr.update(value=line, visible=bool(line))
 
     # ---------- Wiki-Quellen (#32) ----------
@@ -464,22 +467,27 @@ class WebUI:
         return gr.update(), gr.update()
 
     # Stream the response (UI updates continuously)
-    def _arm_stream_stop(self) -> threading.Event:
+    @staticmethod
+    def _arm_stream_stop(session: SessionContext) -> threading.Event:
         """Fresh kill switch for the stream that is about to start (#35)."""
         stop = threading.Event()
-        self._stream_stop = stop
+        session.stream_stop = stop
         return stop
 
-    def _stop_requested(self, stop: threading.Event) -> bool:
+    @staticmethod
+    def _stop_requested(session: SessionContext, stop: threading.Event) -> bool:
         """True when *this* stream was asked to stop.
 
-        Identity check on purpose: a newer stream replaces `_stream_stop`, and a
+        Identity check on purpose: a newer stream replaces `stream_stop`, and a
         stale generator must not react to the new stream's switch.
         """
-        return self._stream_stop is stop and stop.is_set()
+        return session.stream_stop is stop and stop.is_set()
 
     def _stream_reply(
-        self, message_history: list[Message], chat_history: list[ChatPair]
+        self,
+        session: SessionContext,
+        message_history: list[Message],
+        chat_history: list[ChatPair],
     ) -> Iterator[tuple]:
         # Die Quellen-Slots stehen vor dem Stream schon fest und bleiben hier
         # unangetastet — gr.update() ohne Wert ist ein No-op für die Anzeige.
@@ -491,15 +499,15 @@ class WebUI:
         # den Socket schicken; last_flush=0.0 lässt den ersten Chunk sofort durch.
         reply = ""
         last_flush = 0.0
-        stop = self._arm_stream_stop()
+        stop = self._arm_stream_stop(session)
         stopped = False
         # Explizites Iterator-Handle, damit der Stream beim Stop deterministisch
         # geschlossen wird (close() löst das finally im Streaming-Provider aus und
         # beendet damit den Ollama-Stream) statt erst irgendwann per GC.
-        tokens = self.streamer.stream(messages=message_history)
+        tokens = session.streamer.stream(messages=message_history)
         try:
             for token in tokens:
-                if self._stop_requested(stop):
+                if self._stop_requested(session, stop):
                     stopped = True
                     break
                 reply += token
@@ -517,8 +525,8 @@ class WebUI:
             close = getattr(tokens, "close", None)
             if close is not None:
                 close()
-            if self._stream_stop is stop:
-                self._stream_stop = None
+            if session.stream_stop is stop:
+                session.stream_stop = None
 
         if stopped:
             # Teilantwort behalten — sie ist der Grund, warum man abbricht.
@@ -527,24 +535,25 @@ class WebUI:
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
-        stats = self._last_stream_stats()
+        stats = self._last_stream_stats(session)
         yield (
             None,
             chat_history,
             message_history,
             *keep,
-            self._status_update(message_history, stats),
+            self._status_update(session, message_history, stats),
         )
 
     def respond_streaming(
         self,
+        session: SessionContext,
         user_input: str,
         chat_history: list[ChatPair],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
-        if not self.bot:
+        if not session.bot:
             yield (
                 "",
                 chat_history,
@@ -567,7 +576,7 @@ class WebUI:
         # 3) Wiki hint and snippet (top hit)
         wiki_hints, contexts = lookup_wiki_snippet(
             user_input,
-            self.bot,
+            session.bot,
             self.keyword_finder,
             self.wiki_mode,
             self.proxy_port,
@@ -598,7 +607,7 @@ class WebUI:
         llm_history.append(user_message)
 
         # 6) Compress the context if needed and record that in chat history
-        if self._handle_context_warning(llm_history, chat_history):
+        if self._handle_context_warning(session, llm_history, chat_history):
             yield (
                 None,
                 chat_history,
@@ -608,7 +617,7 @@ class WebUI:
             )
 
         # 7) Stream the answer
-        yield from self._stream_reply(llm_history, chat_history)
+        yield from self._stream_reply(session, llm_history, chat_history)
 
     def _streaming_button_updates(self, streaming: bool) -> tuple:
         """Send ⇄ Stop tauschen; Regenerate währenddessen sperren (#35)."""
@@ -642,42 +651,52 @@ class WebUI:
 
     def respond_streaming_with_controls(
         self,
+        session: SessionContext,
         user_input: str,
         chat_history: list[ChatPair],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
-            self.respond_streaming(user_input, chat_history, history_state)
+            self.respond_streaming(session, user_input, chat_history, history_state)
         )
 
     def respond_briefing_with_controls(
-        self, chat_history: list[ChatPair], history_state: list[Message] | None
+        self,
+        session: SessionContext,
+        chat_history: list[ChatPair],
+        history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
-            self.respond_briefing(chat_history, history_state)
+            self.respond_briefing(session, chat_history, history_state)
         )
 
     def regenerate_with_controls(
-        self, chat_history: list[ChatPair], history_state: list[Message] | None
+        self,
+        session: SessionContext,
+        chat_history: list[ChatPair],
+        history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
-            self._on_regenerate(chat_history, history_state)
+            self._on_regenerate(session, chat_history, history_state)
         )
 
-    def _on_stop_stream(self) -> tuple:
+    def _on_stop_stream(self, session: SessionContext) -> tuple:
         """Stoppt den laufenden Stream (#35).
 
         Eigenes Gradio-Event statt `cancels`: nur so läuft der Handler
         garantiert und der Generator kommt geordnet zum Ende — mit Teilantwort
         im Verlauf, statt sie wegzuwerfen.
         """
-        stop = self._stream_stop
+        stop = session.stream_stop
         if stop is not None:
             stop.set()
         return self._streaming_button_updates(streaming=False)
 
     def _on_regenerate(
-        self, chat_history: list[ChatPair], history_state: list[Message] | None
+        self,
+        session: SessionContext,
+        chat_history: list[ChatPair],
+        history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         """Letzte Antwort verwerfen und mit identischem Kontext neu streamen.
 
@@ -689,7 +708,7 @@ class WebUI:
         llm_history = list(history_state or [])
         keep = self._wiki_sources_unchanged()
 
-        if not self.bot or not self.streamer:
+        if not session.bot or not session.streamer:
             yield gr.update(), chat_history, llm_history, *keep, gr.update()
             return
 
@@ -708,16 +727,19 @@ class WebUI:
         # gr.update() statt None: ein noch nicht abgeschickter Entwurf im
         # Eingabefeld soll durch das Neuerzeugen nicht verloren gehen.
         for _input_value, updated_chat, updated_state, *rest in self._stream_reply(
-            llm_history, chat_history
+            session, llm_history, chat_history
         ):
             yield gr.update(), updated_chat, updated_state, *rest
 
     def respond_briefing(
-        self, chat_history: list[ChatPair], history_state: list[Message] | None
+        self,
+        session: SessionContext,
+        chat_history: list[ChatPair],
+        history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
         keep = self._wiki_sources_unchanged()
-        if not self.bot or not self.briefing_enabled:
+        if not session.bot or not self.briefing_enabled:
             yield gr.update(), chat_history, history_state, *keep, gr.update()
             return
 
@@ -737,7 +759,7 @@ class WebUI:
             float(self.briefing_cfg.get("timeout_connect", 5.0)),
             float(self.briefing_cfg.get("timeout_read", 8.0)),
         )
-        hints, items = fetch_briefing_items(self.briefing_cfg, self.bot, timeout)
+        hints, items = fetch_briefing_items(self.briefing_cfg, session.bot, timeout)
 
         for hint in hints:
             if hint:
@@ -754,10 +776,10 @@ class WebUI:
         inject_briefing_context(llm_history, items)
         llm_history.append({"role": "user", "content": briefing_prompt})
 
-        if self._handle_context_warning(llm_history, chat_history):
+        if self._handle_context_warning(session, llm_history, chat_history):
             yield None, chat_history, llm_history, *keep, gr.update()
 
-        yield from self._stream_reply(llm_history, chat_history)
+        yield from self._stream_reply(session, llm_history, chat_history)
 
     def _as_persona_outputs(self, updates: dict) -> tuple:
         """Resolve a named update dict into the tuple order of PERSONA_OUTPUT_KEYS."""
@@ -892,6 +914,7 @@ class WebUI:
 
     def _on_persona_selected(
         self,
+        session: SessionContext,
         user: str,
         *,
         key: str = "",
@@ -901,15 +924,14 @@ class WebUI:
     ) -> tuple:
         persona = (persona_info or {}).get(key)
         if not persona:
-            self.bot = None
-            self.streamer = None
+            session.clear_persona()
             return self._reset_ui_updates()
 
-        self.bot = persona["name"]
-        self.streamer = self.factory.get_streamer_for_persona(self.bot)
-        self._stamp_user(user)
-        conversation_id = self._open_conversation(self.bot, user)
-        self._stamp_conversation(conversation_id)
+        session.bot = persona["name"]
+        session.streamer = self.factory.get_streamer_for_persona(session.bot)
+        self._stamp_user(session, user)
+        conversation_id = self._open_conversation(session.bot, user)
+        self._stamp_conversation(session, conversation_id)
         return self._persona_selected_updates(
             key,
             persona,
@@ -919,22 +941,22 @@ class WebUI:
             conversation_id=conversation_id,
         )
 
-    def _cancel_ask_all_broadcast(self) -> None:
+    @staticmethod
+    def _cancel_ask_all_broadcast(session: SessionContext) -> None:
         """Stops the workers of a running ask-all broadcast (if any)."""
-        stop = self._ask_all_stop
+        stop = session.ask_all_stop
         if stop is not None:
             stop.set()
-            self._ask_all_stop = None
+            session.ask_all_stop = None
 
-    def _on_reset_to_start(self) -> tuple:
-        self._cancel_ask_all_broadcast()
+    def _on_reset_to_start(self, session: SessionContext) -> tuple:
+        self._cancel_ask_all_broadcast(session)
         # Zusätzlich zum `cancels` am Reset-Button: das cancels bricht nur den
         # asyncio-Task ab, der Kill-Switch beendet die Arbeit im Backend (#35).
-        stop = self._stream_stop
+        stop = session.stream_stop
         if stop is not None:
             stop.set()
-        self.bot = None
-        self.streamer = None
+        session.clear_persona()
         return self._reset_ui_updates()
 
     def _available_models(self, default_model: str) -> list[str]:
@@ -955,23 +977,25 @@ class WebUI:
             choices.insert(0, default_model)
         return choices or [default_model]
 
-    def _on_model_selected(self, choice: str | None, conversation_id: str):
+    def _on_model_selected(
+        self, session: SessionContext, choice: str | None, conversation_id: str
+    ):
         """Session-Override des Modells; config.yaml bleibt unangetastet."""
         choice = (choice or "").strip()
         if not choice:
             return gr.update(value="", visible=False)
         self.cfg.override("core", {"model_name": choice})
-        if self.bot:
+        if session.bot:
             # Laufendes Gespräch: Streamer neu bauen (History lebt im gr.State),
             # damit auch die Cutoff-Zeile im System-Prompt zum Modell passt.
-            self.streamer = self.factory.get_streamer_for_persona(self.bot)
+            session.streamer = self.factory.get_streamer_for_persona(session.bot)
             # Der neue Streamer schreibt in dasselbe Gespräch weiter (#54).
             # Über die UI ist dieser Fall derzeit nicht auslösbar — das
             # Modell-Dropdown sitzt im „Erweitert"-Akkordeon der Startseite und
             # ist während eines Chats nicht sichtbar. Die Verdrahtung steht
             # trotzdem, damit sie nicht fehlt, sobald es das ist.
-            self._stamp_conversation(conversation_id)
-            self._stamp_user("")
+            self._stamp_conversation(session, conversation_id)
+            self._stamp_user(session, "")
         logging.info("Modell per UI gewechselt: %s", choice)
         return gr.update(
             value=self._t("web_model_switched", model_name=choice), visible=True
@@ -993,7 +1017,9 @@ class WebUI:
         combined = f"{current_text or ''} {transcript}".strip()
         return gr.update(value=combined), gr.update(value=None)
 
-    def _on_read_aloud(self, history_state: list[Message] | None):
+    def _on_read_aloud(
+        self, session: SessionContext, history_state: list[Message] | None
+    ):
         """Liest die letzte Antwort mit der Piper-Stimme der Persona vor."""
         last_reply = next(
             (
@@ -1003,7 +1029,7 @@ class WebUI:
             ),
             "",
         )
-        if not self.bot or not last_reply.strip():
+        if not session.bot or not last_reply.strip():
             gr.Warning(self._t("tts_no_reply"))
             return gr.update(value=None, visible=False)
         try:
@@ -1014,7 +1040,7 @@ class WebUI:
                 out_wav = Path(tmp.name)
             create_wav(
                 last_reply,
-                self.bot,
+                session.bot,
                 voices_dir=Path("voices"),
                 out_wav=out_wav,
                 tts_cfg=self.tts_cfg,
@@ -1026,9 +1052,8 @@ class WebUI:
             return gr.update(value=None, visible=False)
         return gr.update(value=str(out_wav), visible=True)
 
-    def _on_show_ask_all(self) -> tuple:
-        self.bot = None
-        self.streamer = None
+    def _on_show_ask_all(self, session: SessionContext) -> tuple:
+        session.clear_persona()
         updates = self._reset_updates()
         updates.update(
             grid_group=gr.update(visible=False),
@@ -1067,9 +1092,8 @@ class WebUI:
             return []
         return [(self._history_label(ref), ref.id) for ref in refs]
 
-    def _on_show_history(self, user: str) -> tuple:
-        self.bot = None
-        self.streamer = None
+    def _on_show_history(self, session: SessionContext, user: str) -> tuple:
+        session.clear_persona()
         choices = self._history_choices(user)
         updates = self._reset_updates()
         updates.update(
@@ -1124,6 +1148,7 @@ class WebUI:
 
     def _on_history_open(
         self,
+        session: SessionContext,
         conversation_id: str | None,
         persona_info: dict[str, dict[str, Any]] | None = None,
         input_placeholder: str = "",
@@ -1162,10 +1187,10 @@ class WebUI:
             )
             return self._as_persona_outputs(updates)
 
-        self.bot = persona["name"]
-        self.streamer = self.factory.get_streamer_for_persona(self.bot)
-        self._stamp_user(ref.user)
-        self._stamp_conversation(ref.id)
+        session.bot = persona["name"]
+        session.streamer = self.factory.get_streamer_for_persona(session.bot)
+        self._stamp_user(session, ref.user)
+        self._stamp_conversation(session, ref.id)
 
         meta = {
             "created_at": ref.created_at,
@@ -1225,10 +1250,9 @@ class WebUI:
             gr.update(value=False),
         )
 
-    def _on_show_guest(self) -> tuple:
+    def _on_show_guest(self, session: SessionContext) -> tuple:
         """Formular für eine Gast-Persona zeigen (#28)."""
-        self.bot = None
-        self.streamer = None
+        session.clear_persona()
         updates = self._reset_updates()
         updates.update(
             grid_group=gr.update(visible=False),
@@ -1240,6 +1264,7 @@ class WebUI:
 
     def _on_start_guest(
         self,
+        session: SessionContext,
         name: str | None,
         prompt: str | None,
         temperature: float | None,
@@ -1272,11 +1297,11 @@ class WebUI:
         options = {
             "temperature": float(temperature if temperature is not None else 0.7)
         }
-        self.bot = name
-        self.streamer = self.factory.get_streamer_for_guest(name, prompt, options)
-        self._stamp_user(user)
+        session.bot = name
+        session.streamer = self.factory.get_streamer_for_guest(name, prompt, options)
+        self._stamp_user(session, user)
         conversation_id = self._open_conversation(name, user)
-        self._stamp_conversation(conversation_id)
+        self._stamp_conversation(session, conversation_id)
         logging.info("Gast-Persona '%s' gestartet (nur Sitzung)", name)
 
         persona = {"name": name, "description": self._t("guest_description")}
@@ -1292,10 +1317,9 @@ class WebUI:
         )
         return updates
 
-    def _on_show_self_talk(self) -> tuple:
-        self.bot = None
-        self.streamer = None
-        self.self_talk_runner = None
+    def _on_show_self_talk(self, session: SessionContext) -> tuple:
+        session.clear_persona()
+        session.self_talk_runner = None
         updates = self._reset_updates()
         updates.update(
             grid_group=gr.update(visible=False),
@@ -1313,12 +1337,16 @@ class WebUI:
         return self._as_persona_outputs(updates)
 
     def _on_start_self_talk(
-        self, persona_a: str | None, persona_b: str | None, start_prompt: str | None
+        self,
+        session: SessionContext,
+        persona_a: str | None,
+        persona_b: str | None,
+        start_prompt: str | None,
     ) -> tuple:
         persona_a = (persona_a or "").strip()
         persona_b = (persona_b or "").strip()
         start_prompt = (start_prompt or "").strip()
-        self.self_talk_runner = None
+        session.self_talk_runner = None
 
         if not persona_a or not persona_b:
             msg = self._t("self_talk_persona_required")
@@ -1359,7 +1387,7 @@ class WebUI:
                 gr.update(value="", visible=False),
             )
 
-        self.self_talk_runner = SelfTalkRunner(
+        session.self_talk_runner = SelfTalkRunner(
             self.factory,
             self.texts,
             persona_a,
@@ -1384,21 +1412,25 @@ class WebUI:
         )
 
     def _run_self_talk_stream(
-        self, chat_history: list[ChatPair], history_state: list[Message]
+        self,
+        session: SessionContext,
+        chat_history: list[ChatPair],
+        history_state: list[Message],
     ) -> Iterator[tuple[list[ChatPair], list[Message]]]:
-        if self.self_talk_runner is None:
+        runner = session.self_talk_runner
+        if runner is None:
             return
 
         chat_history = list(chat_history or [])
         history_state = list(history_state or [])
         # Stop wirkt hier zwischen den Turns, nicht mitten drin: run_turn() holt
         # die Antwort in einem Zug ab, es gibt keinen Token-Strom zum Abbrechen.
-        stop = self._arm_stream_stop()
+        stop = self._arm_stream_stop(session)
         try:
             while True:
-                if self._stop_requested(stop):
+                if self._stop_requested(session, stop):
                     break
-                persona_name, reply, should_stop, _ = self.self_talk_runner.run_turn()
+                persona_name, reply, should_stop, _ = runner.run_turn()
                 shown_reply = f"{persona_name}: {reply}"
                 # run_turn() liefert die Antwort bereits komplett; die
                 # Zeichen-Schleife war reine Schreibmaschinen-Animation (ein
@@ -1418,8 +1450,8 @@ class WebUI:
                 if should_stop:
                     break
         finally:
-            if self._stream_stop is stop:
-                self._stream_stop = None
+            if session.stream_stop is stop:
+                session.stream_stop = None
 
     def _ask_all_state(
         self,
@@ -1461,7 +1493,10 @@ class WebUI:
         )
 
     def _on_submit_ask_all(
-        self, question: str | None, current_results: str | None = None
+        self,
+        session: SessionContext,
+        question: str | None,
+        current_results: str | None = None,
     ) -> Iterator[tuple]:
         question = (question or "").strip()
         existing = current_results or ""
@@ -1530,7 +1565,7 @@ class WebUI:
         # sequenzieller Fallback per ui.experimental.broadcast_parallel: false.
         if self.broadcast_parallel:
             stop = threading.Event()
-            self._ask_all_stop = stop
+            session.ask_all_stop = stop
             events_iter = iter_broadcast_events_parallel(
                 self.factory,
                 question,
@@ -1556,7 +1591,7 @@ class WebUI:
                     **running,
                 )
 
-        self._ask_all_stop = None
+        session.ask_all_stop = None
         # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
         yield self._ask_all_state(
             question,
@@ -1616,6 +1651,7 @@ class WebUI:
 
     def _on_load_conversation(
         self,
+        session: SessionContext,
         upload_path: str | None,
         persona_info: dict[str, dict[str, Any]],
         input_placeholder: str,
@@ -1640,9 +1676,9 @@ class WebUI:
             )
             return self._load_failure_updates(msg)
 
-        self.bot = persona["name"]
-        self.streamer = self.factory.get_streamer_for_persona(self.bot)
-        self._stamp_user(str(meta.get("user") or ""))
+        session.bot = persona["name"]
+        session.streamer = self.factory.get_streamer_for_persona(session.bot)
+        self._stamp_user(session, str(meta.get("user") or ""))
 
         normalized_meta = dict(meta)
         normalized_meta.setdefault("app", "web")
@@ -1656,9 +1692,12 @@ class WebUI:
         )
 
     def _on_download_conversation(
-        self, messages: list[Message] | None, meta: dict | None
+        self,
+        session: SessionContext,
+        messages: list[Message] | None,
+        meta: dict | None,
     ) -> tuple:
-        if not (meta and meta.get("persona")) and not self.bot:
+        if not (meta and meta.get("persona")) and not session.bot:
             msg = self._t("no_selection_warning")
             return gr.update(value=None, visible=False), gr.update(
                 value=msg, visible=True
@@ -1666,7 +1705,7 @@ class WebUI:
 
         try:
             payload = {
-                "meta": meta or self._build_meta(self.bot or ""),
+                "meta": meta or self._build_meta(session.bot or ""),
                 "messages": messages or [],
             }
 
@@ -1712,6 +1751,7 @@ class WebUI:
 
     def _on_chat_like(
         self,
+        session: SessionContext,
         chat_history: list[ChatPair] | None,
         meta: dict | None,
         evt: gr.LikeData,
@@ -1738,7 +1778,7 @@ class WebUI:
                 "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
                 "app": meta.get("app", "web"),
                 "user": meta.get("user") or self._fallback_user(),
-                "persona": meta.get("persona") or self.bot or "",
+                "persona": meta.get("persona") or session.bot or "",
                 "model": meta.get("model", ""),
                 "vote": "up" if evt.liked else "down",
                 "question": self._find_question_for_row(chat_history, row),
@@ -1798,6 +1838,10 @@ class WebUI:
         # ein Handler, der stillschweigend auf einen leeren Nutzer zurückfällt,
         # schreibt Gespräche unter der falschen Identität weg.
         user_state = components["user_state"]
+        # Persona, Streamer und Kill-Switches dieser Browser-Sitzung (siehe
+        # ui/session.py). Steht bewusst als *erster* Input jedes Handlers, der
+        # sie braucht — die Reihenfolge hier ist die Parameterreihenfolge dort.
+        session_state = components["session_state"]
 
         # Identität einmal pro Browser-Sitzung einsammeln (#53).
         components["demo"].load(
@@ -1813,7 +1857,7 @@ class WebUI:
                     greeting_template=greeting_template,
                     input_placeholder=input_placeholder,
                 ),
-                inputs=[user_state],
+                inputs=[session_state, user_state],
                 outputs=persona_outputs,
                 queue=False,
             )
@@ -1824,7 +1868,7 @@ class WebUI:
                 persona_info=persona_info,
                 input_placeholder=input_placeholder,
             ),
-            inputs=[load_input],
+            inputs=[session_state, load_input],
             outputs=persona_outputs,
             queue=False,
         )
@@ -1833,7 +1877,7 @@ class WebUI:
         # Initialwert; bewusst außerhalb der PERSONA_OUTPUT_KEYS gehalten.
         model_dropdown.change(
             fn=self._on_model_selected,
-            inputs=[model_dropdown, components["conversation_state"]],
+            inputs=[session_state, model_dropdown, components["conversation_state"]],
             outputs=[model_status],
             queue=False,
         )
@@ -1859,39 +1903,44 @@ class WebUI:
 
         input_submit_evt = input_box.submit(
             fn=self.respond_streaming_with_controls,
-            inputs=[input_box, chatbot, history_state],
+            inputs=[session_state, input_box, chatbot, history_state],
             outputs=stream_outputs,
             queue=True,
         )
 
         send_click_evt = send_btn.click(
             fn=self.respond_streaming_with_controls,
-            inputs=[input_box, chatbot, history_state],
+            inputs=[session_state, input_box, chatbot, history_state],
             outputs=stream_outputs,
             queue=True,
         )
 
         # Kein `cancels`: der Kill-Switch beendet den Generator geordnet, damit
         # die Teilantwort im Verlauf bleibt.
-        stop_btn.click(fn=self._on_stop_stream, outputs=stream_buttons, queue=False)
+        stop_btn.click(
+            fn=self._on_stop_stream,
+            inputs=[session_state],
+            outputs=stream_buttons,
+            queue=False,
+        )
 
         regenerate_evt = regenerate_btn.click(
             fn=self.regenerate_with_controls,
-            inputs=[chatbot, history_state],
+            inputs=[session_state, chatbot, history_state],
             outputs=stream_outputs,
             queue=True,
         )
 
         download_btn.click(
             fn=self._on_download_conversation,
-            inputs=[history_state, meta_state],
+            inputs=[session_state, history_state, meta_state],
             outputs=[download_file, save_status],
             queue=False,
         )
 
         briefing_evt = briefing_btn.click(
             fn=self.respond_briefing_with_controls,
-            inputs=[chatbot, history_state],
+            inputs=[session_state, chatbot, history_state],
             outputs=stream_outputs,
             queue=True,
         )
@@ -1899,7 +1948,7 @@ class WebUI:
         # queue=True: die Piper-Synthese längerer Antworten dauert Sekunden
         read_aloud_btn.click(
             fn=self._on_read_aloud,
-            inputs=[history_state],
+            inputs=[session_state, history_state],
             outputs=[tts_audio],
             queue=True,
         )
@@ -1907,7 +1956,7 @@ class WebUI:
         # Binding .like() auto-enables the thumb buttons on the chatbot (#40).
         chatbot.like(
             fn=self._on_chat_like,
-            inputs=[chatbot, meta_state],
+            inputs=[session_state, chatbot, meta_state],
             outputs=[],
             queue=False,
         )
@@ -1915,14 +1964,14 @@ class WebUI:
         if ask_all_card_btn is not None:
             ask_all_card_btn.click(
                 fn=self._on_show_ask_all,
-                inputs=[],
+                inputs=[session_state],
                 outputs=persona_outputs,
                 queue=False,
             )
 
         components["history_card_btn"].click(
             fn=self._on_show_history,
-            inputs=[user_state],
+            inputs=[session_state, user_state],
             outputs=persona_outputs,
             queue=False,
         )
@@ -1940,7 +1989,7 @@ class WebUI:
                 persona_info=persona_info,
                 input_placeholder=input_placeholder,
             ),
-            inputs=[components["history_pick"]],
+            inputs=[session_state, components["history_pick"]],
             outputs=persona_outputs,
             queue=False,
         )
@@ -1971,7 +2020,7 @@ class WebUI:
 
         components["guest_card_btn"].click(
             fn=self._on_show_guest,
-            inputs=[],
+            inputs=[session_state],
             outputs=persona_outputs,
             queue=False,
         )
@@ -1983,6 +2032,7 @@ class WebUI:
                 input_placeholder=input_placeholder,
             ),
             inputs=[
+                session_state,
                 components["guest_name"],
                 components["guest_prompt"],
                 components["guest_temperature"],
@@ -1995,14 +2045,19 @@ class WebUI:
         if self_talk_card_btn is not None:
             self_talk_card_btn.click(
                 fn=self._on_show_self_talk,
-                inputs=[],
+                inputs=[session_state],
                 outputs=persona_outputs,
                 queue=False,
             )
 
         self_talk_stream_evt = self_talk_start_btn.click(
             fn=self._on_start_self_talk,
-            inputs=[self_talk_persona_a, self_talk_persona_b, self_talk_prompt],
+            inputs=[
+                session_state,
+                self_talk_persona_a,
+                self_talk_persona_b,
+                self_talk_prompt,
+            ],
             outputs=[
                 self_talk_status,
                 chatbot,
@@ -2016,21 +2071,21 @@ class WebUI:
             queue=False,
         ).then(
             fn=self._run_self_talk_stream,
-            inputs=[chatbot, history_state],
+            inputs=[session_state, chatbot, history_state],
             outputs=[chatbot, history_state],
             queue=True,
         )
 
         ask_all_submit_evt = ask_all_submit.click(
             fn=self._on_submit_ask_all,
-            inputs=[ask_all_question, ask_all_results],
+            inputs=[session_state, ask_all_question, ask_all_results],
             outputs=ask_all_outputs,
             queue=True,
         )
 
         ask_all_question_evt = ask_all_question.submit(
             fn=self._on_submit_ask_all,
-            inputs=[ask_all_question, ask_all_results],
+            inputs=[session_state, ask_all_question, ask_all_results],
             outputs=ask_all_outputs,
             queue=True,
         )
@@ -2040,7 +2095,7 @@ class WebUI:
         # YulYenStreamingProvider.stream aus, das den LLM-Stream beendet.
         new_chat_btn.click(
             fn=self._on_reset_to_start,
-            inputs=[],
+            inputs=[session_state],
             outputs=persona_outputs,
             queue=False,
             cancels=[
@@ -2054,7 +2109,7 @@ class WebUI:
 
         ask_all_new_chat.click(
             fn=self._on_reset_to_start,
-            inputs=[],
+            inputs=[session_state],
             outputs=persona_outputs,
             queue=False,
             cancels=[ask_all_submit_evt, ask_all_question_evt],

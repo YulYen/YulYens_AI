@@ -1,4 +1,5 @@
 import gradio as gr
+from ui.session import SessionContext
 
 
 def build_ui(
@@ -485,6 +486,11 @@ def build_ui(
         # Laufendes Gespräch in der Ablage (#54) — überlebt einen
         # Streamer-Neubau, etwa beim Modellwechsel.
         conversation_state = gr.State("")
+        # Persona, Streamer und Kill-Switches dieser Browser-Sitzung. Gradio
+        # legt pro Sitzung eine eigene Kopie des Default-Werts an, deshalb
+        # reicht es, das Objekt als Input durchzureichen und in-place zu
+        # ändern — am WebUI-Singleton wären sie für alle Browser dieselben.
+        session_state = gr.State(SessionContext())
 
     components = {
         "demo": demo,
@@ -506,6 +512,7 @@ def build_ui(
         "meta_state": meta_state,
         "user_state": user_state,
         "conversation_state": conversation_state,
+        "session_state": session_state,
         "guest_card_btn": guest_card_btn,
         "guest_group": guest_group,
         "guest_status": guest_status,
