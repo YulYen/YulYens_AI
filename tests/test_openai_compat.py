@@ -10,7 +10,7 @@ import json
 import pytest
 from api.openai_compat import RateLimiter, reset_rate_limiter, resolve_secret
 from config.config_singleton import Config
-from wiki.lookup import WikiSnippet
+from wiki.lookup import WikiLookup, WikiSnippet
 
 
 @pytest.fixture(autouse=True)
@@ -366,12 +366,7 @@ def _provider_with_fake_streamer(monkeypatch, captured):
     factory.get_config.return_value = Config()
 
     return AiApiProvider(
-        keyword_finder=None,
-        wiki_mode="offline",
-        wiki_proxy_port=8042,
-        wiki_snippet_limit=100,
-        max_wiki_snippets=1,
-        wiki_timeout=(1.0, 1.0),
+        wiki=WikiLookup(mode="offline", proxy_port=8042, limit=100, max_snippets=1),
         factory=factory,
     )
 
@@ -380,7 +375,7 @@ def test_wiki_context_lands_directly_before_the_last_user_turn(client, monkeypat
     captured = []
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     monkeypatch.setattr(
-        "api.provider.lookup_wiki_snippet",
+        "wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: (["hint"], [WikiSnippet("Kiwix", "Ein Schnipsel")]),
     )
     monkeypatch.setattr(
@@ -411,7 +406,7 @@ def test_wiki_lookup_uses_the_last_user_message(client, monkeypatch):
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     asked = {}
     monkeypatch.setattr(
-        "api.provider.lookup_wiki_snippet",
+        "wiki.lookup.lookup_wiki_snippet",
         lambda question, *a, **k: (asked.update(question=question), ([], []))[1],
     )
 
@@ -429,7 +424,7 @@ def test_stream_messages_does_not_mutate_the_callers_history(client, monkeypatch
     captured = []
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     monkeypatch.setattr(
-        "api.provider.lookup_wiki_snippet",
+        "wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: ([], [WikiSnippet("T", "S")]),
     )
     monkeypatch.setattr(

@@ -419,3 +419,49 @@ def test_set_user_falls_back_instead_of_writing_an_empty_name(tmp_path, monkeypa
     provider.set_user("   ")
 
     assert provider.user == "local"
+
+
+# ---- Der Eingangs-Check des Guards steht nur noch einmal --------------------
+
+
+class _BlockAllGuard:
+    """Guard, der jede Eingabe ablehnt — mit dem Vertrag von BasicGuard."""
+
+    texts = {"security_blocked_keyword": "Nö."}
+
+    def check_input(self, text: str) -> dict[str, Any]:
+        return {"ok": False, "reason": "blocked_keyword", "detail": text[:10]}
+
+    def process_output(self, text: str) -> dict[str, Any]:
+        return {"blocked": False, "text": text}
+
+    def check_output(self, text: str) -> dict[str, Any]:
+        return {"ok": True}
+
+
+def test_stream_and_one_shot_refuse_the_same_way() -> None:
+    """Beide Pfade prüften die Eingabe getrennt — jetzt über dieselbe Methode.
+
+    Der Test hält fest, was daran zählt: dieselbe Eingabe führt in beiden
+    Einstiegen zur identischen Absage, statt dass eine Änderung nur an einer
+    Stelle ankommt.
+    """
+    from wiki.lookup import WikiLookup
+
+    provider = create_streaming_provider(guard=_BlockAllGuard())
+
+    streamed = "".join(
+        provider.stream(messages=[{"role": "user", "content": "verbotene Frage"}])
+    )
+    one_shot = provider.respond_one_shot(
+        "verbotene Frage", persona="TEST", wiki=WikiLookup()
+    )
+
+    assert streamed == one_shot
+    assert "Nö." in streamed
+
+
+def test_without_a_guard_nothing_is_refused() -> None:
+    provider = create_streaming_provider()
+
+    assert provider._input_refusal("beliebige Frage", "TEST") is None

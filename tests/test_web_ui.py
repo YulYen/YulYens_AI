@@ -21,7 +21,7 @@ from ui.web_ui import (
     STREAM_OUTPUT_KEYS,
     WebUI,
 )
-from wiki.lookup import WikiSnippet
+from wiki.lookup import WikiLookup, WikiSnippet
 
 
 def test_webui_start_server_uses_configured_host_and_port():
@@ -32,14 +32,9 @@ def test_webui_start_server_uses_configured_host_and_port():
     web_ui = WebUI(
         factory=Mock(),
         config=dummy_config,
-        keyword_finder=Mock(),
-        wiki_snippet_limit=42,
-        max_wiki_snippets=2,
-        wiki_mode="offline",
-        proxy_port=8042,
+        wiki=WikiLookup(),
         web_host="0.0.0.0",
         web_port="9000",
-        wiki_timeout=1.0,
     )
 
     demo = Mock()
@@ -72,14 +67,9 @@ def _create_web_ui(ui_config=None):
     return WebUI(
         factory=Mock(),
         config=dummy_config,
-        keyword_finder=None,
-        wiki_snippet_limit=42,
-        max_wiki_snippets=2,
-        wiki_mode="offline",
-        proxy_port=8042,
+        wiki=WikiLookup(mode="offline", proxy_port=8042, limit=42, max_snippets=2),
         web_host="0.0.0.0",
         web_port="9000",
-        wiki_timeout=1.0,
     )
 
 
@@ -138,7 +128,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     history_state = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
@@ -164,7 +154,7 @@ def test_webui_heuristic_strategy_never_instantiates_karl():
     session.streamer = streamer
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
         patch(
@@ -191,7 +181,7 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
     session.streamer = streamer
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
         patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
@@ -222,7 +212,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     history_state = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.context_near_limit", return_value=True),
         patch("ui.web_ui.get_drink", return_value="☕"),
@@ -256,7 +246,7 @@ def test_respond_streaming_keeps_session_histories_isolated():
     session_two_state = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         session_one_outputs = list(
@@ -299,7 +289,7 @@ def test_respond_streaming_returns_chat_and_state_updates():
     history_state: list = []
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         outputs = list(
@@ -325,7 +315,7 @@ def test_respond_streaming_appends_final_history_entries():
     session.streamer = streamer
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         outputs = list(
@@ -356,7 +346,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
         patch(
-            "ui.web_ui.lookup_wiki_snippet",
+            "wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
         ) as mock_lookup,
         patch("ui.web_ui.inject_wiki_context", side_effect=fake_inject),
@@ -390,7 +380,7 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
 
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
             "ui.web_ui.iter_broadcast_events_parallel",
             side_effect=fake_iter_broadcast_events,
@@ -428,7 +418,7 @@ def test_on_submit_ask_all_sequential_fallback_via_config():
 
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
             "ui.web_ui.iter_broadcast_events",
             side_effect=fake_iter_broadcast_events,
@@ -1402,7 +1392,7 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
     snapshots = []
     with (
         patch(
-            "ui.web_ui.lookup_wiki_snippet",
+            "wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [snippet]),
         ),
         patch("ui.web_ui.inject_wiki_context"),
@@ -1447,7 +1437,7 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
     session.streamer = streamer
 
     with (
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch("ui.web_ui.context_near_limit", return_value=False),
     ):
         outputs = list(web_ui.respond_streaming(session, "Frage", [], []))
@@ -1491,7 +1481,7 @@ def test_ask_all_publishes_the_injected_snippet_text():
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
         patch(
-            "ui.web_ui.lookup_wiki_snippet",
+            "wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [snippet]),
         ),
         patch("ui.web_ui.inject_wiki_context"),
@@ -1522,7 +1512,7 @@ def test_ask_all_keeps_the_sources_in_every_yield():
 
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [snippet])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [snippet])),
         patch("ui.web_ui.inject_wiki_context"),
         patch("ui.web_ui.iter_broadcast_events", return_value=iter(events)),
     ):
@@ -1540,7 +1530,7 @@ def test_ask_all_hides_the_accordion_without_wiki_hits():
 
     with (
         patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
-        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
             "ui.web_ui.iter_broadcast_events",
             return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),

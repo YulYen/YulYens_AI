@@ -11,6 +11,7 @@ from security.tinyguard import BasicGuard, create_guard
 from storage import ConversationStore, build_store
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
+from wiki.lookup import WikiLookup
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
 
 from core.dummy_llm_core import DummyLLMCore
@@ -39,6 +40,7 @@ class AppFactory:
     def __init__(self) -> None:
         self._cfg = Config()
         self._keyword_finder: SpacyKeywordFinder | None = None
+        self._wiki_lookup: WikiLookup | None = None
         self._api_provider = None
         self._one_shot_provider = None
         self._ui = None  # TerminalUI or WebUI
@@ -89,6 +91,14 @@ class AppFactory:
             else:
                 self._keyword_finder = None
         return self._keyword_finder
+
+    def get_wiki_lookup(self) -> WikiLookup:
+        """Die Wiki-Einstellungen als ein Objekt (statt fünf Argumente je Klasse)."""
+        if self._wiki_lookup is None:
+            self._wiki_lookup = WikiLookup.from_config(
+                self._cfg, self.get_keyword_finder()
+            )
+        return self._wiki_lookup
 
     def warm_up_model(self) -> None:
         """One-time model preload so the first real request hits a warm model.
@@ -310,16 +320,7 @@ class AppFactory:
             from api.provider import AiApiProvider
 
             self._one_shot_provider = AiApiProvider(
-                keyword_finder=self.get_keyword_finder(),
-                wiki_mode=self._cfg.wiki["mode"],
-                wiki_proxy_port=int(self._cfg.wiki["proxy_port"]),
-                wiki_snippet_limit=int(self._cfg.wiki["snippet_limit"]),
-                max_wiki_snippets=int(self._cfg.wiki["max_wiki_snippets"]),
-                wiki_timeout=(
-                    float(self._cfg.wiki["timeout_connect"]),
-                    float(self._cfg.wiki["timeout_read"]),
-                ),
-                factory=self,
+                wiki=self.get_wiki_lookup(), factory=self
             )
         return self._one_shot_provider
 
@@ -344,41 +345,16 @@ class AppFactory:
             self._ui = None
             return None
 
-        finder = self.get_keyword_finder()
-        wiki = self._cfg.wiki
-
         if ui_type == "terminal":
-            self._ui = TerminalUI(
-                self,
-                self._cfg,
-                finder,
-                int(wiki["snippet_limit"]),
-                int(wiki["max_wiki_snippets"]),
-                wiki["mode"],
-                int(wiki["proxy_port"]),
-                wiki_timeout=(
-                    float(wiki["timeout_connect"]),
-                    float(wiki["timeout_read"]),
-                ),
-            )
+            self._ui = TerminalUI(self, self._cfg, self.get_wiki_lookup())
         elif ui_type == "web":
             web_cfg = self._cfg.ui["web"]
-            host = web_cfg["host"]
-            port = int(web_cfg["port"])
             self._ui = WebUI(
                 self,
                 self._cfg,
-                finder,
-                int(wiki["snippet_limit"]),
-                int(wiki["max_wiki_snippets"]),
-                wiki["mode"],
-                int(wiki["proxy_port"]),
-                web_host=host,
-                web_port=port,
-                wiki_timeout=(
-                    float(wiki["timeout_connect"]),
-                    float(wiki["timeout_read"]),
-                ),
+                self.get_wiki_lookup(),
+                web_host=web_cfg["host"],
+                web_port=int(web_cfg["port"]),
             )
         else:
             raise ValueError(

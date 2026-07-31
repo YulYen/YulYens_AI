@@ -5,7 +5,7 @@ from typing import Any
 
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
-from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
+from wiki.lookup import WikiLookup, inject_wiki_context
 
 
 class UnknownPersonaError(ValueError):
@@ -22,23 +22,8 @@ class AiApiProvider:
     a client-supplied history and stream tokens back.
     """
 
-    def __init__(
-        self,
-        *,
-        keyword_finder: Any,
-        wiki_mode: str | bool,
-        wiki_proxy_port: int,
-        wiki_snippet_limit: int,
-        max_wiki_snippets: int,
-        wiki_timeout: tuple[float, float],
-        factory: Any,
-    ) -> None:
-        self.keyword_finder = keyword_finder
-        self.wiki_mode = wiki_mode
-        self.wiki_proxy_port = wiki_proxy_port
-        self.wiki_snippet_limit = wiki_snippet_limit
-        self.max_wiki_snippets = max_wiki_snippets
-        self.wiki_timeout = wiki_timeout
+    def __init__(self, *, wiki: WikiLookup, factory: Any) -> None:
+        self.wiki = wiki
         self.factory = factory
         self.cfg = factory.get_config() if factory is not None else Config()
         self._known_personas = tuple(get_all_persona_names())
@@ -81,16 +66,7 @@ class AiApiProvider:
         )
         if last_user_index is not None:
             question = str(history[last_user_index].get("content") or "")
-            _hints, contexts = lookup_wiki_snippet(
-                question,
-                canonical_persona,
-                self.keyword_finder,
-                self.wiki_mode,
-                self.wiki_proxy_port,
-                self.wiki_snippet_limit,
-                self.wiki_timeout,
-                self.max_wiki_snippets,
-            )
+            _hints, contexts = self.wiki.snippets(question, canonical_persona)
             if contexts:
                 # Wie im UI: die Kontext-System-Messages stehen unmittelbar vor
                 # dem User-Turn, auf den sie sich beziehen.
@@ -123,12 +99,5 @@ class AiApiProvider:
         )
 
         return streamer.respond_one_shot(
-            frage,
-            keyword_finder=self.keyword_finder,
-            wiki_mode=self.wiki_mode,
-            wiki_proxy_port=self.wiki_proxy_port,
-            wiki_snippet_limit=self.wiki_snippet_limit,
-            wiki_timeout=self.wiki_timeout,
-            max_wiki_snippets=self.max_wiki_snippets,
-            persona=canonical_persona,
+            frage, persona=canonical_persona, wiki=self.wiki
         ).strip()

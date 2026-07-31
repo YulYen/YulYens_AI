@@ -356,3 +356,84 @@ def test_proxy_apply_limit_counts_the_infobox_block_too():
 
     assert text.startswith(kv_line)
     assert full_length == len(kv_line) + 2 + len(article)
+
+
+# ---- WikiLookup: ein Objekt statt fünf Attributen ---------------------------
+
+
+def test_wiki_lookup_passes_every_setting_through(monkeypatch):
+    """Die acht Argumente standen an sechs Stellen — jetzt an einer."""
+    from wiki.lookup import WikiLookup
+
+    captured = {}
+
+    def _fake(question, persona_name, finder, mode, port, limit, timeout, max_snippets):
+        captured.update(
+            question=question,
+            persona=persona_name,
+            finder=finder,
+            mode=mode,
+            port=port,
+            limit=limit,
+            timeout=timeout,
+            max_snippets=max_snippets,
+        )
+        return ([], [])
+
+    monkeypatch.setattr("wiki.lookup.lookup_wiki_snippet", _fake)
+
+    finder = _DummyKeywordFinder("Thema")
+    lookup = WikiLookup(
+        keyword_finder=finder,
+        mode="offline",
+        proxy_port=1234,
+        limit=99,
+        max_snippets=3,
+        timeout=(1.0, 2.0),
+    )
+    lookup.snippets("Frage?", "PETER")
+
+    assert captured == {
+        "question": "Frage?",
+        "persona": "PETER",
+        "finder": finder,
+        "mode": "offline",
+        "port": 1234,
+        "limit": 99,
+        "timeout": (1.0, 2.0),
+        "max_snippets": 3,
+    }
+
+
+def test_wiki_lookup_from_config_reads_the_wiki_section():
+    from types import SimpleNamespace
+
+    from wiki.lookup import WikiLookup
+
+    cfg = SimpleNamespace(
+        wiki={
+            "mode": "online",
+            "proxy_port": 8042,
+            "snippet_limit": 1200,
+            "max_wiki_snippets": 2,
+            "timeout_connect": 3.0,
+            "timeout_read": 8.0,
+        }
+    )
+
+    lookup = WikiLookup.from_config(cfg, keyword_finder=None)
+
+    assert lookup.mode == "online"
+    assert lookup.limit == 1200
+    assert lookup.timeout == (3.0, 8.0)
+
+
+def test_wiki_lookup_without_a_wiki_section_stays_usable():
+    """Eine Config ohne wiki-Sektion darf nicht beim Bauen krachen."""
+    from types import SimpleNamespace
+
+    from wiki.lookup import WikiLookup
+
+    lookup = WikiLookup.from_config(SimpleNamespace(), keyword_finder=None)
+
+    assert lookup.snippets("Frage?", "TEST") == ([], [])

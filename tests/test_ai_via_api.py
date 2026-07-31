@@ -69,17 +69,7 @@ def test_persona_name_normalized(client, monkeypatch):
     """Der Persona-Name wird normalisiert — 'leah' erreicht den Streamer als LEAH."""
     captured: dict[str, str] = {}
 
-    def fake_respond(
-        self,
-        user_input,
-        persona,
-        keyword_finder,
-        wiki_mode,
-        wiki_proxy_port,
-        wiki_snippet_limit,
-        max_wiki_snippets,
-        wiki_timeout,
-    ):
+    def fake_respond(self, user_input, persona, wiki):
         captured["persona_arg"] = persona
         return f"Persona arg: {persona} | Bot attr: {self.persona}"
 

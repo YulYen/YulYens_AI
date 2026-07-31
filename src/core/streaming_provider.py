@@ -23,7 +23,7 @@ from typing import Any
 from config.config_singleton import Config
 from security.tinyguard import BasicGuard, zeigefinger_message
 from storage import ConversationStore, NullStore
-from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
+from wiki.lookup import WikiLookup, inject_wiki_context
 
 from core.context_utils import approx_token_count
 from core.utils import LOCAL_USER, ensure_dir_exists, is_ollama_module_not_found
@@ -374,6 +374,22 @@ class YulYenStreamingProvider:
                 "%s", _render_prompt_trace(self.persona, self.model_name, messages)
             )
 
+    def _input_refusal(self, text: str, persona: str) -> str | None:
+        """Guard-Eingangsprüfung: die Absage — oder None, wenn nichts anschlägt.
+
+        Geteilt von ``stream()`` und ``respond_one_shot()``: die Prüfung stand
+        zweimal da und hätte bei jeder Änderung auseinanderlaufen können.
+        """
+        if not self.guard:
+            return None
+        result = self.guard.check_input(text or "")
+        if result["ok"]:
+            return None
+        logging.info(
+            "[GUARD] input blocked persona=%s reason=%s", persona, result.get("reason")
+        )
+        return zeigefinger_message(result, texts=getattr(self.guard, "texts", None))
+
     def stream(self, messages: list[dict[str, Any]]) -> Generator[str, None, None]:
         """
         Generator that yields the LLM response token by token.
@@ -388,14 +404,9 @@ class YulYenStreamingProvider:
         if self.guard:
             for m in reversed(messages):
                 if m.get("role") == "user":
-                    res = self.guard.check_input(m.get("content") or "")
-                    if not res["ok"]:
-                        logging.info(
-                            "[GUARD] input blocked persona=%s reason=%s",
-                            self.persona,
-                            res.get("reason"),
-                        )
-                        yield zeigefinger_message(res, texts=guard_texts)
+                    refusal = self._input_refusal(m.get("content") or "", self.persona)
+                    if refusal is not None:
+                        yield refusal
                         return
                     break
 
@@ -511,17 +522,7 @@ class YulYenStreamingProvider:
             self._append_conversation_log("assistant", err)
             yield err
 
-    def respond_one_shot(
-        self,
-        user_input: str,
-        persona: str,
-        keyword_finder,
-        wiki_mode: str,
-        wiki_proxy_port: int,
-        wiki_snippet_limit: int,
-        wiki_timeout: tuple[float, float],
-        max_wiki_snippets: int,
-    ) -> str:
+    def respond_one_shot(self, user_input: str, persona: str, wiki: WikiLookup) -> str:
         """
         Convenience method for the API: runs a single prompt
         and returns the complete answer as a string.
@@ -529,16 +530,7 @@ class YulYenStreamingProvider:
         messages: list[dict[str, Any]] = []
 
         # Look up the Wikipedia snippet(s)
-        _wiki_hints, contexts = lookup_wiki_snippet(
-            user_input,
-            persona,
-            keyword_finder,
-            wiki_mode,
-            wiki_proxy_port,
-            wiki_snippet_limit,
-            wiki_timeout,
-            max_wiki_snippets,
-        )
+        _wiki_hints, contexts = wiki.snippets(user_input, persona)
 
         # Attach context
         if contexts:
@@ -548,16 +540,9 @@ class YulYenStreamingProvider:
         messages.append({"role": "user", "content": user_input})
 
         # Check guard input
-        if self.guard:
-            guard_texts = getattr(self.guard, "texts", None)
-            res_in = self.guard.check_input(user_input or "")
-            if not res_in["ok"]:
-                logging.info(
-                    "[GUARD] input blocked persona=%s reason=%s",
-                    persona,
-                    res_in.get("reason"),
-                )
-                return zeigefinger_message(res_in, texts=guard_texts)
+        refusal = self._input_refusal(user_input, persona)
+        if refusal is not None:
+            return refusal
 
         # Run the LLM and collect the answer
         full_reply = run_llm_collect(self, messages)
@@ -571,7 +556,9 @@ class YulYenStreamingProvider:
                     persona,
                     res_out.get("reason"),
                 )
-                return zeigefinger_message(res_out, texts=guard_texts)
+                return zeigefinger_message(
+                    res_out, texts=getattr(self.guard, "texts", None)
+                )
 
         return full_reply
 

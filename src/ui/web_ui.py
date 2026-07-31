@@ -42,16 +42,15 @@ from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
 from ui.webui_layout import build_ui
 from wiki.lookup import (
+    WikiLookup,
     WikiSnippet,
     format_snippet_meta,
     inject_wiki_context,
-    lookup_wiki_snippet,
 )
 
 if TYPE_CHECKING:
     from config.config_singleton import Config
     from core.factory import AppFactory
-    from wiki.spacy_keyword_finder import SpacyKeywordFinder
 
 # One chatbot entry: (user_text, bot_text) — either side may be None.
 ChatPair = tuple[str | None, str | None]
@@ -179,25 +178,15 @@ class WebUI:
         self,
         factory: AppFactory,
         config: Config,
-        keyword_finder: SpacyKeywordFinder | None,
-        wiki_snippet_limit: int,
-        max_wiki_snippets: int,
-        wiki_mode: str,
-        proxy_port: int,
+        wiki: WikiLookup,
         web_host: str,
         web_port: int | str,
-        wiki_timeout: tuple[float, float],
     ) -> None:
-        self.keyword_finder = keyword_finder
         self.cfg = config
         self.factory = factory
-        self.wiki_snippet_limit = wiki_snippet_limit
-        self.max_wiki_snippets = max_wiki_snippets
-        self.wiki_mode = wiki_mode
-        self.proxy_port = proxy_port
+        self.wiki = wiki
         self.web_host = web_host
         self.web_port = int(web_port)
-        self.wiki_timeout = wiki_timeout
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         # Wer bedient die UI (#53). Default DisabledAuth = Verhalten wie bisher.
@@ -616,16 +605,7 @@ class WebUI:
         yield "", chat_history, llm_history, *self._wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
-        wiki_hints, contexts = lookup_wiki_snippet(
-            user_input,
-            session.bot,
-            self.keyword_finder,
-            self.wiki_mode,
-            self.proxy_port,
-            self.wiki_snippet_limit,
-            self.wiki_timeout,
-            self.max_wiki_snippets,
-        )
+        wiki_hints, contexts = self.wiki.snippets(user_input, session.bot)
 
         # Display the UI hints (do not add them to the LLM context window)
         for wiki_hint in wiki_hints:
@@ -1600,16 +1580,7 @@ class WebUI:
 
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
-        wiki_hints, contexts = lookup_wiki_snippet(
-            question,
-            "ask_all",
-            self.keyword_finder,
-            self.wiki_mode,
-            self.proxy_port,
-            self.wiki_snippet_limit,
-            self.wiki_timeout,
-            self.max_wiki_snippets,
-        )
+        wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
         context_messages: list[Message] = []
         if contexts:
             inject_wiki_context(context_messages, contexts)
