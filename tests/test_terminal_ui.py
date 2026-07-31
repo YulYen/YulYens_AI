@@ -363,3 +363,36 @@ def test_new_conversation_drops_the_recorded_snippets(monkeypatch) -> None:
     ui._start_dialog_flow()
 
     assert ui.last_wiki_snippets == []
+
+
+# ---- Datei-Austausch abschaltbar (#54) -------------------------------------
+
+
+def test_save_command_is_refused_when_the_exchange_is_off(capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.file_exchange_enabled = False
+
+    ui._handle_save_command("irgendwo.json")
+
+    assert "abgeschaltet" in capsys.readouterr().out
+
+
+def test_start_menu_hides_loading_when_the_exchange_is_off(monkeypatch, capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.file_exchange_enabled = False
+    monkeypatch.setattr("builtins.input", lambda _: "exit")
+
+    ui._start_dialog_flow()
+
+    out = capsys.readouterr().out
+    assert ui.texts["terminal_start_menu_load_option"] not in out
+    assert ui.texts["terminal_start_menu_new_option"] in out
+
+
+def test_start_menu_shows_loading_by_default(monkeypatch, capsys) -> None:
+    ui = _create_terminal_ui()
+    monkeypatch.setattr("builtins.input", lambda _: "exit")
+
+    ui._start_dialog_flow()
+
+    assert ui.texts["terminal_start_menu_load_option"] in capsys.readouterr().out

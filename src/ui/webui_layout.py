@@ -54,6 +54,7 @@ def build_ui(
     history_export_label,
     history_delete_label,
     history_confirm_label,
+    file_exchange_enabled,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -246,7 +247,7 @@ def build_ui(
                 else:
                     ask_all_card_btn = None
 
-            with gr.Row():
+            with gr.Row(visible=file_exchange_enabled):
                 with gr.Column(scale=2, min_width=300):
                     load_input = gr.File(
                         label=load_label,

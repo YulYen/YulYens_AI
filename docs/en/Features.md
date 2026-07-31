@@ -151,6 +151,8 @@ Conversations live in a local SQLite file (`storage.path`, `data/conversations.s
 
 Continuing really means continuing: the reply is appended to the same conversation record rather than starting a second one. Conversations from a guest persona stay readable but cannot be continued — that persona's system prompt only existed in its session.
 
+File exchange (JSON download/upload in the web UI, `/save` and “load conversation” in the terminal) remains alongside it — it is meant for backups and moving between machines. If you do not need it, switch it off with `storage.file_exchange: false`; the history's Markdown export is unaffected.
+
 The former JSONL transcript under `logs/` is still available, but purely as a debugging tool and off by default (`logging.conversation_jsonl`).
 
 ## Sign-in (optional)

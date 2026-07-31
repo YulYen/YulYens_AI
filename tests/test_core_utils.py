@@ -46,3 +46,17 @@ def test_token_estimate_logs_on_debug_not_info(caplog):
     with caplog.at_level(logging.DEBUG):
         approx_token_count(messages)
     assert "approx_token_count" in caplog.text
+
+
+def test_file_exchange_defaults_to_on_and_can_be_switched_off():
+    from types import SimpleNamespace
+
+    from core.utils import is_file_exchange_enabled
+
+    # Ohne Sektion und ohne Schlüssel: an — der Austausch war immer da.
+    assert is_file_exchange_enabled(SimpleNamespace()) is True
+    assert is_file_exchange_enabled(SimpleNamespace(storage={})) is True
+    assert (
+        is_file_exchange_enabled(SimpleNamespace(storage={"file_exchange": False}))
+        is False
+    )

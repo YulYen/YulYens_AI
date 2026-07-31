@@ -142,6 +142,11 @@ logging:
 storage:
   enabled: true
   path: "data/conversations.sqlite3"
+  # Datei-Austausch mit der Außenwelt: JSON herunterladen/hochladen im WebUI,
+  # /save und "Gespräch laden" im Terminal. Das ist etwas anderes als die
+  # Ablage oben — wer es nicht braucht, schaltet es hier ab.
+  # Nicht betroffen: der Markdown-Export im Verlauf, der gehört zum Verlauf.
+  file_exchange: true
 
 # --- Persona e-mail adapter -----------------------------------------------------
 # Optional IMAP/SMTP bridge: routes incoming plain-text e-mails to personas via

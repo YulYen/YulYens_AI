@@ -27,7 +27,12 @@ from core.context_utils import threshold as CONTEXT_FILL_WARN_RATIO
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.streaming_provider import StreamStats
 from core.system_checks import fetch_model_names
-from core.utils import ensure_dir_exists, is_broadcast_enabled, is_broadcast_parallel
+from core.utils import (
+    ensure_dir_exists,
+    is_broadcast_enabled,
+    is_broadcast_parallel,
+    is_file_exchange_enabled,
+)
 from storage import ConversationRef
 from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
@@ -109,6 +114,7 @@ PERSONA_OUTPUT_KEYS = (
     "history_status",
     "history_pick",
     "history_preview",
+    "history_confirm",
 )
 
 # Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
@@ -178,6 +184,8 @@ class WebUI:
         self.auth = build_auth_provider(
             ui_cfg.get("web") if isinstance(ui_cfg, dict) else None
         )
+        # Datei-Austausch (JSON rein/raus) ist abschaltbar (#54).
+        self.file_exchange_enabled = is_file_exchange_enabled(self.cfg)
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
         self.broadcast_parallel = is_broadcast_parallel(self.cfg)
         # Kill switch für den laufenden Ask-All-Broadcast: Gradio cancels
@@ -814,6 +822,9 @@ class WebUI:
             "history_status": gr.update(value="", visible=False),
             "history_pick": gr.update(choices=[], value=None),
             "history_preview": gr.update(value=""),
+            # Muss zurück: ein gesetztes Häkchen überlebte sonst den Weg zur
+            # Startseite und der nächste Klick löschte ohne neue Bestätigung.
+            "history_confirm": gr.update(value=False),
         }
 
     def _persona_selected_updates(
@@ -856,7 +867,7 @@ class WebUI:
             ),
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
-            download_btn=gr.update(visible=True),
+            download_btn=gr.update(visible=self.file_exchange_enabled),
             briefing_btn=gr.update(visible=self.briefing_enabled),
             read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             meta_state=self._build_meta(persona["name"], user=user),
@@ -1588,7 +1599,7 @@ class WebUI:
             ),
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
-            download_btn=gr.update(visible=True),
+            download_btn=gr.update(visible=self.file_exchange_enabled),
             briefing_btn=gr.update(visible=self.briefing_enabled),
             read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             history_state=messages,
@@ -2199,6 +2210,7 @@ class WebUI:
             history_export_label=history_export_label,
             history_delete_label=history_delete_label,
             history_confirm_label=history_confirm_label,
+            file_exchange_enabled=self.file_exchange_enabled,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

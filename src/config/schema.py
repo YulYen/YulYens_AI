@@ -97,6 +97,7 @@ class StorageSection(BaseModel):
 
     enabled: bool = True
     path: str | None = None
+    file_exchange: bool = True
 
 
 class ContextManagementSection(BaseModel):

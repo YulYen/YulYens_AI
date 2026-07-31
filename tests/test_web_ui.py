@@ -1940,3 +1940,51 @@ def test_persona_selection_opens_exactly_one_conversation(tmp_path):
     assert [ref.id for ref in store.list_conversations(user="yulyen")] == [
         conversation_id
     ]
+
+
+def test_leaving_the_history_clears_the_delete_confirmation():
+    """Ein gesetztes Häkchen darf den Weg zur Startseite nicht überleben."""
+    updates = _create_web_ui()._reset_ui_updates()
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_confirm")]["value"] is False
+
+
+# ---- Datei-Austausch abschaltbar (#54) -------------------------------------
+
+
+def _exchange_web_ui(enabled):
+    web_ui = _create_web_ui()
+    web_ui.cfg.storage = {"file_exchange": enabled}
+    web_ui.file_exchange_enabled = enabled
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "classic"
+    return web_ui
+
+
+def test_download_button_follows_the_file_exchange_switch():
+    for enabled in (True, False):
+        web_ui = _exchange_web_ui(enabled)
+
+        updates = web_ui._persona_selected_updates(
+            "karl",
+            {"name": "Karl", "description": "d"},
+            "Hallo {persona_name}",
+            "Tippe",
+        )
+
+        download = updates[PERSONA_OUTPUT_KEYS.index("download_btn")]
+        assert download["visible"] is enabled
+
+
+def test_loaded_conversation_also_respects_the_switch():
+    web_ui = _exchange_web_ui(False)
+
+    updates = web_ui._conversation_loaded_updates(
+        "karl",
+        {"name": "Karl", "description": "d"},
+        {"persona": "Karl", "model": "m", "created_at": "x", "app": "web"},
+        [{"role": "user", "content": "Hallo"}],
+        "Tippe",
+    )
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("download_btn")]["visible"] is False

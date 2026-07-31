@@ -151,6 +151,8 @@ Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig
 
 Fortsetzen heißt wirklich fortsetzen: die Antwort landet im selben Gesprächseintrag, es entsteht kein zweiter. Gespräche einer Gast-Persona bleiben lesbar, lassen sich aber nicht fortsetzen — deren System-Prompt lebte nur in der damaligen Sitzung.
 
+Der Austausch per Datei (JSON herunterladen/hochladen im WebUI, `/save` und „Gespräch laden" im Terminal) bleibt daneben bestehen — er ist für Backups und den Wechsel zwischen Rechnern gedacht. Wer ihn nicht braucht, schaltet ihn mit `storage.file_exchange: false` ab; der Markdown-Export im Verlauf bleibt davon unberührt.
+
 Der frühere JSONL-Mitschnitt in `logs/` ist weiterhin verfügbar, aber als reines Debug-Werkzeug und standardmäßig aus (`logging.conversation_jsonl`).
 
 ## Anmeldung (optional)

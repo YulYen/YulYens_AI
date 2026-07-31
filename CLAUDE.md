@@ -257,7 +257,7 @@ in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 | `data/conversations.sqlite3` | **die Aufzeichnung** — Verlauf (#25), später Suche (#49) und Fakten (#24) |
 | `logs/conversation_*.json` | roher Mitschnitt zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
 
-**Der Datei-Im-/Export bleibt — er ist etwas anderes.** `conversation_io_terminal.py`
+**Der Datei-Im-/Export bleibt, ist aber abschaltbar** (`storage.file_exchange`, Default an) — er ist etwas anderes als die Ablage. `conversation_io_terminal.py`
 (JSON hoch-/runterladen im WebUI, `/save` und Laden im Terminal) ist der
 *Austausch mit der Außenwelt*: sichern, auf einen anderen Rechner mitnehmen,
 weitergeben. Die Ablage ist das *eigene Gedächtnis der App*. Drei Wege, drei
@@ -267,7 +267,7 @@ Zwecke:
 |---|---|---|
 | Verlauf → Öffnen | — | eigenes Gespräch fortsetzen |
 | Verlauf → Als Markdown | Markdown | lesbar weitergeben (Einbahnstraße) |
-| „Konversation herunterladen" / Upload | JSON | Austausch, verlustfrei zurückladbar |
+| „Konversation herunterladen" / Upload | JSON | Austausch, verlustfrei zurückladbar — abschaltbar über `storage.file_exchange` |
 
 **Migrationen** über `PRAGMA user_version` plus die Liste `_MIGRATIONS`: neue
 Schritte nur **anhängen**, nie einen ausgelieferten Schritt ändern. Die

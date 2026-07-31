@@ -10,7 +10,7 @@ from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
-from core.utils import _greeting_text, is_broadcast_enabled
+from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
 from ui import self_talk
 from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui.persona_chooser import prompt_persona_choice
@@ -55,6 +55,8 @@ class TerminalUI:
         self.texts = config.texts
         self._t = config.t
         self.broadcast_enabled = is_broadcast_enabled(config)
+        # JSON-Austausch per Datei ist abschaltbar (#54).
+        self.file_exchange_enabled = is_file_exchange_enabled(config)
         self.tts_cfg = getattr(config, "tts", {}) or {}
         self.tts_auto_wav_enabled = bool(self.tts_cfg.get("enabled")) and bool(
             self.tts_cfg.get("features", {}).get("terminal_auto_create_wav")
@@ -87,10 +89,11 @@ class TerminalUI:
         print(self.greeting)
         print(f"{Fore.MAGENTA}{self.texts['terminal_exit_hint']}{Style.RESET_ALL}")
         print(f"{Fore.MAGENTA}{self.texts['terminal_clear_hint']}{Style.RESET_ALL}")
-        save_hint = self.texts.get(
-            "terminal_save_hint", "('/save <pfad> zum Speichern)"
-        )
-        print(f"{Fore.MAGENTA}{save_hint}{Style.RESET_ALL}")
+        if self.file_exchange_enabled:
+            save_hint = self.texts.get(
+                "terminal_save_hint", "('/save <pfad> zum Speichern)"
+            )
+            print(f"{Fore.MAGENTA}{save_hint}{Style.RESET_ALL}")
         if self.briefing_enabled:
             briefing_hint = self.texts.get("terminal_briefing_hint", "/briefing")
             print(f"{Fore.MAGENTA}{briefing_hint}{Style.RESET_ALL}")
@@ -118,7 +121,8 @@ class TerminalUI:
         while True:
             print(self.texts["terminal_start_menu_title"])
             print(self.texts["terminal_start_menu_new_option"])
-            print(self.texts["terminal_start_menu_load_option"])
+            if self.file_exchange_enabled:
+                print(self.texts["terminal_start_menu_load_option"])
             print(self.texts["terminal_start_menu_self_talk_option"])
 
             if self.broadcast_enabled:
@@ -139,7 +143,7 @@ class TerminalUI:
                 self.print_welcome()
                 return True
 
-            if choice in {"2", "l", "load"}:
+            if choice in {"2", "l", "load"} and self.file_exchange_enabled:
                 if self._load_conversation_from_prompt():
                     self.print_welcome()
                     return True
@@ -223,6 +227,13 @@ class TerminalUI:
         return True
 
     def _handle_save_command(self, save_target: str) -> None:
+        if not self.file_exchange_enabled:
+            msg = self.texts.get(
+                "terminal_file_exchange_off",
+                "Datei-Austausch ist abgeschaltet (storage.file_exchange).",
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return
         if not save_target:
             usage = self.texts.get("terminal_save_usage") or "/save <pfad>"
             print(f"{Fore.YELLOW}{usage}{Style.RESET_ALL}\n")
