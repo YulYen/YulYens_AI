@@ -33,7 +33,6 @@ from core.utils import (
     is_file_exchange_enabled,
     module_available,
 )
-from storage import ConversationRef
 from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
@@ -90,12 +89,18 @@ _tmp_dir_lock = threading.Lock()
 _tmp_dir: str | None = None
 
 
-def _delivery_dir() -> str:
+def _delivery_dir(register=atexit.register) -> str:
+    """Verzeichnis der Auslieferungsdateien; wird beim Beenden abgeräumt.
+
+    ``register`` ist injizierbar, damit der Test nicht `atexit.register` global
+    ersetzen muss — sonst verschwindet still, was in diesem Fenster sonst noch
+    registriert.
+    """
     global _tmp_dir
     with _tmp_dir_lock:
         if _tmp_dir is None:
             _tmp_dir = tempfile.mkdtemp(prefix="yulyen-webui-")
-            atexit.register(shutil.rmtree, _tmp_dir, True)
+            register(shutil.rmtree, _tmp_dir, True)
     return _tmp_dir
 
 
@@ -252,12 +257,15 @@ class WebUI:
         identity = self.auth.identity_from_request(None)
         return identity.name or "unknown"
 
-    def _build_meta(self, persona_name: str, user: str = "") -> dict:
+    def _build_meta(self, persona_name: str, user: str = "", app: str = "web") -> dict:
+        # `app` muss mitkommen: sonst trägt die heruntergeladene JSON eines
+        # Gasts „web" statt GUEST_APP, und beim Hochladen wäre die Markierung
+        # verloren, an der _continuable_persona den Gast erkennt.
         return {
             "created_at": datetime.now().isoformat(),
             "model": str(self.cfg.core.get("model_name")),
             "persona": persona_name,
-            "app": "web",
+            "app": app,
             # Nie leer: ohne Anmeldung der lokale Standardnutzer, sonst der
             # angemeldete Name — #25 und #24 sollen sich darauf verlassen können.
             "user": user or self._fallback_user(),
@@ -713,6 +721,7 @@ class WebUI:
         user: str = "",
         conversation_id: str = "",
         image_path: str | None = "",
+        app: str = "web",
     ) -> tuple:
         display_name = persona["name"].title()
         # Modell live aus der Config lesen (kann per Profi-Option gewechselt sein)
@@ -747,7 +756,7 @@ class WebUI:
             download_btn=gr.update(visible=self.file_exchange_enabled),
             briefing_btn=gr.update(visible=self.briefing_enabled),
             read_aloud_btn=gr.update(visible=self.tts_web_enabled),
-            meta_state=self._build_meta(persona["name"], user=user),
+            meta_state=self._build_meta(persona["name"], user=user, app=app),
             conversation_state=conversation_id,
             ask_all_question=gr.update(
                 value="",
@@ -978,21 +987,29 @@ class WebUI:
 
     @staticmethod
     def _continuable_persona(
-        ref: ConversationRef, persona_info: dict[str, dict[str, Any]] | None
+        persona_name: str | None,
+        app: str | None,
+        persona_info: dict[str, dict[str, Any]] | None,
     ) -> dict[str, Any] | None:
         """Die Ensemble-Persona zu einem Gespräch — oder None.
 
         Zwei Hürden, weil eine allein nicht reicht: Gast-Gespräche tragen ein
         eigenes `app`, und der Name muss exakt stimmen. Sonst öffnete ein Gast
         namens „Leah" das Gespräch still als die echte LEAH weiter, weil die
-        Auflösung über `ref.persona.lower()` läuft — ohne jeden Hinweis, dass
-        ab da ein anderer System-Prompt antwortet. Die Namensprüfung deckt auch
+        Auflösung über `persona.lower()` läuft — ohne jeden Hinweis, dass ab da
+        ein anderer System-Prompt antwortet. Die Namensprüfung deckt auch
         Gast-Gespräche ab, die vor dem eigenen `app` entstanden sind.
+
+        Bewusst auf Primitiven statt auf `ConversationRef`: **beide** Wege ins
+        Gespräch müssen dieselbe Prüfung benutzen — der Verlauf aus der Ablage
+        und der Upload einer JSON-Datei. Zwei Varianten derselben Regel waren
+        genau der Fehler (die erste Fassung schloss nur den Verlauf, über den
+        Upload war der Gast weiter als echte Persona fortsetzbar).
         """
-        if ref.app == GUEST_APP:
+        if app == GUEST_APP:
             return None
-        persona = (persona_info or {}).get(ref.persona.lower())
-        if not persona or persona.get("name") != ref.persona:
+        persona = (persona_info or {}).get((persona_name or "").lower())
+        if not persona or persona.get("name") != persona_name:
             return None
         return persona
 
@@ -1018,7 +1035,7 @@ class WebUI:
             return as_persona_outputs(updates)
 
         ref, messages = loaded
-        persona = self._continuable_persona(ref, persona_info)
+        persona = self._continuable_persona(ref.persona, ref.app, persona_info)
         if not persona:
             # Gast-Personas leben nur in ihrer Sitzung; ihr Verlauf bleibt
             # lesbar, fortsetzen lässt er sich ohne den Prompt aber nicht.
@@ -1163,6 +1180,8 @@ class WebUI:
             conversation_id=conversation_id,
             # Der Gast hat kein Bild — lieber leer als ein toter Pfad.
             image_path=None,
+            # Markierung bis in die heruntergeladene JSON durchreichen.
+            app=GUEST_APP,
         )
         return updates
 
@@ -1499,7 +1518,10 @@ class WebUI:
 
         persona_name = meta.get("persona")
         persona_key = (persona_name or "").lower()
-        persona = persona_info.get(persona_key)
+        # Dieselbe Prüfung wie im Verlauf: eine hochgeladene Gast-Konversation
+        # („Leah") darf nicht als die echte LEAH weiterlaufen — hier wöge das
+        # sogar schwerer, weil das Gespräch danach fortsetzbar wäre.
+        persona = self._continuable_persona(persona_name, meta.get("app"), persona_info)
 
         if not persona:
             msg = self._t(

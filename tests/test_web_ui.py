@@ -2028,13 +2028,14 @@ def test_reset_in_one_session_does_not_clear_the_other():
     assert b.streamer is not None
 
 
-def test_the_default_session_state_is_copied_per_browser_session():
-    """Gradio kopiert den Default-Wert je Sitzung — sonst wäre alles geteilt.
+def test_the_default_session_context_survives_a_deepcopy():
+    """Der Default muss kopierbar sein — Gradio kopiert ihn pro Sitzung.
 
-    Der Verlass darauf ist der Kern der Lösung, deshalb hier festgenagelt:
-    `SessionState.__getitem__` (gradio/state_holder.py) macht einmalig ein
-    `deepcopy` des Component-Werts. Ein nicht kopierbarer Default würde die
-    Trennung still wieder aufheben.
+    **Was dieser Test nicht prüft:** dass Gradio das wirklich tut. Das ist eine
+    Zusage des Frameworks, keine meiner Klassen; sie steht in
+    `test_web_ui_wiring.py` gegen den echten `StateHolder`. Hier geht es nur um
+    die Bedingung auf meiner Seite: ein nicht kopierbarer Default (etwa ein
+    Streamer im Feld) würde die Trennung still wieder aufheben.
     """
     from copy import deepcopy
 
@@ -2147,11 +2148,12 @@ def test_the_delivery_directory_is_registered_for_cleanup(monkeypatch):
 
     registered: list = []
     monkeypatch.setattr(module, "_tmp_dir", None)
-    monkeypatch.setattr(
-        module.atexit, "register", lambda fn, *args, **kw: registered.append((fn, args))
-    )
 
-    directory = module._delivery_dir()
+    # Registrator injizieren statt atexit.register global zu ersetzen — sonst
+    # verschwindet still, was in diesem Fenster sonst noch registriert.
+    directory = module._delivery_dir(
+        register=lambda fn, *args, **kw: registered.append((fn, args))
+    )
     try:
         assert registered, "kein atexit-Handler für das Auslieferungsverzeichnis"
         cleanup, args = registered[0]
@@ -2182,3 +2184,100 @@ def test_history_limit_falls_back_on_nonsense(tmp_path):
     _fill(store)
 
     assert len(web_ui._history_choices("local")) == 1
+
+
+# ---- Der Upload-Weg ist derselbe Weg (Review-Nachtrag) ----------------------
+# Die erste Fassung schloss nur den Verlauf. Über „Konversation herunterladen"
+# → Upload lief ein Gast weiter als die echte Persona — und dort sogar
+# *fortsetzbar*, also schlimmer als der Fall, der behoben war.
+
+
+def _uploaded(tmp_path, **meta_overrides) -> str:
+    meta = {
+        "persona": "Leah",
+        "model": "m",
+        "app": "web-guest",
+        "user": "local",
+        "created_at": "2026-07-31T10:00:00",
+    }
+    meta.update(meta_overrides)
+    path = tmp_path / "gespraech.json"
+    path.write_text(
+        json.dumps({"meta": meta, "messages": [{"role": "user", "content": "Hallo"}]}),
+        encoding="utf-8",
+    )
+    return str(path)
+
+
+def _load_web_ui():
+    web_ui = _web_ui_with_texts()
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "classic"
+    return web_ui
+
+
+@pytest.mark.parametrize("app", ["web-guest", "web"], ids=["markiert", "altzeile"])
+def test_uploading_a_guest_conversation_does_not_continue_as_the_persona(tmp_path, app):
+    """Auch ohne Markierung fängt der exakte Namensvergleich den Gast ab."""
+    web_ui = _load_web_ui()
+    session = SessionContext()
+
+    updates = web_ui._on_load_conversation(
+        session,
+        _uploaded(tmp_path, app=app),
+        {"leah": {"name": "LEAH", "description": "warm"}},
+        "Tippe",
+    )
+
+    assert session.bot is None
+    web_ui.factory.get_streamer_for_persona.assert_not_called()
+    assert updates[PERSONA_OUTPUT_KEYS.index("input_box")]["visible"] is False
+    assert updates[PERSONA_OUTPUT_KEYS.index("load_status")]["visible"] is True
+
+
+def test_uploading_a_real_conversation_still_works(tmp_path):
+    web_ui = _load_web_ui()
+    session = SessionContext()
+
+    updates = web_ui._on_load_conversation(
+        session,
+        _uploaded(tmp_path, persona="LEAH", app="web"),
+        {"leah": {"name": "LEAH", "description": "warm"}},
+        "Tippe",
+    )
+
+    assert session.bot == "LEAH"
+    assert updates[PERSONA_OUTPUT_KEYS.index("input_box")]["visible"] is True
+
+
+def test_a_downloaded_guest_conversation_keeps_its_marker(tmp_path):
+    """Die Markierung muss den Export überleben — sonst greift oben nur der Name."""
+    from ui.web_ui import GUEST_APP
+
+    web_ui, _store = _history_web_ui(tmp_path)
+    session = SessionContext()
+
+    updates = web_ui._on_start_guest(
+        session, "Pirat", "Du bist ein Pirat", 0.7, "local"
+    )
+
+    meta = updates[PERSONA_OUTPUT_KEYS.index("meta_state")]
+    assert meta["app"] == GUEST_APP
+
+    file_update, _status = web_ui._on_download_conversation(session, [], meta)
+    written = json.loads(Path(file_update["value"]).read_text(encoding="utf-8"))
+    assert written["meta"]["app"] == GUEST_APP
+
+
+def test_a_normal_persona_still_carries_the_web_app(tmp_path):
+    web_ui, _store = _history_web_ui(tmp_path)
+    session = SessionContext()
+
+    updates = web_ui._on_persona_selected(
+        session,
+        "local",
+        key="leah",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
+    )
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["app"] == "web"
