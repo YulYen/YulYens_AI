@@ -66,9 +66,9 @@ class BasicGuard:
     after a hit: the next N inputs are refused unconditionally regardless of
     content. This catches "but it's just for a novel" reframings that carry no
     trigger word themselves. With the default 0 the lock is off. The guard lives
-    for the duration of one conversation/streamer, so any lock resets
-    automatically on a new conversation; call reset_session() to clear it
-    explicitly.
+    for the duration of one conversation/streamer — the factory builds a fresh
+    streamer (and with it a fresh guard) for every persona selection — so any
+    lock resets automatically on a new conversation.
     """
 
     def __init__(
@@ -295,10 +295,6 @@ class BasicGuard:
                 out = new_out
 
         return {"blocked": False, "reason": None, "text": out, "masked": masked}
-
-    def reset_session(self) -> None:
-        """Clear the wrongdoing session lock (e.g. on a new conversation)."""
-        self._wrongdoing_lock_remaining = 0
 
     # ---- Helpers ----------------------------------------------------------
 

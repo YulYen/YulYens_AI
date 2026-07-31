@@ -147,6 +147,8 @@ storage:
   # Ablage oben — wer es nicht braucht, schaltet es hier ab.
   # Nicht betroffen: der Markdown-Export im Verlauf, der gehört zum Verlauf.
   file_exchange: true
+  # Wie viele Gespräche die Verlauf-Liste zeigt (neueste zuerst).
+  history_limit: 50
 
 # --- Persona e-mail adapter -----------------------------------------------------
 # Optional IMAP/SMTP bridge: routes incoming plain-text e-mails to personas via

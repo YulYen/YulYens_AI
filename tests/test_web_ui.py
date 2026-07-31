@@ -1947,9 +1947,10 @@ def test_history_open_of_an_unknown_id_reports_it(tmp_path):
 
 def test_history_export_writes_markdown(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
     cid = _fill(store, question="Frage?")
 
-    update = web_ui._on_history_export(cid)
+    update = web_ui._on_history_export(session, cid)
 
     text = Path(update["value"]).read_text(encoding="utf-8")
     assert "Frage?" in text and "Antwort" in text
@@ -2153,3 +2154,141 @@ def test_the_default_session_state_is_copied_per_browser_session():
 
     assert b.bot is None
     assert a.tmp_files is not b.tmp_files
+
+
+# ---- Gast kapert keine Persona (B2) ----------------------------------------
+
+
+def test_a_guest_named_like_a_persona_is_not_continued_as_that_persona(tmp_path):
+    """Ein Gast „Leah" darf im Verlauf nicht als die echte LEAH weiterlaufen.
+
+    Die Auflösung lief über `ref.persona.lower()` — und traf damit den
+    Ensemble-Eintrag „leah", ohne jeden Hinweis, dass ab da ein anderer
+    System-Prompt antwortet.
+    """
+    from ui.web_ui import GUEST_APP
+
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    cid = store.start(user="local", persona="Leah", model="m", app=GUEST_APP)
+    store.append(cid, "user", "Hallo Gast")
+
+    updates = web_ui._on_history_open(
+        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+    )
+
+    status = updates[PERSONA_OUTPUT_KEYS.index("history_status")]
+    assert status["visible"] is True
+    assert session.bot is None  # kein stiller Wechsel auf die echte LEAH
+
+
+def test_an_old_guest_row_without_the_marker_is_caught_by_the_name(tmp_path):
+    """Gespräche von vor dem eigenen `app` fängt der exakte Namensvergleich."""
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    cid = store.start(user="local", persona="Leah", model="m", app="web")
+    store.append(cid, "user", "Hallo Gast")
+
+    updates = web_ui._on_history_open(
+        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+    )
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
+    assert session.bot is None
+
+
+def test_the_real_persona_is_still_continuable(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    cid = _fill(store, persona="LEAH")
+
+    web_ui._on_history_open(
+        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+    )
+
+    assert session.bot == "LEAH"
+
+
+def test_a_guest_conversation_is_marked_in_the_store(tmp_path):
+    from ui.web_ui import GUEST_APP
+
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+
+    web_ui._on_start_guest(session, "Pirat", "Du bist ein Pirat", 0.7, "local")
+
+    refs = store.list_conversations(user="local")
+    assert [ref.app for ref in refs] == [GUEST_APP]
+
+
+# ---- Temporäre Dateien (B3) -------------------------------------------------
+
+
+def test_each_download_replaces_the_previous_temp_file():
+    """Sie muss den Response überleben — also erst beim nächsten Mal weg."""
+    web_ui = _create_web_ui()
+    session = SessionContext()
+    meta = {"persona": "LEAH", "model": "m", "app": "web", "user": "local"}
+
+    first, _ = web_ui._on_download_conversation(session, [], meta)
+    second, _ = web_ui._on_download_conversation(session, [], meta)
+
+    assert not Path(first["value"]).exists()
+    assert Path(second["value"]).exists()
+    assert len(session.tmp_files) == 1
+
+
+def test_two_sessions_do_not_delete_each_others_downloads():
+    web_ui = _create_web_ui()
+    a, b = SessionContext(), SessionContext()
+    meta = {"persona": "LEAH", "model": "m", "app": "web", "user": "local"}
+
+    from_a, _ = web_ui._on_download_conversation(a, [], meta)
+    web_ui._on_download_conversation(b, [], meta)
+
+    assert Path(from_a["value"]).exists()
+
+
+def test_the_delivery_directory_is_registered_for_cleanup(monkeypatch):
+    """Ohne das lägen WAVs und JSONs bis zum Neustart des Rechners herum."""
+    import shutil
+
+    import ui.web_ui as module
+
+    registered: list = []
+    monkeypatch.setattr(module, "_tmp_dir", None)
+    monkeypatch.setattr(
+        module.atexit, "register", lambda fn, *args, **kw: registered.append((fn, args))
+    )
+
+    directory = module._delivery_dir()
+    try:
+        assert registered, "kein atexit-Handler für das Auslieferungsverzeichnis"
+        cleanup, args = registered[0]
+        assert args[0] == directory
+        # Und der Handler räumt wirklich ab, statt nur registriert zu sein.
+        Path(directory, "probe.wav").write_text("x", encoding="utf-8")
+        cleanup(*args)
+        assert not Path(directory).exists()
+    finally:
+        shutil.rmtree(directory, ignore_errors=True)
+
+
+# ---- Verlauf-Länge (E1) -----------------------------------------------------
+
+
+def test_history_limit_comes_from_the_config(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    web_ui.cfg.storage = {"history_limit": 2}
+    for i in range(4):
+        _fill(store, question=f"Frage {i}")
+
+    assert len(web_ui._history_choices("local")) == 2
+
+
+def test_history_limit_falls_back_on_nonsense(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    web_ui.cfg.storage = {"history_limit": "viele"}
+    _fill(store)
+
+    assert len(web_ui._history_choices("local")) == 1

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import atexit
 import json
 import logging
 import os
+import shutil
 import tempfile
 import threading
 import time
@@ -64,6 +66,26 @@ STREAM_FLUSH_INTERVAL_S = 0.1
 # Feedback votes (#40) are appended from Gradio event handlers that may run
 # concurrently for multiple browser sessions sharing one WebUI instance.
 _feedback_log_lock = threading.Lock()
+
+# Gast-Gespräche bekommen ein eigenes `app`, damit der Verlauf sie erkennt:
+# ein Gast namens „Leah" darf nicht als die echte LEAH fortgesetzt werden.
+GUEST_APP = "web-guest"
+
+# Auslieferungsdateien (WAV, JSON, Markdown) liegen in einem eigenen
+# Verzeichnis, das am Prozessende komplett verschwindet. Sie müssen den
+# Response überleben, können also nicht sofort nach dem Schreiben weg.
+_tmp_dir_lock = threading.Lock()
+_tmp_dir: str | None = None
+
+
+def _delivery_dir() -> str:
+    global _tmp_dir
+    with _tmp_dir_lock:
+        if _tmp_dir is None:
+            _tmp_dir = tempfile.mkdtemp(prefix="yulyen-webui-")
+            atexit.register(shutil.rmtree, _tmp_dir, True)
+    return _tmp_dir
+
 
 # Single source of truth for the order of the "switch view" output components.
 # Every handler bound to these outputs builds a dict keyed by these names and
@@ -235,7 +257,7 @@ class WebUI:
     def _reset_meta_state(self) -> dict:
         return {}
 
-    def _open_conversation(self, persona_name: str, user: str) -> str:
+    def _open_conversation(self, persona_name: str, user: str, app: str = "web") -> str:
         """Neues Gespräch anlegen (#54).
 
         Die ID gehört ab hier der Oberfläche: sie liegt im `gr.State` und wird
@@ -243,8 +265,28 @@ class WebUI:
         Gespräch entsteht.
         """
         return self.factory.open_conversation(
-            persona_name, "web", user or self._fallback_user()
+            persona_name, app, user or self._fallback_user()
         )
+
+    @staticmethod
+    def _delivery_file(session: SessionContext, kind: str, suffix: str) -> Path:
+        """Pfad für eine Datei, die diese Sitzung gleich ausliefert.
+
+        Die vorherige Datei derselben Art wird dabei gelöscht: löschte man
+        sofort nach dem Schreiben, wäre sie weg, bevor der Browser sie abholt.
+        Die Ablage hängt an der Sitzung, damit ein Download in einem Browser
+        nicht die Datei eines anderen wegräumt.
+        """
+        previous = session.tmp_files.get(kind)
+        if previous:
+            try:
+                os.unlink(previous)
+            except OSError:
+                logging.debug("Temporäre Datei %s war schon weg", previous)
+        handle, path = tempfile.mkstemp(suffix=suffix, dir=_delivery_dir())
+        os.close(handle)
+        session.tmp_files[kind] = path
+        return Path(path)
 
     def _stamp_conversation(
         self, session: SessionContext, conversation_id: str
@@ -1036,8 +1078,7 @@ class WebUI:
             # Lazy wie im Terminal: piper_tts importiert piper auf Modulebene
             from tts.piper_tts import create_wav
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-                out_wav = Path(tmp.name)
+            out_wav = self._delivery_file(session, "tts", ".wav")
             create_wav(
                 last_reply,
                 session.bot,
@@ -1083,9 +1124,14 @@ class WebUI:
         Die Filterung nach Nutzer ist der Grund, warum #53 vor diesem Ticket
         kam: ohne sie zeigt eine Verlaufsliste jedem alles.
         """
+        storage_cfg = getattr(self.cfg, "storage", None) or {}
+        try:
+            limit = max(1, int(storage_cfg.get("history_limit", 50)))
+        except (TypeError, ValueError):
+            limit = 50
         try:
             refs = self.factory.get_store().list_conversations(
-                user=user or self._fallback_user()
+                user=user or self._fallback_user(), limit=limit
             )
         except Exception:
             logging.exception("Verlauf konnte nicht gelesen werden")
@@ -1146,6 +1192,26 @@ class WebUI:
             lines.append("")
         return "\n".join(lines)
 
+    @staticmethod
+    def _continuable_persona(
+        ref: ConversationRef, persona_info: dict[str, dict[str, Any]] | None
+    ) -> dict[str, Any] | None:
+        """Die Ensemble-Persona zu einem Gespräch — oder None.
+
+        Zwei Hürden, weil eine allein nicht reicht: Gast-Gespräche tragen ein
+        eigenes `app`, und der Name muss exakt stimmen. Sonst öffnete ein Gast
+        namens „Leah" das Gespräch still als die echte LEAH weiter, weil die
+        Auflösung über `ref.persona.lower()` läuft — ohne jeden Hinweis, dass
+        ab da ein anderer System-Prompt antwortet. Die Namensprüfung deckt auch
+        Gast-Gespräche ab, die vor dem eigenen `app` entstanden sind.
+        """
+        if ref.app == GUEST_APP:
+            return None
+        persona = (persona_info or {}).get(ref.persona.lower())
+        if not persona or persona.get("name") != ref.persona:
+            return None
+        return persona
+
     def _on_history_open(
         self,
         session: SessionContext,
@@ -1168,7 +1234,7 @@ class WebUI:
             return self._as_persona_outputs(updates)
 
         ref, messages = loaded
-        persona = (persona_info or {}).get(ref.persona.lower())
+        persona = self._continuable_persona(ref, persona_info)
         if not persona:
             # Gast-Personas leben nur in ihrer Sitzung; ihr Verlauf bleibt
             # lesbar, fortsetzen lässt er sich ohne den Prompt aber nicht.
@@ -1208,17 +1274,16 @@ class WebUI:
         as_dict["conversation_state"] = ref.id
         return self._as_persona_outputs(as_dict)
 
-    def _on_history_export(self, conversation_id: str | None) -> Any:
+    def _on_history_export(
+        self, session: SessionContext, conversation_id: str | None
+    ) -> Any:
         loaded = self._load_from_store(conversation_id)
         if loaded is None:
             return gr.update(value=None, visible=False)
         ref, messages = loaded
-        with tempfile.NamedTemporaryFile(
-            "w", delete=False, suffix=".md", encoding="utf-8"
-        ) as tmp:
-            tmp.write(self._conversation_markdown(ref, messages))
-            path = tmp.name
-        return gr.update(value=path, visible=True)
+        path = self._delivery_file(session, "export", ".md")
+        path.write_text(self._conversation_markdown(ref, messages), encoding="utf-8")
+        return gr.update(value=str(path), visible=True)
 
     def _on_history_delete(
         self, conversation_id: str | None, confirmed: bool, user: str
@@ -1300,7 +1365,7 @@ class WebUI:
         session.bot = name
         session.streamer = self.factory.get_streamer_for_guest(name, prompt, options)
         self._stamp_user(session, user)
-        conversation_id = self._open_conversation(name, user)
+        conversation_id = self._open_conversation(name, user, app=GUEST_APP)
         self._stamp_conversation(session, conversation_id)
         logging.info("Gast-Persona '%s' gestartet (nur Sitzung)", name)
 
@@ -1709,11 +1774,11 @@ class WebUI:
                 "messages": messages or [],
             }
 
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
-                tmp.write(
-                    json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-                )
-                file_path = tmp.name
+            path = self._delivery_file(session, "download", ".json")
+            path.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            file_path = str(path)
         except Exception as exc:  # pragma: no cover - UI utility
             msg = self._t("web_save_status_error", reason=str(exc))
             return gr.update(value=None, visible=False), gr.update(
@@ -1996,7 +2061,7 @@ class WebUI:
 
         components["history_export_btn"].click(
             fn=self._on_history_export,
-            inputs=[components["history_pick"]],
+            inputs=[session_state, components["history_pick"]],
             outputs=[components["history_file"]],
             queue=False,
         )
