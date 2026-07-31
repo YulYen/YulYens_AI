@@ -52,7 +52,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── ui/
 │   │   ├── web_ui.py            # Gradio-UI
 │   │   ├── terminal_ui.py       # Terminal-UI (farbig)
-│   │   ├── webui_layout.py      # Gradio-Layout-Builder
+│   │   ├── webui_layout.py      # Gradio-Layout-Builder + Ausgabe-Key-Listen
+│   │   ├── webui_format.py      # Reine Formatierer (Statuszeile, Quellen, Markdown)
+│   │   ├── session.py           # SessionContext: Zustand *einer* Browser-Sitzung
 │   │   ├── conversation_io_terminal.py  # JSON-Im-/Export (Austausch, nicht Ablage)
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
@@ -63,7 +65,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── email_adapter/
 │   │   └── service.py           # opt-in IMAP/SMTP-Bridge (Personas per Mail)
 │   ├── wiki/
-│   │   ├── lookup.py            # Snippet-Abruf (WikiSnippet) + Kontext-Injektion
+│   │   ├── lookup.py            # WikiLookup + Snippet-Abruf (WikiSnippet) + Injektion
 │   │   ├── wikipedia_proxy.py   # HTTP-Proxy (Port 8042)
 │   │   ├── spacy_keyword_finder.py  # NLP-Schlüsselwortextraktion
 │   │   └── kiwix_autostart.py
@@ -94,7 +96,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 33 Testmodule
+│   └── test_*.py                # 36 Testmodule (inkl. test_web_ui_wiring.py)
 ├── locales/
 │   ├── de.yaml                  # 111 UI-Texte Deutsch
 │   └── en.yaml                  # UI-Texte Englisch
@@ -136,8 +138,16 @@ User-Input → SecurityGuard (pre-check) → spaCy → Wiki-Proxy (8042) → Oll
 ```
 
 ### AppFactory
-- Baut und cached alle Komponenten (Streamer, UI, API-Provider)
+- Baut und cached alle Komponenten (Streamer, UI, API-Provider, Store, `WikiLookup`)
 - Zustand in Tests via `set_provider(None)` + `Config.reset_instance()` zurücksetzen
+
+### WikiLookup: ein Objekt statt fünf Attributen
+`wiki/lookup.py` bündelt Modus, Port, Limit, Snippet-Zahl, Timeout und den
+Keyword-Finder. `AppFactory.get_wiki_lookup()` baut es einmal; WebUI, TerminalUI,
+API-Provider und `respond_one_shot` bekommen es als **ein** Argument. Vorher stand
+derselbe Achter-Aufruf an sechs Stellen und dieselben fünf `wiki_*`-Attribute in
+drei Klassen — eine neue Wiki-Option hätte man überall nachziehen müssen. Neue
+Optionen also **in `WikiLookup`**, nicht als weiteres Argument.
 
 ## Tests ausführen
 
@@ -224,6 +234,11 @@ api:
     enabled: true
     api_key: ""              # leer = offen; besser "env:YULYEN_API_KEY"
     rate_limit_per_minute: 60
+
+storage:
+  enabled: true              # Gesprächs-Ablage (SQLite)
+  file_exchange: true        # JSON-Down-/Upload im WebUI, /save im Terminal
+  history_limit: 50          # wie viele Gespräche der Verlauf zeigt
 
 security:
   enabled: true
@@ -393,9 +408,39 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
-| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar |
+| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
-| **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
+| **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
+
+### Sitzungszustand gehört in den `gr.State`, nicht ans WebUI-Objekt
+Die `WebUI` ist ein **Singleton der AppFactory** und bedient alle Browser
+gleichzeitig. Persona, Streamer, die beiden Kill-Switches und der
+Self-Talk-Runner hingen anfangs am Objekt — zwei parallele Sitzungen teilten sie
+sich also. Belegt im Browser: A wählt LEAH, B danach DORIS, A fragt → die
+Nachricht landet in **DORIS'** Gespräch, LEAHs bleibt leer.
+
+Sie liegen deshalb in `SessionContext` (`ui/session.py`) und reisen als
+`gr.State` durch die Handler — als **erster** Parameter, passend zur
+`inputs=`-Reihenfolge. Gradio legt pro Browser-Sitzung eine eigene Kopie des
+Default-Werts an (`SessionState.__getitem__` in `gradio/state_holder.py` macht
+einmalig ein `deepcopy` und merkt sie sich), deshalb genügt es, das Objekt
+durchzureichen und **in-place** zu ändern; als Output zurück muss es nicht.
+Konsequenzen fürs Weiterbauen:
+
+- **Neuer sitzungsabhängiger Zustand gehört in `SessionContext`**, nie an `self`.
+  Am WebUI-Objekt bleibt nur, was für alle gleich ist (Config-Flags, Auth, Texte).
+- Der Default-Wert muss `deepcopy`-fähig sein — ein Streamer im Default würde die
+  Trennung still wieder aufheben.
+- Auslieferungsdateien (WAV, JSON, Markdown) hängen aus demselben Grund an der
+  Sitzung (`SessionContext.tmp_files`): sonst räumt ein Download im einen Browser
+  die Datei eines anderen weg.
+
+### ⚠️ Die Konsolenwarnung „Too many arguments provided for the endpoint" ist normal
+Sie kommt aus Gradios **Frontend**
+(`_frontend_code/client/src/helpers/api_info.ts`) und vergleicht die Zahl der
+gesendeten Werte mit `api_info.parameters`. `gr.State` hat `skip_api = True` und
+steht dort nicht drin — **jedes Event mit einem State als Input warnt**, ohne
+dass etwas kaputt wäre. Nicht suchen, nicht "reparieren".
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
 Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
