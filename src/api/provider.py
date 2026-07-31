@@ -56,6 +56,10 @@ class AiApiProvider:
         canonical_persona = self.resolve_persona(persona)
         history = [dict(m) for m in messages or []]
 
+        # Der Streamer wird vorgezogen: er bringt den Guard mit, und der muss
+        # den Wiki-Kontext sehen, *bevor* er im Prompt landet.
+        streamer = self.factory.get_streamer_for_persona(canonical_persona)
+
         last_user_index = next(
             (
                 i
@@ -72,10 +76,9 @@ class AiApiProvider:
                 # dem User-Turn, auf den sie sich beziehen.
                 tail = history[last_user_index:]
                 del history[last_user_index:]
-                inject_wiki_context(history, contexts)
+                inject_wiki_context(history, contexts, getattr(streamer, "guard", None))
                 history.extend(tail)
 
-        streamer = self.factory.get_streamer_for_persona(canonical_persona)
         streamer.set_conversation(
             self.factory.open_conversation(canonical_persona, "api")
         )

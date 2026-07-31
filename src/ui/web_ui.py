@@ -477,7 +477,9 @@ class WebUI:
 
         # 4) Optional: inject wiki context
         if contexts:
-            inject_wiki_context(llm_history, contexts)
+            inject_wiki_context(
+                llm_history, contexts, getattr(session.streamer, "guard", None)
+            )
 
         # 5) Send the user question to the LLM
         user_message = {"role": "user", "content": user_input}
@@ -650,7 +652,9 @@ class WebUI:
             return
 
         # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
-        inject_briefing_context(llm_history, items)
+        inject_briefing_context(
+            llm_history, items, getattr(session.streamer, "guard", None)
+        )
         llm_history.append({"role": "user", "content": briefing_prompt})
 
         if self._handle_context_warning(session, llm_history, chat_history):
@@ -1399,7 +1403,9 @@ class WebUI:
         wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
         context_messages: list[Message] = []
         if contexts:
-            inject_wiki_context(context_messages, contexts)
+            # Ask-All hat hier noch keinen Streamer: der Kontext entsteht
+            # einmal für alle Personas, bevor die Worker gebaut werden.
+            inject_wiki_context(context_messages, contexts, self.factory.build_guard())
         wiki_status = "\n\n".join(hint for hint in wiki_hints if hint)
         # Die Quellen stehen hier bereits fest und reisen ab jetzt in jedem
         # Yield mit — genau wie wiki_status (#32a).

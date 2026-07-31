@@ -275,7 +275,10 @@ class TerminalUI:
                 if wiki_hint:
                     print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
             if contexts:
-                inject_wiki_context(context_messages, contexts)
+                # Wie in der WebUI: der Broadcast baut die Streamer erst danach.
+                inject_wiki_context(
+                    context_messages, contexts, self.factory.build_guard()
+                )
 
         print(
             f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}"
@@ -361,7 +364,9 @@ class TerminalUI:
 
                 # Insert the snippet as system context (guardrail plus context)
                 if contexts:
-                    inject_wiki_context(self.history, contexts)
+                    inject_wiki_context(
+                        self.history, contexts, getattr(self.streamer, "guard", None)
+                    )
 
             # --- (2) Append the user question to history ---
             self.history.append({"role": "user", "content": user_input})
@@ -433,7 +438,9 @@ class TerminalUI:
             return
 
         # Same ordering as the wiki context: system messages first, then user turn
-        inject_briefing_context(self.history, items)
+        inject_briefing_context(
+            self.history, items, getattr(self.streamer, "guard", None)
+        )
         self.history.append(
             {"role": "user", "content": self._t("briefing_user_prompt")}
         )

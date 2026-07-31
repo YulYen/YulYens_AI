@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import logging
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any, TypedDict
 
 
@@ -315,6 +316,61 @@ class BasicGuard:
 
 
 # ---------------------------------------------------------------------------
+
+# Nur diese Befunde halten abgerufenen Fremdtext aus dem Prompt heraus.
+# Bewusst **nicht** `pii_detected`: ein Wikipedia-Artikel oder eine
+# Nachrichtenmeldung darf E-Mail-Adressen und Telefonnummern enthalten — das
+# würde reihenweise harmlose Quellen wegwerfen.
+CONTEXT_BLOCKING_REASONS = frozenset({"prompt_injection", "wrongdoing"})
+
+
+def context_rejection(guard: BasicGuard | None, text: str) -> str | None:
+    """Grund, warum abgerufener Text nicht in den Prompt darf — oder ``None``.
+
+    **Warum es das braucht.** Der Guard prüfte ausschließlich die letzte
+    ``user``-Nachricht. Wiki-Snippets und RSS-Meldungen gingen an ihm vorbei —
+    und zwar als ``system``-Nachricht, also mit höherer Autorität als die
+    Eingabe des Nutzers, direkt hinter einer Anweisung, ausschließlich diesem
+    Kontext zu folgen. Derselbe Satz, der beim Tippen blockiert wurde, kam über
+    eine heruntergeladene ZIM-Datei oder einen abonnierten Feed ungeprüft durch.
+
+    Das ist der realistischste Injection-Weg dieser Anwendung, weil der Inhalt
+    aus Quellen stammt, die niemand Zeile für Zeile gelesen hat.
+    """
+    if guard is None or not text:
+        return None
+    result = guard.check_input(text)
+    if result["ok"]:
+        return None
+    reason = result.get("reason") or ""
+    return reason if reason in CONTEXT_BLOCKING_REASONS else None
+
+
+def accepted_context(
+    guard: BasicGuard | None,
+    items: list[Any],
+    *,
+    text_of: Callable[[Any], str],
+    label_of: Callable[[Any], str],
+) -> list[Any]:
+    """Filtert die Einträge heraus, die der Guard beanstandet.
+
+    Hier statt bei den Aufrufern, damit Wiki- und Briefing-Injektion dieselbe
+    Regel benutzen — und nicht wieder eine der beiden Quellen vergessen wird.
+    ``guard=None`` lässt alles durch (Verhalten wie vorher).
+    """
+    if guard is None:
+        return list(items)
+    kept = []
+    for item in items:
+        reason = context_rejection(guard, text_of(item))
+        if reason:
+            logging.warning(
+                "[GUARD] injizierter Kontext verworfen: %s (%s)", label_of(item), reason
+            )
+            continue
+        kept.append(item)
+    return kept
 
 
 class DisabledGuard(BasicGuard):

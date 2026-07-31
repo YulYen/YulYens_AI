@@ -289,6 +289,17 @@ class AppFactory:
 
         return OllamaLLMCore
 
+    def build_guard(self) -> BasicGuard | None:
+        """Ein frischer Guard nach der aktuellen Config — oder None.
+
+        Für Aufrufer, die prüfen müssen, ohne einen Streamer zu haben: der
+        Broadcast injiziert den Wiki-Kontext *einmal für alle Personas*, bevor
+        die Streamer existieren. Bewusst nicht gecacht und bewusst frisch: der
+        Wrongdoing-Lock ist Sitzungszustand und darf nicht zwischen Aufrufern
+        wandern (dieselbe Regel wie bei ``_build_streamer``).
+        """
+        return self._build_guard(getattr(self._cfg, "security", None))
+
     def _build_guard(self, sec_cfg: dict | None) -> BasicGuard | None:
         if not isinstance(sec_cfg, dict):
             return None

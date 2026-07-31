@@ -340,7 +340,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
         captured["context_messages"] = list(context_messages or [])
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
 
-    def fake_inject(history, contexts):
+    def fake_inject(history, contexts, guard=None):
         history.append({"role": "system", "content": "WIKI"})
 
     with (
@@ -713,7 +713,7 @@ def test_respond_briefing_streams_summary_with_injected_context():
     mock_fetch.assert_called_once()
     assert mock_fetch.call_args[0][2] == (1.0, 1.0)  # Timeout-Tuple aus der Config
     mock_inject.assert_called_once()
-    injected_history, injected_items = mock_inject.call_args[0]
+    injected_history, injected_items, _guard = mock_inject.call_args[0]
     assert injected_items == [("quelle: Titel", "Text")]
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]

@@ -534,7 +534,7 @@ class YulYenStreamingProvider:
 
         # Attach context
         if contexts:
-            inject_wiki_context(messages, contexts)
+            inject_wiki_context(messages, contexts, self.guard)
 
         # Add the user question as the last message
         messages.append({"role": "user", "content": user_input})

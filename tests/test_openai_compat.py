@@ -380,7 +380,7 @@ def test_wiki_context_lands_directly_before_the_last_user_turn(client, monkeypat
     )
     monkeypatch.setattr(
         "api.provider.inject_wiki_context",
-        lambda history, contexts: history.append(
+        lambda history, contexts, guard=None: history.append(
             {"role": "system", "content": f"WIKI:{contexts[0].topic}"}
         ),
     )
@@ -429,7 +429,9 @@ def test_stream_messages_does_not_mutate_the_callers_history(client, monkeypatch
     )
     monkeypatch.setattr(
         "api.provider.inject_wiki_context",
-        lambda history, contexts: history.append({"role": "system", "content": "WIKI"}),
+        lambda history, contexts, guard=None: history.append(
+            {"role": "system", "content": "WIKI"}
+        ),
     )
 
     original = [{"role": "user", "content": "Frage"}]

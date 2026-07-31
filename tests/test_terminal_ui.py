@@ -98,7 +98,11 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
         },
     )
 
-    ui = TerminalUI(factory=SimpleNamespace(), config=dummy_config, wiki=WikiLookup())
+    ui = TerminalUI(
+        factory=SimpleNamespace(build_guard=lambda: None),
+        config=dummy_config,
+        wiki=WikiLookup(),
+    )
     prompts = iter(["4", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(prompts))
 
@@ -111,7 +115,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
 
 def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
-    ui.factory = SimpleNamespace()
+    ui.factory = SimpleNamespace(build_guard=lambda: None)
     question = "Testfrage"
 
     monkeypatch.setattr("builtins.input", lambda _: question)
@@ -138,7 +142,7 @@ def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> No
 
 def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
-    ui.factory = SimpleNamespace()
+    ui.factory = SimpleNamespace(build_guard=lambda: None)
     ui.wiki = WikiLookup(keyword_finder=object())
 
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
@@ -147,7 +151,7 @@ def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -
         lambda *args, **kwargs: (["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
     )
 
-    def fake_inject(history, contexts):
+    def fake_inject(history, contexts, guard=None):
         history.append({"role": "system", "content": "WIKI"})
 
     monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", fake_inject)
@@ -318,7 +322,7 @@ def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
 
 def test_ask_all_flow_records_the_injected_snippets(monkeypatch) -> None:
     ui = _create_terminal_ui()
-    ui.factory = SimpleNamespace()
+    ui.factory = SimpleNamespace(build_guard=lambda: None)
     ui.wiki = WikiLookup(keyword_finder=object())
 
     snippets = [_snippet()]
