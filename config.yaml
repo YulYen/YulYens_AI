@@ -212,6 +212,14 @@ security:
   enabled: true
   guard: BasicGuard
   prompt_injection_protection: true
+  # Default AUS. Folgen, damit sie nicht überraschen:
+  #  - Eingang: Fragen mit E-Mail-Adresse oder Telefonnummer werden NICHT
+  #    abgewiesen ("Schreib eine Mail an anna@firma.de" geht also durch).
+  #  - Ausgang: es wird nichts maskiert — der Holdback dient dann allein dem
+  #    output_blocklist (Schlüsselmaterial).
+  # Einschalten, wenn andere mitlesen können oder echte fremde Daten im Spiel
+  # sind. Achtung: die Maskierung greift heute nur in der Anzeige, nicht in der
+  # Ablage — siehe Backlog #58, vorher nicht als Datenschutz verlassen.
   pii_protection: false
   output_blocklist: true
   wrongdoing_protection: true
