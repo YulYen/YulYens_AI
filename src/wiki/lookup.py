@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import quote
 
 import requests
@@ -52,11 +53,60 @@ def format_snippet_meta(snippet: WikiSnippet, t) -> str:
     )
 
 
+@dataclass(frozen=True)
+class WikiLookup:
+    """Die Wiki-Einstellungen als *ein* Ding statt als fünf lose Attribute.
+
+    ``lookup_wiki_snippet`` wurde an sechs Stellen mit denselben acht
+    Argumenten gerufen, und WebUI, TerminalUI und der API-Provider hielten je
+    dieselben fünf ``wiki_*``-Attribute — eine neue Option hätte man an allen
+    dreien nachziehen müssen. Die Factory baut das Objekt einmal und reicht es
+    weiter.
+    """
+
+    keyword_finder: Any = None
+    mode: str | bool = False
+    proxy_port: int = 8042
+    limit: int = 1200
+    max_snippets: int = 2
+    timeout: tuple[float, float] = (3.0, 8.0)
+
+    @classmethod
+    def from_config(cls, cfg, keyword_finder) -> WikiLookup:
+        wiki = getattr(cfg, "wiki", {}) or {}
+        return cls(
+            keyword_finder=keyword_finder,
+            mode=wiki.get("mode", False),
+            proxy_port=int(wiki.get("proxy_port", 8042)),
+            limit=int(wiki.get("snippet_limit", 1200)),
+            max_snippets=int(wiki.get("max_wiki_snippets", 2)),
+            timeout=(
+                float(wiki.get("timeout_connect", 3.0)),
+                float(wiki.get("timeout_read", 8.0)),
+            ),
+        )
+
+    def snippets(
+        self, question: str, persona_name: str
+    ) -> tuple[list[str], list[WikiSnippet]]:
+        """UI-Hinweise und Snippets zur Frage — leer, wenn Wiki aus ist."""
+        return lookup_wiki_snippet(
+            question,
+            persona_name,
+            self.keyword_finder,
+            self.mode,
+            self.proxy_port,
+            self.limit,
+            self.timeout,
+            self.max_snippets,
+        )
+
+
 def lookup_wiki_snippet(
     question: str,
     persona_name: str,
     keyword_finder,
-    wiki_mode: str,
+    wiki_mode: str | bool,
     proxy_port: int,
     limit: int,
     timeout: tuple[float, float],

@@ -60,3 +60,26 @@ def test_file_exchange_defaults_to_on_and_can_be_switched_off():
         is_file_exchange_enabled(SimpleNamespace(storage={"file_exchange": False}))
         is False
     )
+
+
+def test_module_available_survives_a_stub_without_spec():
+    """`find_spec` wirft ValueError, wenn ein Modul ohne __spec__ registriert ist.
+
+    Genau das passiert, sobald ein Test (oder ein Plugin) einen Platzhalter für
+    eine optionale Abhängigkeit in `sys.modules` legt — die WebUI startete dann
+    gar nicht mehr, statt den Vorlesen-Button einfach auszublenden.
+    """
+    import sys
+    import types
+
+    from core.utils import module_available
+
+    name = "yulyen_stub_ohne_spec"
+    sys.modules[name] = types.ModuleType(name)
+    try:
+        assert module_available(name) is False
+    finally:
+        del sys.modules[name]
+
+    assert module_available("json") is True
+    assert module_available("garantiert_nicht_installiert_xyz") is False

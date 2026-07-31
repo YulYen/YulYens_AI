@@ -5,7 +5,7 @@ from unittest.mock import Mock
 
 from config.texts import Texts
 from ui.terminal_ui import TerminalUI
-from wiki.lookup import WikiSnippet
+from wiki.lookup import WikiLookup, WikiSnippet
 
 
 def _create_terminal_ui() -> TerminalUI:
@@ -27,16 +27,7 @@ def _create_terminal_ui() -> TerminalUI:
         },
     )
 
-    return TerminalUI(
-        factory=None,
-        config=dummy_config,
-        keyword_finder=None,
-        wiki_snippet_limit=0,
-        max_wiki_snippets=0,
-        wiki_mode=False,
-        proxy_port=0,
-        wiki_timeout=0,
-    )
+    return TerminalUI(factory=None, config=dummy_config, wiki=WikiLookup())
 
 
 def test_terminal_ui_start_menu_shows_ask_all_when_enabled(monkeypatch, capsys) -> None:
@@ -107,16 +98,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
         },
     )
 
-    ui = TerminalUI(
-        factory=SimpleNamespace(),
-        config=dummy_config,
-        keyword_finder=None,
-        wiki_snippet_limit=0,
-        max_wiki_snippets=0,
-        wiki_mode=False,
-        proxy_port=0,
-        wiki_timeout=0,
-    )
+    ui = TerminalUI(factory=SimpleNamespace(), config=dummy_config, wiki=WikiLookup())
     prompts = iter(["4", "exit"])
     monkeypatch.setattr("builtins.input", lambda _: next(prompts))
 
@@ -157,11 +139,11 @@ def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> No
 def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
     ui.factory = SimpleNamespace()
-    ui.keyword_finder = object()
+    ui.wiki = WikiLookup(keyword_finder=object())
 
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
     monkeypatch.setattr(
-        "ui.terminal_ui.lookup_wiki_snippet",
+        "wiki.lookup.lookup_wiki_snippet",
         lambda *args, **kwargs: (["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
     )
 
@@ -313,12 +295,12 @@ def test_sources_command_says_so_when_nothing_was_injected(capsys) -> None:
 def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
     ui = _create_terminal_ui()
     ui.bot = "LEAH"
-    ui.keyword_finder = object()
+    ui.wiki = WikiLookup(keyword_finder=object())
     ui.streamer = SimpleNamespace(stream=lambda messages: iter(["Antwort"]))
 
     snippets = [_snippet()]
     monkeypatch.setattr(
-        "ui.terminal_ui.lookup_wiki_snippet",
+        "wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: (["hint"], snippets),
     )
     monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", lambda *a, **k: None)
@@ -337,12 +319,12 @@ def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
 def test_ask_all_flow_records_the_injected_snippets(monkeypatch) -> None:
     ui = _create_terminal_ui()
     ui.factory = SimpleNamespace()
-    ui.keyword_finder = object()
+    ui.wiki = WikiLookup(keyword_finder=object())
 
     snippets = [_snippet()]
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
     monkeypatch.setattr(
-        "ui.terminal_ui.lookup_wiki_snippet", lambda *a, **k: ([], snippets)
+        "wiki.lookup.lookup_wiki_snippet", lambda *a, **k: ([], snippets)
     )
     monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", lambda *a, **k: None)
     monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", lambda *a, **k: None)

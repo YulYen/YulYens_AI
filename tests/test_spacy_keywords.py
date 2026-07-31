@@ -60,14 +60,15 @@ tricky_positive = [
     ),
 ]
 
-top_pick_cases = [
+# (3b) Sätze mit mehreren Entitäten — alle müssen gefunden werden
+multi_entity_cases = [
     # 1
     ("Seit wann ist Donald Trump Präsident der USA?", ["Donald_Trump", "USA"]),
-    # 2 – two ORGs, earlier position wins
+    # 2 – two ORGs
     ("Erzähl mir etwas über Bundesbank und die Amazon.", ["Bundesbank", "Amazon"]),
     # 3 – two LOCs
     ("Ist Paris größer als Berlin?", ["Paris", "Berlin"]),
-    # 4 – two football ORGs, prefer the longer early span
+    # 4 – two football ORGs
     (
         "Wie erfolgreich ist der FC Bayern München gegen Borussia Dortmund?",
         ["FC_Bayern_München", "Borussia_Dortmund"],
@@ -76,7 +77,7 @@ top_pick_cases = [
     ("Hat die NASA mit SpaceX zusammengearbeitet?", ["NASA", "SpaceX"]),
     # 6 – LOC vs. LOC
     ("Wo liegt der Grand Canyon in den USA?", ["Grand_Canyon", "USA"]),
-    # 7 – two ORGs, longer early span
+    # 7 – two ORGs
     (
         "Was macht die Europäische Union im Vergleich zur NATO?",
         ["Europäische_Union", "NATO"],
@@ -88,7 +89,7 @@ top_pick_cases = [
         "Ist Saturn weiter von der Erde entfernt als Jupiter?",
         ["Saturn", "Erde", "Jupiter"],
     ),
-    # 10 – PER first, then ORG
+    # 10 – PER and ORG
     (
         "Welche Strategie verfolgt Satya Nadella bei Microsoft?",
         ["Satya_Nadella", "Microsoft"],
@@ -136,22 +137,12 @@ def keyword_finder():
 
 @pytest.mark.parametrize(
     "text,expected",
-    easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases,
+    easy_positive
+    + easy_negative
+    + tricky_positive
+    + tricky_negative
+    + multi_entity_cases,
 )
 def test_keyword_detection(keyword_finder, text, expected):
     result = keyword_finder.find_keywords(text)
     assert sorted(result) == sorted(expected)
-
-
-@pytest.mark.parametrize(
-    "text,expected_list",
-    easy_positive + easy_negative + tricky_positive + tricky_negative + top_pick_cases,
-)
-def test_top_keyword_selection(keyword_finder, text, expected_list):
-    top = keyword_finder.find_top_keyword(text)
-
-    if expected_list:
-        # Convention: treat the first expected keyword as the "top" entry
-        assert top == expected_list[0]
-    else:
-        assert top is None

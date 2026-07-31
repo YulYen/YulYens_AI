@@ -208,3 +208,26 @@ def test_open_conversation_never_breaks_the_caller(tmp_path, monkeypatch, caplog
         assert "nicht angelegt" in caplog.text
     finally:
         Config.reset_instance()
+
+
+def test_build_store_closes_the_database_at_exit(tmp_path, monkeypatch):
+    """close() war nie gerufen — der WAL-Inhalt blieb dem nächsten Start.
+
+    Registriert wird der Handler in build_store; der Test prüft beides:
+    dass er registriert ist und dass er die Verbindung wirklich schließt.
+    """
+    import atexit
+
+    registered: list = []
+    monkeypatch.setattr(
+        atexit, "register", lambda fn, *args, **kw: registered.append((fn, args))
+    )
+
+    store = build_store(
+        {"enabled": True, "path": str(tmp_path / "conversations.sqlite3")}
+    )
+
+    assert registered and registered[0][0] == store.close
+    registered[0][0]()
+    with pytest.raises(sqlite3.ProgrammingError):
+        store.start(user="local", persona="LEAH", model="m", app="test")

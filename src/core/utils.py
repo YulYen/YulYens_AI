@@ -1,10 +1,25 @@
 # --------- General utilities (no external side effects) ---------
+import importlib.util
 import os
 import re
 from datetime import datetime
 from pathlib import Path
 
 from config.personas import get_prompt_by_name
+
+
+def module_available(name: str) -> bool:
+    """True, wenn das Modul importierbar ist — ohne es zu importieren.
+
+    `find_spec` allein reicht nicht: liegt der Name schon als Modul ohne
+    `__spec__` in `sys.modules` (Stubs, manche Namespace-Konstrukte), wirft es
+    `ValueError` statt `None` zu liefern. Optionale Abhängigkeiten dürfen die
+    App aber nie am Start hindern.
+    """
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
 
 
 def _wiki_mode_enabled(mode_val) -> bool:

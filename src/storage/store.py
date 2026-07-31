@@ -21,6 +21,7 @@ Vorratshaltung, deshalb ist er noch nicht da.
 
 from __future__ import annotations
 
+import atexit
 import logging
 import sqlite3
 import threading
@@ -281,7 +282,7 @@ def build_store(storage_cfg: dict | None) -> ConversationStore:
         return NullStore()
     path = str(cfg.get("path") or "data/conversations.sqlite3")
     try:
-        return SqliteStore(path)
+        store = SqliteStore(path)
     except sqlite3.Error as exc:
         # Eine kaputte Datei darf die App nicht am Start hindern — dann eben
         # ohne Ablage, aber laut.
@@ -291,3 +292,7 @@ def build_store(storage_cfg: dict | None) -> ConversationStore:
             exc,
         )
         return NullStore()
+    # Beim Beenden sauber schließen: das schreibt den WAL-Inhalt in die
+    # Datenbank zurück, statt ihn dem nächsten Start zu überlassen.
+    atexit.register(store.close)
+    return store

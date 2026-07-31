@@ -64,9 +64,9 @@ def test_model_is_cached_per_config(monkeypatch):
     assert _FakeWhisperModel.instances[1].model_name == "tiny"
 
 
-def test_is_stt_available_reflects_find_spec(monkeypatch):
-    monkeypatch.setattr(whisper_stt.importlib.util, "find_spec", lambda name: None)
+def test_is_stt_available_reflects_module_availability(monkeypatch):
+    monkeypatch.setattr(whisper_stt, "module_available", lambda name: False)
     assert whisper_stt.is_stt_available() is False
 
-    monkeypatch.setattr(whisper_stt.importlib.util, "find_spec", lambda name: object())
+    monkeypatch.setattr(whisper_stt, "module_available", lambda name: True)
     assert whisper_stt.is_stt_available() is True

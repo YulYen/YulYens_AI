@@ -15,10 +15,10 @@ from ui import self_talk
 from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui.persona_chooser import prompt_persona_choice
 from wiki.lookup import (
+    WikiLookup,
     WikiSnippet,
     format_snippet_meta,
     inject_wiki_context,
-    lookup_wiki_snippet,
 )
 
 
@@ -30,25 +30,10 @@ class TerminalUI:
     - Token-by-token streaming of the LLM response stays unchanged
     """
 
-    def __init__(
-        self,
-        factory,
-        config,
-        keyword_finder,
-        wiki_snippet_limit: int,
-        max_wiki_snippets: int,
-        wiki_mode: str,
-        proxy_port: int,
-        wiki_timeout: tuple[float, float],
-    ) -> None:
+    def __init__(self, factory, config, wiki: WikiLookup) -> None:
         self.factory = factory
         self.config = config
-        self.keyword_finder = keyword_finder
-        self.wiki_snippet_limit = wiki_snippet_limit
-        self.max_wiki_snippets = max_wiki_snippets
-        self.wiki_mode = wiki_mode
-        self.proxy_port = proxy_port
-        self.wiki_timeout = wiki_timeout
+        self.wiki = wiki
         self.greeting = None  # set after selection
         self.bot = None  # set after selection
         self.streamer = None  # set after selection
@@ -97,7 +82,7 @@ class TerminalUI:
         if self.briefing_enabled:
             briefing_hint = self.texts.get("terminal_briefing_hint", "/briefing")
             print(f"{Fore.MAGENTA}{briefing_hint}{Style.RESET_ALL}")
-        if self.keyword_finder:
+        if self.wiki.keyword_finder:
             sources_hint = self.texts.get("terminal_sources_hint", "/quellen")
             print(f"{Fore.MAGENTA}{sources_hint}{Style.RESET_ALL}")
 
@@ -265,17 +250,8 @@ class TerminalUI:
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
         context_messages: list[dict[str, str]] = []
-        if self.keyword_finder:
-            wiki_hints, contexts = lookup_wiki_snippet(
-                question,
-                "ask_all",
-                self.keyword_finder,
-                self.wiki_mode,
-                self.proxy_port,
-                self.wiki_snippet_limit,
-                self.wiki_timeout,
-                self.max_wiki_snippets,
-            )
+        if self.wiki.keyword_finder:
+            wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
             self.last_wiki_snippets = list(contexts)
             for wiki_hint in wiki_hints:
                 if wiki_hint:
@@ -355,17 +331,8 @@ class TerminalUI:
                 continue
 
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
-            if self.keyword_finder:
-                wiki_hints, contexts = lookup_wiki_snippet(
-                    user_input,
-                    self.bot,
-                    self.keyword_finder,
-                    self.wiki_mode,
-                    self.proxy_port,
-                    self.wiki_snippet_limit,
-                    self.wiki_timeout,
-                    self.max_wiki_snippets,
-                )
+            if self.wiki.keyword_finder:
+                wiki_hints, contexts = self.wiki.snippets(user_input, self.bot)
 
                 self.last_wiki_snippets = list(contexts)
 
