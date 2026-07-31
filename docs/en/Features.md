@@ -145,6 +145,12 @@ Optionally, a lightweight **email adapter** can be enabled (`email_adapter.enabl
 
 The MVP handles plain-text emails; HTML is pragmatically reduced to text, attachments are ignored. To avoid mail loops and duplicate replies, the adapter ignores its own system/persona addresses and moves successfully processed (or deliberately ignored) messages into the configured `processed_mailbox` folder by default. Credentials do not belong in the code: `config.yaml` provides placeholders like `env:YULYEN_MAIL_IMAP_PASSWORD` that are resolved from environment variables at runtime.
 
+## Web UI conveniences
+
+- **Light and dark mode:** Two links in the top right switch themes (`?__theme=dark` / `?__theme=light`). Gradio reads the setting on load, so switching means a brief reload.
+- **Copy an answer:** Every chat message carries a copy icon.
+- **Status line:** After each answer, the line below the chat shows how full the context window is (`Context █░░░ 424 / 8,192 tokens (5 %)`) and how fast the model was (`24.0 tok/s · first token after 1.9 s`). Past 75 % it is highlighted — that is exactly where the application starts trimming the conversation history.
+
 ## Wikipedia integration
 
 To deliver well-grounded answers, the system can automatically **incorporate Wikipedia knowledge** for factual queries (configurable option). It relies on the following mechanisms:

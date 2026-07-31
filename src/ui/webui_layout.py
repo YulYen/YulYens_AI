@@ -36,6 +36,8 @@ def build_ui(
     stop_label,
     regenerate_label,
     sources_label,
+    theme_light_label,
+    theme_dark_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -45,7 +47,7 @@ def build_ui(
                 <style>
                 .persona-row { gap:24px; }
                 .persona-card {
-                    border:1px solid #e3e7ed;
+                    border:1px solid var(--border-color-primary, #e3e7ed);
                     border-radius:10px;
                     padding:12px;
                     text-align:center;
@@ -80,7 +82,7 @@ def build_ui(
                 .focus-row > div { justify-content: center; }
                 /* Ask-All-Ergebnisse: Abschnitt pro Persona, dezent gerahmt */
                 .ask-all-results {
-                    border: 1px solid #e3e7ed;
+                    border: 1px solid var(--border-color-primary, #e3e7ed);
                     border-radius: 10px;
                     padding: 4px 16px 12px;
                     background: var(--background-fill-primary, #fff);
@@ -101,8 +103,30 @@ def build_ui(
                     white-space: pre-wrap;
                     opacity: 0.85;
                 }
+                /* Statuszeile (#36): Kennzahlen, keine Ansage — klein und leise */
+                .chat-status {
+                    font-size: 0.8rem;
+                    opacity: 0.7;
+                    font-family: var(--font-mono, monospace);
+                }
+                /* Theme-Umschalter (#36): dezent oben rechts, stört den Kopf nicht */
+                .theme-switch {
+                    text-align: right;
+                    font-size: 0.85rem;
+                    opacity: 0.65;
+                }
+                .theme-switch a { text-decoration: none; margin-left: 10px; }
                 </style>
             """
+        )
+        # Theme-Umschalter (#36): Gradio 4.44 liest `?__theme=` beim Laden, ein
+        # Wechsel ohne Reload ist nicht vorgesehen. Deshalb schlichte Links statt
+        # eines JS-Handlers — der Reload ist der Preis, dafür kein eigener Code.
+        gr.HTML(
+            f"""<div class="theme-switch">
+                <a href="?__theme=light" title="{theme_light_label}">{theme_light_label}</a>
+                <a href="?__theme=dark" title="{theme_dark_label}">{theme_dark_label}</a>
+            </div>"""
         )
         gr.Markdown(f"# {project_title}")
 
@@ -207,7 +231,7 @@ def build_ui(
             gr.Markdown("---")
 
         greeting_md = gr.Markdown("", visible=False)
-        chatbot = gr.Chatbot(label="", visible=False)
+        chatbot = gr.Chatbot(label="", visible=False, show_copy_button=True)
         # Quellen-Transparenz (#32): zugeklappt direkt unter dem Chat. Zeigt den
         # Text, den das Modell tatsächlich als Kontext bekommen hat — inklusive
         # der Länge, damit ein an wiki.snippet_limit gekürzter Artikel als
@@ -216,6 +240,8 @@ def build_ui(
             sources_label, open=False, visible=False, elem_classes="wiki-sources"
         ) as sources_accordion:
             sources_md = gr.Markdown("", elem_classes="wiki-sources-body")
+        # Statuszeile (#36): Kontext-Füllstand und Tempo der letzten Antwort.
+        status_md = gr.Markdown("", visible=False, elem_classes="chat-status")
         with gr.Row():
             download_btn = gr.Button(
                 save_button_label,
@@ -408,5 +434,6 @@ def build_ui(
         "sources_md": sources_md,
         "ask_all_sources_accordion": ask_all_sources_accordion,
         "ask_all_sources_md": ask_all_sources_md,
+        "status_md": status_md,
     }
     return demo, components

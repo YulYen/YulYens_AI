@@ -173,14 +173,18 @@ def test_vram_no_gpu(monkeypatch):
 
 
 def test_run_checks_dummy_backend_skips_ollama_and_wiki():
+    # model_name gehört dazu: ohne ihn schlägt seit #43 zu Recht der
+    # Schema-Check an — die Konfiguration wäre unvollständig.
     cfg = SimpleNamespace(
-        core={"backend": "dummy"},
+        core={"backend": "dummy", "model_name": "dummy"},
         wiki={"mode": False},
         language="de",
     )
     results = sc.run_checks(cfg, include_vram=False)
     names = {r.name for r in results}
-    assert names == {"ollama", "wiki"}
+    # "config" läuft immer mit (#43) — Ollama und Wiki bleiben die einzigen
+    # Checks, die vom Backend abhängen.
+    assert names == {"config", "ollama", "wiki"}
     assert all(r.ok for r in results)  # both informational
 
 
@@ -260,3 +264,64 @@ def test_healthz_returns_503_on_critical(client, monkeypatch):
 
 def test_health_liveness_still_cheap(client):
     assert client.get("/health").json() == {"status": "ok"}
+
+
+# ---- Passt das Modell in den freien VRAM? (#43) -----------------------------
+
+
+def _tags_response(models):
+    return SimpleNamespace(
+        raise_for_status=lambda: None, json=lambda: {"models": models}
+    )
+
+
+def test_model_vram_warns_when_the_model_does_not_fit(monkeypatch):
+    monkeypatch.setattr(
+        sc.requests,
+        "get",
+        lambda *a, **k: _tags_response([{"name": "big:8b", "size": 8 * 1024**3}]),
+    )
+    monkeypatch.setattr(sc, "_free_vram_mib", lambda timeout=5.0: 4 * 1024)
+
+    result = sc.check_model_fits_vram("http://x", "big:8b")
+
+    assert result.ok is False
+    assert "8.0 GB" in result.detail and "4.0 GB" in result.detail
+
+
+def test_model_vram_is_fine_with_enough_headroom(monkeypatch):
+    monkeypatch.setattr(
+        sc.requests,
+        "get",
+        lambda *a, **k: _tags_response([{"name": "small:3b", "size": 2 * 1024**3}]),
+    )
+    monkeypatch.setattr(sc, "_free_vram_mib", lambda timeout=5.0: 10 * 1024)
+
+    assert sc.check_model_fits_vram("http://x", "small:3b").ok is True
+
+
+def test_model_vram_stays_informational_without_a_gpu(monkeypatch):
+    """Ohne NVIDIA-GPU nur der Bedarf — kein Urteil, das niemand einhalten kann."""
+    monkeypatch.setattr(
+        sc.requests,
+        "get",
+        lambda *a, **k: _tags_response([{"name": "m:1b", "size": 1024**3}]),
+    )
+    monkeypatch.setattr(sc, "_free_vram_mib", lambda timeout=5.0: None)
+
+    result = sc.check_model_fits_vram("http://x", "m:1b")
+
+    assert result.ok is True
+    assert "1.0 GB" in result.detail
+
+
+def test_model_vram_degrades_quietly_without_ollama(monkeypatch):
+    def _boom(*_a, **_k):
+        raise sc.requests.RequestException("down")
+
+    monkeypatch.setattr(sc.requests, "get", _boom)
+
+    result = sc.check_model_fits_vram("http://x", "m:1b")
+
+    assert result.ok is True
+    assert "unreachable" in result.detail

@@ -11,6 +11,7 @@ from unittest.mock import Mock, patch
 import gradio as gr
 import requests
 from config.texts import Texts
+from core.streaming_provider import StreamStats
 from ui.web_ui import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
@@ -86,6 +87,7 @@ def test_stream_reply_throttles_updates():
     tokens = [f"t{i} " for i in range(50)]
     full_text = "".join(tokens)
     streamer = Mock()
+    streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
     web_ui.streamer = streamer
 
@@ -105,6 +107,7 @@ def test_stream_reply_always_flushes_final_state():
     web_ui = _create_web_ui()
     tokens = ["Hallo ", "Welt", "!"]
     streamer = Mock()
+    streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
     web_ui.streamer = streamer
 
@@ -996,6 +999,7 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     web_ui = _create_web_ui()
     stream = _BlockingStream("Teil ")
     streamer = Mock()
+    streamer.persona_options = {}
     streamer.stream.return_value = stream
     web_ui.streamer = streamer
 
@@ -1021,6 +1025,7 @@ def test_stop_clears_the_switch_so_the_next_stream_runs():
     web_ui._on_stop_stream()  # Stop ohne laufenden Stream: darf nichts kaputt machen
 
     streamer = Mock()
+    streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
     web_ui.streamer = streamer
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
@@ -1104,6 +1109,7 @@ def test_regenerate_drops_last_answer_and_streams_again():
     web_ui = _create_web_ui()
     web_ui.bot = "Karl"
     streamer = Mock()
+    streamer.persona_options = {}
     # Snapshot beim Aufruf: _stream_reply hängt die neue Antwort an dieselbe
     # Liste an, hinterher wäre nicht mehr sichtbar, was gesendet wurde.
     sent_snapshot = []
@@ -1141,6 +1147,7 @@ def test_regenerate_keeps_wiki_hint_rows():
     web_ui = _create_web_ui()
     web_ui.bot = "Karl"
     streamer = Mock()
+    streamer.persona_options = {}
     streamer.stream.return_value = iter(["Neu"])
     web_ui.streamer = streamer
 
@@ -1488,3 +1495,90 @@ def test_reset_updates_hide_the_ask_all_sources_accordion():
     accordion = updates[PERSONA_OUTPUT_KEYS.index("ask_all_sources_accordion")]
     assert accordion["visible"] is False
     assert updates[PERSONA_OUTPUT_KEYS.index("ask_all_sources_md")]["value"] == ""
+
+
+# ---- Statuszeile: Kontext-Füllstand und Tempo (#36) -------------------------
+# Beide Zahlen kannte das Projekt längst — der Füllstand steckt in
+# context_near_limit, die Zeiten standen nur im Logfile.
+
+STATUS_INDEX = STREAM_OUTPUT_KEYS.index("status_md")
+
+
+def _status_web_ui(num_ctx=8192):
+    web_ui = _web_ui_with_texts()
+    web_ui.streamer = SimpleNamespace(persona_options={"num_ctx": num_ctx})
+    return web_ui
+
+
+def test_status_line_shows_context_fill():
+    web_ui = _status_web_ui()
+    history = [{"role": "user", "content": "x" * 400}]
+
+    line = web_ui._format_status_line(history, None)
+
+    assert "8.192" in line
+    assert "%" in line
+    assert "█" in line or "░" in line
+
+
+def test_status_line_highlights_once_compression_kicks_in():
+    """Fett genau ab der Schwelle, ab der shrink_history_for_context greift."""
+    web_ui = _status_web_ui(num_ctx=1000)
+    small = [{"role": "user", "content": "kurz"}]
+    huge = [{"role": "user", "content": "x" * 4000}]
+
+    assert not web_ui._format_status_line(small, None).startswith("**")
+    assert web_ui._format_status_line(huge, None).startswith("**")
+
+
+def test_status_line_reports_speed_and_first_token():
+    web_ui = _status_web_ui()
+    stats = StreamStats(tokens=120, t_first_ms=1900, t_total_ms=5000)
+
+    line = web_ui._format_status_line([], stats)
+
+    assert "24.0" in line  # 120 Token in 5 s
+    assert "1.9" in line
+
+
+def test_status_line_stays_empty_without_context_limit_and_stats():
+    web_ui = _web_ui_with_texts()
+    web_ui.streamer = SimpleNamespace(persona_options={})
+
+    assert web_ui._format_status_line([], None) == ""
+
+
+def test_status_line_ignores_a_streamer_without_real_stats():
+    """Testdoubles setzen last_stream_stats nicht — das darf nichts rendern."""
+    web_ui = _status_web_ui()
+    web_ui.streamer = Mock()
+    web_ui.streamer.persona_options = {"num_ctx": 8192}
+
+    assert web_ui._last_stream_stats() is None
+
+
+def test_stream_reply_publishes_the_status_only_at_the_end():
+    web_ui = _web_ui_with_texts()
+    streamer = Mock()
+    streamer.persona_options = {"num_ctx": 8192}
+    streamer.last_stream_stats = StreamStats(tokens=10, t_first_ms=500, t_total_ms=1000)
+    streamer.stream.return_value = iter(["a", "b", "c"])
+    web_ui.streamer = streamer
+
+    clock = iter(1000.0 + i for i in range(10))
+    with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
+        outputs = list(web_ui._stream_reply([], []))
+
+    # Zwischendurch nur der No-op-Marker, am Ende der echte Wert.
+    assert all("value" not in item[STATUS_INDEX] for item in outputs[:-1])
+    final = outputs[-1][STATUS_INDEX]
+    assert final["visible"] is True
+    assert "10.0" in final["value"]
+
+
+def test_reset_hides_the_status_line():
+    updates = _create_web_ui()._reset_ui_updates()
+
+    status = updates[PERSONA_OUTPUT_KEYS.index("status_md")]
+    assert status["visible"] is False
+    assert status["value"] == ""
