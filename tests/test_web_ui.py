@@ -1776,6 +1776,10 @@ def _history_web_ui(tmp_path):
     web_ui.cfg.ensemble = "classic"
     store = SqliteStore(tmp_path / "conversations.sqlite3")
     web_ui.factory.get_store.return_value = store
+    # Die Factory legt Gespräche an (#54) — hier gegen denselben Store.
+    web_ui.factory.open_conversation.side_effect = lambda persona, app, user="local": (
+        store.start(user=user, persona=persona, model="m", app=app)
+    )
     return web_ui, store
 
 
@@ -1876,19 +1880,39 @@ def test_history_delete_removes_it_from_the_list(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store)
 
-    pick, preview, status, _file = web_ui._on_history_delete(cid, "local")
+    pick, preview, status, _file, confirm = web_ui._on_history_delete(
+        cid, True, "local"
+    )
 
     assert pick["choices"] == []
     assert preview["value"] == ""
     assert status["visible"] is True
+    assert confirm["value"] is False  # Häkchen zurückgesetzt
     assert store.load(cid) is None
+
+
+def test_history_delete_needs_confirmation(tmp_path):
+    """Löschen ist endgültig — ein Fehlklick darf nichts vernichten."""
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store)
+
+    _pick, _preview, status, _file, _confirm = web_ui._on_history_delete(
+        cid, False, "local"
+    )
+
+    assert status["visible"] is True
+    assert store.load(cid) is not None
 
 
 # ---- Ein Gespräch bleibt eines (#54) ---------------------------------------
 
 
 def test_model_switch_keeps_the_same_conversation(tmp_path):
-    """Vorher entstand hier eine zweite Logdatei — der Kern des Tickets."""
+    """Ein Streamer-Neubau darf kein zweites Gespräch beginnen.
+
+    Über die UI ist der Modellwechsel mitten im Chat derzeit nicht erreichbar
+    (Dropdown nur auf der Startseite); der Test hält die Verdrahtung fest.
+    """
     web_ui, _store = _history_web_ui(tmp_path)
     web_ui.bot = "LEAH"
     new_streamer = Mock()
@@ -1913,4 +1937,6 @@ def test_persona_selection_opens_exactly_one_conversation(tmp_path):
 
     conversation_id = updates[PERSONA_OUTPUT_KEYS.index("conversation_state")]
     assert conversation_id
-    assert [ref.id for ref in store.list(user="yulyen")] == [conversation_id]
+    assert [ref.id for ref in store.list_conversations(user="yulyen")] == [
+        conversation_id
+    ]

@@ -2,7 +2,7 @@
 
 The point is reach, not novelty: every OpenAI client (Open WebUI, phone apps,
 editor plugins) can talk to the personas — and unlike raw Ollama it goes through
-the guard, the wiki injection and the conversation log, because it uses the very
+the guard, the wiki injection and the conversation store, because it uses the very
 same streamer the UI uses.
 
 Mapping: ``model`` is the persona name. ``/v1/models`` therefore lists personas,

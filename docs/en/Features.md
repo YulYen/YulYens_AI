@@ -84,7 +84,7 @@ Alongside the UI, the system can be accessed through a REST API (e.g., for integ
 The personas also speak the **OpenAI protocol**. That means any client built for
 OpenAI works — Open WebUI, phone apps, editor plugins — just with LEAH, DORIS,
 PETER and POPCORN instead of a cloud model. Unlike raw Ollama, everything still
-goes through the guard, the wiki injection and the conversation log, because it is
+goes through the guard, the wiki injection and the conversation store, because it is
 the same streamer the UI uses.
 
 The mapping is the trick: **`model` is the persona name.** `/v1/models` therefore
@@ -161,13 +161,13 @@ By default the web UI asks for **no login** — on a single-seat machine that wo
 - `local`: username and password from `ui.web.auth.users`. Passwords do not belong in the config in plain text — use `env:NAME`.
 - `header`: the identity comes from a reverse proxy in front (oauth2-proxy, Authelia, …). This is the route to putting a real identity provider such as Keycloak in front later — Gradio itself cannot do OpenID Connect.
 
-The username is written into every line of the conversation log and into every 👍/👎 vote. The login applies whether or not a public share link is active.
+The username is recorded with every conversation in the store and in every 👍/👎 vote. The login applies whether or not a public share link is active.
 
 > **Important:** the login transmits passwords over HTTP in clear text. Without TLS it separates users from one another but does not protect against anyone reading the network traffic. The `header` mode trusts the header unconditionally and therefore belongs strictly behind a proxy that strips it from outside requests.
 
 ## Guest persona
 
-The “Create guest 🎭” card lets you assemble your own persona from a name, a system prompt and a temperature — no YAML, no restart. It lives only in the running session and is gone after a restart; everything else (Wikipedia context, security filter, conversation log, status line) behaves exactly as it does for the bundled personas.
+The “Create guest 🎭” card lets you assemble your own persona from a name, a system prompt and a temperature — no YAML, no restart. It lives only in the running session and is gone after a restart; everything else (Wikipedia context, security filter, conversation store, status line) behaves exactly as it does for the bundled personas.
 
 ## Web UI conveniences
 

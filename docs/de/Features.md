@@ -84,7 +84,7 @@ Zusätzlich sprechen die Personas das **OpenAI-Protokoll**. Damit lässt sich je
 Client benutzen, der mit OpenAI reden kann — Open WebUI, Handy-Apps,
 Editor-Plugins — nur eben mit LEAH, DORIS, PETER und POPCORN statt mit einem
 Cloud-Modell. Anders als rohes Ollama läuft dabei alles durch Guard,
-Wiki-Injektion und Gesprächslog, weil derselbe Streamer arbeitet wie in der UI.
+Wiki-Injektion und Gesprächs-Ablage, weil derselbe Streamer arbeitet wie in der UI.
 
 Der Trick ist die Zuordnung: **`model` ist der Persona-Name.** `/v1/models`
 listet daher die Personas und nicht die LLMs — welches Modell darunter läuft,
@@ -161,13 +161,13 @@ Standardmäßig verlangt die Web-UI **keine Anmeldung** — für den Einzelplatz
 - `local`: Benutzername und Passwort aus `ui.web.auth.users`. Passwörter gehören nicht im Klartext in die Config, sondern als `env:NAME`.
 - `header`: die Identität kommt von einem vorgeschalteten Reverse-Proxy (oauth2-proxy, Authelia, …). Das ist der Weg, um später einen echten Anmeldedienst wie Keycloak davorzusetzen — Gradio selbst kann kein OpenID Connect.
 
-Der Nutzername landet in jeder Zeile des Gesprächslogs und in jeder 👍/👎-Bewertung. Die Anmeldung gilt unabhängig davon, ob ein öffentlicher Share-Link aktiv ist.
+Der Nutzername wird zu jedem Gespräch in der Ablage vermerkt und steht in jeder 👍/👎-Bewertung. Die Anmeldung gilt unabhängig davon, ob ein öffentlicher Share-Link aktiv ist.
 
 > **Wichtig:** Die Anmeldung überträgt Passwörter über HTTP im Klartext. Ohne TLS trennt sie Nutzer voneinander, schützt aber nicht gegen jemanden, der den Netzwerkverkehr mitliest. Der `header`-Modus vertraut dem Header bedingungslos und gehört deshalb ausschließlich hinter einen Proxy, der ihn von außen entfernt.
 
 ## Gast-Persona
 
-Über die Karte „Gast anlegen 🎭" lässt sich eine eigene Persona aus Name, System-Prompt und Temperatur zusammenstellen — ohne YAML und ohne Neustart. Sie lebt nur in der laufenden Sitzung und ist nach einem Neustart wieder weg; alles andere (Wikipedia-Kontext, Sicherheitsfilter, Gesprächslog, Statuszeile) funktioniert dabei genau wie bei den mitgelieferten Personas.
+Über die Karte „Gast anlegen 🎭" lässt sich eine eigene Persona aus Name, System-Prompt und Temperatur zusammenstellen — ohne YAML und ohne Neustart. Sie lebt nur in der laufenden Sitzung und ist nach einem Neustart wieder weg; alles andere (Wikipedia-Kontext, Sicherheitsfilter, Gesprächs-Ablage, Statuszeile) funktioniert dabei genau wie bei den mitgelieferten Personas.
 
 ## Bedienkomfort in der Web-UI
 

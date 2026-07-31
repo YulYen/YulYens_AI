@@ -173,6 +173,12 @@ class TerminalUI:
         self.streamer = self.factory.get_streamer_for_persona(persona_name)
         self.bot = persona_name
         self.greeting = _greeting_text(self.config, self.bot)
+        # Auch das Terminal zeichnet in der Ablage auf (#54) — ohne Anmeldung
+        # unter dem lokalen Nutzer. Vorher landete hier gar nichts mehr, seit
+        # der JSONL-Mitschnitt standardmäßig aus ist.
+        self.streamer.set_conversation(
+            self.factory.open_conversation(persona_name, "terminal")
+        )
 
     def _reset_meta(self) -> None:
         self.meta = {

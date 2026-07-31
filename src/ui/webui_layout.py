@@ -53,6 +53,7 @@ def build_ui(
     history_open_label,
     history_export_label,
     history_delete_label,
+    history_confirm_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -423,6 +424,9 @@ def build_ui(
                 history_open_btn = gr.Button(history_open_label, variant="primary")
                 history_export_btn = gr.Button(history_export_label)
                 history_delete_btn = gr.Button(history_delete_label, variant="stop")
+            # Löschen ist endgültig — ein Häkchen statt eines Zwei-Klick-Tanzes
+            # mit wechselnder Beschriftung, das sich niemand merken muss.
+            history_confirm = gr.Checkbox(label=history_confirm_label, value=False)
             history_file = gr.File(visible=False)
 
         with gr.Group(visible=False) as ask_all_group:
@@ -516,6 +520,7 @@ def build_ui(
         "history_open_btn": history_open_btn,
         "history_export_btn": history_export_btn,
         "history_delete_btn": history_delete_btn,
+        "history_confirm": history_confirm,
         "history_file": history_file,
         "ask_all_group": ask_all_group,
         "ask_all_results": ask_all_results,

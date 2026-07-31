@@ -236,22 +236,15 @@ class WebUI:
         return {}
 
     def _open_conversation(self, persona_name: str, user: str) -> str:
-        """Neues Gespräch in der Ablage anlegen (#54).
+        """Neues Gespräch anlegen (#54).
 
         Die ID gehört ab hier der Oberfläche: sie liegt im `gr.State` und wird
-        nach einem Streamer-Neubau (Modellwechsel!) erneut gesetzt, statt dass
-        ein zweites Gespräch entsteht.
+        nach einem Streamer-Neubau erneut gesetzt, statt dass ein zweites
+        Gespräch entsteht.
         """
-        try:
-            return self.factory.get_store().start(
-                user=user or self._fallback_user(),
-                persona=persona_name,
-                model=str(self.cfg.core.get("model_name", "")),
-                app="web",
-            )
-        except Exception:
-            logging.exception("Gespräch konnte nicht angelegt werden")
-            return ""
+        return self.factory.open_conversation(
+            persona_name, "web", user or self._fallback_user()
+        )
 
     def _stamp_conversation(self, conversation_id: str) -> None:
         setter = getattr(self.streamer, "set_conversation", None)
@@ -261,8 +254,8 @@ class WebUI:
     def _stamp_user(self, user: str) -> None:
         """Identität an den frischen Streamer geben (#53).
 
-        Sie landet dadurch in jeder Zeile des Gesprächslogs — der Datei, die
-        #25 (Verlauf) und #49 (Suche) später durchgehen.
+        Sie hängt dadurch am Gespräch in der Ablage — die Grundlage für den
+        Verlauf (#25) und später die Suche (#49).
         """
         setter = getattr(self.streamer, "set_user", None)
         if callable(setter):
@@ -962,8 +955,10 @@ class WebUI:
             # damit auch die Cutoff-Zeile im System-Prompt zum Modell passt.
             self.streamer = self.factory.get_streamer_for_persona(self.bot)
             # Der neue Streamer schreibt in dasselbe Gespräch weiter (#54).
-            # Vorher entstand hier eine zweite Logdatei, und ein Gespräch lag
-            # danach in zwei Stücken.
+            # Über die UI ist dieser Fall derzeit nicht auslösbar — das
+            # Modell-Dropdown sitzt im „Erweitert"-Akkordeon der Startseite und
+            # ist während eines Chats nicht sichtbar. Die Verdrahtung steht
+            # trotzdem, damit sie nicht fehlt, sobald es das ist.
             self._stamp_conversation(conversation_id)
             self._stamp_user("")
         logging.info("Modell per UI gewechselt: %s", choice)
@@ -1053,7 +1048,9 @@ class WebUI:
         kam: ohne sie zeigt eine Verlaufsliste jedem alles.
         """
         try:
-            refs = self.factory.get_store().list(user=user or self._fallback_user())
+            refs = self.factory.get_store().list_conversations(
+                user=user or self._fallback_user()
+            )
         except Exception:
             logging.exception("Verlauf konnte nicht gelesen werden")
             return []
@@ -1187,8 +1184,19 @@ class WebUI:
             path = tmp.name
         return gr.update(value=path, visible=True)
 
-    def _on_history_delete(self, conversation_id: str | None, user: str) -> tuple:
-        """Löschen ohne Rückfrage-Dialog, aber mit klarer Rückmeldung."""
+    def _on_history_delete(
+        self, conversation_id: str | None, confirmed: bool, user: str
+    ) -> tuple:
+        """Löschen ist endgültig — deshalb nur mit gesetztem Häkchen."""
+        if not confirmed:
+            return (
+                gr.update(),
+                gr.update(),
+                gr.update(value=self._t("history_confirm_first"), visible=True),
+                gr.update(),
+                gr.update(),
+            )
+
         deleted = False
         if conversation_id:
             try:
@@ -1202,6 +1210,8 @@ class WebUI:
             gr.update(value=""),
             gr.update(value=self._t(message), visible=True),
             gr.update(value=None, visible=False),
+            # Häkchen zurücksetzen, damit der nächste Klick nicht durchrutscht.
+            gr.update(value=False),
         )
 
     def _on_show_guest(self) -> tuple:
@@ -1933,12 +1943,17 @@ class WebUI:
 
         components["history_delete_btn"].click(
             fn=self._on_history_delete,
-            inputs=[components["history_pick"], user_state],
+            inputs=[
+                components["history_pick"],
+                components["history_confirm"],
+                user_state,
+            ],
             outputs=[
                 components["history_pick"],
                 components["history_preview"],
                 components["history_status"],
                 components["history_file"],
+                components["history_confirm"],
             ],
             queue=False,
         )
@@ -2125,6 +2140,7 @@ class WebUI:
         history_open_label = ui.get("history_open_label", "Öffnen")
         history_export_label = ui.get("history_export_label", "Als Markdown")
         history_delete_label = ui.get("history_delete_label", "Löschen")
+        history_confirm_label = ui.get("history_confirm_label", "Löschen bestätigen")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -2182,6 +2198,7 @@ class WebUI:
             history_open_label=history_open_label,
             history_export_label=history_export_label,
             history_delete_label=history_delete_label,
+            history_confirm_label=history_confirm_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

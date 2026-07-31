@@ -65,7 +65,7 @@ class AiApiProvider:
 
         The history is passed through as the client sent it — no Karl, no
         heuristic trimming: an OpenAI client owns its context window. Guard,
-        wiki injection and conversation logging come along because they live in
+        wiki injection and conversation recording come along because they live in
         the streamer, which is the same one the UI uses.
         """
         canonical_persona = self.resolve_persona(persona)
@@ -100,6 +100,9 @@ class AiApiProvider:
                 history.extend(tail)
 
         streamer = self.factory.get_streamer_for_persona(canonical_persona)
+        streamer.set_conversation(
+            self.factory.open_conversation(canonical_persona, "api")
+        )
         yield from streamer.stream(messages=history)
 
     def answer(self, question: str, persona: str) -> str:
@@ -113,6 +116,11 @@ class AiApiProvider:
         canonical_persona = self.resolve_persona(persona)
 
         streamer = self.factory.get_streamer_for_persona(canonical_persona)
+        # Ein Gespräch pro Anfrage (#54): die API kennt keine Sitzung, jede
+        # Anfrage steht für sich.
+        streamer.set_conversation(
+            self.factory.open_conversation(canonical_persona, "api")
+        )
 
         return streamer.respond_one_shot(
             frage,

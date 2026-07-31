@@ -1,7 +1,7 @@
 """Wer bedient die Web-UI? — die Identitäts-Naht (#53).
 
 **Der Wert liegt in der Naht, nicht im Feature.** Für den Einzelplatz-Betrieb
-ist eine Anmeldung reiner Aufwand; gebraucht wird sie, weil Gesprächslogs und
+ist eine Anmeldung reiner Aufwand; gebraucht wird sie, weil Gespräche und
 Feedback-Votes ohne Nutzerbegriff niemandem zugeordnet werden können — genau
 das brauchen #25 (Verlauf-Tab), #40b und #24 (Langzeit-Gedächtnis).
 
@@ -100,9 +100,12 @@ class LocalUsersAuth:
 
     def check(self, username: str, password: str) -> bool:
         expected = self._users.get(username or "")
-        # Kein früher Abbruch bei unbekanntem Nutzer: sonst verrät die Laufzeit,
-        # welche Namen existieren.
-        return bool(expected) and _constant_time_equals(expected, password or "")
+        if expected is None:
+            # Trotzdem vergleichen: ein früher Abbruch verriete über die
+            # Laufzeit, welche Benutzernamen existieren.
+            _constant_time_equals("", password or "")
+            return False
+        return _constant_time_equals(expected, password or "")
 
     def gradio_auth(self):
         if not self._users:

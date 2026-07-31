@@ -3,9 +3,9 @@
 **Warum es das gibt:** bis hierher war das Gesprächs-*Logfile* die Persistenz.
 Das hatte drei konkrete Folgen: es gab zwei unvereinbare Formate (JSONL im
 Archiv, `{"meta":…, "messages":…}` beim Download), ein Gespräch war kein
-eigenständiges Ding sondern hing an der Lebensdauer eines Streamer-Objekts —
-ein Modellwechsel mitten im Gespräch erzeugte eine zweite Datei —, und Suchen
-oder Filtern hätte bedeutet, alle Dateien zu lesen.
+eigenständiges Ding sondern hing an der Lebensdauer eines Streamer-Objekts (es
+gab keine ID, an der man es hätte festmachen können), und Suchen oder Filtern
+hätte bedeutet, alle Dateien zu lesen.
 
 **Warum SQLite:** es ist stdlib (keine neue Abhängigkeit), eine Datei, atomar,
 Windows-tauglich. Und #49 (Volltextsuche) bekommt mit FTS5 einen Index
@@ -83,7 +83,7 @@ class ConversationStore(Protocol):
 
     def append(self, conversation_id: str, role: str, content: str) -> None: ...
 
-    def list(
+    def list_conversations(
         self, *, user: str | None = None, limit: int = 50, offset: int = 0
     ) -> list[ConversationRef]: ...
 
@@ -103,7 +103,7 @@ class NullStore:
     def append(self, conversation_id: str, role: str, content: str) -> None:
         return None
 
-    def list(
+    def list_conversations(
         self, *, user: str | None = None, limit: int = 50, offset: int = 0
     ) -> list[ConversationRef]:
         return []
@@ -200,7 +200,7 @@ class SqliteStore:
                 )
             self._conn.commit()
 
-    def list(
+    def list_conversations(
         self, *, user: str | None = None, limit: int = 50, offset: int = 0
     ) -> list[ConversationRef]:
         query = (

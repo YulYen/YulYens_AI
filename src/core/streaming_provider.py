@@ -273,18 +273,17 @@ class YulYenStreamingProvider:
     def set_user(self, user: str) -> None:
         """Identität des Gesprächs setzen (#53).
 
-        Landet in jeder Zeile des Gesprächslogs — das ist die Datei, die #25
-        (Verlauf) und #49 (Suche) später durchgehen. Ohne dieses Feld wäre die
-        Anmeldung nur Zierde.
+        Hängt am Gespräch in der Ablage — ohne dieses Feld wäre die Anmeldung
+        nur Zierde, weil #25 (Verlauf) und #24 niemandem etwas zuordnen könnten.
         """
         self.user = (user or "").strip() or LOCAL_USER
 
     def set_conversation(self, conversation_id: str) -> None:
         """Gespräch, in das aufgezeichnet wird (#54).
 
-        Die ID gehört der Oberfläche, nicht dem Streamer: ein Modellwechsel baut
-        einen neuen Streamer, das Gespräch bleibt aber dasselbe. Vorher entstand
-        dabei eine zweite Logdatei.
+        Die ID gehört der Oberfläche, nicht dem Streamer: wird der Streamer neu
+        gebaut (Persona geladen, Modell gewechselt), bleibt das Gespräch dasselbe.
+        Ohne das begänne jede Fortsetzung einen neuen Datensatz.
         """
         self.conversation_id = (conversation_id or "").strip()
 

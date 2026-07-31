@@ -21,6 +21,7 @@ if TYPE_CHECKING:  # zur Laufzeit bewusst nicht importiert (optionale Abhängigk
     from core.ollama_llm_core import OllamaLLMCore
 
 from core.utils import (
+    LOCAL_USER,
     _system_prompt_with_date,
     _wiki_mode_enabled,
     is_ollama_module_not_found,
@@ -53,6 +54,24 @@ class AppFactory:
         if self._store is None:
             self._store = build_store(getattr(self._cfg, "storage", None))
         return self._store
+
+    def open_conversation(self, persona: str, app: str, user: str = LOCAL_USER) -> str:
+        """Neues Gespräch anlegen und seine ID liefern (#54).
+
+        Hier statt in jeder Oberfläche, weil alle vier Kanäle (Web, Terminal,
+        API, Mail) dasselbe brauchen — inklusive der Regel, dass ein Fehler beim
+        Aufzeichnen nie den Betrieb stoppt.
+        """
+        try:
+            return self.get_store().start(
+                user=user or LOCAL_USER,
+                persona=persona,
+                model=str(self._cfg.core.get("model_name", "")),
+                app=app,
+            )
+        except Exception:
+            logging.exception("Gespräch konnte nicht angelegt werden")
+            return ""
 
     def get_keyword_finder(self) -> SpacyKeywordFinder | None:
         if self._keyword_finder is None:
@@ -139,7 +158,7 @@ class AppFactory:
         """Streamer für eine Gast-Persona, die nur in der Sitzung lebt (#28).
 
         Identisch zum Persona-Pfad, nur ohne Umweg über die Ensemble-YAML —
-        Guard, Wiki, Kontext-Management und Gesprächslog kommen dadurch gratis
+        Guard, Wiki, Kontext-Management und Gesprächs-Ablage kommen dadurch gratis
         mit, statt für den Gast nachgebaut zu werden.
         """
         return self._build_streamer(
