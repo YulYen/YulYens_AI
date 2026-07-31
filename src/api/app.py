@@ -2,11 +2,16 @@ import logging
 import traceback
 
 import core.system_checks as system_checks
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 
-from .openai_compat import OpenAIError, openai_error_handler, validation_error_handler
+from .openai_compat import (
+    OpenAIError,
+    openai_error_handler,
+    require_ask_access,
+    validation_error_handler,
+)
 from .openai_compat import router as openai_router
 from .provider import AiApiProvider, UnknownPersonaError
 
@@ -66,7 +71,12 @@ def healthz(response: Response):
     return {"status": status, "checks": [r.as_dict() for r in results]}
 
 
-@app.post("/ask", response_model=AskResponse)
+# Derselbe Schlüssel und dasselbe Rate-Limit wie unter /v1: /ask bietet
+# dieselbe Fähigkeit auf demselben Port an, war aber ungeschützt — wer
+# api.openai_compatible.api_key setzte, hielt die API für abgesichert.
+@app.post(
+    "/ask", response_model=AskResponse, dependencies=[Depends(require_ask_access)]
+)
 def ask(req: AskRequest):
     try:
         provider = get_provider()

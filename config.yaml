@@ -191,13 +191,21 @@ api:
   # Personas. Damit sprechen Open WebUI, Handy-Apps und Editor-Plugins mit den
   # Personas, inklusive Guard, Wiki-Injection und Gesprächslog.
   openai_compatible:
+    # Schaltet nur /v1 ab; /ask bleibt davon unberührt und hängt an api.enabled.
     enabled: true
     # Optionaler Bearer-Key. Leer = offen (nur sinnvoll, solange host auf
     # 127.0.0.1 steht!). Sobald der Server im LAN hängt: setzen, am besten als
     # "env:YULYEN_API_KEY" statt im Klartext.
+    #
+    # Er gilt für ALLE Endpunkte, auch für /ask — der Name sagt nur, wo die
+    # Option steht. Vorher schützte er ausschließlich /v1, während /ask auf
+    # demselben Port dieselbe Fähigkeit ohne Schlüssel anbot; wer ihn setzte,
+    # hielt die API damit für abgesichert, ohne es zu sein.
+    # /health bleibt bewusst frei, sonst meldet ein Monitor den Prozess als tot.
     api_key: ""
     # Fixed-Window-Limit pro Client und Minute; 0 schaltet es ab. Klein
     # angesetzt, weil ein einzelnes Ollama die Anfragen ohnehin serialisiert.
+    # Gilt ebenfalls für /ask.
     rate_limit_per_minute: 60
 
 security:
