@@ -17,6 +17,7 @@ import os
 import threading
 import time
 from collections.abc import Generator, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from config.config_singleton import Config
@@ -86,6 +87,26 @@ def _output_checks_active(guard: BasicGuard | None) -> bool:
         return False
     flags = getattr(guard, "flags", {}) or {}
     return bool(flags.get("pii_protection") or flags.get("output_blocklist"))
+
+
+@dataclass(frozen=True)
+class StreamStats:
+    """Kennzahlen des letzten Streams (#36).
+
+    Gemessen wurden sie schon immer — sie standen nur im Logfile. Für die
+    Statuszeile im WebUI müssen sie den Aufrufer erreichen, ohne die Signatur
+    von ``stream()`` zu ändern: der Provider legt sie auf sich selbst ab.
+    """
+
+    tokens: int
+    t_first_ms: int | None
+    t_total_ms: int
+
+    @property
+    def tokens_per_second(self) -> float:
+        if self.t_total_ms <= 0 or self.tokens <= 0:
+            return 0.0
+        return self.tokens / (self.t_total_ms / 1000)
 
 
 class _StreamModerator:
@@ -218,6 +239,8 @@ class YulYenStreamingProvider:
         ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
         self.guard: BasicGuard | None = guard
+        # Kennzahlen des zuletzt gelaufenen Streams (#36); None vor dem ersten.
+        self.last_stream_stats: StreamStats | None = None
         self.stream_holdback: int = _STREAM_HOLDBACK_CHARS
 
     def set_guard(self, guard: BasicGuard) -> None:
@@ -355,6 +378,7 @@ class YulYenStreamingProvider:
         try:
             t_start = time.time()
             first_token_time: float | None = None
+            token_count = 0
 
             self._log_generation_start(messages, options)
 
@@ -379,6 +403,7 @@ class YulYenStreamingProvider:
                     token = chunk.get("message", {}).get("content", "")
                     if not token:
                         continue
+                    token_count += 1
                     full_reply_parts.append(token)
                     for out in moderator.feed(token):
                         yield out
@@ -404,12 +429,16 @@ class YulYenStreamingProvider:
                 t_first_ms = int((first_token_time - t_start) * 1000)
             else:
                 t_first_ms = None
+            t_total_ms = int((t_end - t_start) * 1000)
+            self.last_stream_stats = StreamStats(
+                tokens=token_count, t_first_ms=t_first_ms, t_total_ms=t_total_ms
+            )
             logging.info(
                 "model %s options: %s t_first_ms: %s t_total_ms: %s",
                 self.model_name,
                 options,
                 t_first_ms,
-                int((t_end - t_start) * 1000),
+                t_total_ms,
             )
 
             # Log the final assistant reply. When the guard blocked the output

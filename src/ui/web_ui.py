@@ -17,8 +17,14 @@ import gradio as gr
 import requests
 from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
-from core.context_utils import context_near_limit, shrink_history_for_context
+from core.context_utils import (
+    approx_token_count,
+    context_near_limit,
+    shrink_history_for_context,
+)
+from core.context_utils import threshold as CONTEXT_FILL_WARN_RATIO
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
+from core.streaming_provider import StreamStats
 from core.system_checks import fetch_model_names
 from core.utils import ensure_dir_exists, is_broadcast_enabled, is_broadcast_parallel
 from stt.whisper_stt import is_stt_available, transcribe_wav
@@ -93,6 +99,7 @@ PERSONA_OUTPUT_KEYS = (
     "sources_md",
     "ask_all_sources_accordion",
     "ask_all_sources_md",
+    "status_md",
 )
 
 # Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
@@ -104,6 +111,7 @@ STREAM_OUTPUT_KEYS = (
     "history_state",
     "sources_accordion",
     "sources_md",
+    "status_md",
 )
 
 # Was _with_stream_controls hinter STREAM_OUTPUT_KEYS anhängt.
@@ -282,6 +290,71 @@ class WebUI:
         )
         return True
 
+    # ---------- Statuszeile (#36) ----------
+    def _format_status_line(
+        self, history: list[Message] | None, stats: StreamStats | None
+    ) -> str:
+        """Kontext-Füllstand und Tempo der letzten Antwort.
+
+        Beides misst das Projekt längst — der Füllstand steckt in
+        ``context_near_limit``, die Zeiten schrieb ``stream()`` bisher nur ins
+        Logfile. Sichtbar erklärt der Balken die Kompressions-Meldung, *bevor*
+        sie kommt.
+        """
+        parts: list[str] = []
+        options = getattr(self.streamer, "persona_options", None) or {}
+        limit = int(options.get("num_ctx") or 0)
+        if limit > 0:
+            used = approx_token_count(history or [])
+            ratio = used / limit
+            bar = self._context_bar(ratio)
+            text = self._t(
+                "web_status_context",
+                used=f"{used:,}".replace(",", "."),
+                limit=f"{limit:,}".replace(",", "."),
+                percent=f"{ratio * 100:.0f}",
+                bar=bar,
+            )
+            # Ab dieser Schwelle greift die Kompression — dann fett statt still.
+            parts.append(f"**{text}**" if ratio >= CONTEXT_FILL_WARN_RATIO else text)
+
+        if stats is not None and stats.tokens:
+            parts.append(
+                self._t(
+                    "web_status_speed",
+                    tokens_per_second=f"{stats.tokens_per_second:.1f}",
+                )
+            )
+            if stats.t_first_ms is not None:
+                parts.append(
+                    self._t(
+                        "web_status_first_token",
+                        seconds=f"{stats.t_first_ms / 1000:.1f}",
+                    )
+                )
+        return " · ".join(parts)
+
+    @staticmethod
+    def _context_bar(ratio: float, width: int = 12) -> str:
+        filled = max(0, min(width, round(ratio * width)))
+        return "█" * filled + "░" * (width - filled)
+
+    def _last_stream_stats(self) -> StreamStats | None:
+        """Kennzahlen des Providers — nur, wenn es wirklich welche sind.
+
+        Vor dem ersten Stream ist das Attribut None; Testdoubles setzen es gar
+        nicht. Die isinstance-Prüfung hält halbe Werte aus der Anzeige heraus,
+        statt sie zu formatieren.
+        """
+        stats = getattr(self.streamer, "last_stream_stats", None)
+        return stats if isinstance(stats, StreamStats) else None
+
+    def _status_update(
+        self, history: list[Message] | None, stats: StreamStats | None
+    ) -> Any:
+        line = self._format_status_line(history, stats)
+        return gr.update(value=line, visible=bool(line))
+
     # ---------- Wiki-Quellen (#32) ----------
     def _format_wiki_sources(self, snippets: list[WikiSnippet]) -> str:
         """Markdown für das Quellen-Accordion.
@@ -335,6 +408,9 @@ class WebUI:
         # Die Quellen-Slots stehen vor dem Stream schon fest und bleiben hier
         # unangetastet — gr.update() ohne Wert ist ein No-op für die Anzeige.
         keep = self._wiki_sources_unchanged()
+        # Statuszeile erst im Schluss-Yield: Tempo und Füllstand stehen vorher
+        # nicht fest, und jeder Wert pro Yield kostet Bandbreite (#36).
+        status_keep = gr.update()
         # Gedrosselt wie in der Ask-All-Ansicht: nicht jedes Token einzeln über
         # den Socket schicken; last_flush=0.0 lässt den ersten Chunk sofort durch.
         reply = ""
@@ -354,7 +430,13 @@ class WebUI:
                 now = time.monotonic()
                 if now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                     last_flush = now
-                    yield None, chat_history + [(None, reply)], message_history, *keep
+                    yield (
+                        None,
+                        chat_history + [(None, reply)],
+                        message_history,
+                        *keep,
+                        status_keep,
+                    )
         finally:
             close = getattr(tokens, "close", None)
             if close is not None:
@@ -369,7 +451,14 @@ class WebUI:
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
-        yield None, chat_history, message_history, *keep
+        stats = self._last_stream_stats()
+        yield (
+            None,
+            chat_history,
+            message_history,
+            *keep,
+            self._status_update(message_history, stats),
+        )
 
     def respond_streaming(
         self,
@@ -380,7 +469,13 @@ class WebUI:
 
         # Safety check: persona not selected yet → UI should prevent this, but we double-check
         if not self.bot:
-            yield "", chat_history, history_state, *self._wiki_sources_unchanged()
+            yield (
+                "",
+                chat_history,
+                history_state,
+                *self._wiki_sources_unchanged(),
+                gr.update(),
+            )
             return
 
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
@@ -391,7 +486,7 @@ class WebUI:
         #    verschwinden deshalb sofort (#32).
         logging.debug("User input received (%d chars)", len(user_input))
         chat_history.append((user_input, None))
-        yield "", chat_history, llm_history, *self._wiki_source_updates([])
+        yield "", chat_history, llm_history, *self._wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
         wiki_hints, contexts = lookup_wiki_snippet(
@@ -410,7 +505,13 @@ class WebUI:
             if wiki_hint:
                 chat_history.append((None, wiki_hint))
         if wiki_hints or contexts:
-            yield None, chat_history, llm_history, *self._wiki_source_updates(contexts)
+            yield (
+                None,
+                chat_history,
+                llm_history,
+                *self._wiki_source_updates(contexts),
+                gr.update(),
+            )
 
         # 4) Optional: inject wiki context
         if contexts:
@@ -422,7 +523,13 @@ class WebUI:
 
         # 6) Compress the context if needed and record that in chat history
         if self._handle_context_warning(llm_history, chat_history):
-            yield None, chat_history, llm_history, *self._wiki_sources_unchanged()
+            yield (
+                None,
+                chat_history,
+                llm_history,
+                *self._wiki_sources_unchanged(),
+                gr.update(),
+            )
 
         # 7) Stream the answer
         yield from self._stream_reply(llm_history, chat_history)
@@ -507,12 +614,12 @@ class WebUI:
         keep = self._wiki_sources_unchanged()
 
         if not self.bot or not self.streamer:
-            yield gr.update(), chat_history, llm_history, *keep
+            yield gr.update(), chat_history, llm_history, *keep, gr.update()
             return
 
         if not llm_history or llm_history[-1].get("role") != "assistant":
             gr.Warning(self._t("web_regenerate_nothing"))
-            yield gr.update(), chat_history, llm_history, *keep
+            yield gr.update(), chat_history, llm_history, *keep, gr.update()
             return
 
         llm_history.pop()
@@ -520,14 +627,14 @@ class WebUI:
         # sind ebenfalls Bot-Zeilen, stehen aber davor und bleiben stehen.
         if chat_history and chat_history[-1][0] is None:
             chat_history.pop()
-        yield gr.update(), chat_history, llm_history, *keep
+        yield gr.update(), chat_history, llm_history, *keep, gr.update()
 
         # gr.update() statt None: ein noch nicht abgeschickter Entwurf im
         # Eingabefeld soll durch das Neuerzeugen nicht verloren gehen.
-        for _input_value, updated_chat, updated_state, *sources in self._stream_reply(
+        for _input_value, updated_chat, updated_state, *rest in self._stream_reply(
             llm_history, chat_history
         ):
-            yield gr.update(), updated_chat, updated_state, *sources
+            yield gr.update(), updated_chat, updated_state, *rest
 
     def respond_briefing(
         self, chat_history: list[ChatPair], history_state: list[Message] | None
@@ -535,14 +642,20 @@ class WebUI:
         """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
         keep = self._wiki_sources_unchanged()
         if not self.bot or not self.briefing_enabled:
-            yield gr.update(), chat_history, history_state, *keep
+            yield gr.update(), chat_history, history_state, *keep, gr.update()
             return
 
         llm_history = list(history_state or [])
         briefing_prompt = self._t("briefing_user_prompt")
         chat_history.append((briefing_prompt, None))
         # Kein Wiki im Spiel — die Quellen der vorigen Antwort sind hier hinfällig.
-        yield gr.update(), chat_history, llm_history, *self._wiki_source_updates([])
+        yield (
+            gr.update(),
+            chat_history,
+            llm_history,
+            *self._wiki_source_updates([]),
+            gr.update(),
+        )
 
         timeout = (
             float(self.briefing_cfg.get("timeout_connect", 5.0)),
@@ -554,11 +667,11 @@ class WebUI:
             if hint:
                 chat_history.append((None, hint))
         if hints:
-            yield None, chat_history, llm_history, *keep
+            yield None, chat_history, llm_history, *keep, gr.update()
 
         if not items:
             chat_history.append((None, self._t("briefing_empty")))
-            yield None, chat_history, llm_history, *keep
+            yield None, chat_history, llm_history, *keep, gr.update()
             return
 
         # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
@@ -566,7 +679,7 @@ class WebUI:
         llm_history.append({"role": "user", "content": briefing_prompt})
 
         if self._handle_context_warning(llm_history, chat_history):
-            yield None, chat_history, llm_history, *keep
+            yield None, chat_history, llm_history, *keep, gr.update()
 
         yield from self._stream_reply(llm_history, chat_history)
 
@@ -625,6 +738,7 @@ class WebUI:
             "sources_md": gr.update(value=""),
             "ask_all_sources_accordion": gr.update(visible=False, open=False),
             "ask_all_sources_md": gr.update(value=""),
+            "status_md": gr.update(value="", visible=False),
         }
 
     def _persona_selected_updates(
@@ -1571,6 +1685,8 @@ class WebUI:
         stop_label = ui.get("web_stop_button", "Stop ⏹")
         regenerate_label = ui.get("web_regenerate_button", "Nochmal 🔄")
         sources_label = ui.get("web_sources_label", "Quellen 📚")
+        theme_light_label = ui.get("web_theme_light", "☀️ Hell")
+        theme_dark_label = ui.get("web_theme_dark", "🌙 Dunkel")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1611,6 +1727,8 @@ class WebUI:
             stop_label=stop_label,
             regenerate_label=regenerate_label,
             sources_label=sources_label,
+            theme_light_label=theme_light_label,
+            theme_dark_label=theme_dark_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
