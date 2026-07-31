@@ -20,11 +20,9 @@ from auth import build_auth_provider
 from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import (
-    approx_token_count,
     context_near_limit,
     shrink_history_for_context,
 )
-from core.context_utils import threshold as CONTEXT_FILL_WARN_RATIO
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.streaming_provider import StreamStats
 from core.system_checks import fetch_model_names
@@ -40,11 +38,26 @@ from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
-from ui.webui_layout import build_ui
+from ui.webui_format import (
+    conversation_markdown,
+    find_question_for_row,
+    format_ask_all_results,
+    format_status_line,
+    format_wiki_sources,
+    history_label,
+    messages_to_chat_history,
+)
+from ui.webui_layout import (
+    ASK_ALL_OUTPUT_KEYS,
+    PERSONA_OUTPUT_KEYS,
+    STREAM_CONTROL_KEYS,
+    STREAM_OUTPUT_KEYS,
+    as_persona_outputs,
+    build_ui,
+)
 from wiki.lookup import (
     WikiLookup,
     WikiSnippet,
-    format_snippet_meta,
     inject_wiki_context,
 )
 
@@ -84,86 +97,6 @@ def _delivery_dir() -> str:
             _tmp_dir = tempfile.mkdtemp(prefix="yulyen-webui-")
             atexit.register(shutil.rmtree, _tmp_dir, True)
     return _tmp_dir
-
-
-# Single source of truth for the order of the "switch view" output components.
-# Every handler bound to these outputs builds a dict keyed by these names and
-# resolves it via WebUI._as_persona_outputs() — never by positional index.
-PERSONA_OUTPUT_KEYS = (
-    "selected_persona_state",
-    "grid_group",
-    "focus_group",
-    "focus_img",
-    "focus_md",
-    "greeting_md",
-    "chatbot",
-    "input_box",
-    "send_btn",
-    "new_chat_btn",
-    "download_btn",
-    "download_file",
-    "save_status",
-    "history_state",
-    "meta_state",
-    "ask_all_group",
-    "ask_all_results",
-    "ask_all_question",
-    "ask_all_submit",
-    "ask_all_new_chat",
-    "ask_all_status",
-    "load_status",
-    "self_talk_group",
-    "self_talk_status",
-    "self_talk_persona_a",
-    "self_talk_persona_b",
-    "self_talk_prompt",
-    "self_talk_start_btn",
-    "mic_audio",
-    "briefing_btn",
-    "read_aloud_btn",
-    "tts_audio",
-    "stop_btn",
-    "regenerate_btn",
-    "sources_accordion",
-    "sources_md",
-    "ask_all_sources_accordion",
-    "ask_all_sources_md",
-    "status_md",
-    "guest_group",
-    "guest_status",
-    "conversation_state",
-    "history_group",
-    "history_status",
-    "history_pick",
-    "history_preview",
-    "history_confirm",
-)
-
-# Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
-# reisen bewusst in denselben Yields mit statt als eigenes .then()-Event davor —
-# das hätte den ersten Token um Sekunden verzögert (siehe _with_stream_controls).
-STREAM_OUTPUT_KEYS = (
-    "input_box",
-    "chatbot",
-    "history_state",
-    "sources_accordion",
-    "sources_md",
-    "status_md",
-)
-
-# Was _with_stream_controls hinter STREAM_OUTPUT_KEYS anhängt.
-STREAM_CONTROL_KEYS = ("send_btn", "stop_btn", "regenerate_btn")
-
-# Reihenfolge der Ask-All-Ausgaben — dieselbe, die _ask_all_state aufbaut.
-ASK_ALL_OUTPUT_KEYS = (
-    "ask_all_question",
-    "ask_all_status",
-    "ask_all_results",
-    "ask_all_submit",
-    "ask_all_new_chat",
-    "ask_all_sources_accordion",
-    "ask_all_sources_md",
-)
 
 
 class WebUI:
@@ -330,32 +263,6 @@ class WebUI:
             "user": user or self._fallback_user(),
         }
 
-    def _messages_to_chat_history(
-        self, messages: list[Message] | None
-    ) -> list[ChatPair]:
-        chat_history = []
-        pending_user = None
-
-        for item in messages or []:
-            role = item.get("role")
-            content = item.get("content")
-
-            if role == "user":
-                if pending_user is not None:
-                    chat_history.append((pending_user, None))
-                pending_user = content
-            elif role == "assistant":
-                if pending_user is not None:
-                    chat_history.append((pending_user, content))
-                    pending_user = None
-                else:
-                    chat_history.append((None, content))
-
-        if pending_user is not None:
-            chat_history.append((pending_user, None))
-
-        return chat_history
-
     def _persona_thumbnail_path(self, persona_name: str) -> str:
         ensemble = getattr(self.cfg, "ensemble", None)
         if not ensemble:
@@ -395,58 +302,8 @@ class WebUI:
         return True
 
     # ---------- Statuszeile (#36) ----------
-    def _format_status_line(
-        self,
-        session: SessionContext,
-        history: list[Message] | None,
-        stats: StreamStats | None,
-    ) -> str:
-        """Kontext-Füllstand und Tempo der letzten Antwort.
-
-        Beides misst das Projekt längst — der Füllstand steckt in
-        ``context_near_limit``, die Zeiten schrieb ``stream()`` bisher nur ins
-        Logfile. Sichtbar erklärt der Balken die Kompressions-Meldung, *bevor*
-        sie kommt.
-        """
-        parts: list[str] = []
-        options = getattr(session.streamer, "persona_options", None) or {}
-        limit = int(options.get("num_ctx") or 0)
-        if limit > 0:
-            used = approx_token_count(history or [])
-            ratio = used / limit
-            bar = self._context_bar(ratio)
-            text = self._t(
-                "web_status_context",
-                used=f"{used:,}".replace(",", "."),
-                limit=f"{limit:,}".replace(",", "."),
-                percent=f"{ratio * 100:.0f}",
-                bar=bar,
-            )
-            # Ab dieser Schwelle greift die Kompression — dann fett statt still.
-            parts.append(f"**{text}**" if ratio >= CONTEXT_FILL_WARN_RATIO else text)
-
-        if stats is not None and stats.tokens:
-            parts.append(
-                self._t(
-                    "web_status_speed",
-                    tokens_per_second=f"{stats.tokens_per_second:.1f}",
-                )
-            )
-            if stats.t_first_ms is not None:
-                parts.append(
-                    self._t(
-                        "web_status_first_token",
-                        seconds=f"{stats.t_first_ms / 1000:.1f}",
-                    )
-                )
-        return " · ".join(parts)
-
     @staticmethod
-    def _context_bar(ratio: float, width: int = 12) -> str:
-        filled = max(0, min(width, round(ratio * width)))
-        return "█" * filled + "░" * (width - filled)
-
-    def _last_stream_stats(self, session: SessionContext) -> StreamStats | None:
+    def _last_stream_stats(session: SessionContext) -> StreamStats | None:
         """Kennzahlen des Providers — nur, wenn es wirklich welche sind.
 
         Vor dem ersten Stream ist das Attribut None; Testdoubles setzen es gar
@@ -462,35 +319,18 @@ class WebUI:
         history: list[Message] | None,
         stats: StreamStats | None,
     ) -> Any:
-        line = self._format_status_line(session, history, stats)
+        line = format_status_line(
+            self._t,
+            getattr(session.streamer, "persona_options", None),
+            history,
+            stats,
+        )
         return gr.update(value=line, visible=bool(line))
 
     # ---------- Wiki-Quellen (#32) ----------
-    def _format_wiki_sources(self, snippets: list[WikiSnippet]) -> str:
-        """Markdown für das Quellen-Accordion.
-
-        Zeigt bewusst den *injizierten* Text und dessen Länge, nicht nur Titel
-        und Link: nur so ist erkennbar, worauf eine Antwort beruht — und ob der
-        Artikel an ``wiki.snippet_limit`` abgeschnitten wurde, das Modell den
-        Rest also nie gesehen hat.
-        """
-        sections = []
-        for idx, snip in enumerate(snippets or [], start=1):
-            title = snip.topic or "?"
-            heading = f"[{title}]({snip.link})" if snip.link else title
-            meta = format_snippet_meta(snip, self._t)
-            # Blockquote: hebt den fremden Text vom Rahmen ab und bleibt auch
-            # bei 1200 Zeichen am Stück lesbar.
-            quoted = "\n".join(
-                f"> {line}" if line.strip() else ">"
-                for line in snip.snippet.splitlines()
-            )
-            sections.append(f"### {idx}. {heading}\n*{meta}*\n\n{quoted}")
-        return "\n\n---\n\n".join(sections)
-
     def _wiki_source_updates(self, snippets: list[WikiSnippet] | None) -> tuple:
         """Accordion + Markdown; ohne Treffer bleibt das Accordion unsichtbar."""
-        markdown = self._format_wiki_sources(snippets or [])
+        markdown = format_wiki_sources(snippets, self._t)
         return gr.update(visible=bool(markdown)), gr.update(value=markdown)
 
     @staticmethod
@@ -803,13 +643,6 @@ class WebUI:
 
         yield from self._stream_reply(session, llm_history, chat_history)
 
-    def _as_persona_outputs(self, updates: dict) -> tuple:
-        """Resolve a named update dict into the tuple order of PERSONA_OUTPUT_KEYS."""
-        unknown = set(updates) - set(PERSONA_OUTPUT_KEYS)
-        if unknown:
-            raise KeyError(f"Unknown persona-output keys: {sorted(unknown)}")
-        return tuple(updates[key] for key in PERSONA_OUTPUT_KEYS)
-
     def _reset_updates(self) -> dict:
         """Baseline 'back to start screen' state; handlers override what differs."""
         return {
@@ -929,10 +762,10 @@ class WebUI:
             regenerate_btn=gr.update(visible=True, interactive=True),
             stop_btn=gr.update(visible=False),
         )
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     def _reset_ui_updates(self) -> tuple:
-        return self._as_persona_outputs(self._reset_updates())
+        return as_persona_outputs(self._reset_updates())
 
     def _on_persona_selected(
         self,
@@ -1088,16 +921,9 @@ class WebUI:
             ask_all_submit=gr.update(visible=True, interactive=True),
             ask_all_new_chat=gr.update(visible=True),
         )
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     # ---------- Verlauf (#25) ----------
-    @staticmethod
-    def _history_label(ref: ConversationRef) -> str:
-        """`2026-07-31 05:10 · PETER · Wie ist der Status …`"""
-        stamp = ref.updated_at[:16].replace("T", " ")
-        title = ref.title or "—"
-        return f"{stamp} · {ref.persona} · {title}"
-
     def _history_choices(self, user: str) -> list[tuple[str, str]]:
         """Gespräche des angemeldeten Nutzers — Beschriftung und ID.
 
@@ -1116,7 +942,7 @@ class WebUI:
         except Exception:
             logging.exception("Verlauf konnte nicht gelesen werden")
             return []
-        return [(self._history_label(ref), ref.id) for ref in refs]
+        return [(history_label(ref), ref.id) for ref in refs]
 
     def _on_show_history(self, session: SessionContext, user: str) -> tuple:
         session.clear_persona()
@@ -1131,7 +957,7 @@ class WebUI:
                 value=self._t("history_empty"), visible=not choices
             ),
         )
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     def _on_history_selected(self, conversation_id: str | None) -> Any:
         """Vorschau des gewählten Gesprächs."""
@@ -1139,7 +965,7 @@ class WebUI:
         if loaded is None:
             return gr.update(value="")
         ref, messages = loaded
-        return gr.update(value=self._conversation_markdown(ref, messages))
+        return gr.update(value=conversation_markdown(ref, messages, self._t))
 
     def _load_from_store(self, conversation_id: str | None):
         if not conversation_id:
@@ -1149,28 +975,6 @@ class WebUI:
         except Exception:
             logging.exception("Gespräch %s nicht ladbar", conversation_id)
             return None
-
-    def _conversation_markdown(
-        self, ref: ConversationRef, messages: list[Message]
-    ) -> str:
-        """Ein Gespräch als Markdown — dieselbe Form für Vorschau und Export."""
-        head = self._t(
-            "history_export_head",
-            persona=ref.persona,
-            model=ref.model,
-            created_at=ref.created_at[:16].replace("T", " "),
-            user=ref.user,
-        )
-        lines = [f"# {ref.title or ref.persona}", "", f"*{head}*", ""]
-        for message in messages:
-            who = (
-                ref.persona
-                if message.get("role") == "assistant"
-                else self._t("history_role_user")
-            )
-            lines.append(f"**{who}:** {message.get('content', '')}")
-            lines.append("")
-        return "\n".join(lines)
 
     @staticmethod
     def _continuable_persona(
@@ -1211,7 +1015,7 @@ class WebUI:
                     value=self._t("history_not_found"), visible=True
                 ),
             )
-            return self._as_persona_outputs(updates)
+            return as_persona_outputs(updates)
 
         ref, messages = loaded
         persona = self._continuable_persona(ref, persona_info)
@@ -1224,14 +1028,14 @@ class WebUI:
                 new_chat_btn=gr.update(visible=True),
                 history_group=gr.update(visible=True),
                 history_preview=gr.update(
-                    value=self._conversation_markdown(ref, messages)
+                    value=conversation_markdown(ref, messages, self._t)
                 ),
                 history_status=gr.update(
                     value=self._t("history_persona_gone", persona=ref.persona),
                     visible=True,
                 ),
             )
-            return self._as_persona_outputs(updates)
+            return as_persona_outputs(updates)
 
         session.bot = persona["name"]
         session.streamer = self.factory.get_streamer_for_persona(session.bot)
@@ -1252,7 +1056,7 @@ class WebUI:
         # gesetzt werden, sonst schreibt das fortgesetzte Gespräch ins Leere.
         as_dict = dict(zip(PERSONA_OUTPUT_KEYS, updates, strict=True))
         as_dict["conversation_state"] = ref.id
-        return self._as_persona_outputs(as_dict)
+        return as_persona_outputs(as_dict)
 
     def _on_history_export(
         self, session: SessionContext, conversation_id: str | None
@@ -1262,7 +1066,7 @@ class WebUI:
             return gr.update(value=None, visible=False)
         ref, messages = loaded
         path = self._delivery_file(session, "export", ".md")
-        path.write_text(self._conversation_markdown(ref, messages), encoding="utf-8")
+        path.write_text(conversation_markdown(ref, messages, self._t), encoding="utf-8")
         return gr.update(value=str(path), visible=True)
 
     def _on_history_delete(
@@ -1305,7 +1109,7 @@ class WebUI:
             new_chat_btn=gr.update(visible=True),
             guest_group=gr.update(visible=True),
         )
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     def _on_start_guest(
         self,
@@ -1337,7 +1141,7 @@ class WebUI:
                     value=self._t("guest_missing_fields"), visible=True
                 ),
             )
-            return self._as_persona_outputs(updates)
+            return as_persona_outputs(updates)
 
         options = {
             "temperature": float(temperature if temperature is not None else 0.7)
@@ -1379,7 +1183,7 @@ class WebUI:
             ),
             self_talk_start_btn=gr.update(visible=True, interactive=True),
         )
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     def _on_start_self_talk(
         self,
@@ -1530,13 +1334,6 @@ class WebUI:
             gr.update(value=sources_md),
         )
 
-    @staticmethod
-    def _format_ask_all_results(replies: dict[str, str]) -> str:
-        """One markdown section per persona, separated by horizontal rules."""
-        return "\n\n---\n\n".join(
-            f"### {persona}\n\n{reply}" for persona, reply in replies.items()
-        )
-
     def _on_submit_ask_all(
         self,
         session: SessionContext,
@@ -1574,9 +1371,7 @@ class WebUI:
             "submit_visible": False,
             "submit_interactive": False,
         }
-        yield self._ask_all_state(
-            question, self._format_ask_all_results(replies), **running
-        )
+        yield self._ask_all_state(question, format_ask_all_results(replies), **running)
 
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
@@ -1587,11 +1382,11 @@ class WebUI:
         wiki_status = "\n\n".join(hint for hint in wiki_hints if hint)
         # Die Quellen stehen hier bereits fest und reisen ab jetzt in jedem
         # Yield mit — genau wie wiki_status (#32a).
-        sources_md = self._format_wiki_sources(contexts)
+        sources_md = format_wiki_sources(contexts, self._t)
         if wiki_status or sources_md:
             yield self._ask_all_state(
                 question,
-                self._format_ask_all_results(replies),
+                format_ask_all_results(replies),
                 status=wiki_status,
                 sources_md=sources_md,
                 **running,
@@ -1621,7 +1416,7 @@ class WebUI:
                 last_flush = now
                 yield self._ask_all_state(
                     question,
-                    self._format_ask_all_results(replies),
+                    format_ask_all_results(replies),
                     status=wiki_status,
                     sources_md=sources_md,
                     **running,
@@ -1631,7 +1426,7 @@ class WebUI:
         # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
         yield self._ask_all_state(
             question,
-            self._format_ask_all_results(replies),
+            format_ask_all_results(replies),
             status=wiki_status,
             sources_md=sources_md,
             editable=True,
@@ -1640,7 +1435,7 @@ class WebUI:
     def _load_failure_updates(self, message: str) -> tuple:
         updates = self._reset_updates()
         updates["load_status"] = gr.update(value=message, visible=True)
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     def _conversation_loaded_updates(
         self,
@@ -1652,7 +1447,7 @@ class WebUI:
     ) -> tuple:
         display_name = persona["name"].title()
         focus_text = f"### {persona['name']}\n{persona['description']}"
-        chat_history = self._messages_to_chat_history(messages)
+        chat_history = messages_to_chat_history(messages)
 
         greeting = self._t("web_load_status_success", persona_name=display_name)
 
@@ -1683,7 +1478,7 @@ class WebUI:
             ),
             load_status=gr.update(value=greeting, visible=True),
         )
-        return self._as_persona_outputs(updates)
+        return as_persona_outputs(updates)
 
     def _on_load_conversation(
         self,
@@ -1770,21 +1565,6 @@ class WebUI:
         self.feedback_log_path = os.path.join(log_dir, "feedback_votes.jsonl")
         return self.feedback_log_path
 
-    @staticmethod
-    def _find_question_for_row(chat_history: list[ChatPair] | None, row: int) -> str:
-        # Live chat appends (question, None) and (None, answer) as separate rows
-        # (with optional (None, wiki_hint) rows in between), while loaded
-        # conversations pair (question, answer) — walking backwards from the
-        # liked row to the nearest user text covers both layouts.
-        if not chat_history:
-            return ""
-        row = min(row, len(chat_history) - 1)
-        for r in range(row, -1, -1):
-            pair = chat_history[r]
-            if pair and pair[0] is not None:
-                return str(pair[0])
-        return ""
-
     def _on_chat_like(
         self,
         session: SessionContext,
@@ -1817,7 +1597,7 @@ class WebUI:
                 "persona": meta.get("persona") or session.bot or "",
                 "model": meta.get("model", ""),
                 "vote": "up" if evt.liked else "down",
-                "question": self._find_question_for_row(chat_history, row),
+                "question": find_question_for_row(chat_history, row),
                 "answer": answer,
                 "index": [row, col],
             }

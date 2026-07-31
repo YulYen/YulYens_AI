@@ -986,12 +986,6 @@ def test_chat_like_handles_garbage_input(tmp_path):
     assert vote["index"] == [-1, 1]
 
 
-def test_find_question_returns_empty_on_garbage():
-    assert WebUI._find_question_for_row([], 0) == ""
-    assert WebUI._find_question_for_row(None, 3) == ""
-    assert WebUI._find_question_for_row([(None, "nur Bot")], 5) == ""
-
-
 def test_chat_like_ignores_votes_on_user_messages(tmp_path):
     """Gradio also shows thumbs on the user row — those votes carry no signal."""
 
@@ -1304,61 +1298,6 @@ def _web_ui_with_texts():
     return web_ui
 
 
-def test_format_wiki_sources_shows_link_length_and_the_injected_text():
-    web_ui = _web_ui_with_texts()
-
-    markdown = web_ui._format_wiki_sources(
-        [
-            WikiSnippet(
-                topic="Deutschland",
-                snippet="Deutschland ist ein Bundesstaat.",
-                link="http://127.0.0.1:8080/wiki/Deutschland",
-                source="local",
-                full_length=8432,
-            )
-        ]
-    )
-
-    assert "[Deutschland](http://127.0.0.1:8080/wiki/Deutschland)" in markdown
-    assert "Offline-Archiv" in markdown
-    # Gekürzt: beide Zahlen müssen dastehen, sonst ist nicht erkennbar, wie viel
-    # des Artikels das Modell nie gesehen hat.
-    assert "32 von 8432 Zeichen" in markdown
-    assert "gekürzt" in markdown
-    assert "> Deutschland ist ein Bundesstaat." in markdown
-
-
-def test_format_wiki_sources_marks_complete_snippets_as_complete():
-    web_ui = _web_ui_with_texts()
-
-    markdown = web_ui._format_wiki_sources(
-        [WikiSnippet(topic="Kiwix", snippet="Kurz.", source="online", full_length=5)]
-    )
-
-    assert "vollständig" in markdown
-    assert "gekürzt" not in markdown
-    assert "Wikipedia (online)" in markdown
-
-
-def test_format_wiki_sources_numbers_every_snippet():
-    web_ui = _web_ui_with_texts()
-
-    markdown = web_ui._format_wiki_sources(
-        [
-            WikiSnippet(topic="Eins", snippet="A", full_length=1),
-            WikiSnippet(topic="Zwei", snippet="B", full_length=1),
-        ]
-    )
-
-    assert "### 1. Eins" in markdown
-    assert "### 2. Zwei" in markdown
-    assert markdown.count("---") == 1
-
-
-def test_format_wiki_sources_is_empty_without_snippets():
-    assert _web_ui_with_texts()._format_wiki_sources([]) == ""
-
-
 def test_wiki_source_updates_hide_the_accordion_without_hits():
     accordion, markdown = _web_ui_with_texts()._wiki_source_updates([])
 
@@ -1562,45 +1501,6 @@ def _status_web_ui(num_ctx=8192):
         streamer=SimpleNamespace(persona_options={"num_ctx": num_ctx})
     )
     return _web_ui_with_texts(), session
-
-
-def test_status_line_shows_context_fill():
-    web_ui, session = _status_web_ui()
-    history = [{"role": "user", "content": "x" * 400}]
-
-    line = web_ui._format_status_line(session, history, None)
-
-    assert "8.192" in line
-    assert "%" in line
-    assert "█" in line or "░" in line
-
-
-def test_status_line_highlights_once_compression_kicks_in():
-    """Fett genau ab der Schwelle, ab der shrink_history_for_context greift."""
-    web_ui, session = _status_web_ui(num_ctx=1000)
-    small = [{"role": "user", "content": "kurz"}]
-    huge = [{"role": "user", "content": "x" * 4000}]
-
-    assert not web_ui._format_status_line(session, small, None).startswith("**")
-    assert web_ui._format_status_line(session, huge, None).startswith("**")
-
-
-def test_status_line_reports_speed_and_first_token():
-    web_ui, session = _status_web_ui()
-    stats = StreamStats(tokens=120, t_first_ms=1900, t_total_ms=5000)
-
-    line = web_ui._format_status_line(session, [], stats)
-
-    assert "24.0" in line  # 120 Token in 5 s
-    assert "1.9" in line
-
-
-def test_status_line_stays_empty_without_context_limit_and_stats():
-    web_ui = _web_ui_with_texts()
-    session = SessionContext()
-    session.streamer = SimpleNamespace(persona_options={})
-
-    assert web_ui._format_status_line(session, [], None) == ""
 
 
 def test_status_line_ignores_a_streamer_without_real_stats():

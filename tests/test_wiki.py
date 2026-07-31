@@ -437,3 +437,168 @@ def test_wiki_lookup_without_a_wiki_section_stays_usable():
     lookup = WikiLookup.from_config(SimpleNamespace(), keyword_finder=None)
 
     assert lookup.snippets("Frage?", "TEST") == ([], [])
+
+
+# ---- Der Proxy selbst (T2) --------------------------------------------------
+
+
+@pytest.fixture
+def proxy(monkeypatch):
+    """Die Anfrage-Auswertung mit festen Einstellungen, ohne Socket und Netz."""
+    from wiki import wikipedia_proxy as module
+
+    Config.reset_instance()
+    cfg = Config("config.yaml")
+    settings = SimpleNamespace(
+        config=cfg,
+        online_base_url="https://de.wikipedia.org",
+        snippet_limit=1200,
+        timeout=(1.0, 1.0),
+        kiwix_port=8080,
+        kiwix_host="127.0.0.1",
+        proxy_port=8042,
+        zim_prefix="wikipedia_de",
+    )
+    monkeypatch.setattr(module, "_get_settings", lambda: settings)
+    yield module
+    Config.reset_instance()
+
+
+class _KiwixResponse:
+    def __init__(self, html: str) -> None:
+        self.text = html
+        self.content = html.encode("utf-8")
+
+
+def test_proxy_rejects_a_request_without_a_search_term(proxy):
+    result = proxy.handle_lookup("/?json=1")
+
+    assert result.status == 400
+    assert result.payload is None
+    assert "Search term" in result.text
+
+
+def test_proxy_returns_404_as_plain_text(proxy, monkeypatch):
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (404, None))
+
+    result = proxy.handle_lookup("/Gibtsnicht?json=1")
+
+    assert result.status == 404
+    assert result.payload is None
+
+
+def test_proxy_maps_any_other_failure_to_500(proxy, monkeypatch):
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (503, None))
+
+    result = proxy.handle_lookup("/Deutschland")
+
+    assert result.status == 500
+    assert "503" in result.text
+
+
+def test_proxy_delivers_text_link_source_and_original_length(proxy, monkeypatch):
+    html = "<html><body><div id='content'><p>Berlin ist die Hauptstadt.</p></div></body></html>"
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (200, _KiwixResponse(html)))
+
+    result = proxy.handle_lookup(
+        "/Deutschland?json=1&persona=PETER", "192.168.0.5:8042"
+    )
+
+    assert result.status == 200
+    payload = result.payload
+    assert payload["title"] == "Deutschland"
+    assert "Berlin" in payload["text"]
+    assert payload["source"] == "local"
+    # Der Link zeigt auf den Host der Anfrage, aber auf den Kiwix-Port.
+    assert payload["link"] == "http://192.168.0.5:8080/wikipedia_de/Deutschland"
+    assert payload["full_length"] == len(payload["text"])
+    assert "PETER" in payload["wiki_hint"]
+
+
+def test_proxy_truncates_at_the_requested_limit_and_reports_the_full_length(
+    proxy, monkeypatch
+):
+    article = "Wort " * 400  # 2000 Zeichen
+    html = f"<html><body><div id='content'><p>{article}</p></div></body></html>"
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (200, _KiwixResponse(html)))
+
+    result = proxy.handle_lookup("/Deutschland?json=1&limit=100")
+
+    payload = result.payload
+    assert len(payload["text"]) <= 102  # gekürzt am Wortende, plus " …"
+    assert payload["full_length"] > len(payload["text"])
+
+
+def test_proxy_never_exceeds_the_configured_snippet_limit(proxy, monkeypatch):
+    """Ein größerer limit-Parameter darf die Konfiguration nicht aushebeln."""
+    article = "Wort " * 2000
+    html = f"<html><body><div id='content'><p>{article}</p></div></body></html>"
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (200, _KiwixResponse(html)))
+
+    result = proxy.handle_lookup("/Deutschland?json=1&limit=999999")
+
+    assert len(result.payload["text"]) <= 1202
+
+
+def test_proxy_falls_back_to_the_configured_limit_on_nonsense(proxy, monkeypatch):
+    monkeypatch.setattr(
+        proxy,
+        "_fetch_kiwix",
+        lambda term: (200, _KiwixResponse("<html><body>Kurz.</body></html>")),
+    )
+
+    result = proxy.handle_lookup("/Deutschland?limit=viele")
+
+    assert result.status == 200
+
+
+def test_proxy_online_mode_uses_the_summary_and_the_wikipedia_link(proxy, monkeypatch):
+    called = {}
+
+    def _fake_online(term):
+        called["term"] = term
+        return 200, SimpleNamespace(text="Berlin ist die Hauptstadt.")
+
+    monkeypatch.setattr(proxy, "_fetch_online", _fake_online)
+    monkeypatch.setattr(
+        proxy, "_fetch_kiwix", lambda term: pytest.fail("Kiwix darf hier nicht laufen")
+    )
+
+    result = proxy.handle_lookup("/Deutschland?json=1&online=1")
+
+    assert called["term"] == "Deutschland"
+    assert result.payload["source"] == "online"
+    assert result.payload["link"] == "https://de.wikipedia.org/wiki/Deutschland"
+
+
+def test_proxy_keeps_the_infobox_block_in_front_of_the_body(proxy, monkeypatch):
+    html = (
+        "<html><body><div id='content'>"
+        "<table class='infobox'><tr><th>Hauptstadt</th><td>Berlin</td></tr></table>"
+        "<p>Deutschland ist ein Bundesstaat.</p>"
+        "</div></body></html>"
+    )
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (200, _KiwixResponse(html)))
+
+    result = proxy.handle_lookup("/Deutschland?json=1")
+
+    text = result.payload["text"]
+    assert text.startswith("Hauptstadt: Berlin")
+    # Die Infobox steht nur einmal drin — im Fließtext wurde sie entfernt.
+    assert text.count("Hauptstadt") == 1
+    assert "Bundesstaat" in text
+
+
+def test_proxy_decodes_percent_escapes_in_the_term(proxy, monkeypatch):
+    seen = {}
+
+    def _fetch(term):
+        seen["term"] = term
+        return 200, _KiwixResponse("<html><body>Text</body></html>")
+
+    monkeypatch.setattr(proxy, "_fetch_kiwix", _fetch)
+
+    result = proxy.handle_lookup("/C%2B%2B?json=1")
+
+    assert seen["term"] == "C++"
+    assert result.payload["title"] == "C++"

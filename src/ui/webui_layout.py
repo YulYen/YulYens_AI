@@ -1,6 +1,98 @@
 import gradio as gr
 from ui.session import SessionContext
 
+# Single source of truth for the order of the "switch view" output components.
+# Every handler bound to these outputs builds a dict keyed by these names and
+# resolves it via as_persona_outputs() — never by positional index.
+PERSONA_OUTPUT_KEYS = (
+    "selected_persona_state",
+    "grid_group",
+    "focus_group",
+    "focus_img",
+    "focus_md",
+    "greeting_md",
+    "chatbot",
+    "input_box",
+    "send_btn",
+    "new_chat_btn",
+    "download_btn",
+    "download_file",
+    "save_status",
+    "history_state",
+    "meta_state",
+    "ask_all_group",
+    "ask_all_results",
+    "ask_all_question",
+    "ask_all_submit",
+    "ask_all_new_chat",
+    "ask_all_status",
+    "load_status",
+    "self_talk_group",
+    "self_talk_status",
+    "self_talk_persona_a",
+    "self_talk_persona_b",
+    "self_talk_prompt",
+    "self_talk_start_btn",
+    "mic_audio",
+    "briefing_btn",
+    "read_aloud_btn",
+    "tts_audio",
+    "stop_btn",
+    "regenerate_btn",
+    "sources_accordion",
+    "sources_md",
+    "ask_all_sources_accordion",
+    "ask_all_sources_md",
+    "status_md",
+    "guest_group",
+    "guest_status",
+    "conversation_state",
+    "history_group",
+    "history_status",
+    "history_pick",
+    "history_preview",
+    "history_confirm",
+)
+
+# Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
+# reisen bewusst in denselben Yields mit statt als eigenes .then()-Event davor —
+# das hätte den ersten Token um Sekunden verzögert (siehe _with_stream_controls).
+STREAM_OUTPUT_KEYS = (
+    "input_box",
+    "chatbot",
+    "history_state",
+    "sources_accordion",
+    "sources_md",
+    "status_md",
+)
+
+# Was _with_stream_controls hinter STREAM_OUTPUT_KEYS anhängt.
+STREAM_CONTROL_KEYS = ("send_btn", "stop_btn", "regenerate_btn")
+
+# Reihenfolge der Ask-All-Ausgaben — dieselbe, die _ask_all_state aufbaut.
+ASK_ALL_OUTPUT_KEYS = (
+    "ask_all_question",
+    "ask_all_status",
+    "ask_all_results",
+    "ask_all_submit",
+    "ask_all_new_chat",
+    "ask_all_sources_accordion",
+    "ask_all_sources_md",
+)
+
+
+def as_persona_outputs(updates: dict) -> tuple:
+    """Ein benanntes Update-Dict in die Reihenfolge von PERSONA_OUTPUT_KEYS bringen.
+
+    Die Keys stehen hier statt bei den Handlern, weil die Komponenten, die sie
+    benennen, hier gebaut werden: ein Key ohne Komponente fällt so beim Lesen
+    einer Datei auf statt beim Klicken im Browser.
+    """
+    unknown = set(updates) - set(PERSONA_OUTPUT_KEYS)
+    if unknown:
+        raise KeyError(f"Unknown persona-output keys: {sorted(unknown)}")
+    return tuple(updates[key] for key in PERSONA_OUTPUT_KEYS)
+
 
 def build_ui(
     *,
