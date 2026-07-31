@@ -184,3 +184,22 @@ def _ignore_local_config_override(monkeypatch):
 
     monkeypatch.setenv("YULYEN_SKIP_LOCAL_CONFIG", "1")
     yield
+
+
+@pytest.fixture(autouse=True)
+def _no_conversation_store_by_default(monkeypatch):
+    """Kein Test schreibt in die echte Gesprächs-Ablage (#54).
+
+    Sonst würde jede Test-Session `data/conversations.sqlite3` im Repo
+    vollschreiben. Tests, die den Store selbst prüfen, bauen sich einen
+    SqliteStore in tmp_path.
+    """
+
+    original_load_config = Config._load_config
+
+    def _patched_load_config(self, path):
+        original_load_config(self, path)
+        self.storage = {"enabled": False}
+
+    monkeypatch.setattr(Config, "_load_config", _patched_load_config)
+    yield

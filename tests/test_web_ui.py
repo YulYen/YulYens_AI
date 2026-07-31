@@ -5,6 +5,7 @@ import logging
 import sys
 import threading
 import types
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -519,7 +520,7 @@ def test_on_model_selected_overrides_config_and_rebuilds_streamer():
     web_ui.cfg.override = Mock()
     web_ui.bot = "Karl"
 
-    update = web_ui._on_model_selected("neu:1")
+    update = web_ui._on_model_selected("neu:1", "")
 
     web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
     web_ui.factory.get_streamer_for_persona.assert_called_once_with("Karl")
@@ -531,7 +532,7 @@ def test_on_model_selected_without_persona_keeps_streamer_none():
     web_ui.cfg.override = Mock()
     web_ui.bot = None
 
-    update = web_ui._on_model_selected("neu:1")
+    update = web_ui._on_model_selected("neu:1", "")
 
     web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
     web_ui.factory.get_streamer_for_persona.assert_not_called()
@@ -543,7 +544,7 @@ def test_on_model_selected_empty_choice_is_noop():
     web_ui = _create_web_ui()
     web_ui.cfg.override = Mock()
 
-    update = web_ui._on_model_selected("")
+    update = web_ui._on_model_selected("", "")
 
     web_ui.cfg.override.assert_not_called()
     assert update["visible"] is False
@@ -1711,7 +1712,7 @@ def _guest_web_ui():
 def test_guest_start_builds_a_session_only_streamer():
     web_ui = _guest_web_ui()
 
-    web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 1.2)
+    web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 1.2, "")
 
     web_ui.factory.get_streamer_for_guest.assert_called_once_with(
         "Pirat", "Du bist ein Pirat.", {"temperature": 1.2}
@@ -1725,7 +1726,7 @@ def test_guest_start_opens_the_chat_without_an_image():
     """Der Gast hat kein Portrait — lieber leer als ein toter Pfad."""
     web_ui = _guest_web_ui()
 
-    updates = web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 0.7)
+    updates = web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 0.7, "")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
     focus_img = updates[PERSONA_OUTPUT_KEYS.index("focus_img")]
@@ -1738,7 +1739,7 @@ def test_guest_start_opens_the_chat_without_an_image():
 def test_guest_start_refuses_incomplete_forms(name, prompt):
     web_ui = _guest_web_ui()
 
-    updates = web_ui._on_start_guest(name, prompt, 0.7)
+    updates = web_ui._on_start_guest(name, prompt, 0.7, "")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("guest_status")]["visible"] is True
@@ -1762,3 +1763,228 @@ def test_show_guest_opens_the_form_and_leaves_the_grid():
 
     assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("grid_group")]["visible"] is False
+
+
+# ---- Verlauf auf der Ablage (#25 auf #54) ----------------------------------
+
+
+def _history_web_ui(tmp_path):
+    from storage import SqliteStore
+
+    web_ui = _web_ui_with_texts()
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "classic"
+    store = SqliteStore(tmp_path / "conversations.sqlite3")
+    web_ui.factory.get_store.return_value = store
+    # Die Factory legt Gespräche an (#54) — hier gegen denselben Store.
+    web_ui.factory.open_conversation.side_effect = lambda persona, app, user="local": (
+        store.start(user=user, persona=persona, model="m", app=app)
+    )
+    return web_ui, store
+
+
+def _fill(store, *, user="local", persona="LEAH", question="Hallo"):
+    cid = store.start(user=user, persona=persona, model="m", app="web")
+    store.append(cid, "user", question)
+    store.append(cid, "assistant", "Antwort")
+    return cid
+
+
+def test_history_lists_only_the_signed_in_users_conversations(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    mine = _fill(store, user="yulyen")
+    _fill(store, user="jemand_anders")
+
+    updates = web_ui._on_show_history("yulyen")
+
+    choices = updates[PERSONA_OUTPUT_KEYS.index("history_pick")]["choices"]
+    assert [cid for _label, cid in choices] == [mine]
+
+
+def test_history_label_shows_date_persona_and_title(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    _fill(store, user="local", persona="PETER", question="Wie ist der Status?")
+
+    label = web_ui._on_show_history("local")[PERSONA_OUTPUT_KEYS.index("history_pick")][
+        "choices"
+    ][0][0]
+
+    assert "PETER" in label and "Wie ist der Status?" in label
+
+
+def test_history_says_so_when_there_is_nothing(tmp_path):
+    web_ui, _store = _history_web_ui(tmp_path)
+
+    updates = web_ui._on_show_history("local")
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
+
+
+def test_history_preview_renders_both_roles(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store, question="Frage?")
+
+    preview = web_ui._on_history_selected(cid)["value"]
+
+    assert "Frage?" in preview and "Antwort" in preview
+    assert "LEAH" in preview
+
+
+def test_history_open_makes_the_conversation_continuable(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store, persona="LEAH", question="Frage?")
+    persona_info = {"leah": {"name": "LEAH", "description": "d"}}
+
+    updates = web_ui._on_history_open(cid, persona_info, "Tippe")
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
+    # Ohne die Gesprächs-ID würde das fortgesetzte Gespräch ins Leere schreiben.
+    assert updates[PERSONA_OUTPUT_KEYS.index("conversation_state")] == cid
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_state")][0]["content"] == "Frage?"
+    assert web_ui.bot == "LEAH"
+
+
+def test_history_open_of_a_gone_persona_stays_readable(tmp_path):
+    """Gast-Personas leben nur in ihrer Sitzung — lesbar ja, fortsetzbar nein."""
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store, persona="Pirat")
+
+    updates = web_ui._on_history_open(cid, {"leah": {"name": "LEAH"}}, "Tippe")
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_group")]["visible"] is True
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
+    assert "Antwort" in updates[PERSONA_OUTPUT_KEYS.index("history_preview")]["value"]
+    assert web_ui.bot is None
+
+
+def test_history_open_of_an_unknown_id_reports_it(tmp_path):
+    web_ui, _store = _history_web_ui(tmp_path)
+
+    updates = web_ui._on_history_open("gibtesnicht", {}, "Tippe")
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
+
+
+def test_history_export_writes_markdown(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store, question="Frage?")
+
+    update = web_ui._on_history_export(cid)
+
+    text = Path(update["value"]).read_text(encoding="utf-8")
+    assert "Frage?" in text and "Antwort" in text
+    assert "LEAH" in text and "local" in text
+
+
+def test_history_delete_removes_it_from_the_list(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store)
+
+    pick, preview, status, _file, confirm = web_ui._on_history_delete(
+        cid, True, "local"
+    )
+
+    assert pick["choices"] == []
+    assert preview["value"] == ""
+    assert status["visible"] is True
+    assert confirm["value"] is False  # Häkchen zurückgesetzt
+    assert store.load(cid) is None
+
+
+def test_history_delete_needs_confirmation(tmp_path):
+    """Löschen ist endgültig — ein Fehlklick darf nichts vernichten."""
+    web_ui, store = _history_web_ui(tmp_path)
+    cid = _fill(store)
+
+    _pick, _preview, status, _file, _confirm = web_ui._on_history_delete(
+        cid, False, "local"
+    )
+
+    assert status["visible"] is True
+    assert store.load(cid) is not None
+
+
+# ---- Ein Gespräch bleibt eines (#54) ---------------------------------------
+
+
+def test_model_switch_keeps_the_same_conversation(tmp_path):
+    """Ein Streamer-Neubau darf kein zweites Gespräch beginnen.
+
+    Über die UI ist der Modellwechsel mitten im Chat derzeit nicht erreichbar
+    (Dropdown nur auf der Startseite); der Test hält die Verdrahtung fest.
+    """
+    web_ui, _store = _history_web_ui(tmp_path)
+    web_ui.bot = "LEAH"
+    new_streamer = Mock()
+    web_ui.factory.get_streamer_for_persona.return_value = new_streamer
+    web_ui.cfg.override = Mock()
+
+    web_ui._on_model_selected("anderes-modell", "gespraech-1")
+
+    new_streamer.set_conversation.assert_called_once_with("gespraech-1")
+
+
+def test_persona_selection_opens_exactly_one_conversation(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+
+    updates = web_ui._on_persona_selected(
+        "yulyen",
+        key="leah",
+        persona_info={"leah": {"name": "LEAH", "description": "d"}},
+        greeting_template="Hallo {persona_name}",
+        input_placeholder="Tippe",
+    )
+
+    conversation_id = updates[PERSONA_OUTPUT_KEYS.index("conversation_state")]
+    assert conversation_id
+    assert [ref.id for ref in store.list_conversations(user="yulyen")] == [
+        conversation_id
+    ]
+
+
+def test_leaving_the_history_clears_the_delete_confirmation():
+    """Ein gesetztes Häkchen darf den Weg zur Startseite nicht überleben."""
+    updates = _create_web_ui()._reset_ui_updates()
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_confirm")]["value"] is False
+
+
+# ---- Datei-Austausch abschaltbar (#54) -------------------------------------
+
+
+def _exchange_web_ui(enabled):
+    web_ui = _create_web_ui()
+    web_ui.cfg.storage = {"file_exchange": enabled}
+    web_ui.file_exchange_enabled = enabled
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "classic"
+    return web_ui
+
+
+def test_download_button_follows_the_file_exchange_switch():
+    for enabled in (True, False):
+        web_ui = _exchange_web_ui(enabled)
+
+        updates = web_ui._persona_selected_updates(
+            "karl",
+            {"name": "Karl", "description": "d"},
+            "Hallo {persona_name}",
+            "Tippe",
+        )
+
+        download = updates[PERSONA_OUTPUT_KEYS.index("download_btn")]
+        assert download["visible"] is enabled
+
+
+def test_loaded_conversation_also_respects_the_switch():
+    web_ui = _exchange_web_ui(False)
+
+    updates = web_ui._conversation_loaded_updates(
+        "karl",
+        {"name": "Karl", "description": "d"},
+        {"persona": "Karl", "model": "m", "created_at": "x", "app": "web"},
+        [{"role": "user", "content": "Hallo"}],
+        "Tippe",
+    )
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("download_btn")]["visible"] is False

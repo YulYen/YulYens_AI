@@ -27,7 +27,13 @@ from core.context_utils import threshold as CONTEXT_FILL_WARN_RATIO
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.streaming_provider import StreamStats
 from core.system_checks import fetch_model_names
-from core.utils import ensure_dir_exists, is_broadcast_enabled, is_broadcast_parallel
+from core.utils import (
+    ensure_dir_exists,
+    is_broadcast_enabled,
+    is_broadcast_parallel,
+    is_file_exchange_enabled,
+)
+from storage import ConversationRef
 from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
@@ -103,6 +109,12 @@ PERSONA_OUTPUT_KEYS = (
     "status_md",
     "guest_group",
     "guest_status",
+    "conversation_state",
+    "history_group",
+    "history_status",
+    "history_pick",
+    "history_preview",
+    "history_confirm",
 )
 
 # Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
@@ -172,6 +184,8 @@ class WebUI:
         self.auth = build_auth_provider(
             ui_cfg.get("web") if isinstance(ui_cfg, dict) else None
         )
+        # Datei-Austausch (JSON rein/raus) ist abschaltbar (#54).
+        self.file_exchange_enabled = is_file_exchange_enabled(self.cfg)
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
         self.broadcast_parallel = is_broadcast_parallel(self.cfg)
         # Kill switch für den laufenden Ask-All-Broadcast: Gradio cancels
@@ -229,11 +243,27 @@ class WebUI:
     def _reset_meta_state(self) -> dict:
         return {}
 
+    def _open_conversation(self, persona_name: str, user: str) -> str:
+        """Neues Gespräch anlegen (#54).
+
+        Die ID gehört ab hier der Oberfläche: sie liegt im `gr.State` und wird
+        nach einem Streamer-Neubau erneut gesetzt, statt dass ein zweites
+        Gespräch entsteht.
+        """
+        return self.factory.open_conversation(
+            persona_name, "web", user or self._fallback_user()
+        )
+
+    def _stamp_conversation(self, conversation_id: str) -> None:
+        setter = getattr(self.streamer, "set_conversation", None)
+        if callable(setter):
+            setter(conversation_id)
+
     def _stamp_user(self, user: str) -> None:
         """Identität an den frischen Streamer geben (#53).
 
-        Sie landet dadurch in jeder Zeile des Gesprächslogs — der Datei, die
-        #25 (Verlauf) und #49 (Suche) später durchgehen.
+        Sie hängt dadurch am Gespräch in der Ablage — die Grundlage für den
+        Verlauf (#25) und später die Suche (#49).
         """
         setter = getattr(self.streamer, "set_user", None)
         if callable(setter):
@@ -787,6 +817,14 @@ class WebUI:
             "status_md": gr.update(value="", visible=False),
             "guest_group": gr.update(visible=False),
             "guest_status": gr.update(value="", visible=False),
+            "conversation_state": "",
+            "history_group": gr.update(visible=False),
+            "history_status": gr.update(value="", visible=False),
+            "history_pick": gr.update(choices=[], value=None),
+            "history_preview": gr.update(value=""),
+            # Muss zurück: ein gesetztes Häkchen überlebte sonst den Weg zur
+            # Startseite und der nächste Klick löschte ohne neue Bestätigung.
+            "history_confirm": gr.update(value=False),
         }
 
     def _persona_selected_updates(
@@ -796,6 +834,7 @@ class WebUI:
         greeting_template: str,
         input_placeholder: str,
         user: str = "",
+        conversation_id: str = "",
         image_path: str | None = "",
     ) -> tuple:
         display_name = persona["name"].title()
@@ -828,10 +867,11 @@ class WebUI:
             ),
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
-            download_btn=gr.update(visible=True),
+            download_btn=gr.update(visible=self.file_exchange_enabled),
             briefing_btn=gr.update(visible=self.briefing_enabled),
             read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             meta_state=self._build_meta(persona["name"], user=user),
+            conversation_state=conversation_id,
             ask_all_question=gr.update(
                 value="",
                 visible=False,
@@ -852,7 +892,7 @@ class WebUI:
 
     def _on_persona_selected(
         self,
-        user: str = "",
+        user: str,
         *,
         key: str = "",
         persona_info: dict[str, dict[str, Any]] | None = None,
@@ -868,8 +908,15 @@ class WebUI:
         self.bot = persona["name"]
         self.streamer = self.factory.get_streamer_for_persona(self.bot)
         self._stamp_user(user)
+        conversation_id = self._open_conversation(self.bot, user)
+        self._stamp_conversation(conversation_id)
         return self._persona_selected_updates(
-            key, persona, greeting_template, input_placeholder, user=user
+            key,
+            persona,
+            greeting_template,
+            input_placeholder,
+            user=user,
+            conversation_id=conversation_id,
         )
 
     def _cancel_ask_all_broadcast(self) -> None:
@@ -908,7 +955,7 @@ class WebUI:
             choices.insert(0, default_model)
         return choices or [default_model]
 
-    def _on_model_selected(self, choice: str | None):
+    def _on_model_selected(self, choice: str | None, conversation_id: str):
         """Session-Override des Modells; config.yaml bleibt unangetastet."""
         choice = (choice or "").strip()
         if not choice:
@@ -918,6 +965,13 @@ class WebUI:
             # Laufendes Gespräch: Streamer neu bauen (History lebt im gr.State),
             # damit auch die Cutoff-Zeile im System-Prompt zum Modell passt.
             self.streamer = self.factory.get_streamer_for_persona(self.bot)
+            # Der neue Streamer schreibt in dasselbe Gespräch weiter (#54).
+            # Über die UI ist dieser Fall derzeit nicht auslösbar — das
+            # Modell-Dropdown sitzt im „Erweitert"-Akkordeon der Startseite und
+            # ist während eines Chats nicht sichtbar. Die Verdrahtung steht
+            # trotzdem, damit sie nicht fehlt, sobald es das ist.
+            self._stamp_conversation(conversation_id)
+            self._stamp_user("")
         logging.info("Modell per UI gewechselt: %s", choice)
         return gr.update(
             value=self._t("web_model_switched", model_name=choice), visible=True
@@ -990,6 +1044,187 @@ class WebUI:
         )
         return self._as_persona_outputs(updates)
 
+    # ---------- Verlauf (#25) ----------
+    @staticmethod
+    def _history_label(ref: ConversationRef) -> str:
+        """`2026-07-31 05:10 · PETER · Wie ist der Status …`"""
+        stamp = ref.updated_at[:16].replace("T", " ")
+        title = ref.title or "—"
+        return f"{stamp} · {ref.persona} · {title}"
+
+    def _history_choices(self, user: str) -> list[tuple[str, str]]:
+        """Gespräche des angemeldeten Nutzers — Beschriftung und ID.
+
+        Die Filterung nach Nutzer ist der Grund, warum #53 vor diesem Ticket
+        kam: ohne sie zeigt eine Verlaufsliste jedem alles.
+        """
+        try:
+            refs = self.factory.get_store().list_conversations(
+                user=user or self._fallback_user()
+            )
+        except Exception:
+            logging.exception("Verlauf konnte nicht gelesen werden")
+            return []
+        return [(self._history_label(ref), ref.id) for ref in refs]
+
+    def _on_show_history(self, user: str) -> tuple:
+        self.bot = None
+        self.streamer = None
+        choices = self._history_choices(user)
+        updates = self._reset_updates()
+        updates.update(
+            grid_group=gr.update(visible=False),
+            new_chat_btn=gr.update(visible=True),
+            history_group=gr.update(visible=True),
+            history_pick=gr.update(choices=choices, value=None),
+            history_status=gr.update(
+                value=self._t("history_empty"), visible=not choices
+            ),
+        )
+        return self._as_persona_outputs(updates)
+
+    def _on_history_selected(self, conversation_id: str | None) -> Any:
+        """Vorschau des gewählten Gesprächs."""
+        loaded = self._load_from_store(conversation_id)
+        if loaded is None:
+            return gr.update(value="")
+        ref, messages = loaded
+        return gr.update(value=self._conversation_markdown(ref, messages))
+
+    def _load_from_store(self, conversation_id: str | None):
+        if not conversation_id:
+            return None
+        try:
+            return self.factory.get_store().load(str(conversation_id))
+        except Exception:
+            logging.exception("Gespräch %s nicht ladbar", conversation_id)
+            return None
+
+    def _conversation_markdown(
+        self, ref: ConversationRef, messages: list[Message]
+    ) -> str:
+        """Ein Gespräch als Markdown — dieselbe Form für Vorschau und Export."""
+        head = self._t(
+            "history_export_head",
+            persona=ref.persona,
+            model=ref.model,
+            created_at=ref.created_at[:16].replace("T", " "),
+            user=ref.user,
+        )
+        lines = [f"# {ref.title or ref.persona}", "", f"*{head}*", ""]
+        for message in messages:
+            who = (
+                ref.persona
+                if message.get("role") == "assistant"
+                else self._t("history_role_user")
+            )
+            lines.append(f"**{who}:** {message.get('content', '')}")
+            lines.append("")
+        return "\n".join(lines)
+
+    def _on_history_open(
+        self,
+        conversation_id: str | None,
+        persona_info: dict[str, dict[str, Any]] | None = None,
+        input_placeholder: str = "",
+    ) -> tuple:
+        """Gespräch in den Chat holen — fortsetzbar, nicht nur ansehbar."""
+        loaded = self._load_from_store(conversation_id)
+        if loaded is None:
+            updates = self._reset_updates()
+            updates.update(
+                grid_group=gr.update(visible=False),
+                new_chat_btn=gr.update(visible=True),
+                history_group=gr.update(visible=True),
+                history_status=gr.update(
+                    value=self._t("history_not_found"), visible=True
+                ),
+            )
+            return self._as_persona_outputs(updates)
+
+        ref, messages = loaded
+        persona = (persona_info or {}).get(ref.persona.lower())
+        if not persona:
+            # Gast-Personas leben nur in ihrer Sitzung; ihr Verlauf bleibt
+            # lesbar, fortsetzen lässt er sich ohne den Prompt aber nicht.
+            updates = self._reset_updates()
+            updates.update(
+                grid_group=gr.update(visible=False),
+                new_chat_btn=gr.update(visible=True),
+                history_group=gr.update(visible=True),
+                history_preview=gr.update(
+                    value=self._conversation_markdown(ref, messages)
+                ),
+                history_status=gr.update(
+                    value=self._t("history_persona_gone", persona=ref.persona),
+                    visible=True,
+                ),
+            )
+            return self._as_persona_outputs(updates)
+
+        self.bot = persona["name"]
+        self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        self._stamp_user(ref.user)
+        self._stamp_conversation(ref.id)
+
+        meta = {
+            "created_at": ref.created_at,
+            "model": ref.model,
+            "persona": ref.persona,
+            "app": ref.app,
+            "user": ref.user,
+        }
+        updates = self._conversation_loaded_updates(
+            ref.persona.lower(), persona, meta, messages, input_placeholder
+        )
+        # _conversation_loaded_updates kennt die Ablage nicht — die ID muss
+        # gesetzt werden, sonst schreibt das fortgesetzte Gespräch ins Leere.
+        as_dict = dict(zip(PERSONA_OUTPUT_KEYS, updates, strict=True))
+        as_dict["conversation_state"] = ref.id
+        return self._as_persona_outputs(as_dict)
+
+    def _on_history_export(self, conversation_id: str | None) -> Any:
+        loaded = self._load_from_store(conversation_id)
+        if loaded is None:
+            return gr.update(value=None, visible=False)
+        ref, messages = loaded
+        with tempfile.NamedTemporaryFile(
+            "w", delete=False, suffix=".md", encoding="utf-8"
+        ) as tmp:
+            tmp.write(self._conversation_markdown(ref, messages))
+            path = tmp.name
+        return gr.update(value=path, visible=True)
+
+    def _on_history_delete(
+        self, conversation_id: str | None, confirmed: bool, user: str
+    ) -> tuple:
+        """Löschen ist endgültig — deshalb nur mit gesetztem Häkchen."""
+        if not confirmed:
+            return (
+                gr.update(),
+                gr.update(),
+                gr.update(value=self._t("history_confirm_first"), visible=True),
+                gr.update(),
+                gr.update(),
+            )
+
+        deleted = False
+        if conversation_id:
+            try:
+                deleted = self.factory.get_store().delete(str(conversation_id))
+            except Exception:
+                logging.exception("Gespräch %s nicht löschbar", conversation_id)
+        choices = self._history_choices(user)
+        message = "history_deleted" if deleted else "history_not_found"
+        return (
+            gr.update(choices=choices, value=None),
+            gr.update(value=""),
+            gr.update(value=self._t(message), visible=True),
+            gr.update(value=None, visible=False),
+            # Häkchen zurücksetzen, damit der nächste Klick nicht durchrutscht.
+            gr.update(value=False),
+        )
+
     def _on_show_guest(self) -> tuple:
         """Formular für eine Gast-Persona zeigen (#28)."""
         self.bot = None
@@ -1008,7 +1243,7 @@ class WebUI:
         name: str | None,
         prompt: str | None,
         temperature: float | None,
-        user: str = "",
+        user: str,
         *,
         greeting_template: str = "",
         input_placeholder: str = "",
@@ -1040,6 +1275,8 @@ class WebUI:
         self.bot = name
         self.streamer = self.factory.get_streamer_for_guest(name, prompt, options)
         self._stamp_user(user)
+        conversation_id = self._open_conversation(name, user)
+        self._stamp_conversation(conversation_id)
         logging.info("Gast-Persona '%s' gestartet (nur Sitzung)", name)
 
         persona = {"name": name, "description": self._t("guest_description")}
@@ -1049,6 +1286,7 @@ class WebUI:
             greeting_template,
             input_placeholder,
             user=user,
+            conversation_id=conversation_id,
             # Der Gast hat kein Bild — lieber leer als ein toter Pfad.
             image_path=None,
         )
@@ -1361,7 +1599,7 @@ class WebUI:
             ),
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
-            download_btn=gr.update(visible=True),
+            download_btn=gr.update(visible=self.file_exchange_enabled),
             briefing_btn=gr.update(visible=self.briefing_enabled),
             read_aloud_btn=gr.update(visible=self.tts_web_enabled),
             history_state=messages,
@@ -1556,6 +1794,9 @@ class WebUI:
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
 
+        # Parameter, die aus `inputs=` kommen, stehen bewusst ohne Default da:
+        # ein Handler, der stillschweigend auf einen leeren Nutzer zurückfällt,
+        # schreibt Gespräche unter der falschen Identität weg.
         user_state = components["user_state"]
 
         # Identität einmal pro Browser-Sitzung einsammeln (#53).
@@ -1592,7 +1833,7 @@ class WebUI:
         # Initialwert; bewusst außerhalb der PERSONA_OUTPUT_KEYS gehalten.
         model_dropdown.change(
             fn=self._on_model_selected,
-            inputs=[model_dropdown],
+            inputs=[model_dropdown, components["conversation_state"]],
             outputs=[model_status],
             queue=False,
         )
@@ -1678,6 +1919,55 @@ class WebUI:
                 outputs=persona_outputs,
                 queue=False,
             )
+
+        components["history_card_btn"].click(
+            fn=self._on_show_history,
+            inputs=[user_state],
+            outputs=persona_outputs,
+            queue=False,
+        )
+
+        components["history_pick"].change(
+            fn=self._on_history_selected,
+            inputs=[components["history_pick"]],
+            outputs=[components["history_preview"]],
+            queue=False,
+        )
+
+        components["history_open_btn"].click(
+            fn=partial(
+                self._on_history_open,
+                persona_info=persona_info,
+                input_placeholder=input_placeholder,
+            ),
+            inputs=[components["history_pick"]],
+            outputs=persona_outputs,
+            queue=False,
+        )
+
+        components["history_export_btn"].click(
+            fn=self._on_history_export,
+            inputs=[components["history_pick"]],
+            outputs=[components["history_file"]],
+            queue=False,
+        )
+
+        components["history_delete_btn"].click(
+            fn=self._on_history_delete,
+            inputs=[
+                components["history_pick"],
+                components["history_confirm"],
+                user_state,
+            ],
+            outputs=[
+                components["history_pick"],
+                components["history_preview"],
+                components["history_status"],
+                components["history_file"],
+                components["history_confirm"],
+            ],
+            queue=False,
+        )
 
         components["guest_card_btn"].click(
             fn=self._on_show_guest,
@@ -1854,6 +2144,14 @@ class WebUI:
         guest_prompt_placeholder = ui.get("guest_prompt_placeholder", "Du bist …")
         guest_temperature_label = ui.get("guest_temperature_label", "Temperatur")
         guest_start_label = ui.get("guest_start_label", "Gast starten")
+        history_card_label = ui.get("history_card_label", "Verlauf öffnen")
+        history_title = ui.get("history_title", "Verlauf")
+        history_description = ui.get("history_description", "Frühere Gespräche")
+        history_pick_label = ui.get("history_pick_label", "Gespräch")
+        history_open_label = ui.get("history_open_label", "Öffnen")
+        history_export_label = ui.get("history_export_label", "Als Markdown")
+        history_delete_label = ui.get("history_delete_label", "Löschen")
+        history_confirm_label = ui.get("history_confirm_label", "Löschen bestätigen")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1904,6 +2202,15 @@ class WebUI:
             guest_prompt_placeholder=guest_prompt_placeholder,
             guest_temperature_label=guest_temperature_label,
             guest_start_label=guest_start_label,
+            history_card_label=history_card_label,
+            history_title=history_title,
+            history_description=history_description,
+            history_pick_label=history_pick_label,
+            history_open_label=history_open_label,
+            history_export_label=history_export_label,
+            history_delete_label=history_delete_label,
+            history_confirm_label=history_confirm_label,
+            file_exchange_enabled=self.file_exchange_enabled,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

@@ -28,12 +28,12 @@ filterwarnings = [
     "ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning",
 ]
 
-# Typprüfung (#52): bewusst nur src/core — dort sitzt die Logik, die alle UIs
-# teilen. Erweitert wird Modul für Modul, nicht per Big Bang; ein dauerhaft
-# gelber Job wäre wertlos.
+# Typprüfung (#52): Modul für Modul erweitert, nicht per Big Bang — ein
+# dauerhaft gelber Job wäre wertlos. src/core war der Anfang; storage und auth
+# kamen mit #54/#53 dazu und waren von Beginn an sauber.
 [tool.mypy]
 python_version = "3.10"
-files = ["src/core"]
+files = ["src/core", "src/storage", "src/auth"]
 mypy_path = "src"
 # Der Rest des Projekts wird mitgelesen (Signaturen!), aber nicht gemeldet —
 # sonst müsste man alles auf einmal aufräumen.

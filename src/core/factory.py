@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import config.personas as personas
 from config.config_singleton import Config
 from security.tinyguard import BasicGuard, create_guard
+from storage import ConversationStore, build_store
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
 from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
@@ -20,6 +21,7 @@ if TYPE_CHECKING:  # zur Laufzeit bewusst nicht importiert (optionale Abhängigk
     from core.ollama_llm_core import OllamaLLMCore
 
 from core.utils import (
+    LOCAL_USER,
     _system_prompt_with_date,
     _wiki_mode_enabled,
     is_ollama_module_not_found,
@@ -40,11 +42,36 @@ class AppFactory:
         self._api_provider = None
         self._one_shot_provider = None
         self._ui = None  # TerminalUI or WebUI
+        self._store: ConversationStore | None = None
         self._warmed_up = False
 
     # --------- Lazy‑Singleton Getter ---------
     def get_config(self) -> Config:
         return self._cfg
+
+    def get_store(self) -> ConversationStore:
+        """Ablage der Gespräche (#54) — ein Handle pro Prozess."""
+        if self._store is None:
+            self._store = build_store(getattr(self._cfg, "storage", None))
+        return self._store
+
+    def open_conversation(self, persona: str, app: str, user: str = LOCAL_USER) -> str:
+        """Neues Gespräch anlegen und seine ID liefern (#54).
+
+        Hier statt in jeder Oberfläche, weil alle vier Kanäle (Web, Terminal,
+        API, Mail) dasselbe brauchen — inklusive der Regel, dass ein Fehler beim
+        Aufzeichnen nie den Betrieb stoppt.
+        """
+        try:
+            return self.get_store().start(
+                user=user or LOCAL_USER,
+                persona=persona,
+                model=str(self._cfg.core.get("model_name", "")),
+                app=app,
+            )
+        except Exception:
+            logging.exception("Gespräch konnte nicht angelegt werden")
+            return ""
 
     def get_keyword_finder(self) -> SpacyKeywordFinder | None:
         if self._keyword_finder is None:
@@ -131,7 +158,7 @@ class AppFactory:
         """Streamer für eine Gast-Persona, die nur in der Sitzung lebt (#28).
 
         Identisch zum Persona-Pfad, nur ohne Umweg über die Ensemble-YAML —
-        Guard, Wiki, Kontext-Management und Gesprächslog kommen dadurch gratis
+        Guard, Wiki, Kontext-Management und Gesprächs-Ablage kommen dadurch gratis
         mit, statt für den Gast nachgebaut zu werden.
         """
         return self._build_streamer(
@@ -157,6 +184,7 @@ class AppFactory:
 
         streamer_base_url = base_url if base_url is not None else ""
 
+        log_cfg = getattr(self._cfg, "logging", {}) or {}
         streamer = YulYenStreamingProvider(
             base_url=streamer_base_url,
             model_name=core_cfg["model_name"],
@@ -166,6 +194,8 @@ class AppFactory:
             persona_options=options,
             log_file=conv_log_file,
             llm_core=llm_core,  # inject
+            store=self.get_store(),
+            jsonl_log=bool(log_cfg.get("conversation_jsonl", False)),
         )
 
         # Security guard configured via YAML

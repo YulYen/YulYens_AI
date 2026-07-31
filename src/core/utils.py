@@ -160,3 +160,15 @@ def resolve_secret(value) -> str:
     if match:
         return os.environ.get(match.group(1), "")
     return text
+
+
+def is_file_exchange_enabled(cfg) -> bool:
+    """Darf ein Gespräch als Datei rein und raus (#54)?
+
+    Betrifft den JSON-Austausch in beiden Oberflächen — nicht die Ablage und
+    nicht den Markdown-Export des Verlaufs.
+    """
+    storage = getattr(cfg, "storage", None)
+    if not isinstance(storage, dict):
+        return True
+    return bool(storage.get("file_exchange", True))

@@ -64,3 +64,4 @@ out/
 
 # Local config override (real/personal values, never committed)
 config.local.yaml
+data/
