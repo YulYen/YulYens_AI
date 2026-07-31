@@ -4,7 +4,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 import requests
@@ -406,6 +406,11 @@ def handle_lookup(path: str, host_header: str = "localhost") -> ProxyResponse:
 
 # ---------- HTTP-Handler --------------------------------------------------------
 class WikiRequestHandler(BaseHTTPRequestHandler):
+    # Wie lange auf eine vollständige Anfragezeile samt Headern gewartet wird.
+    # Ohne das blockiert eine halb geöffnete Verbindung den Handler unbegrenzt —
+    # beim vorherigen einthreadigen Server hing damit die ganze Wiki-Funktion.
+    timeout = 10
+
     # Redirect standard HTTPServer logs into our logger (optional but nice)
     def log_message(self, format, *args):
         logger.info("%s - %s", self.address_string(), format % args)
@@ -427,11 +432,35 @@ class WikiRequestHandler(BaseHTTPRequestHandler):
             )
 
 
+def build_server(proxy_port: int) -> ThreadingHTTPServer:
+    """Baut den Proxy-Server — nebenläufig und ausdrücklich nur auf Loopback.
+
+    Als Funktion heraus, damit der Test denselben Server bekommt wie der
+    Betrieb; ginge das nur über ``run()``, prüfte er die Bind-Adresse gegen
+    seine eigene Nachbildung statt gegen den echten Aufbau (dasselbe Motiv wie
+    bei ``handle_lookup``).
+
+    **Threading:** vorher ein einfacher ``HTTPServer``, der genau eine Anfrage
+    zur Zeit bearbeitet. Der parallele Broadcast (#23) fragt aber für jede
+    Persona zuerst das Wiki, also serialisierten sich vier Personas hier
+    vollständig — gemessen 311/617/920/1223 ms bei 300 ms Antwortzeit des
+    Backends. Genau der Speedup, für den #23 gebaut wurde.
+
+    **Bind-Adresse:** vorher ``("")`` — also alle Interfaces, obwohl Log und
+    Doku „local proxy" sagen. Zusammen mit dem einthreadigen Server genügte
+    *eine* halb geöffnete Verbindung aus dem LAN, um jeden Wiki-Lookup der
+    Anwendung bis zum eigenen Timeout hängen zu lassen. Der einzige Aufrufer
+    ist ``wiki/lookup.py`` über ``http://localhost`` — Loopback reicht.
+    """
+    server = ThreadingHTTPServer(("127.0.0.1", proxy_port), WikiRequestHandler)
+    server.daemon_threads = True
+    return server
+
+
 def run():
     proxy_port = _get_settings().proxy_port
-    logger.info(f"Starting local Wikipedia text proxy at http://localhost:{proxy_port}")
-    server = HTTPServer(("", proxy_port), WikiRequestHandler)
-    server.serve_forever()
+    logger.info(f"Starting local Wikipedia text proxy at http://127.0.0.1:{proxy_port}")
+    build_server(proxy_port).serve_forever()
 
 
 if __name__ == "__main__":
