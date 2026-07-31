@@ -19,8 +19,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 import time
 import uuid
 from collections.abc import Iterator
@@ -28,6 +26,7 @@ from threading import Lock
 from typing import Any, Literal
 
 from core.context_utils import approx_token_count
+from core.utils import resolve_secret
 from fastapi import APIRouter, Depends, Header, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -123,21 +122,6 @@ def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
 def _openai_cfg(cfg) -> dict:
     api_cfg = dict(getattr(cfg, "api", {}) or {})
     return dict(api_cfg.get("openai_compatible", {}) or {})
-
-
-def resolve_secret(value: Any) -> str:
-    """Same convention as the mail adapter: literal, ``env:NAME`` or ``${NAME}``."""
-    if isinstance(value, dict) and "env" in value:
-        return os.environ.get(str(value["env"]), "")
-    if value is None:
-        return ""
-    text = str(value)
-    if text.startswith("env:"):
-        return os.environ.get(text[4:].strip(), "")
-    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", text.strip())
-    if match:
-        return os.environ.get(match.group(1), "")
-    return text
 
 
 # ---- Rate limiting -------------------------------------------------------
