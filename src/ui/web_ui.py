@@ -82,6 +82,10 @@ _feedback_log_lock = threading.Lock()
 # ein Gast namens „Leah" darf nicht als die echte LEAH fortgesetzt werden.
 GUEST_APP = "web-guest"
 
+# Hochgeladene Gespräche ebenfalls: sie sind fortsetzbar wie ein eigenes, aber
+# im Verlauf soll erkennbar bleiben, dass sie von außen kamen.
+IMPORT_APP = "web-import"
+
 # Auslieferungsdateien (WAV, JSON, Markdown) liegen in einem eigenen
 # Verzeichnis, das am Prozessende komplett verschwindet. Sie müssen den
 # Response überleben, können also nicht sofort nach dem Schreiben weg.
@@ -1463,6 +1467,7 @@ class WebUI:
         meta: dict,
         messages: list[Message],
         input_placeholder: str,
+        conversation_id: str = "",
     ) -> tuple:
         display_name = persona["name"].title()
         focus_text = f"### {persona['name']}\n{persona['description']}"
@@ -1496,6 +1501,9 @@ class WebUI:
                 placeholder=self.ask_all_placeholder,
             ),
             load_status=gr.update(value=greeting, visible=True),
+            # Ohne die ID schriebe die Fortsetzung ins Leere: SqliteStore.append
+            # steigt bei leerer conversation_id sofort aus.
+            conversation_state=conversation_id,
         )
         return as_persona_outputs(updates)
 
@@ -1529,9 +1537,17 @@ class WebUI:
             )
             return self._load_failure_updates(msg)
 
+        user = str(meta.get("user") or "")
         session.bot = persona["name"]
         session.streamer = self.factory.get_streamer_for_persona(session.bot)
-        self._stamp_user(session, str(meta.get("user") or ""))
+        self._stamp_user(session, user)
+        # Eine hochgeladene Datei wird ab hier fortgesetzt — also gehört sie in
+        # die Ablage, sonst schriebe jeder weitere Turn ins Leere. Das Terminal
+        # macht das nach dem Laden längst (`TerminalUI._set_persona`); die WebUI
+        # war die Abweichlerin. Eigenes `app`, damit im Verlauf erkennbar
+        # bleibt, dass dieses Gespräch von außen kam.
+        conversation_id = self._open_conversation(session.bot, user, app=IMPORT_APP)
+        self._stamp_conversation(session, conversation_id)
 
         normalized_meta = dict(meta)
         normalized_meta.setdefault("app", "web")
@@ -1542,6 +1558,7 @@ class WebUI:
             normalized_meta,
             messages,
             input_placeholder,
+            conversation_id=conversation_id,
         )
 
     def _on_download_conversation(

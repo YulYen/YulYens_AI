@@ -282,7 +282,7 @@ Zwecke:
 |---|---|---|
 | Verlauf → Öffnen | — | eigenes Gespräch fortsetzen |
 | Verlauf → Als Markdown | Markdown | lesbar weitergeben (Einbahnstraße) |
-| „Konversation herunterladen" / Upload | JSON | Austausch, verlustfrei zurückladbar — abschaltbar über `storage.file_exchange` |
+| „Konversation herunterladen" / Upload | JSON | Austausch, verlustfrei zurückladbar — abschaltbar über `storage.file_exchange`. Ein hochgeladenes Gespräch läuft als **eigener** Eintrag in der Ablage weiter (`app: web-import`); ohne das schriebe jeder Turn nach dem Laden ins Leere |
 
 **Migrationen** über `PRAGMA user_version` plus die Liste `_MIGRATIONS`: neue
 Schritte nur **anhängen**, nie einen ausgelieferten Schritt ändern. Die

@@ -2281,3 +2281,50 @@ def test_a_normal_persona_still_carries_the_web_app(tmp_path):
     )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["app"] == "web"
+
+
+def test_an_uploaded_conversation_is_recorded_when_continued(tmp_path):
+    """Vorher schrieb jede Fortsetzung einer hochgeladenen Datei ins Leere.
+
+    `_on_load_conversation` eröffnete kein Gespräch, `conversation_state` blieb
+    leer — und `SqliteStore.append` steigt bei leerer ID sofort aus. Das
+    Terminal machte es nach dem Laden längst richtig.
+    """
+    from ui.web_ui import IMPORT_APP
+
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    session.streamer = Mock()
+
+    updates = web_ui._on_load_conversation(
+        session,
+        _uploaded(tmp_path, persona="LEAH", app="web", user="yulyen"),
+        {"leah": {"name": "LEAH", "description": "warm"}},
+        "Tippe",
+    )
+
+    conversation_id = updates[PERSONA_OUTPUT_KEYS.index("conversation_state")]
+    assert conversation_id, "kein Gespräch in der Ablage eröffnet"
+    session.streamer.set_conversation.assert_called_once_with(conversation_id)
+
+    refs = store.list_conversations(user="yulyen")
+    assert [(ref.persona, ref.app) for ref in refs] == [("LEAH", IMPORT_APP)]
+
+    # Und ein weiterer Turn landet wirklich darin.
+    store.append(conversation_id, "user", "Frage nach dem Laden")
+    _ref, messages = store.load(conversation_id)
+    assert messages[-1]["content"] == "Frage nach dem Laden"
+
+
+def test_a_rejected_upload_records_nothing(tmp_path):
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+
+    web_ui._on_load_conversation(
+        session,
+        _uploaded(tmp_path),  # Gast „Leah"
+        {"leah": {"name": "LEAH", "description": "warm"}},
+        "Tippe",
+    )
+
+    assert store.list_conversations() == []
