@@ -145,6 +145,14 @@ Optionally, a lightweight **email adapter** can be enabled (`email_adapter.enabl
 
 The MVP handles plain-text emails; HTML is pragmatically reduced to text, attachments are ignored. To avoid mail loops and duplicate replies, the adapter ignores its own system/persona addresses and moves successfully processed (or deliberately ignored) messages into the configured `processed_mailbox` folder by default. Credentials do not belong in the code: `config.yaml` provides placeholders like `env:YULYEN_MAIL_IMAP_PASSWORD` that are resolved from environment variables at runtime.
 
+## Finding conversations again
+
+Conversations live in a local SQLite file (`storage.path`, `data/conversations.sqlite3` by default) — not in log files. The “Open history 🗂” card lists them for review, lets you **continue** one, export it as Markdown, or delete it. Only your own conversations are listed; without a login that is the `local` user.
+
+Continuing really means continuing: the reply is appended to the same conversation record rather than starting a second one. Conversations from a guest persona stay readable but cannot be continued — that persona's system prompt only existed in its session.
+
+The former JSONL transcript under `logs/` is still available, but purely as a debugging tool and off by default (`logging.conversation_jsonl`).
+
 ## Sign-in (optional)
 
 By default the web UI asks for **no login** — on a single-seat machine that would be pure overhead. It is switched on via `ui.web.auth.provider`:

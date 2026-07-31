@@ -145,6 +145,14 @@ Optional kann ein schlanker **E-Mail-Adapter** aktiviert werden (`email_adapter.
 
 Das MVP verarbeitet einfache Text-E-Mails; HTML wird pragmatisch zu Text reduziert, Attachments werden ignoriert. Um Mail-Loops und doppelte Antworten zu vermeiden, ignoriert der Adapter eigene System-/Persona-Adressen und verschiebt erfolgreich bearbeitete oder bewusst ignorierte Nachrichten standardmäßig in den konfigurierten `processed_mailbox`-Ordner. Zugangsdaten gehören nicht in den Code: In `config.yaml` sind Platzhalter wie `env:YULYEN_MAIL_IMAP_PASSWORD` vorgesehen, die zur Laufzeit aus Umgebungsvariablen gelesen werden.
 
+## Gespräche wiederfinden
+
+Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig `data/conversations.sqlite3`) — nicht in Logdateien. Über die Karte „Verlauf öffnen 🗂" lassen sie sich auflisten, ansehen, **fortsetzen**, als Markdown exportieren und löschen. Angezeigt werden nur die eigenen Gespräche; wer als `local` arbeitet, sieht die des lokalen Nutzers.
+
+Fortsetzen heißt wirklich fortsetzen: die Antwort landet im selben Gesprächseintrag, es entsteht kein zweiter. Gespräche einer Gast-Persona bleiben lesbar, lassen sich aber nicht fortsetzen — deren System-Prompt lebte nur in der damaligen Sitzung.
+
+Der frühere JSONL-Mitschnitt in `logs/` ist weiterhin verfügbar, aber als reines Debug-Werkzeug und standardmäßig aus (`logging.conversation_jsonl`).
+
 ## Anmeldung (optional)
 
 Standardmäßig verlangt die Web-UI **keine Anmeldung** — für den Einzelplatz am eigenen Rechner wäre sie nur Aufwand. Über `ui.web.auth.provider` lässt sie sich einschalten:

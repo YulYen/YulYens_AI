@@ -69,6 +69,8 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── kiwix_autostart.py
 │   ├── auth/
 │   │   └── provider.py         # Identitäts-Naht der WebUI (#53)
+│   ├── storage/
+│   │   └── store.py            # Gesprächs-Ablage in SQLite (#54)
 │   ├── security/
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
 │   ├── tts/
@@ -245,6 +247,30 @@ persönliche/geheime Werte (z. B. echter Mail-Host/-Adresse) aus der **öffentli
 `config.yaml` heraus, während die App lokal trotzdem läuft. `config.local.yaml` ist
 in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
+### Ablage der Gespräche (#54): Store ≠ Logfile
+`src/storage/store.py` hält die Gespräche in einer SQLite-Datei
+(`storage.path`, gitignored). **Das Gesprächs-Logfile war vorher die Persistenz**
+— mit zwei unvereinbaren Formaten und ohne Gesprächsbegriff. Jetzt gilt:
+
+| Artefakt | Rolle |
+|---|---|
+| `data/conversations.sqlite3` | **die Aufzeichnung** — Verlauf (#25), später Suche (#49) und Fakten (#24) |
+| `logs/conversation_*.json` | roher Mitschnitt zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
+
+**Migrationen** über `PRAGMA user_version` plus die Liste `_MIGRATIONS`: neue
+Schritte nur **anhängen**, nie einen ausgelieferten Schritt ändern. Die
+FTS5-Tabelle für #49 wird Schritt 2 — SQLite bringt FTS5 mit, ein eigener Index
+ist unnötig.
+
+**Die Gesprächs-ID gehört der Oberfläche, nicht dem Streamer:** sie liegt im
+`gr.State` `conversation_state` und wird nach einem Streamer-Neubau erneut
+gesetzt (`set_conversation`). Sonst begänne jede Fortsetzung ein neues Gespräch.
+
+Aufzeichnen darf **nie** den Stream abbrechen (wie beim Logfile davor), und eine
+unbrauchbare Datei degradiert zum `NullStore`, statt den Start zu verhindern.
+Tests laufen per autouse-Fixture gegen `storage.enabled: false` — sonst schriebe
+jede Test-Session in die echte Datenbank.
+
 ### Anmeldung (#53): eine Naht, kein Sicherheitsprodukt
 `src/auth/provider.py` beantwortet „wer bedient die UI". Drei Provider über
 `ui.web.auth.provider`:
@@ -355,6 +381,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
+| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächslog kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
@@ -430,7 +457,7 @@ Highlights:
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
   (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
-- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
+- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
@@ -440,7 +467,8 @@ via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen)
 #25 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
 #32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
-#43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona.
+#43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
+#54 Gesprächs-Ablage (SQLite), #25 Verlauf.
 
 ## Sprachstrategie
 

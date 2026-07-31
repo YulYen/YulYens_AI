@@ -46,6 +46,13 @@ def build_ui(
     guest_prompt_placeholder,
     guest_temperature_label,
     guest_start_label,
+    history_card_label,
+    history_title,
+    history_description,
+    history_pick_label,
+    history_open_label,
+    history_export_label,
+    history_delete_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -197,6 +204,24 @@ def build_ui(
                         )
                         guest_card_btn = gr.Button(
                             guest_card_label, variant="secondary"
+                        )
+
+                with gr.Column(scale=1, min_width=170):
+                    with gr.Group(elem_classes="persona-card"):
+                        gr.Image(
+                            "static/YUL_YEN.png",
+                            show_label=False,
+                            container=False,
+                            show_download_button=False,
+                            show_fullscreen_button=False,
+                            elem_classes="persona-img",
+                        )
+                        gr.Markdown(
+                            f"<div class='name'>{history_title}</div>"
+                            f"<div class='desc'>{history_description}</div>"
+                        )
+                        history_card_btn = gr.Button(
+                            history_card_label, variant="secondary"
                         )
 
                 if broadcast_enabled:
@@ -384,6 +409,22 @@ def build_ui(
             )
             guest_start_btn = gr.Button(guest_start_label, variant="primary")
 
+        # Verlauf (#25) auf der Ablage aus #54 — bewusst ein Dropdown statt
+        # gr.Dataframe: die Komponente verliert in Gradio 4.44 Updates aus
+        # Generatoren und verfälscht mit Mess-Zeilen die Browser-Tests.
+        with gr.Group(visible=False) as history_group:
+            gr.Markdown(f"## {history_title}")
+            history_status = gr.Markdown("", visible=False)
+            history_pick = gr.Dropdown(
+                choices=[], label=history_pick_label, interactive=True
+            )
+            history_preview = gr.Markdown("", elem_classes="wiki-sources-body")
+            with gr.Row():
+                history_open_btn = gr.Button(history_open_label, variant="primary")
+                history_export_btn = gr.Button(history_export_label)
+                history_delete_btn = gr.Button(history_delete_label, variant="stop")
+            history_file = gr.File(visible=False)
+
         with gr.Group(visible=False) as ask_all_group:
             gr.Markdown(f"## {ask_all_title}")
             with gr.Row(elem_classes="ask-all-strip"):
@@ -436,6 +477,9 @@ def build_ui(
         meta_state = gr.State({})
         # Identität der Browser-Sitzung, beim Laden gefüllt (#53).
         user_state = gr.State("")
+        # Laufendes Gespräch in der Ablage (#54) — überlebt einen
+        # Streamer-Neubau, etwa beim Modellwechsel.
+        conversation_state = gr.State("")
 
     components = {
         "demo": demo,
@@ -456,6 +500,7 @@ def build_ui(
         "history_state": history_state,
         "meta_state": meta_state,
         "user_state": user_state,
+        "conversation_state": conversation_state,
         "guest_card_btn": guest_card_btn,
         "guest_group": guest_group,
         "guest_status": guest_status,
@@ -463,6 +508,15 @@ def build_ui(
         "guest_prompt": guest_prompt,
         "guest_temperature": guest_temperature,
         "guest_start_btn": guest_start_btn,
+        "history_card_btn": history_card_btn,
+        "history_group": history_group,
+        "history_status": history_status,
+        "history_pick": history_pick,
+        "history_preview": history_preview,
+        "history_open_btn": history_open_btn,
+        "history_export_btn": history_export_btn,
+        "history_delete_btn": history_delete_btn,
+        "history_file": history_file,
         "ask_all_group": ask_all_group,
         "ask_all_results": ask_all_results,
         "ask_all_question": ask_all_question,
