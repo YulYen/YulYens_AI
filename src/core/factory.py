@@ -23,6 +23,7 @@ from core.utils import (
     _system_prompt_with_date,
     _wiki_mode_enabled,
     is_ollama_module_not_found,
+    with_timestamps,
 )
 
 
@@ -115,12 +116,32 @@ class AppFactory:
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
         """Creates a new LLM streamer for the given persona."""
-        core_cfg = self._cfg.core
-        persona_prompt = _system_prompt_with_date(persona_name, self._cfg)
         # get_options liefert None, wenn eine Persona keine llm_options hat;
         # der Provider erwartet ein dict und würde sonst beim ersten
         # Kontext-Check über None stolpern (von mypy gefunden, #52).
-        options = personas.get_options(persona_name) or {}
+        return self._build_streamer(
+            persona_name,
+            _system_prompt_with_date(persona_name, self._cfg),
+            personas.get_options(persona_name) or {},
+        )
+
+    def get_streamer_for_guest(
+        self, name: str, prompt: str, options: dict | None = None
+    ) -> YulYenStreamingProvider:
+        """Streamer für eine Gast-Persona, die nur in der Sitzung lebt (#28).
+
+        Identisch zum Persona-Pfad, nur ohne Umweg über die Ensemble-YAML —
+        Guard, Wiki, Kontext-Management und Gesprächslog kommen dadurch gratis
+        mit, statt für den Gast nachgebaut zu werden.
+        """
+        return self._build_streamer(
+            name, with_timestamps(prompt, self._cfg), dict(options or {})
+        )
+
+    def _build_streamer(
+        self, persona_name: str, persona_prompt: str, options: dict
+    ) -> YulYenStreamingProvider:
+        core_cfg = self._cfg.core
         log_prefix = self._cfg.logging["conversation_prefix"]
         conv_log_file = (
             f"{log_prefix}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.json"

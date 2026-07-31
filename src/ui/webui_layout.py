@@ -38,6 +38,14 @@ def build_ui(
     sources_label,
     theme_light_label,
     theme_dark_label,
+    guest_card_label,
+    guest_title,
+    guest_description,
+    guest_name_label,
+    guest_prompt_label,
+    guest_prompt_placeholder,
+    guest_temperature_label,
+    guest_start_label,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -171,6 +179,24 @@ def build_ui(
                         )
                         self_talk_card_btn = gr.Button(
                             self_talk_button_label, variant="secondary"
+                        )
+
+                with gr.Column(scale=1, min_width=170):
+                    with gr.Group(elem_classes="persona-card"):
+                        gr.Image(
+                            "static/YUL_YEN.png",
+                            show_label=False,
+                            container=False,
+                            show_download_button=False,
+                            show_fullscreen_button=False,
+                            elem_classes="persona-img",
+                        )
+                        gr.Markdown(
+                            f"<div class='name'>{guest_title}</div>"
+                            f"<div class='desc'>{guest_description}</div>"
+                        )
+                        guest_card_btn = gr.Button(
+                            guest_card_label, variant="secondary"
                         )
 
                 if broadcast_enabled:
@@ -337,6 +363,27 @@ def build_ui(
             )
             self_talk_start_btn = gr.Button(self_talk_start_label, variant="primary")
 
+        # Gast-Persona (#28): lebt nur in der Sitzung — kein YAML, kein Reload.
+        with gr.Group(visible=False) as guest_group:
+            gr.Markdown(f"## {guest_title}")
+            guest_status = gr.Markdown("", visible=False)
+            guest_name = gr.Textbox(label=guest_name_label, interactive=True)
+            guest_prompt = gr.Textbox(
+                label=guest_prompt_label,
+                placeholder=guest_prompt_placeholder,
+                lines=5,
+                interactive=True,
+            )
+            guest_temperature = gr.Slider(
+                minimum=0.0,
+                maximum=1.5,
+                value=0.7,
+                step=0.05,
+                label=guest_temperature_label,
+                interactive=True,
+            )
+            guest_start_btn = gr.Button(guest_start_label, variant="primary")
+
         with gr.Group(visible=False) as ask_all_group:
             gr.Markdown(f"## {ask_all_title}")
             with gr.Row(elem_classes="ask-all-strip"):
@@ -387,6 +434,8 @@ def build_ui(
                 ask_all_sources_md = gr.Markdown("", elem_classes="wiki-sources-body")
         history_state = gr.State([])
         meta_state = gr.State({})
+        # Identität der Browser-Sitzung, beim Laden gefüllt (#53).
+        user_state = gr.State("")
 
     components = {
         "demo": demo,
@@ -406,6 +455,14 @@ def build_ui(
         "persona_buttons": persona_buttons,
         "history_state": history_state,
         "meta_state": meta_state,
+        "user_state": user_state,
+        "guest_card_btn": guest_card_btn,
+        "guest_group": guest_group,
+        "guest_status": guest_status,
+        "guest_name": guest_name,
+        "guest_prompt": guest_prompt,
+        "guest_temperature": guest_temperature,
+        "guest_start_btn": guest_start_btn,
         "ask_all_group": ask_all_group,
         "ask_all_results": ask_all_results,
         "ask_all_question": ask_all_question,

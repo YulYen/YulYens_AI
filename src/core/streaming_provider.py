@@ -25,7 +25,7 @@ from security.tinyguard import BasicGuard, zeigefinger_message
 from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
 
 from core.context_utils import approx_token_count
-from core.utils import ensure_dir_exists, is_ollama_module_not_found
+from core.utils import LOCAL_USER, ensure_dir_exists, is_ollama_module_not_found
 
 # Import the LLM interface
 from .llm_core import LLMCore
@@ -239,6 +239,10 @@ class YulYenStreamingProvider:
         ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
         self.guard: BasicGuard | None = guard
+        # Wer das Gespräch führt (#53). Ohne Anmeldung — Terminal, API — ist
+        # der lokale Nutzer die ehrliche Antwort; die WebUI überschreibt es
+        # mit der angemeldeten Identität.
+        self.user: str = LOCAL_USER
         # Kennzahlen des zuletzt gelaufenen Streams (#36); None vor dem ersten.
         self.last_stream_stats: StreamStats | None = None
         self.stream_holdback: int = _STREAM_HOLDBACK_CHARS
@@ -258,6 +262,15 @@ class YulYenStreamingProvider:
         except (TypeError, ValueError):
             self.stream_holdback = _STREAM_HOLDBACK_CHARS
 
+    def set_user(self, user: str) -> None:
+        """Identität des Gesprächs setzen (#53).
+
+        Landet in jeder Zeile des Gesprächslogs — das ist die Datei, die #25
+        (Verlauf) und #49 (Suche) später durchgehen. Ohne dieses Feld wäre die
+        Anmeldung nur Zierde.
+        """
+        self.user = (user or "").strip() or LOCAL_USER
+
     def _append_conversation_log(self, role: str, content: str) -> None:
         """Writes an entry to the conversation JSON log."""
         try:
@@ -267,6 +280,7 @@ class YulYenStreamingProvider:
                 .isoformat(timespec="seconds"),
                 "model": self.model_name,
                 "bot": self.persona,
+                "user": self.user,
                 "options": self.persona_options,
                 "role": role,
                 "content": content,

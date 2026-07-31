@@ -67,6 +67,8 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── wikipedia_proxy.py   # HTTP-Proxy (Port 8042)
 │   │   ├── spacy_keyword_finder.py  # NLP-Schlüsselwortextraktion
 │   │   └── kiwix_autostart.py
+│   ├── auth/
+│   │   └── provider.py         # Identitäts-Naht der WebUI (#53)
 │   ├── security/
 │   │   └── tinyguard.py         # BasicGuard (Prompt-Injection, PII, Blocklist)
 │   ├── tts/
@@ -243,6 +245,38 @@ persönliche/geheime Werte (z. B. echter Mail-Host/-Adresse) aus der **öffentli
 `config.yaml` heraus, während die App lokal trotzdem läuft. `config.local.yaml` ist
 in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
+### Anmeldung (#53): eine Naht, kein Sicherheitsprodukt
+`src/auth/provider.py` beantwortet „wer bedient die UI". Drei Provider über
+`ui.web.auth.provider`:
+
+| Provider | Verhalten |
+|---|---|
+| `disabled` (**Default**) | kein Login, alle sind `local` — Verhalten wie vor #53 |
+| `local` | Nutzer aus `ui.web.auth.users`, Passwörter über die `env:`-Konvention |
+| `header` | Identität aus dem Header eines vorgeschalteten Proxys |
+
+**Der Wert liegt in der Naht:** `user` steht in jeder Zeile des Gesprächslogs
+(`YulYenStreamingProvider.set_user`) und in jeder Feedback-Vote. Genau das
+brauchen #25 (Verlauf), #49 (Suche), #40b und #24 (Fakten über den Nutzer).
+Die Identität wird **einmal pro Browser-Sitzung** über `demo.load` + `gr.Request`
+in ein `gr.State` geholt — nicht `gr.Request` an jeden Handler hängen, die
+Persona-Buttons laufen über `functools.partial`.
+
+**Ehrlich einordnen:** Gradios Basic-Auth geht über HTTP im Klartext. Ohne TLS
+ist das eine *Trennung* von Nutzern, kein Schutz gegen Mitlesen. `header`
+vertraut dem Header bedingungslos und darf nur hinter einem Proxy laufen, der
+ihn von außen entfernt.
+
+**Kein OIDC direkt:** Gradios `auth=`-Callable bekommt nur Name und Passwort —
+kein Redirect-Flow, keine Token-Validierung. Keycloak & Co. laufen über
+oauth2-proxy/Authelia davor, die die Identität als Header durchreichen; genau
+dafür gibt es `HeaderAuth`.
+
+Die Anmeldung gilt **unabhängig von `share`**. Das alte `ui.web.share_auth`
+greift nur noch als Fallback (mit Deprecation-Warnung) — es wirkte früher
+ausschließlich beim Share-Link, obwohl der Server per Default auf `0.0.0.0`
+horcht.
+
 ### Schema-Prüfung (#43): zwei Härtegrade
 `src/config/schema.py` prüft `config.yaml` und die Ensemble-Dateien mit pydantic.
 **Beim Start wird nur gewarnt** (`logging.warning("[CONFIG] …")`) — ein laufendes
@@ -321,6 +355,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
+| **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächslog kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
@@ -393,7 +428,7 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #27 Ask-All-Moderator, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
+- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
   (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
@@ -405,7 +440,7 @@ via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen)
 #25 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
 #32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
-#43 Config-/Ensemble-Validierung.
+#43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona.
 
 ## Sprachstrategie
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import html
 import imaplib
 import logging
-import os
 import re
 import smtplib
 import threading
@@ -17,6 +16,7 @@ from email.utils import getaddresses, make_msgid, parseaddr
 from typing import Protocol
 
 from api.provider import AiApiProvider
+from core.utils import resolve_secret
 
 
 class ImapClient(Protocol):
@@ -86,15 +86,15 @@ class EmailAdapterConfig:
             imap_host=str(imap_cfg.get("host", "")),
             imap_port=int(imap_cfg.get("port", 993)),
             imap_ssl=_as_bool(imap_cfg.get("ssl", True)),
-            imap_username=_resolve_secret(imap_cfg.get("username", "")),
-            imap_password=_resolve_secret(imap_cfg.get("password", "")),
+            imap_username=resolve_secret(imap_cfg.get("username", "")),
+            imap_password=resolve_secret(imap_cfg.get("password", "")),
             smtp_host=str(smtp_cfg.get("host", "")),
             smtp_port=int(smtp_cfg.get("port", 465)),
             smtp_ssl=_as_bool(smtp_cfg.get("ssl", True)),
             smtp_starttls=_as_bool(smtp_cfg.get("starttls", False)),
-            smtp_username=_resolve_secret(smtp_cfg.get("username", "")),
-            smtp_password=_resolve_secret(smtp_cfg.get("password", "")),
-            smtp_from_address=_resolve_secret(smtp_cfg.get("from_address", "")),
+            smtp_username=resolve_secret(smtp_cfg.get("username", "")),
+            smtp_password=resolve_secret(smtp_cfg.get("password", "")),
+            smtp_from_address=resolve_secret(smtp_cfg.get("from_address", "")),
             quote_attribution=str(quote_cfg.get("attribution", cls.quote_attribution)),
             quote_attribution_no_date=str(
                 quote_cfg.get("attribution_no_date", cls.quote_attribution_no_date)
@@ -390,20 +390,6 @@ def _optional_str(value) -> str | None:
     text = str(value).strip()
     if not text:
         return None
-    return text
-
-
-def _resolve_secret(value) -> str:
-    if isinstance(value, dict) and "env" in value:
-        return os.environ.get(str(value["env"]), "")
-    if value is None:
-        return ""
-    text = str(value)
-    if text.startswith("env:"):
-        return os.environ.get(text[4:].strip(), "")
-    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", text.strip())
-    if match:
-        return os.environ.get(match.group(1), "")
     return text
 
 

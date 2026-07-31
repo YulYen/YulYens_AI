@@ -35,6 +35,20 @@ ui:
     host: "0.0.0.0"
     port: 7860
     share: false  # enable to publish a public Gradio share link
+    # Anmeldung (#53). Gilt unabhängig von `share` — die App horcht oben auf
+    # 0.0.0.0, ist im LAN also ohne Login sonst offen.
+    # ACHTUNG: Basic-Auth geht über HTTP im Klartext. Ohne TLS ist das eine
+    # Trennung von Nutzern, kein Schutz gegen Mitlesen.
+    auth:
+      provider: "disabled"   # disabled | local | header
+      # provider: local — Passwörter als env:NAME, nicht im Klartext hier:
+      users: {}
+      #  yulyen: "env:YULYEN_WEB_PASSWORD"
+      # provider: header — Identität von einem vorgeschalteten Proxy
+      # (oauth2-proxy, Authelia, …). Nur hinter einem Proxy benutzen, der den
+      # Header von außen entfernt! Das ist der Weg zu Keycloak.
+      header_name: "X-Forwarded-User"
+    # Veraltet, wirkt nur noch als Fallback wenn `auth` fehlt:
     share_auth:
       username: ""
       password: ""

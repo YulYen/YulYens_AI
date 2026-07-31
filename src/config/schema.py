@@ -53,10 +53,28 @@ class WikiSection(BaseModel):
     max_wiki_snippets: int = Field(default=2, ge=0)
 
 
+class WebAuthSection(BaseModel):
+    model_config = _ALLOW_EXTRA
+
+    provider: Literal["disabled", "local", "header"] = "disabled"
+    users: dict[str, Any] | None = None
+    header_name: str | None = None
+
+
+class WebSection(BaseModel):
+    model_config = _ALLOW_EXTRA
+
+    host: str | None = None
+    port: int | None = Field(default=None, ge=1, le=65535)
+    share: bool | None = None
+    auth: WebAuthSection | None = None
+
+
 class UiSection(BaseModel):
     model_config = _ALLOW_EXTRA
 
     type: Literal["web", "terminal"] | None = None
+    web: WebSection | None = None
 
 
 class ApiSection(BaseModel):

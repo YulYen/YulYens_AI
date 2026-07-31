@@ -1,4 +1,5 @@
 # --------- General utilities (no external side effects) ---------
+import os
 import re
 from datetime import datetime
 from pathlib import Path
@@ -51,14 +52,17 @@ def _wiki_timestamp_text(cfg) -> str | None:
     return None
 
 
-def _system_prompt_with_date(name: str, cfg) -> str:
-    """Append a clearly separated 'three timestamps' block to the persona prompt:
+def with_timestamps(base: str, cfg) -> str:
+    """Append a clearly separated 'three timestamps' block to a system prompt:
     today's date, the model's training cutoff, and the wiki data date. Keeping
     the three distinct stops personas from claiming their knowledge reaches today.
     Missing values are stated honestly ('unknown') rather than faked or dropped
     silently; the wiki line is omitted entirely when no wiki source is active.
-    Master switch: core.include_date."""
-    base = get_prompt_by_name(name)
+    Master switch: core.include_date.
+
+    Takes the prompt text rather than a persona name, so the guest persona (#28)
+    gets the very same block without a detour through the YAML registry.
+    """
     core = getattr(cfg, "core", {}) or {}
     if not core.get("include_date"):
         return base
@@ -71,6 +75,11 @@ def _system_prompt_with_date(name: str, cfg) -> str:
         parts.append(wiki_part)
     parts.append(cfg.t("persona_ts_guidance"))
     return f"{base} | {' '.join(parts)}"
+
+
+def _system_prompt_with_date(name: str, cfg) -> str:
+    """Same block for a persona from the ensemble YAML."""
+    return with_timestamps(get_prompt_by_name(name), cfg)
 
 
 def _greeting_text(cfg, bot) -> str:
@@ -115,6 +124,10 @@ def is_ollama_module_not_found(exc: ModuleNotFoundError) -> bool:
     )
 
 
+# Ohne Anmeldung ist "der Nutzer" schlicht der, der am Rechner sitzt (#53).
+# Terminal-UI und API kennen kein Login — dort ist das die ehrliche Antwort.
+LOCAL_USER = "local"
+
 SAME_AS_CHAT = "same_as_chat"
 
 
@@ -128,3 +141,22 @@ def resolve_model_name(configured: str | None, chat_model_name: str) -> str:
     if not name or name == SAME_AS_CHAT:
         return chat_model_name
     return name
+
+
+def resolve_secret(value) -> str:
+    """Literal, ``env:NAME`` oder ``${NAME}`` — die Geheimnis-Konvention des Projekts.
+
+    Stand identisch in `api/openai_compat.py` und `email_adapter/service.py`;
+    mit dem Auth-Provider wäre es die dritte Kopie geworden (#53).
+    """
+    if isinstance(value, dict) and "env" in value:
+        return os.environ.get(str(value["env"]), "")
+    if value is None:
+        return ""
+    text = str(value)
+    if text.startswith("env:"):
+        return os.environ.get(text[4:].strip(), "")
+    match = re.fullmatch(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}", text.strip())
+    if match:
+        return os.environ.get(match.group(1), "")
+    return text

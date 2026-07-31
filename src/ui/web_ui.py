@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 import gradio as gr
 import requests
+from auth import build_auth_provider
 from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import (
@@ -100,6 +101,8 @@ PERSONA_OUTPUT_KEYS = (
     "ask_all_sources_accordion",
     "ask_all_sources_md",
     "status_md",
+    "guest_group",
+    "guest_status",
 )
 
 # Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
@@ -164,6 +167,11 @@ class WebUI:
         self.bot: str | None = None  # assigned later
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
+        # Wer bedient die UI (#53). Default DisabledAuth = Verhalten wie bisher.
+        ui_cfg = getattr(config, "ui", {}) or {}
+        self.auth = build_auth_provider(
+            ui_cfg.get("web") if isinstance(ui_cfg, dict) else None
+        )
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
         self.broadcast_parallel = is_broadcast_parallel(self.cfg)
         # Kill switch für den laufenden Ask-All-Broadcast: Gradio cancels
@@ -221,12 +229,50 @@ class WebUI:
     def _reset_meta_state(self) -> dict:
         return {}
 
-    def _build_meta(self, persona_name: str) -> dict:
+    def _stamp_user(self, user: str) -> None:
+        """Identität an den frischen Streamer geben (#53).
+
+        Sie landet dadurch in jeder Zeile des Gesprächslogs — der Datei, die
+        #25 (Verlauf) und #49 (Suche) später durchgehen.
+        """
+        setter = getattr(self.streamer, "set_user", None)
+        if callable(setter):
+            setter(user or self._fallback_user())
+
+    def _on_page_load(self, request: gr.Request) -> str:
+        """Identität der Browser-Sitzung einmal beim Laden einsammeln (#53).
+
+        Bewusst hier statt `gr.Request` an jedem Handler: die Persona-Buttons
+        laufen über `functools.partial`, und ob Gradio dort die Signatur
+        durchschaut, ist nichts, worauf man bauen sollte. Ein Wert im
+        `gr.State` ist zudem sauber pro Browser-Sitzung.
+        """
+        identity = self.auth.identity_from_request(request)
+        if not identity.is_known:
+            logging.debug(
+                "Sitzung ohne erkennbare Identität (provider=%s)", self.auth.name
+            )
+            return self._fallback_user()
+        return identity.name
+
+    def _fallback_user(self) -> str:
+        """Nutzername, wenn die Session-Identität (noch) nicht vorliegt.
+
+        Ohne Login ist das der lokale Standardnutzer; mit Login wäre ein leerer
+        Wert eine Lüge, deshalb "unknown".
+        """
+        identity = self.auth.identity_from_request(None)
+        return identity.name or "unknown"
+
+    def _build_meta(self, persona_name: str, user: str = "") -> dict:
         return {
             "created_at": datetime.now().isoformat(),
             "model": str(self.cfg.core.get("model_name")),
             "persona": persona_name,
             "app": "web",
+            # Nie leer: ohne Anmeldung der lokale Standardnutzer, sonst der
+            # angemeldete Name — #25 und #24 sollen sich darauf verlassen können.
+            "user": user or self._fallback_user(),
         }
 
     def _messages_to_chat_history(
@@ -696,7 +742,7 @@ class WebUI:
             "selected_persona_state": gr.update(value=""),
             "grid_group": gr.update(visible=True),
             "focus_group": gr.update(visible=False),
-            "focus_img": gr.update(value=None),
+            "focus_img": gr.update(value=None, visible=True),
             "focus_md": gr.update(value=""),
             "greeting_md": gr.update(value="", visible=False),
             "chatbot": gr.update(value=[], label="", visible=False),
@@ -739,6 +785,8 @@ class WebUI:
             "ask_all_sources_accordion": gr.update(visible=False, open=False),
             "ask_all_sources_md": gr.update(value=""),
             "status_md": gr.update(value="", visible=False),
+            "guest_group": gr.update(visible=False),
+            "guest_status": gr.update(value="", visible=False),
         }
 
     def _persona_selected_updates(
@@ -747,6 +795,8 @@ class WebUI:
         persona: dict[str, Any],
         greeting_template: str,
         input_placeholder: str,
+        user: str = "",
+        image_path: str | None = "",
     ) -> tuple:
         display_name = persona["name"].title()
         # Modell live aus der Config lesen (kann per Profi-Option gewechselt sein)
@@ -761,7 +811,15 @@ class WebUI:
             selected_persona_state=gr.update(value=persona_key),
             grid_group=gr.update(visible=False),
             focus_group=gr.update(visible=True),
-            focus_img=gr.update(value=self._persona_full_image_path(persona["name"])),
+            # Gast-Personas haben kein Portrait: Komponente ausblenden statt
+            # einen leeren Bildrahmen zu zeigen (#28).
+            focus_img=(
+                gr.update(
+                    value=self._persona_full_image_path(persona["name"]), visible=True
+                )
+                if image_path == ""
+                else gr.update(value=None, visible=False)
+            ),
             focus_md=gr.update(value=focus_text),
             greeting_md=gr.update(value=greeting, visible=True),
             chatbot=gr.update(value=[], label=display_name, visible=True),
@@ -773,7 +831,7 @@ class WebUI:
             download_btn=gr.update(visible=True),
             briefing_btn=gr.update(visible=self.briefing_enabled),
             read_aloud_btn=gr.update(visible=self.tts_web_enabled),
-            meta_state=self._build_meta(persona["name"]),
+            meta_state=self._build_meta(persona["name"], user=user),
             ask_all_question=gr.update(
                 value="",
                 visible=False,
@@ -794,12 +852,14 @@ class WebUI:
 
     def _on_persona_selected(
         self,
-        key: str,
-        persona_info: dict[str, dict[str, Any]],
-        greeting_template: str,
-        input_placeholder: str,
+        user: str = "",
+        *,
+        key: str = "",
+        persona_info: dict[str, dict[str, Any]] | None = None,
+        greeting_template: str = "",
+        input_placeholder: str = "",
     ) -> tuple:
-        persona = persona_info.get(key)
+        persona = (persona_info or {}).get(key)
         if not persona:
             self.bot = None
             self.streamer = None
@@ -807,8 +867,9 @@ class WebUI:
 
         self.bot = persona["name"]
         self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        self._stamp_user(user)
         return self._persona_selected_updates(
-            key, persona, greeting_template, input_placeholder
+            key, persona, greeting_template, input_placeholder, user=user
         )
 
     def _cancel_ask_all_broadcast(self) -> None:
@@ -928,6 +989,70 @@ class WebUI:
             ask_all_new_chat=gr.update(visible=True),
         )
         return self._as_persona_outputs(updates)
+
+    def _on_show_guest(self) -> tuple:
+        """Formular für eine Gast-Persona zeigen (#28)."""
+        self.bot = None
+        self.streamer = None
+        updates = self._reset_updates()
+        updates.update(
+            grid_group=gr.update(visible=False),
+            # Rückweg zur Startseite, solange noch kein Gast läuft
+            new_chat_btn=gr.update(visible=True),
+            guest_group=gr.update(visible=True),
+        )
+        return self._as_persona_outputs(updates)
+
+    def _on_start_guest(
+        self,
+        name: str | None,
+        prompt: str | None,
+        temperature: float | None,
+        user: str = "",
+        *,
+        greeting_template: str = "",
+        input_placeholder: str = "",
+    ) -> tuple:
+        """Gast-Persona anlegen — nur im Sitzungsspeicher, kein YAML.
+
+        Bewusst ohne Persistenz: ein Schreiben nach `ensembles/` müsste die
+        Singleton-Kette Config → personas.py → Factory-Cache neu laden. Das ist
+        eine eigene Ausbaustufe, kein Beiwerk.
+        """
+        name = (name or "").strip()
+        prompt = (prompt or "").strip()
+
+        if not name or not prompt:
+            updates = self._reset_updates()
+            updates.update(
+                grid_group=gr.update(visible=False),
+                new_chat_btn=gr.update(visible=True),
+                guest_group=gr.update(visible=True),
+                guest_status=gr.update(
+                    value=self._t("guest_missing_fields"), visible=True
+                ),
+            )
+            return self._as_persona_outputs(updates)
+
+        options = {
+            "temperature": float(temperature if temperature is not None else 0.7)
+        }
+        self.bot = name
+        self.streamer = self.factory.get_streamer_for_guest(name, prompt, options)
+        self._stamp_user(user)
+        logging.info("Gast-Persona '%s' gestartet (nur Sitzung)", name)
+
+        persona = {"name": name, "description": self._t("guest_description")}
+        updates = self._persona_selected_updates(
+            name.lower(),
+            persona,
+            greeting_template,
+            input_placeholder,
+            user=user,
+            # Der Gast hat kein Bild — lieber leer als ein toter Pfad.
+            image_path=None,
+        )
+        return updates
 
     def _on_show_self_talk(self) -> tuple:
         self.bot = None
@@ -1279,6 +1404,7 @@ class WebUI:
 
         self.bot = persona["name"]
         self.streamer = self.factory.get_streamer_for_persona(self.bot)
+        self._stamp_user(str(meta.get("user") or ""))
 
         normalized_meta = dict(meta)
         normalized_meta.setdefault("app", "web")
@@ -1373,6 +1499,7 @@ class WebUI:
             entry = {
                 "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
                 "app": meta.get("app", "web"),
+                "user": meta.get("user") or self._fallback_user(),
                 "persona": meta.get("persona") or self.bot or "",
                 "model": meta.get("model", ""),
                 "vote": "up" if evt.liked else "down",
@@ -1429,6 +1556,13 @@ class WebUI:
         # Same order as the update dicts resolved via _as_persona_outputs()
         persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
 
+        user_state = components["user_state"]
+
+        # Identität einmal pro Browser-Sitzung einsammeln (#53).
+        components["demo"].load(
+            fn=self._on_page_load, inputs=[], outputs=[user_state], queue=False
+        )
+
         for key, btn in components["persona_buttons"]:
             btn.click(
                 fn=partial(
@@ -1438,7 +1572,7 @@ class WebUI:
                     greeting_template=greeting_template,
                     input_placeholder=input_placeholder,
                 ),
-                inputs=[],
+                inputs=[user_state],
                 outputs=persona_outputs,
                 queue=False,
             )
@@ -1545,6 +1679,29 @@ class WebUI:
                 queue=False,
             )
 
+        components["guest_card_btn"].click(
+            fn=self._on_show_guest,
+            inputs=[],
+            outputs=persona_outputs,
+            queue=False,
+        )
+
+        components["guest_start_btn"].click(
+            fn=partial(
+                self._on_start_guest,
+                greeting_template=greeting_template,
+                input_placeholder=input_placeholder,
+            ),
+            inputs=[
+                components["guest_name"],
+                components["guest_prompt"],
+                components["guest_temperature"],
+                user_state,
+            ],
+            outputs=persona_outputs,
+            queue=False,
+        )
+
         if self_talk_card_btn is not None:
             self_talk_card_btn.click(
                 fn=self._on_show_self_talk,
@@ -1614,11 +1771,19 @@ class WebUI:
         )
 
     def _start_server(self, demo: gr.Blocks) -> None:
-        launch_kwargs = {
+        launch_kwargs: dict[str, Any] = {
             "server_name": self.web_host,
             "server_port": self.web_port,
             "show_api": False,
         }
+
+        # Anmeldung gilt jetzt unabhängig von `share` (#53): die App horcht per
+        # Default auf 0.0.0.0, war im LAN aber ungeschützt, weil das alte
+        # share_auth nur beim Share-Link griff.
+        gradio_auth = self.auth.gradio_auth()
+        if gradio_auth is not None:
+            launch_kwargs["auth"] = gradio_auth
+        logging.info("WebUI-Anmeldung: provider=%s", self.auth.name)
 
         ui_cfg = getattr(self.cfg, "ui", None)
         if ui_cfg is not None:
@@ -1628,21 +1793,13 @@ class WebUI:
                 web_cfg = getattr(ui_cfg, "web", {}) or {}
 
             if web_cfg.get("share"):
-                auth_cfg = web_cfg.get("share_auth") or {}
-                username = auth_cfg.get("username") or ""
-                password = auth_cfg.get("password") or ""
-
-                if username and password:
-                    launch_kwargs.update(
-                        {
-                            "share": True,
-                            "auth": (username, password),
-                        }
+                if gradio_auth is None:
+                    logging.warning(
+                        "Gradio share disabled: 'ui.web.share' is on but no login is "
+                        "configured — see 'ui.web.auth'."
                     )
                 else:
-                    logging.warning(
-                        "Gradio share disabled: credentials missing despite 'ui.web.share: true'."
-                    )
+                    launch_kwargs["share"] = True
 
         demo.launch(**launch_kwargs)
 
@@ -1687,6 +1844,16 @@ class WebUI:
         sources_label = ui.get("web_sources_label", "Quellen 📚")
         theme_light_label = ui.get("web_theme_light", "☀️ Hell")
         theme_dark_label = ui.get("web_theme_dark", "🌙 Dunkel")
+        guest_card_label = ui.get("guest_card_label", "Gast anlegen")
+        guest_title = ui.get("guest_title", "Gast-Persona")
+        guest_description = ui.get(
+            "guest_description", "Eigene Persona, nur für diese Sitzung."
+        )
+        guest_name_label = ui.get("guest_name_label", "Name")
+        guest_prompt_label = ui.get("guest_prompt_label", "System-Prompt")
+        guest_prompt_placeholder = ui.get("guest_prompt_placeholder", "Du bist …")
+        guest_temperature_label = ui.get("guest_temperature_label", "Temperatur")
+        guest_start_label = ui.get("guest_start_label", "Gast starten")
 
         self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
@@ -1729,6 +1896,14 @@ class WebUI:
             sources_label=sources_label,
             theme_light_label=theme_light_label,
             theme_dark_label=theme_dark_label,
+            guest_card_label=guest_card_label,
+            guest_title=guest_title,
+            guest_description=guest_description,
+            guest_name_label=guest_name_label,
+            guest_prompt_label=guest_prompt_label,
+            guest_prompt_placeholder=guest_prompt_placeholder,
+            guest_temperature_label=guest_temperature_label,
+            guest_start_label=guest_start_label,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure
