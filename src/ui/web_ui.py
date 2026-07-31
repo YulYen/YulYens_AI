@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import logging
 import os
@@ -32,6 +31,7 @@ from core.utils import (
     is_broadcast_enabled,
     is_broadcast_parallel,
     is_file_exchange_enabled,
+    module_available,
 )
 from storage import ConversationRef
 from stt.whisper_stt import is_stt_available, transcribe_wav
@@ -216,7 +216,7 @@ class WebUI:
         self.tts_web_enabled = (
             bool(self.tts_cfg.get("enabled"))
             and bool(tts_features.get("web_read_aloud"))
-            and importlib.util.find_spec("piper") is not None
+            and module_available("piper")
         )
         if (
             self.tts_cfg.get("enabled")

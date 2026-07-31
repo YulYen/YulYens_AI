@@ -1,6 +1,7 @@
-import importlib.util
 import logging
 from typing import Any
+
+from core.utils import module_available
 
 # WhisperModel-Instanzen sind teuer (Laden dauert Sekunden) — pro
 # (model, device, compute_type) genau einmal instanziieren und behalten.
@@ -9,7 +10,7 @@ _model_cache: dict[tuple[str, str, str], Any] = {}
 
 def is_stt_available() -> bool:
     """True, wenn faster-whisper installiert ist (ohne es zu importieren)."""
-    return importlib.util.find_spec("faster_whisper") is not None
+    return module_available("faster_whisper")
 
 
 def _get_model(stt_cfg: dict) -> Any:
