@@ -362,8 +362,10 @@ def _provider_with_fake_streamer(monkeypatch, captured):
 
     streamer.stream.side_effect = _stream
     factory = Mock()
+    streamer.guard = None
     factory.get_streamer_for_persona.return_value = streamer
     factory.get_config.return_value = Config()
+    factory.build_guard.return_value = None
 
     return AiApiProvider(
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=100, max_snippets=1),

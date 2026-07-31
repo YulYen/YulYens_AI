@@ -460,7 +460,9 @@ class WebUI:
         yield "", chat_history, llm_history, *self._wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
-        wiki_hints, contexts = self.wiki.snippets(user_input, session.bot)
+        wiki_hints, contexts = self.wiki.snippets(
+            user_input, session.bot, getattr(session.streamer, "guard", None)
+        )
 
         # Display the UI hints (do not add them to the LLM context window)
         for wiki_hint in wiki_hints:
@@ -1400,7 +1402,9 @@ class WebUI:
 
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
-        wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
+        wiki_hints, contexts = self.wiki.snippets(
+            question, "ask_all", self.factory.build_guard()
+        )
         context_messages: list[Message] = []
         if contexts:
             # Ask-All hat hier noch keinen Streamer: der Kontext entsteht

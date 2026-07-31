@@ -302,3 +302,61 @@ def test_without_a_guard_nothing_changes():
     inject_wiki_context(history, [WikiSnippet(topic="X", snippet=POISON)])
 
     assert len(history) == 2  # Guardrail + Snippet
+
+
+def test_the_sources_panel_never_lists_a_snippet_the_model_did_not_see():
+    """Die Anzeige (#32) und der Prompt müssen dieselbe Liste sehen.
+
+    Der Guard-Filter saß zuerst nur in `inject_wiki_context`, die Quellen-Karte
+    bekam aber die *ungefilterte* Liste aus `snippets()` — sie listete damit
+    Ausschnitte auf, die das Modell nie gesehen hat. Genau das sichtbar zu
+    machen ist der einzige Zweck von #32.
+
+    Der Auslöser ist nicht exotisch: ein Artikel über `localhost` trifft die
+    Injection-Regel, obwohl er harmlos ist (bekannte False-Positive-Rate, #62).
+    Deshalb filtert `WikiLookup.snippets()` — die eine Stelle, durch die alle
+    Verbraucher gehen.
+    """
+    from wiki.lookup import WikiLookup, WikiSnippet, inject_wiki_context
+
+    harmlos = "Backpulver ist ein Triebmittel."
+    stolpert = "Localhost bezeichnet http://127.0.0.1 im lokalen Netz."
+
+    class _Finder:
+        def find_keywords(self, question):
+            return ["Localhost", "Backpulver"]
+
+    def _fake_lookup(*_args, **_kwargs):
+        return (
+            [],
+            [
+                WikiSnippet(topic="Localhost", snippet=stolpert),
+                WikiSnippet(topic="Backpulver", snippet=harmlos),
+            ],
+        )
+
+    import wiki.lookup as lookup_module
+
+    original = lookup_module.lookup_wiki_snippet
+    lookup_module.lookup_wiki_snippet = _fake_lookup
+    try:
+        _hints, contexts = WikiLookup(keyword_finder=_Finder()).snippets(
+            "Was ist Backpulver?", "LEAH", _guard_for_context()
+        )
+    finally:
+        lookup_module.lookup_wiki_snippet = original
+
+    history: list = []
+    inject_wiki_context(history, contexts, _guard_for_context())
+
+    angezeigt = {snippet.topic for snippet in contexts}
+    im_prompt = {
+        t
+        for t in ("Localhost", "Backpulver")
+        if any(t in m["content"] for m in history)
+    }
+
+    assert (
+        angezeigt == im_prompt
+    ), f"Quellen-Anzeige zeigt {angezeigt}, im Prompt stand aber {im_prompt}"
+    assert angezeigt == {"Backpulver"}

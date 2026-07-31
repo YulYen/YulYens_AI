@@ -88,10 +88,22 @@ class WikiLookup:
         )
 
     def snippets(
-        self, question: str, persona_name: str
+        self, question: str, persona_name: str, guard: Any = None
     ) -> tuple[list[str], list[WikiSnippet]]:
-        """UI-Hinweise und Snippets zur Frage — leer, wenn Wiki aus ist."""
-        return lookup_wiki_snippet(
+        """UI-Hinweise und Snippets zur Frage — leer, wenn Wiki aus ist.
+
+        **Der Guard filtert hier, nicht erst beim Injizieren.** Sonst listet die
+        Quellen-Anzeige (#32) einen Ausschnitt auf, den das Modell nie gesehen
+        hat — und genau das sichtbar zu machen ist der einzige Zweck von #32.
+        Der Auslöser ist nicht exotisch: ein Artikel über ``localhost`` trifft
+        die Injection-Regel, obwohl er harmlos ist (die False-Positive-Rate des
+        Guards ist bekannt schlecht, siehe #62).
+
+        Weil alle Verbraucher — Quellen-Anzeige, Injektion, ``/quellen`` im
+        Terminal — durch diese eine Methode gehen, sehen sie zwangsläufig
+        dieselbe Liste.
+        """
+        hints, contexts = lookup_wiki_snippet(
             question,
             persona_name,
             self.keyword_finder,
@@ -100,6 +112,12 @@ class WikiLookup:
             self.limit,
             self.timeout,
             self.max_snippets,
+        )
+        return hints, accepted_context(
+            guard,
+            contexts,
+            text_of=lambda ctx: ctx.snippet,
+            label_of=lambda ctx: ctx.topic,
         )
 
 

@@ -530,7 +530,7 @@ class YulYenStreamingProvider:
         messages: list[dict[str, Any]] = []
 
         # Look up the Wikipedia snippet(s)
-        _wiki_hints, contexts = wiki.snippets(user_input, persona)
+        _wiki_hints, contexts = wiki.snippets(user_input, persona, self.guard)
 
         # Attach context
         if contexts:

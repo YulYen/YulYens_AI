@@ -269,7 +269,9 @@ class TerminalUI:
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
         context_messages: list[dict[str, str]] = []
         if self.wiki.keyword_finder:
-            wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
+            wiki_hints, contexts = self.wiki.snippets(
+                question, "ask_all", self.factory.build_guard()
+            )
             self.last_wiki_snippets = list(contexts)
             for wiki_hint in wiki_hints:
                 if wiki_hint:
@@ -353,7 +355,9 @@ class TerminalUI:
 
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
             if self.wiki.keyword_finder:
-                wiki_hints, contexts = self.wiki.snippets(user_input, self.bot)
+                wiki_hints, contexts = self.wiki.snippets(
+                    user_input, self.bot, getattr(self.streamer, "guard", None)
+                )
 
                 self.last_wiki_snippets = list(contexts)
 

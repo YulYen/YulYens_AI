@@ -64,8 +64,12 @@ def _create_web_ui(ui_config=None):
             },
         },
     )
+    factory = Mock()
+    # build_guard() liefert bei einem nackten Mock ein Mock statt eines Guards —
+    # der Kontext-Filter liefe dann gegen etwas, das keine Prüfung ist.
+    factory.build_guard.return_value = None
     return WebUI(
-        factory=Mock(),
+        factory=factory,
         config=dummy_config,
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=42, max_snippets=2),
         web_host="0.0.0.0",
@@ -81,6 +85,9 @@ def test_stream_reply_throttles_updates():
     tokens = [f"t{i} " for i in range(50)]
     full_text = "".join(tokens)
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
     session.streamer = streamer
@@ -102,6 +109,9 @@ def test_stream_reply_always_flushes_final_state():
     session = SessionContext()
     tokens = ["Hallo ", "Welt", "!"]
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
     session.streamer = streamer
@@ -204,6 +214,9 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
@@ -230,6 +243,9 @@ def test_respond_streaming_keeps_session_histories_isolated():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     responses = [["Antwort 1"], ["Antwort 2"]]
     captured_messages = []
@@ -281,6 +297,9 @@ def test_respond_streaming_returns_chat_and_state_updates():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
@@ -310,6 +329,9 @@ def test_respond_streaming_appends_final_history_entries():
     history_state: list = []
 
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
@@ -679,6 +701,9 @@ def _briefing_web_ui():
         "feeds": [{"name": "quelle", "url": "https://example.org/rss"}],
     }
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Ant", "wort"])
     session.streamer = streamer
@@ -1030,6 +1055,9 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     session = SessionContext()
     stream = _BlockingStream("Teil ")
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = stream
     session.streamer = streamer
@@ -1059,6 +1087,9 @@ def test_stop_clears_the_switch_so_the_next_stream_runs():
     )  # Stop ohne laufenden Stream: darf nichts kaputt machen
 
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
     session.streamer = streamer
@@ -1145,6 +1176,9 @@ def test_regenerate_drops_last_answer_and_streams_again():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     # Snapshot beim Aufruf: _stream_reply hängt die neue Antwort an dieselbe
     # Liste an, hinterher wäre nicht mehr sichtbar, was gesendet wurde.
@@ -1184,6 +1218,9 @@ def test_regenerate_keeps_wiki_hint_rows():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Neu"])
     session.streamer = streamer
@@ -1311,6 +1348,9 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
@@ -1371,6 +1411,9 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
@@ -1739,6 +1782,7 @@ def _history_web_ui(tmp_path):
     web_ui.cfg.core = {"model_name": "m"}
     web_ui.cfg.ensemble = "classic"
     store = SqliteStore(tmp_path / "conversations.sqlite3")
+    web_ui.factory.build_guard.return_value = None
     web_ui.factory.get_store.return_value = store
     # Die Factory legt Gespräche an (#54) — hier gegen denselben Store.
     web_ui.factory.open_conversation.side_effect = lambda persona, app, user="local": (

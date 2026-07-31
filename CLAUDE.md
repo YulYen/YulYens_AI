@@ -149,11 +149,21 @@ vorbei und landete als **`system`**-Nachricht im Prompt, also mit *mehr* Gewicht
 als die Frage des Nutzers. Derselbe Satz, den der Guard beim Tippen blockt, kam
 über eine heruntergeladene ZIM-Datei ungeprüft durch.
 
-Seit dem Fix prüfen `inject_wiki_context` und `inject_briefing_context` ihren
-Inhalt über `security.tinyguard.accepted_context` (nur `prompt_injection` und
-`wrongdoing` verwerfen — ein Artikel darf E-Mail-Adressen enthalten). Wer einen
-**dritten** Kontext-Kanal baut, muss ihn dort mit anschließen; ein Kanal ohne
-diese Prüfung ist eine Injection-Lücke mit System-Autorität.
+Seit dem Fix prüft `security.tinyguard.accepted_context` den Inhalt (nur
+`prompt_injection` und `wrongdoing` verwerfen — ein Artikel darf E-Mail-Adressen
+enthalten). Wer einen **dritten** Kontext-Kanal baut, muss ihn dort mit
+anschließen; ein Kanal ohne diese Prüfung ist eine Injection-Lücke mit
+System-Autorität.
+
+**Gefiltert wird in `WikiLookup.snippets()`, nicht erst beim Injizieren.** Der
+erste Anlauf hängte die Prüfung nur an `inject_wiki_context` — dann bekam die
+Quellen-Karte (#32) weiterhin die *ungefilterte* Liste und behauptete Quellen,
+die das Modell nie gesehen hat. Das ist exakt der Defekt, gegen den #32 gebaut
+wurde. Ausgelöst wird er von der bekannt schlechten False-Positive-Rate des
+Guards (#62): ein Artikel über `localhost` trifft die Injection-Regel. Alle
+Verbraucher — Anzeige, Injektion, `/quellen` im Terminal — gehen deshalb durch
+diese eine Methode. `inject_wiki_context`/`inject_briefing_context` behalten
+ihren `guard`-Parameter als letzte Schranke vor dem Prompt.
 
 Die Rolle ist weiterhin `system` — sie nach `user` zu verschieben ändert das
 Antwortverhalten aller Personas und braucht einen Lauf am echten Modell (#60).

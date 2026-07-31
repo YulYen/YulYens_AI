@@ -70,7 +70,9 @@ class AiApiProvider:
         )
         if last_user_index is not None:
             question = str(history[last_user_index].get("content") or "")
-            _hints, contexts = self.wiki.snippets(question, canonical_persona)
+            _hints, contexts = self.wiki.snippets(
+                question, canonical_persona, getattr(streamer, "guard", None)
+            )
             if contexts:
                 # Wie im UI: die Kontext-System-Messages stehen unmittelbar vor
                 # dem User-Turn, auf den sie sich beziehen.
