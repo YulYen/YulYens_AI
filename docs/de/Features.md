@@ -145,6 +145,22 @@ Optional kann ein schlanker **E-Mail-Adapter** aktiviert werden (`email_adapter.
 
 Das MVP verarbeitet einfache Text-E-Mails; HTML wird pragmatisch zu Text reduziert, Attachments werden ignoriert. Um Mail-Loops und doppelte Antworten zu vermeiden, ignoriert der Adapter eigene System-/Persona-Adressen und verschiebt erfolgreich bearbeitete oder bewusst ignorierte Nachrichten standardmäßig in den konfigurierten `processed_mailbox`-Ordner. Zugangsdaten gehören nicht in den Code: In `config.yaml` sind Platzhalter wie `env:YULYEN_MAIL_IMAP_PASSWORD` vorgesehen, die zur Laufzeit aus Umgebungsvariablen gelesen werden.
 
+## Anmeldung (optional)
+
+Standardmäßig verlangt die Web-UI **keine Anmeldung** — für den Einzelplatz am eigenen Rechner wäre sie nur Aufwand. Über `ui.web.auth.provider` lässt sie sich einschalten:
+
+- `disabled` (Standard): kein Login, jedes Gespräch wird dem Nutzer `local` zugeordnet.
+- `local`: Benutzername und Passwort aus `ui.web.auth.users`. Passwörter gehören nicht im Klartext in die Config, sondern als `env:NAME`.
+- `header`: die Identität kommt von einem vorgeschalteten Reverse-Proxy (oauth2-proxy, Authelia, …). Das ist der Weg, um später einen echten Anmeldedienst wie Keycloak davorzusetzen — Gradio selbst kann kein OpenID Connect.
+
+Der Nutzername landet in jeder Zeile des Gesprächslogs und in jeder 👍/👎-Bewertung. Die Anmeldung gilt unabhängig davon, ob ein öffentlicher Share-Link aktiv ist.
+
+> **Wichtig:** Die Anmeldung überträgt Passwörter über HTTP im Klartext. Ohne TLS trennt sie Nutzer voneinander, schützt aber nicht gegen jemanden, der den Netzwerkverkehr mitliest. Der `header`-Modus vertraut dem Header bedingungslos und gehört deshalb ausschließlich hinter einen Proxy, der ihn von außen entfernt.
+
+## Gast-Persona
+
+Über die Karte „Gast anlegen 🎭" lässt sich eine eigene Persona aus Name, System-Prompt und Temperatur zusammenstellen — ohne YAML und ohne Neustart. Sie lebt nur in der laufenden Sitzung und ist nach einem Neustart wieder weg; alles andere (Wikipedia-Kontext, Sicherheitsfilter, Gesprächslog, Statuszeile) funktioniert dabei genau wie bei den mitgelieferten Personas.
+
 ## Bedienkomfort in der Web-UI
 
 - **Heller und dunkler Modus:** Oben rechts schalten zwei Links zwischen den Themes (`?__theme=dark` bzw. `?__theme=light`). Gradio liest die Einstellung beim Laden, der Wechsel bedeutet also einen kurzen Reload.

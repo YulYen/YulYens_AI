@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import gradio as gr
+import pytest
 import requests
 from config.texts import Texts
 from core.streaming_provider import StreamStats
@@ -1582,3 +1583,182 @@ def test_reset_hides_the_status_line():
     status = updates[PERSONA_OUTPUT_KEYS.index("status_md")]
     assert status["visible"] is False
     assert status["value"] == ""
+
+
+# ---- Identität in Log und Votes (#53) --------------------------------------
+# Ohne Anmeldung ändert sich nichts am Verhalten — nur das Feld ist jetzt da,
+# weil #25 und #24 sich darauf verlassen können sollen.
+
+
+def test_meta_carries_the_local_user_without_a_login():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"model_name": "m"}
+
+    assert web_ui._build_meta("LEAH")["user"] == "local"
+
+
+def test_meta_carries_the_session_user():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"model_name": "m"}
+
+    assert web_ui._build_meta("LEAH", user="yulyen")["user"] == "yulyen"
+
+
+def test_persona_selection_stamps_the_user_into_meta():
+    web_ui = _create_web_ui()
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "test"
+
+    updates = web_ui._persona_selected_updates(
+        "karl",
+        {"name": "Karl", "description": "d"},
+        "Hallo {persona_name}",
+        "Tippe",
+        user="yulyen",
+    )
+
+    meta = updates[PERSONA_OUTPUT_KEYS.index("meta_state")]
+    assert meta["user"] == "yulyen"
+
+
+def test_vote_records_the_user(tmp_path):
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+
+    web_ui._on_chat_like(
+        [("Frage", "Antwort")],
+        {"persona": "DORIS", "user": "yulyen"},
+        _fake_like(index=(0, 1), value="Antwort", liked=True),
+    )
+
+    assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "yulyen"
+
+
+def test_vote_without_meta_user_falls_back_instead_of_writing_nothing(tmp_path):
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+
+    web_ui._on_chat_like(
+        [("Frage", "Antwort")], {}, _fake_like(index=(0, 1), value="Antwort")
+    )
+
+    assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "local"
+
+
+def test_page_load_reads_the_identity_from_the_request():
+    web_ui = _create_web_ui(
+        ui_config={
+            "experimental": {"broadcast_mode": True},
+            "web": {"auth": {"provider": "local", "users": {"yulyen": "pw"}}},
+        }
+    )
+
+    assert web_ui._on_page_load(SimpleNamespace(username="yulyen")) == "yulyen"
+    # Ohne erkennbare Identität lieber "unknown" als ein leeres Feld.
+    assert web_ui._on_page_load(SimpleNamespace(username=None)) == "unknown"
+
+
+def test_start_server_enables_the_login_without_share():
+    """Der 0.0.0.0-Befund: früher gab es im LAN gar keine Anmeldung."""
+    web_ui = _create_web_ui(
+        ui_config={
+            "web": {
+                "share": False,
+                "auth": {"provider": "local", "users": {"yulyen": "pw"}},
+            }
+        }
+    )
+    demo = Mock()
+
+    web_ui._start_server(demo)
+
+    kwargs = demo.launch.call_args.kwargs
+    assert callable(kwargs["auth"])
+    assert "share" not in kwargs
+
+
+def test_start_server_stays_open_without_configured_auth():
+    web_ui = _create_web_ui()
+    demo = Mock()
+
+    web_ui._start_server(demo)
+
+    assert "auth" not in demo.launch.call_args.kwargs
+
+
+def test_share_without_a_login_is_refused(caplog):
+    web_ui = _create_web_ui(ui_config={"web": {"share": True}})
+    demo = Mock()
+
+    web_ui._start_server(demo)
+
+    assert "share" not in demo.launch.call_args.kwargs
+    assert "no login is configured" in caplog.text
+
+
+# ---- Gast-Persona (#28) ----------------------------------------------------
+# V1 bewusst ohne Persistenz: Schreiben nach ensembles/ müsste die Kette
+# Config → personas.py → Factory-Cache neu laden.
+
+
+def _guest_web_ui():
+    web_ui = _web_ui_with_texts()
+    web_ui.cfg.core = {"model_name": "m"}
+    web_ui.cfg.ensemble = "classic"
+    return web_ui
+
+
+def test_guest_start_builds_a_session_only_streamer():
+    web_ui = _guest_web_ui()
+
+    web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 1.2)
+
+    web_ui.factory.get_streamer_for_guest.assert_called_once_with(
+        "Pirat", "Du bist ein Pirat.", {"temperature": 1.2}
+    )
+    assert web_ui.bot == "Pirat"
+    # Die Ensemble-Personas bleiben unangetastet.
+    web_ui.factory.get_streamer_for_persona.assert_not_called()
+
+
+def test_guest_start_opens_the_chat_without_an_image():
+    """Der Gast hat kein Portrait — lieber leer als ein toter Pfad."""
+    web_ui = _guest_web_ui()
+
+    updates = web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 0.7)
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
+    focus_img = updates[PERSONA_OUTPUT_KEYS.index("focus_img")]
+    assert focus_img["value"] is None
+    assert focus_img["visible"] is False
+    assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is False
+
+
+@pytest.mark.parametrize("name,prompt", [("", "Prompt"), ("Name", ""), ("   ", "   ")])
+def test_guest_start_refuses_incomplete_forms(name, prompt):
+    web_ui = _guest_web_ui()
+
+    updates = web_ui._on_start_guest(name, prompt, 0.7)
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is True
+    assert updates[PERSONA_OUTPUT_KEYS.index("guest_status")]["visible"] is True
+    assert web_ui.bot is None
+    web_ui.factory.get_streamer_for_guest.assert_not_called()
+
+
+def test_guest_start_stamps_the_user_into_meta():
+    web_ui = _guest_web_ui()
+
+    updates = web_ui._on_start_guest("Pirat", "Du bist ein Pirat.", 0.7, "yulyen")
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["user"] == "yulyen"
+    assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["persona"] == "Pirat"
+
+
+def test_show_guest_opens_the_form_and_leaves_the_grid():
+    web_ui = _guest_web_ui()
+
+    updates = web_ui._on_show_guest()
+
+    assert updates[PERSONA_OUTPUT_KEYS.index("guest_group")]["visible"] is True
+    assert updates[PERSONA_OUTPUT_KEYS.index("grid_group")]["visible"] is False

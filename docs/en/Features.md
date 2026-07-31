@@ -145,6 +145,22 @@ Optionally, a lightweight **email adapter** can be enabled (`email_adapter.enabl
 
 The MVP handles plain-text emails; HTML is pragmatically reduced to text, attachments are ignored. To avoid mail loops and duplicate replies, the adapter ignores its own system/persona addresses and moves successfully processed (or deliberately ignored) messages into the configured `processed_mailbox` folder by default. Credentials do not belong in the code: `config.yaml` provides placeholders like `env:YULYEN_MAIL_IMAP_PASSWORD` that are resolved from environment variables at runtime.
 
+## Sign-in (optional)
+
+By default the web UI asks for **no login** — on a single-seat machine that would be pure overhead. It is switched on via `ui.web.auth.provider`:
+
+- `disabled` (default): no login, every conversation is attributed to the user `local`.
+- `local`: username and password from `ui.web.auth.users`. Passwords do not belong in the config in plain text — use `env:NAME`.
+- `header`: the identity comes from a reverse proxy in front (oauth2-proxy, Authelia, …). This is the route to putting a real identity provider such as Keycloak in front later — Gradio itself cannot do OpenID Connect.
+
+The username is written into every line of the conversation log and into every 👍/👎 vote. The login applies whether or not a public share link is active.
+
+> **Important:** the login transmits passwords over HTTP in clear text. Without TLS it separates users from one another but does not protect against anyone reading the network traffic. The `header` mode trusts the header unconditionally and therefore belongs strictly behind a proxy that strips it from outside requests.
+
+## Guest persona
+
+The “Create guest 🎭” card lets you assemble your own persona from a name, a system prompt and a temperature — no YAML, no restart. It lives only in the running session and is gone after a restart; everything else (Wikipedia context, security filter, conversation log, status line) behaves exactly as it does for the bundled personas.
+
 ## Web UI conveniences
 
 - **Light and dark mode:** Two links in the top right switch themes (`?__theme=dark` / `?__theme=light`). Gradio reads the setting on load, so switching means a brief reload.

@@ -112,3 +112,29 @@ def test_persona_without_llm_options_still_yields_a_usable_streamer(cfg, monkeyp
     assert streamer.persona_options == {}
     # Der Pfad, auf dem es sonst geknallt hätte:
     assert streamer.persona_options.get("num_ctx") is None
+
+
+def test_guest_streamer_gets_prompt_temperature_and_timestamps(cfg):
+    """#28: der Gast läuft durch denselben Bau wie eine Ensemble-Persona.
+
+    Damit kommen Guard, Wiki, Kontext-Management und Gesprächslog gratis mit —
+    und die Drei-Zeitstempel-Zeile aus #19 ebenso.
+    """
+    cfg.override("core", {"backend": "dummy", "include_date": True})
+
+    streamer = AppFactory().get_streamer_for_guest(
+        "Pirat", "Du bist ein Pirat.", {"temperature": 1.2}
+    )
+
+    assert streamer.persona == "Pirat"
+    assert streamer.persona_options == {"temperature": 1.2}
+    assert streamer.persona_prompt.startswith("Du bist ein Pirat.")
+    assert "|" in streamer.persona_prompt  # Zeitstempel-Block angehängt
+
+
+def test_guest_streamer_without_options_still_gets_a_dict(cfg):
+    cfg.override("core", {"backend": "dummy"})
+
+    streamer = AppFactory().get_streamer_for_guest("Gast", "Prompt")
+
+    assert streamer.persona_options == {}

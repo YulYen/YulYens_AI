@@ -372,3 +372,47 @@ def test_raising_the_holdback_hides_even_the_label() -> None:
     )
 
     assert leaked == ""
+
+
+def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
+    """#53: das Gesprächslog ist die Datei, die #25 und #49 später durchgehen."""
+    from core.streaming_provider import YulYenStreamingProvider
+
+    provider = YulYenStreamingProvider(
+        base_url="",
+        model_name="m",
+        persona="LEAH",
+        persona_prompt="p",
+        persona_options={},
+        log_file="conv.json",
+        llm_core=None,
+    )
+    monkeypatch.setattr(provider, "conversation_log_path", str(tmp_path / "conv.json"))
+
+    # Ohne Anmeldung (Terminal, API) ist der lokale Nutzer die ehrliche Antwort.
+    provider._append_conversation_log("user", "erste")
+    provider.set_user("yulyen")
+    provider._append_conversation_log("user", "zweite")
+
+    lines = [
+        json.loads(line)
+        for line in (tmp_path / "conv.json").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [entry["user"] for entry in lines] == ["local", "yulyen"]
+
+
+def test_set_user_falls_back_instead_of_writing_an_empty_name(tmp_path, monkeypatch):
+    from core.streaming_provider import YulYenStreamingProvider
+
+    provider = YulYenStreamingProvider(
+        base_url="",
+        model_name="m",
+        persona="LEAH",
+        persona_prompt="p",
+        persona_options={},
+        log_file="conv.json",
+        llm_core=None,
+    )
+    provider.set_user("   ")
+
+    assert provider.user == "local"
