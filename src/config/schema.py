@@ -92,6 +92,13 @@ class SecuritySection(BaseModel):
     stream_holdback_chars: int | None = Field(default=None, ge=0)
 
 
+class StorageSection(BaseModel):
+    model_config = _ALLOW_EXTRA
+
+    enabled: bool = True
+    path: str | None = None
+
+
 class ContextManagementSection(BaseModel):
     model_config = _ALLOW_EXTRA
 
@@ -109,6 +116,7 @@ class ConfigSchema(BaseModel):
     ui: UiSection | None = None
     api: ApiSection | None = None
     security: SecuritySection | None = None
+    storage: StorageSection | None = None
     context_management: ContextManagementSection | None = None
 
 
@@ -122,6 +130,7 @@ KNOWN_TOP_LEVEL_KEYS = frozenset(
         "logging",
         "api",
         "security",
+        "storage",
         "tts",
         "stt",
         "briefing",

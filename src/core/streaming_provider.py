@@ -22,6 +22,7 @@ from typing import Any
 
 from config.config_singleton import Config
 from security.tinyguard import BasicGuard, zeigefinger_message
+from storage import ConversationStore, NullStore
 from wiki.lookup import inject_wiki_context, lookup_wiki_snippet
 
 from core.context_utils import approx_token_count
@@ -210,6 +211,8 @@ class YulYenStreamingProvider:
         guard: BasicGuard | None = None,
         *,
         llm_core: LLMCore | None = None,
+        store: ConversationStore | None = None,
+        jsonl_log: bool = False,
     ) -> None:
         self.model_name = model_name
         self.keep_alive = keep_alive
@@ -234,10 +237,15 @@ class YulYenStreamingProvider:
 
             self._llm_core = OllamaLLMCore(base_url)
 
-        # Configure logging
+        # Die Aufzeichnung liegt seit #54 im Store; der JSONL-Mitschnitt ist ein
+        # ausdrückliches Debug-Artefakt und standardmäßig aus.
+        self.store: ConversationStore = store if store is not None else NullStore()
+        self.conversation_id: str = ""
+        self.jsonl_log = bool(jsonl_log)
         self._logs_dir = "logs"
-        ensure_dir_exists(self._logs_dir)
         self.conversation_log_path = os.path.join(self._logs_dir, log_file)
+        if self.jsonl_log:
+            ensure_dir_exists(self._logs_dir)
         self.guard: BasicGuard | None = guard
         # Wer das Gespräch führt (#53). Ohne Anmeldung — Terminal, API — ist
         # der lokale Nutzer die ehrliche Antwort; die WebUI überschreibt es
@@ -271,8 +279,26 @@ class YulYenStreamingProvider:
         """
         self.user = (user or "").strip() or LOCAL_USER
 
+    def set_conversation(self, conversation_id: str) -> None:
+        """Gespräch, in das aufgezeichnet wird (#54).
+
+        Die ID gehört der Oberfläche, nicht dem Streamer: ein Modellwechsel baut
+        einen neuen Streamer, das Gespräch bleibt aber dasselbe. Vorher entstand
+        dabei eine zweite Logdatei.
+        """
+        self.conversation_id = (conversation_id or "").strip()
+
     def _append_conversation_log(self, role: str, content: str) -> None:
-        """Writes an entry to the conversation JSON log."""
+        """Schreibt einen Turn in den Store (und optional in den JSONL-Mitschnitt)."""
+        try:
+            self.store.append(self.conversation_id, role, content)
+        except Exception:
+            # Aufzeichnen darf den Stream nie abbrechen — dieselbe Regel wie
+            # beim Logfile davor.
+            logging.exception("Could not record turn in the conversation store")
+
+        if not self.jsonl_log:
+            return
         try:
             entry = {
                 "ts": datetime.datetime.now()

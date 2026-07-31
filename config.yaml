@@ -129,8 +129,19 @@ logging:
   to_console: "auto" # "true", "false" or "auto" (auto: false if terminal-ui, otherwise true)
   dir: "logs"
   conversation_prefix: "conversation"
+  # Roher JSONL-Mitschnitt pro Streamer. Seit #54 ist das ein Debug-Artefakt,
+  # nicht die Ablage — die Gespräche liegen in storage.path.
+  conversation_jsonl: false
   trace_prompts: false  # true: log the readable final prompt (incl. injected wiki snippets) per turn at INFO
   log_raw_chunks: false # true: log every raw token chunk at DEBUG (very noisy; needs level: DEBUG too)
+
+# --- Gesprächs-Ablage (#54) ------------------------------------------------------
+# Gespräche liegen in einer SQLite-Datei (stdlib, keine zusätzliche Abhängigkeit)
+# statt in Logdateien. Das gibt jedem Gespräch eine ID, die auch einen
+# Modellwechsel überlebt, und ist die Grundlage für Verlauf (#25) und Suche (#49).
+storage:
+  enabled: true
+  path: "data/conversations.sqlite3"
 
 # --- Persona e-mail adapter -----------------------------------------------------
 # Optional IMAP/SMTP bridge: routes incoming plain-text e-mails to personas via

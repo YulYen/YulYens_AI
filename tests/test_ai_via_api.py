@@ -1,12 +1,9 @@
-import json
 import re
 import unicodedata
 from datetime import datetime
-from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
-from config.config_singleton import Config
 from config.personas import get_all_persona_names
 from core.streaming_provider import YulYenStreamingProvider
 
@@ -69,18 +66,7 @@ def test_invalid_persona_rejected(client):
 
 
 def test_persona_name_normalized(client, monkeypatch):
-    cfg = Config()
-    logs_dir = Path(cfg.logging["dir"])
-    if not logs_dir.is_absolute():
-        logs_dir = Path.cwd() / logs_dir
-    # Größen statt nur Datei-Menge merken: läuft der Test zweimal innerhalb
-    # desselben Zeitstempel-Fensters, wächst die bestehende Log-Datei nur —
-    # dann darf der Test nicht an "neue Datei existiert" scheitern.
-    if logs_dir.exists():
-        before_sizes = {p: p.stat().st_size for p in logs_dir.glob("*.json")}
-    else:
-        before_sizes = {}
-
+    """Der Persona-Name wird normalisiert — 'leah' erreicht den Streamer als LEAH."""
     captured: dict[str, str] = {}
 
     def fake_respond(
@@ -95,50 +81,41 @@ def test_persona_name_normalized(client, monkeypatch):
         wiki_timeout,
     ):
         captured["persona_arg"] = persona
-        answer = f"Persona arg: {persona} | Bot attr: {self.persona}"
-        self._append_conversation_log("user", user_input)
-        self._append_conversation_log("assistant", answer)
-        return answer
+        return f"Persona arg: {persona} | Bot attr: {self.persona}"
 
     monkeypatch.setattr(YulYenStreamingProvider, "respond_one_shot", fake_respond)
 
     response = client.post("/ask", json={"question": "Wer bist du?", "persona": "leah"})
+
     assert response.status_code == 200
     answer = response.json().get("answer", "")
     assert "Persona arg: LEAH" in answer
     assert "Bot attr: LEAH" in answer
     assert captured.get("persona_arg") == "LEAH"
 
-    if logs_dir.exists():
-        after_files = set(logs_dir.glob("*.json"))
-    else:
-        after_files = set()
 
-    new_files = [p for p in after_files if p not in before_sizes]
-    grown_files = [
-        p
-        for p in after_files
-        if p in before_sizes and p.stat().st_size > before_sizes[p]
-    ]
-    written_files = new_files + grown_files
-    assert written_files, "No conversation JSON log entry was written."
-    target = max(written_files, key=lambda path: path.stat().st_mtime)
+def test_api_turns_are_recorded_in_the_store(client, monkeypatch, tmp_path):
+    """Seit #54 ist der Store die Aufzeichnung, nicht mehr die Logdatei."""
+    from storage import SqliteStore
 
-    try:
-        lines = target.read_text(encoding="utf-8").strip().splitlines()
-        assert lines, "Conversation JSON log file contains no entries."
-        last_entry = json.loads(lines[-1])
-        assert last_entry.get("bot") == "LEAH"
-    finally:
-        # Nur selbst erzeugte Dateien aufräumen, gewachsene vorbestehende behalten
-        for path in new_files:
-            try:
-                path.unlink()
-            except FileNotFoundError:
-                pass
+    store = SqliteStore(tmp_path / "conversations.sqlite3")
+    conversation_id = store.start(user="local", persona="LEAH", model="m", app="api")
+
+    def fake_respond(self, user_input, persona, *args, **kwargs):
+        self.store = store
+        self.set_conversation(conversation_id)
+        self._append_conversation_log("user", user_input)
+        self._append_conversation_log("assistant", "Antwort")
+        return "Antwort"
+
+    monkeypatch.setattr(YulYenStreamingProvider, "respond_one_shot", fake_respond)
+    client.post("/ask", json={"question": "Wer bist du?", "persona": "leah"})
+
+    _ref, messages = store.load(conversation_id)
+    assert [m["role"] for m in messages] == ["user", "assistant"]
+    assert messages[0]["content"] == "Wer bist du?"
 
 
-# ---- Normalization / matching -------------------------------------------------
 def _normalize(s: str) -> str:
     """
     Light normalization:

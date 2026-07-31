@@ -116,6 +116,7 @@ def test_stream_defaults_keep_alive_to_600() -> None:
 
 
 def test_streaming_writes_conversation_json_log(tmp_path) -> None:
+    """Der JSONL-Mitschnitt ist seit #54 ein opt-in Debug-Artefakt."""
     log_file = tmp_path / f"conv_{datetime.now().strftime('%H%M%S')}.json"
 
     core = DummyLLMCore()
@@ -127,6 +128,7 @@ def test_streaming_writes_conversation_json_log(tmp_path) -> None:
         persona_options={"temperature": 0.2},
         log_file=log_file.name,
         guard=AllowAllGuard(),
+        jsonl_log=True,
     )
 
     provider._logs_dir = str(tmp_path)
@@ -375,7 +377,7 @@ def test_raising_the_holdback_hides_even_the_label() -> None:
 
 
 def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
-    """#53: das Gesprächslog ist die Datei, die #25 und #49 später durchgehen."""
+    """#53: der Nutzer steht in jeder Zeile — hier über den Debug-Mitschnitt."""
     from core.streaming_provider import YulYenStreamingProvider
 
     provider = YulYenStreamingProvider(
@@ -386,6 +388,7 @@ def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
         persona_options={},
         log_file="conv.json",
         llm_core=None,
+        jsonl_log=True,
     )
     monkeypatch.setattr(provider, "conversation_log_path", str(tmp_path / "conv.json"))
 
