@@ -96,3 +96,19 @@ def test_warm_up_runs_only_once(cfg, monkeypatch) -> None:
     factory.warm_up_model()
 
     assert len(core.calls) == 1
+
+
+def test_persona_without_llm_options_still_yields_a_usable_streamer(cfg, monkeypatch):
+    """Ohne llm_options lieferte get_options None — der Provider erwartet ein dict.
+
+    Von mypy gefunden (#52): `persona_options=None` wäre erst beim ersten
+    Kontext-Check über `.get("num_ctx")` aufgefallen, also mitten im Gespräch.
+    """
+    cfg.override("core", {"backend": "dummy"})
+    monkeypatch.setattr("config.personas.get_options", lambda name: None)
+
+    streamer = AppFactory().get_streamer_for_persona("LEAH")
+
+    assert streamer.persona_options == {}
+    # Der Pfad, auf dem es sonst geknallt hätte:
+    assert streamer.persona_options.get("num_ctx") is None

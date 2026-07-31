@@ -257,3 +257,109 @@ def test_terminal_ui_tts_skips_without_persona(monkeypatch) -> None:
 
     create_mock.assert_not_called()
     play_mock.assert_not_called()
+
+
+# ---- Quellen im Terminal (#32a) --------------------------------------------
+
+
+def _snippet(**kwargs) -> WikiSnippet:
+    defaults = {
+        "topic": "Deutschland",
+        "snippet": "Berlin ist die Hauptstadt.",
+        "link": "http://127.0.0.1:8080/wiki/Deutschland",
+        "source": "local",
+        "full_length": 8432,
+    }
+    defaults.update(kwargs)
+    return WikiSnippet(**defaults)
+
+
+def test_sources_command_prints_link_length_and_the_injected_text(capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.last_wiki_snippets = [_snippet()]
+
+    ui._handle_sources_command()
+
+    out = capsys.readouterr().out
+    assert "1. Deutschland" in out
+    assert "http://127.0.0.1:8080/wiki/Deutschland" in out
+    # Gekürzt: beide Zahlen, sonst ist nicht erkennbar, was das Modell nicht sah
+    assert "26 von 8432 Zeichen" in out
+    assert "gekürzt" in out
+    # Der Ausschnitt selbst — der eigentliche Grund für das Kommando
+    assert "Berlin ist die Hauptstadt." in out
+
+
+def test_sources_command_marks_complete_snippets(capsys) -> None:
+    ui = _create_terminal_ui()
+    ui.last_wiki_snippets = [_snippet(snippet="Kurz.", full_length=5, source="online")]
+
+    ui._handle_sources_command()
+
+    out = capsys.readouterr().out
+    assert "vollständig" in out
+    assert "gekürzt" not in out
+
+
+def test_sources_command_says_so_when_nothing_was_injected(capsys) -> None:
+    ui = _create_terminal_ui()
+
+    ui._handle_sources_command()
+
+    out = capsys.readouterr().out
+    assert ui.texts["terminal_sources_empty"] in out
+
+
+def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
+    ui = _create_terminal_ui()
+    ui.bot = "LEAH"
+    ui.keyword_finder = object()
+    ui.streamer = SimpleNamespace(stream=lambda messages: iter(["Antwort"]))
+
+    snippets = [_snippet()]
+    monkeypatch.setattr(
+        "ui.terminal_ui.lookup_wiki_snippet",
+        lambda *a, **k: (["hint"], snippets),
+    )
+    monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", lambda *a, **k: None)
+    monkeypatch.setattr(TerminalUI, "_start_dialog_flow", lambda self: True)
+    monkeypatch.setattr(TerminalUI, "_ensure_context_headroom", lambda self: None)
+    monkeypatch.setattr(TerminalUI, "_maybe_create_tts_wav", lambda self, reply: None)
+
+    prompts = iter(["Was ist Deutschland?", "exit"])
+    monkeypatch.setattr("builtins.input", lambda _: next(prompts))
+
+    ui.launch()
+
+    assert ui.last_wiki_snippets == snippets
+
+
+def test_ask_all_flow_records_the_injected_snippets(monkeypatch) -> None:
+    ui = _create_terminal_ui()
+    ui.factory = SimpleNamespace()
+    ui.keyword_finder = object()
+
+    snippets = [_snippet()]
+    monkeypatch.setattr("builtins.input", lambda _: "Frage")
+    monkeypatch.setattr(
+        "ui.terminal_ui.lookup_wiki_snippet", lambda *a, **k: ([], snippets)
+    )
+    monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", lambda *a, **k: None)
+    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", lambda *a, **k: None)
+
+    ui._run_ask_all_flow()
+
+    assert ui.last_wiki_snippets == snippets
+
+
+def test_new_conversation_drops_the_recorded_snippets(monkeypatch) -> None:
+    ui = _create_terminal_ui()
+    ui.last_wiki_snippets = [_snippet()]
+
+    monkeypatch.setattr(TerminalUI, "choose_persona", lambda self: None)
+    monkeypatch.setattr(TerminalUI, "print_welcome", lambda self: None)
+    monkeypatch.setattr("builtins.input", lambda _: "1")
+
+    ui._start_dialog_flow()
+
+    assert ui.last_wiki_snippets == []

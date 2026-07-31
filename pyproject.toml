@@ -27,3 +27,22 @@ filterwarnings = [
     "ignore:Importing 'parser\\.split_arg_string'.*:DeprecationWarning",
     "ignore:Please use `import python_multipart` instead.:PendingDeprecationWarning",
 ]
+
+# Typprüfung (#52): bewusst nur src/core — dort sitzt die Logik, die alle UIs
+# teilen. Erweitert wird Modul für Modul, nicht per Big Bang; ein dauerhaft
+# gelber Job wäre wertlos.
+[tool.mypy]
+python_version = "3.10"
+files = ["src/core"]
+mypy_path = "src"
+# Der Rest des Projekts wird mitgelesen (Signaturen!), aber nicht gemeldet —
+# sonst müsste man alles auf einmal aufräumen.
+follow_imports = "silent"
+warn_unused_ignores = true
+warn_redundant_casts = true
+
+# Bibliotheken ohne Typ-Stubs. Bewusst einzeln statt global, damit ein neuer
+# Import nicht stillschweigend ungeprüft durchrutscht.
+[[tool.mypy.overrides]]
+module = ["gradio.*", "colorama.*", "spacy.*", "piper.*", "ollama.*", "faster_whisper.*"]
+ignore_missing_imports = true

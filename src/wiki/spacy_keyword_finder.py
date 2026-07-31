@@ -1,6 +1,12 @@
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 import spacy
+
+if TYPE_CHECKING:  # nur für die Typprüfung — zur Laufzeit kein Import
+    from config.config_singleton import Config
 
 RELEVANT_LABELS = ["PER", "ORG", "LOC", "EVENT", "GPE"]
 
@@ -50,7 +56,7 @@ W_TOKENS = {
 GENERIC_NOUNS = {"amt", "funktion", "rolle", "posten", "thema", "frage"}
 
 
-def resolve_spacy_model(cfg: dict) -> str:
+def resolve_spacy_model(cfg: Config) -> str:
     """
     Determine the correct spaCy model name based on language and variant
     defined in config.yaml. Raises a clear error if configuration is incomplete.

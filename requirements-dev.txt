@@ -2,6 +2,10 @@
 # Pinned so CI and local runs agree on formatting decisions.
 black==24.4.2
 ruff==0.4.10
+# Typprüfung nur für src/core (#52) — Konfiguration in pyproject.toml.
+mypy==1.10.1
+types-requests
+types-PyYAML
 pytest>=8.2,<9.0
 pytest-cov>=5.0,<7.0
 pre-commit>=3.7,<4.0

@@ -25,7 +25,12 @@ from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.webui_layout import build_ui
-from wiki.lookup import WikiSnippet, inject_wiki_context, lookup_wiki_snippet
+from wiki.lookup import (
+    WikiSnippet,
+    format_snippet_meta,
+    inject_wiki_context,
+    lookup_wiki_snippet,
+)
 
 if TYPE_CHECKING:
     from config.config_singleton import Config
@@ -86,6 +91,8 @@ PERSONA_OUTPUT_KEYS = (
     "regenerate_btn",
     "sources_accordion",
     "sources_md",
+    "ask_all_sources_accordion",
+    "ask_all_sources_md",
 )
 
 # Ausgaben jedes streamenden Handlers, in dieser Reihenfolge. Die Quellen (#32)
@@ -101,6 +108,17 @@ STREAM_OUTPUT_KEYS = (
 
 # Was _with_stream_controls hinter STREAM_OUTPUT_KEYS anhängt.
 STREAM_CONTROL_KEYS = ("send_btn", "stop_btn", "regenerate_btn")
+
+# Reihenfolge der Ask-All-Ausgaben — dieselbe, die _ask_all_state aufbaut.
+ASK_ALL_OUTPUT_KEYS = (
+    "ask_all_question",
+    "ask_all_status",
+    "ask_all_results",
+    "ask_all_submit",
+    "ask_all_new_chat",
+    "ask_all_sources_accordion",
+    "ask_all_sources_md",
+)
 
 
 class WebUI:
@@ -277,19 +295,7 @@ class WebUI:
         for idx, snip in enumerate(snippets or [], start=1):
             title = snip.topic or "?"
             heading = f"[{title}]({snip.link})" if snip.link else title
-            origin = self._t(
-                "wiki_source_online" if snip.source == "online" else "wiki_source_local"
-            )
-            meta = self._t(
-                (
-                    "wiki_sources_meta_truncated"
-                    if snip.truncated
-                    else "wiki_sources_meta_full"
-                ),
-                source=origin,
-                shown=len(snip.snippet),
-                total=snip.full_length,
-            )
+            meta = format_snippet_meta(snip, self._t)
             # Blockquote: hebt den fremden Text vom Rahmen ab und bleibt auch
             # bei 1200 Zeichen am Stück lesbar.
             quoted = "\n".join(
@@ -617,6 +623,8 @@ class WebUI:
             "regenerate_btn": gr.update(visible=False, interactive=True),
             "sources_accordion": gr.update(visible=False, open=False),
             "sources_md": gr.update(value=""),
+            "ask_all_sources_accordion": gr.update(visible=False, open=False),
+            "ask_all_sources_md": gr.update(value=""),
         }
 
     def _persona_selected_updates(
@@ -945,8 +953,14 @@ class WebUI:
         submit_visible: bool = True,
         submit_interactive: bool = True,
         status: str = "",
+        sources_md: str = "",
     ) -> tuple:
-        """Builds the 5-tuple of updates every Ask-All yield consists of."""
+        """Builds the tuple of updates every Ask-All yield consists of.
+
+        ``sources_md`` läuft wie ``status`` durch alle Yields mit: der
+        Wiki-Lookup passiert einmal vorab, das Ergebnis muss danach in jedem
+        Update wieder mitgeschickt werden (#32a).
+        """
         return (
             gr.update(
                 value=question,
@@ -958,6 +972,8 @@ class WebUI:
             gr.update(value=results_md, visible=bool(results_md)),
             gr.update(visible=submit_visible, interactive=submit_interactive),
             gr.update(visible=True),
+            gr.update(visible=bool(sources_md)),
+            gr.update(value=sources_md),
         )
 
     @staticmethod
@@ -1021,11 +1037,15 @@ class WebUI:
         if contexts:
             inject_wiki_context(context_messages, contexts)
         wiki_status = "\n\n".join(hint for hint in wiki_hints if hint)
-        if wiki_status:
+        # Die Quellen stehen hier bereits fest und reisen ab jetzt in jedem
+        # Yield mit — genau wie wiki_status (#32a).
+        sources_md = self._format_wiki_sources(contexts)
+        if wiki_status or sources_md:
             yield self._ask_all_state(
                 question,
                 self._format_ask_all_results(replies),
                 status=wiki_status,
+                sources_md=sources_md,
                 **running,
             )
 
@@ -1055,6 +1075,7 @@ class WebUI:
                     question,
                     self._format_ask_all_results(replies),
                     status=wiki_status,
+                    sources_md=sources_md,
                     **running,
                 )
 
@@ -1064,6 +1085,7 @@ class WebUI:
             question,
             self._format_ask_all_results(replies),
             status=wiki_status,
+            sources_md=sources_md,
             editable=True,
         )
 
@@ -1271,8 +1293,8 @@ class WebUI:
         ask_all_question = components["ask_all_question"]
         ask_all_submit = components["ask_all_submit"]
         ask_all_new_chat = components["ask_all_new_chat"]
-        ask_all_status = components["ask_all_status"]
         ask_all_card_btn = components["ask_all_card_btn"]
+        ask_all_outputs = [components[key] for key in ASK_ALL_OUTPUT_KEYS]
         self_talk_card_btn = components["self_talk_card_btn"]
         self_talk_status = components["self_talk_status"]
         self_talk_persona_a = components["self_talk_persona_a"]
@@ -1441,26 +1463,14 @@ class WebUI:
         ask_all_submit_evt = ask_all_submit.click(
             fn=self._on_submit_ask_all,
             inputs=[ask_all_question, ask_all_results],
-            outputs=[
-                ask_all_question,
-                ask_all_status,
-                ask_all_results,
-                ask_all_submit,
-                ask_all_new_chat,
-            ],
+            outputs=ask_all_outputs,
             queue=True,
         )
 
         ask_all_question_evt = ask_all_question.submit(
             fn=self._on_submit_ask_all,
             inputs=[ask_all_question, ask_all_results],
-            outputs=[
-                ask_all_question,
-                ask_all_status,
-                ask_all_results,
-                ask_all_submit,
-                ask_all_new_chat,
-            ],
+            outputs=ask_all_outputs,
             queue=True,
         )
 

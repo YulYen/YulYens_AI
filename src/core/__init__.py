@@ -11,9 +11,10 @@ from .llm_core import LLMCore  # noqa: F401
 
 try:
     # Optional import: only load when the ollama package is available
-    from .ollama_llm_core import OllamaLLMCore  # type: ignore[assignment]
+    from .ollama_llm_core import OllamaLLMCore
 except Exception:
-    OllamaLLMCore = None  # type: ignore[assignment]
+    # Bewusstes Sentinel für den fehlenden optionalen Import — kein Typfehler.
+    OllamaLLMCore = None  # type: ignore[assignment, misc]
 
 from .dummy_llm_core import DummyLLMCore  # noqa: F401
 from .streaming_provider import YulYenStreamingProvider  # noqa: F401

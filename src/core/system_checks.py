@@ -114,7 +114,7 @@ def check_spacy_model(model_name: str) -> CheckResult:
     )
 
 
-def check_kiwix_reachable(host: str, port, timeout: float = 2.0) -> CheckResult:
+def check_kiwix_reachable(host: str | None, port, timeout: float = 2.0) -> CheckResult:
     if not host or port in (None, ""):
         return CheckResult(
             "kiwix", False, WARNING, "offline host/kiwix_port not configured"

@@ -11,7 +11,12 @@ from unittest.mock import Mock, patch
 import gradio as gr
 import requests
 from config.texts import Texts
-from ui.web_ui import PERSONA_OUTPUT_KEYS, STREAM_OUTPUT_KEYS, WebUI
+from ui.web_ui import (
+    ASK_ALL_OUTPUT_KEYS,
+    PERSONA_OUTPUT_KEYS,
+    STREAM_OUTPUT_KEYS,
+    WebUI,
+)
 from wiki.lookup import WikiSnippet
 
 
@@ -1390,3 +1395,96 @@ def test_reset_updates_hide_the_sources_accordion():
 
     assert updates[PERSONA_OUTPUT_KEYS.index("sources_accordion")]["visible"] is False
     assert updates[PERSONA_OUTPUT_KEYS.index("sources_md")]["value"] == ""
+
+
+# ---- Quellen in Ask-All (#32a) ---------------------------------------------
+# Eigenes Accordion innerhalb der Ask-All-Gruppe: das Einzelchat-Accordion
+# liegt außerhalb und stünde in dieser Ansicht über dem ganzen Block.
+
+ASK_ALL_SOURCES_ACCORDION = ASK_ALL_OUTPUT_KEYS.index("ask_all_sources_accordion")
+ASK_ALL_SOURCES_MD = ASK_ALL_OUTPUT_KEYS.index("ask_all_sources_md")
+
+
+def _ask_all_web_ui():
+    web_ui = _web_ui_with_texts()
+    web_ui.broadcast_parallel = False
+    return web_ui
+
+
+def test_ask_all_publishes_the_injected_snippet_text():
+    web_ui = _ask_all_web_ui()
+    snippet = WikiSnippet(
+        topic="Deutschland",
+        snippet="Berlin ist die Hauptstadt.",
+        link="http://localhost:8080/Deutschland",
+        source="local",
+        full_length=9000,
+    )
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch(
+            "ui.web_ui.lookup_wiki_snippet",
+            return_value=(["🕵️ Hinweis"], [snippet]),
+        ),
+        patch("ui.web_ui.inject_wiki_context"),
+        patch(
+            "ui.web_ui.iter_broadcast_events",
+            return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),
+        ),
+    ):
+        outputs = list(web_ui._on_submit_ask_all("Frage"))
+
+    final = outputs[-1]
+    assert final[ASK_ALL_SOURCES_ACCORDION]["visible"] is True
+    markdown = final[ASK_ALL_SOURCES_MD]["value"]
+    assert "[Deutschland](http://localhost:8080/Deutschland)" in markdown
+    assert "26 von 9000 Zeichen" in markdown
+    assert "> Berlin ist die Hauptstadt." in markdown
+
+
+def test_ask_all_keeps_the_sources_in_every_yield():
+    """Der Lookup läuft einmal vorab — danach muss er in jedem Update mitreisen."""
+    web_ui = _ask_all_web_ui()
+    snippet = WikiSnippet(topic="Kiwix", snippet="Kurz.", full_length=5)
+    events = [
+        {"type": "token", "persona": "LEAH", "reply": "A"},
+        {"type": "done", "persona": "LEAH", "reply": "AB"},
+    ]
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [snippet])),
+        patch("ui.web_ui.inject_wiki_context"),
+        patch("ui.web_ui.iter_broadcast_events", return_value=iter(events)),
+    ):
+        outputs = list(web_ui._on_submit_ask_all("Frage"))
+
+    # Erster Yield ist der Platzhalter vor dem Lookup, danach steht die Quelle.
+    after_lookup = outputs[1:]
+    assert after_lookup
+    assert all(item[ASK_ALL_SOURCES_MD]["value"] for item in after_lookup)
+
+
+def test_ask_all_hides_the_accordion_without_wiki_hits():
+    web_ui = _ask_all_web_ui()
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch("ui.web_ui.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "ui.web_ui.iter_broadcast_events",
+            return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),
+        ),
+    ):
+        outputs = list(web_ui._on_submit_ask_all("Frage"))
+
+    assert all(item[ASK_ALL_SOURCES_ACCORDION]["visible"] is False for item in outputs)
+
+
+def test_reset_updates_hide_the_ask_all_sources_accordion():
+    updates = _create_web_ui()._reset_ui_updates()
+
+    accordion = updates[PERSONA_OUTPUT_KEYS.index("ask_all_sources_accordion")]
+    assert accordion["visible"] is False
+    assert updates[PERSONA_OUTPUT_KEYS.index("ask_all_sources_md")]["value"] == ""
