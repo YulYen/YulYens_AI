@@ -433,7 +433,12 @@ Konsequenzen fürs Weiterbauen:
   Trennung still wieder aufheben.
 - Auslieferungsdateien (WAV, JSON, Markdown) hängen aus demselben Grund an der
   Sitzung (`SessionContext.tmp_files`): sonst räumt ein Download im einen Browser
-  die Datei eines anderen weg.
+  die Datei eines anderen weg. Beim nächsten Mal wird die vorherige Datei
+  derselben Art gelöscht, das Verzeichnis räumt ein `atexit`-Handler ab.
+  **Nur die Originale:** Gradio kopiert Ausgabedateien in seinen eigenen Cache
+  (`blocks.py` → `processing_utils.move_files_to_cache`) und liefert von dort
+  aus. Gut, denn das Löschen kann keinen laufenden Abruf zerreißen — aber die
+  zweite Kopie verwaltet Gradio, nicht wir.
 
 ### ⚠️ Die Konsolenwarnung „Too many arguments provided for the endpoint" ist normal
 Sie kommt aus Gradios **Frontend**
@@ -499,7 +504,7 @@ Gradio den Start der App komplett mit „Queue needs to be enabled!".
 eines laufenden Generator-Handlers wird **nicht zuverlässig ausgeführt**, im
 Backend gestartete Arbeit (LLM-Streams, Threads) läuft weiter (live gemessen:
 Streams liefen nach Cancel komplett durch). **Lösung im Projekt:** expliziter
-Kill-Switch — `WebUI._ask_all_stop` (`threading.Event`) wird vom Reset-Handler
+Kill-Switch — `SessionContext.ask_all_stop` (`threading.Event`) wird vom Reset-Handler
 (eigenes, zuverlässig laufendes Gradio-Event) gesetzt und stoppt die
 Broadcast-Worker direkt (`stop_event`-Parameter von `iter_broadcast_events_parallel`).
 Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` bauen.

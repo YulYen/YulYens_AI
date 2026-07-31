@@ -166,6 +166,33 @@ def test_persona_selected_updates_fills_every_slot(wired):
     assert len(updates) == len(PERSONA_OUTPUT_KEYS)
 
 
+def test_gradio_hands_every_browser_session_its_own_context(wired):
+    """Die Sitzungstrennung hängt an Gradios Kopierverhalten — also hier prüfen.
+
+    Der Zwilling dieses Tests in `test_web_ui.py` prüft nur, dass der Default
+    `deepcopy`-fähig ist: eine Bedingung, aber **meine** Annahme. Ob Gradio
+    tatsächlich pro Sitzung kopiert, steht hier — sonst bliebe der Test grün,
+    während sich die Sitzungen wieder still vermischen.
+    """
+    from gradio.state_holder import StateHolder
+
+    holder = StateHolder()
+    holder.set_blocks(wired.demo)
+    state_id = wired.components["session_state"]._id
+
+    a = holder["sitzung-a"][state_id]
+    b = holder["sitzung-b"][state_id]
+    a.bot = "LEAH"
+    a.tmp_files["download"] = "/tmp/a.json"
+
+    assert a is not b
+    assert b.bot is None
+    assert b.tmp_files == {}
+    # Und dieselbe Sitzung bekommt ihr Objekt wieder — sonst wäre jede
+    # In-place-Änderung nach dem nächsten Event weg.
+    assert holder["sitzung-a"][state_id] is a
+
+
 def test_persona_outputs_are_bound_in_list_order(wired):
     """Die Reihenfolge der gebundenen Outputs ist die von PERSONA_OUTPUT_KEYS.
 
