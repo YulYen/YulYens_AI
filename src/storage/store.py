@@ -138,12 +138,44 @@ class SqliteStore:
         self._migrate()
 
     def _migrate(self) -> None:
+        """Wendet die ausstehenden Schritte an — jeden ganz oder gar nicht.
+
+        Vorher lief jeder Schritt über ``executescript``. Das committet die
+        laufende Transaktion *vorher* und klammert das Skript selbst nicht:
+        scheiterte Anweisung 2 von 3, blieb Anweisung 1 stehen, während
+        ``user_version`` auf dem alten Wert blieb. Der Schritt war damit **nie
+        wieder** anwendbar — beim nächsten Start scheiterte er an „table …
+        already exists", ``build_store`` degradierte zum ``NullStore``, und die
+        App lief weiter, ohne noch irgendetwas aufzuzeichnen.
+
+        Deshalb explizit ``BEGIN``/``COMMIT``: Pythons Legacy-Modus
+        (``isolation_level=""``) eröffnet für DDL von sich aus keine
+        Transaktion. ``user_version`` wird im selben Zug gesetzt, damit Schema
+        und Versionsstand nicht auseinanderlaufen können. Das ist die
+        Vorbedingung dafür, dass Schritt 2 (FTS5 für #49) gefahrlos ausgeliefert
+        werden kann: fehlt FTS5 auf der Zielmaschine, bleibt die Datei einfach
+        auf der alten Version stehen.
+        """
         with self._lock:
             version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
             for step, sql in enumerate(_MIGRATIONS[version:], start=version + 1):
-                self._conn.executescript(sql)
-                self._conn.execute(f"PRAGMA user_version = {step}")
-                self._conn.commit()
+                # Bewusst weiter executescript mit BEGIN/COMMIT *im* Skript,
+                # statt den Text an ';' zu zerlegen: ein FTS5-Trigger bringt
+                # eigene Semikolons im BEGIN…END-Rumpf mit, und ein selbstgebauter
+                # Splitter wäre die nächste Falle. PRAGMA user_version ist in
+                # SQLite transaktional und gehört deshalb mit hinein.
+                script = f"BEGIN;\n{sql}\nPRAGMA user_version = {int(step)};\nCOMMIT;"
+                try:
+                    self._conn.executescript(script)
+                except Exception:
+                    self._conn.rollback()
+                    logging.error(
+                        "[STORE] Migrationsschritt %s fehlgeschlagen — die Datei "
+                        "bleibt unverändert auf Version %s.",
+                        step,
+                        step - 1,
+                    )
+                    raise
                 logging.info("[STORE] Schema auf Version %s gebracht", step)
 
     def close(self) -> None:

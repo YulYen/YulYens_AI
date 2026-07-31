@@ -129,6 +129,84 @@ def test_migration_starts_from_an_empty_file(tmp_path):
     assert store.list_conversations() == []
 
 
+# Ein Schritt, wie ihn #49 bringen wird: mehrere Anweisungen, ein Trigger mit
+# eigenen Semikolons im Rumpf — und als letzte eine Anweisung, die auf manchen
+# SQLite-Builds scheitert (FTS5 fehlt dort).
+_STEP_THAT_FAILS_AT_THE_END = """
+    CREATE TABLE search_meta (k TEXT PRIMARY KEY);
+    CREATE TRIGGER messages_ai AFTER INSERT ON messages BEGIN
+        INSERT INTO search_meta(k) VALUES (new.role);
+    END;
+    CREATE VIRTUAL TABLE messages_fts USING fts_gibt_es_nicht(content);
+"""
+_STEP_THAT_WORKS = _STEP_THAT_FAILS_AT_THE_END.replace(
+    "CREATE VIRTUAL TABLE messages_fts USING fts_gibt_es_nicht(content);",
+    "CREATE TABLE messages_fts (content TEXT);",
+)
+
+
+def _object_names(path):
+    with sqlite3.connect(str(path)) as con:
+        return sorted(
+            row[0]
+            for row in con.execute(
+                "SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'"
+            )
+        )
+
+
+def test_a_failing_migration_step_leaves_the_file_untouched(tmp_path, monkeypatch):
+    """Ein Schritt gilt ganz oder gar nicht.
+
+    Vorher lief jeder Schritt über ``executescript``, das die Anweisungen ohne
+    Transaktion ausführt: scheiterte die letzte, blieben die vorherigen stehen,
+    ``user_version`` blieb zurück — und damit war der Schritt **nie wieder**
+    anwendbar ('table … already exists'). Der Store degradierte beim nächsten
+    Start dauerhaft zum NullStore, und die App zeichnete still nichts mehr auf.
+    """
+    path = tmp_path / "conversations.sqlite3"
+    first = SqliteStore(path)
+    cid = first.start(user="u", persona="LEAH", model="m", app="web")
+    first.append(cid, "user", "wichtige Daten")
+    first.close()
+    before = _object_names(path)
+
+    monkeypatch.setattr(
+        "storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_FAILS_AT_THE_END,)
+    )
+    with pytest.raises(sqlite3.Error):
+        SqliteStore(path)
+
+    with sqlite3.connect(str(path)) as con:
+        assert con.execute("PRAGMA user_version").fetchone()[0] == len(_MIGRATIONS)
+    assert _object_names(path) == before, "der halbe Schritt blieb in der Datei stehen"
+
+
+def test_a_repaired_migration_step_still_applies_afterwards(tmp_path, monkeypatch):
+    """Die Gegenprobe: nach dem Fehlschlag darf der Schritt nicht verbrannt sein."""
+    path = tmp_path / "conversations.sqlite3"
+    first = SqliteStore(path)
+    cid = first.start(user="u", persona="LEAH", model="m", app="web")
+    first.append(cid, "user", "wichtige Daten")
+    first.close()
+
+    monkeypatch.setattr(
+        "storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_FAILS_AT_THE_END,)
+    )
+    with pytest.raises(sqlite3.Error):
+        SqliteStore(path)
+
+    # Umgebung repariert (oder Schritt korrigiert) — jetzt muss er durchlaufen.
+    monkeypatch.setattr("storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_WORKS,))
+    store = SqliteStore(path)
+
+    with sqlite3.connect(str(path)) as con:
+        assert con.execute("PRAGMA user_version").fetchone()[0] == len(_MIGRATIONS) + 1
+    assert "messages_fts" in _object_names(path)
+    assert [ref.id for ref in store.list_conversations()] == [cid]
+    store.close()
+
+
 # ---- NullStore und Konfiguration -------------------------------------------
 
 
