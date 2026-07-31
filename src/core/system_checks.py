@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 import requests
 
@@ -127,7 +128,25 @@ def check_kiwix_reachable(host: str | None, port, timeout: float = 2.0) -> Check
     return CheckResult("kiwix", True, WARNING, f"reachable at {target}")
 
 
-def check_vram(timeout: float = 5.0) -> CheckResult:
+# Sektionen, die check_config_schema aus der geladenen Config einsammelt.
+_CONFIG_SECTIONS = (
+    "core",
+    "ui",
+    "wiki",
+    "logging",
+    "api",
+    "security",
+    "tts",
+    "stt",
+    "briefing",
+    "email_adapter",
+    "context_management",
+    "evals",
+)
+
+
+def _nvidia_memory(timeout: float = 5.0) -> tuple[int, int] | None:
+    """(used, total) in MiB — None, wenn es keine NVIDIA-GPU gibt."""
     try:
         proc = subprocess.run(
             [
@@ -140,16 +159,32 @@ def check_vram(timeout: float = 5.0) -> CheckResult:
             timeout=timeout,
         )
     except (FileNotFoundError, OSError, subprocess.SubprocessError):
-        return CheckResult("vram", True, INFO, "no NVIDIA GPU / nvidia-smi unavailable")
+        return None
     if proc.returncode != 0:
-        return CheckResult("vram", True, INFO, "nvidia-smi returned an error")
+        return None
     line = (proc.stdout or "").strip().splitlines()
     if not line:
-        return CheckResult("vram", True, INFO, "nvidia-smi produced no output")
+        return None
     try:
         used, total = (int(x.strip()) for x in line[0].split(","))
     except (ValueError, IndexError):
-        return CheckResult("vram", True, INFO, f"unparseable output: {line[0]!r}")
+        return None
+    return used, total
+
+
+def _free_vram_mib(timeout: float = 5.0) -> int | None:
+    memory = _nvidia_memory(timeout)
+    if memory is None:
+        return None
+    used, total = memory
+    return max(0, total - used)
+
+
+def check_vram(timeout: float = 5.0) -> CheckResult:
+    memory = _nvidia_memory(timeout)
+    if memory is None:
+        return CheckResult("vram", True, INFO, "no NVIDIA GPU / nvidia-smi unavailable")
+    used, total = memory
     pct = (used / total * 100) if total else 0.0
     detail = f"{used}/{total} MiB used ({pct:.0f}%)"
     return CheckResult("vram", pct < 95.0, WARNING, detail)
@@ -158,9 +193,75 @@ def check_vram(timeout: float = 5.0) -> CheckResult:
 # ---- Orchestration --------------------------------------------------------
 
 
+def check_config_schema(cfg) -> CheckResult:
+    """Schema-Befunde zu config.yaml und dem gewählten Ensemble (#43).
+
+    Beim Start wird nur gewarnt (siehe config/schema.py) — hier zählt derselbe
+    Befund als Fehlschlag. Der Doktor ist der Ort, an dem man Strenge will.
+    """
+    from config.schema import validate_config, validate_ensemble
+
+    data = {
+        key: getattr(cfg, key)
+        for key in _CONFIG_SECTIONS
+        if getattr(cfg, key, None) is not None
+    }
+    data["language"] = getattr(cfg, "language", "")
+    problems = validate_config(data)
+
+    ensemble = getattr(cfg, "ensemble", None)
+    if ensemble:
+        problems.extend(
+            validate_ensemble(
+                Path("ensembles") / str(ensemble), str(getattr(cfg, "language", "de"))
+            )
+        )
+
+    if not problems:
+        return CheckResult("config", True, INFO, "schema ok")
+    head = (
+        problems[0] if len(problems) == 1 else f"{problems[0]} (+{len(problems) - 1})"
+    )
+    return CheckResult("config", False, WARNING, head)
+
+
+def check_model_fits_vram(
+    ollama_url: str, model_name: str, timeout: float = 2.0
+) -> CheckResult:
+    """Vergleicht die Modellgröße aus /api/tags mit dem freien VRAM (#43).
+
+    Rein additiv: ohne erreichbares Ollama oder ohne NVIDIA-GPU bleibt es bei
+    einem INFO — der Check soll niemandem den Start vermiesen.
+    """
+    try:
+        base = _ollama_base(ollama_url)
+        resp = requests.get(f"{base}/api/tags", timeout=timeout)
+        resp.raise_for_status()
+        models = (resp.json() or {}).get("models", [])
+    except (requests.RequestException, ValueError):
+        return CheckResult("model_vram", True, INFO, "Ollama unreachable")
+
+    size_bytes = next(
+        (m.get("size") for m in models if m.get("name") == model_name), None
+    )
+    if not size_bytes:
+        return CheckResult("model_vram", True, INFO, f"size for {model_name} unknown")
+    needed_gb = int(size_bytes) / 1024**3
+
+    free = _free_vram_mib()
+    if free is None:
+        return CheckResult(
+            "model_vram", True, INFO, f"{model_name} needs ~{needed_gb:.1f} GB"
+        )
+    free_gb = free / 1024
+    detail = f"{model_name} needs ~{needed_gb:.1f} GB, {free_gb:.1f} GB free"
+    return CheckResult("model_vram", free_gb >= needed_gb, WARNING, detail)
+
+
 def run_checks(cfg, *, include_vram: bool = True) -> list[CheckResult]:
     """Run every applicable check for the given Config and return the results."""
     results: list[CheckResult] = []
+    results.append(check_config_schema(cfg))
 
     core = getattr(cfg, "core", {}) or {}
     backend = str(core.get("backend", "ollama") or "ollama").strip().lower()
@@ -171,6 +272,7 @@ def run_checks(cfg, *, include_vram: bool = True) -> list[CheckResult]:
         results.append(reachable)
         if reachable.ok:
             results.append(check_model_available(url, core.get("model_name", "")))
+            results.append(check_model_fits_vram(url, core.get("model_name", "")))
         else:
             results.append(
                 CheckResult(

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from .schema import validate_config
 from .texts import Texts
 
 
@@ -91,6 +93,15 @@ class Config:
             raise ValueError(
                 "Config value 'language' must be a non-empty string like 'de' or 'en'."
             )
+
+        # Schema-Prüfung (#43): beim Start bewusst nur eine Warnung. Ein
+        # laufendes Setup darf nicht an einem Schema scheitern, das die
+        # persönliche config.local.yaml nie gesehen hat — hart wird es erst in
+        # `--doctor` und /healthz.
+        for problem in validate_config(
+            {**data, "language": language}, source=str(config_path)
+        ):
+            logging.warning("[CONFIG] %s", problem)
 
         self.language = language
         # Anchor on the project root, independent of the config file location

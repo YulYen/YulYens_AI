@@ -46,6 +46,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── config/
 │   │   ├── config_singleton.py  # YAML-Config (Singleton, reset_instance() für Tests)
 │   │   ├── personas.py          # Ensemble-Loader
+│   │   ├── schema.py            # pydantic-Prüfung für config.yaml + Ensembles
 │   │   ├── texts.py             # i18n (MutableMapping)
 │   │   └── logging_setup.py
 │   ├── ui/
@@ -242,6 +243,17 @@ persönliche/geheime Werte (z. B. echter Mail-Host/-Adresse) aus der **öffentli
 `config.yaml` heraus, während die App lokal trotzdem läuft. `config.local.yaml` ist
 in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
+### Schema-Prüfung (#43): zwei Härtegrade
+`src/config/schema.py` prüft `config.yaml` und die Ensemble-Dateien mit pydantic.
+**Beim Start wird nur gewarnt** (`logging.warning("[CONFIG] …")`) — ein laufendes
+Setup darf nicht an einem Schema scheitern, das die persönliche
+`config.local.yaml` nie gesehen hat. **`--doctor` und `/healthz` melden denselben
+Befund hart** (`CheckResult("config")`), dort will man Strenge. Unbekannte Keys
+sind nie ein Fehler, sondern ein Tippfehler-Hinweis: `extra="allow"` plus eigener
+Abgleich gegen `KNOWN_TOP_LEVEL_KEYS`, nicht `extra="forbid"` — sonst blockiert
+jede neue Sektion sofort alles. Neue Config-Optionen also **immer** dort
+nachtragen, sonst warnt der Start grundlos.
+
 **Tests ignorieren das lokale Override:** Die Test-Suite setzt automatisch
 `YULYEN_SKIP_LOCAL_CONFIG=1` (autouse-Fixture in `tests/conftest.py`), damit
 eine persönliche `config.local.yaml` die Tests nicht anders laufen lässt als
@@ -308,6 +320,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
+| **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `WebUI._stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
 ### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
@@ -380,7 +393,7 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #27 Ask-All-Moderator, #36 WebUI-Politur, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
+- **Quick Wins:** #27 Ask-All-Moderator, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
   (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel), #30 Tool-Use (Türöffner), #37 OpenAI-kompatible API
 
@@ -391,7 +404,8 @@ Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei
 via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen),
 #25 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
-#32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`.
+#32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
+#43 Config-/Ensemble-Validierung.
 
 ## Sprachstrategie
 
