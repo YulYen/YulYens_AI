@@ -912,9 +912,17 @@ def test_chat_like_appends_upvote_jsonl(tmp_path):
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Hallo?", None), (None, "wiki hint"), (None, "Antwort!")]
+    # Der Wiki-Hinweis steht bewusst nicht in der LLM-History — daran erkennt
+    # der Handler, dass er kein Modelltext ist.
+    llm_history = [
+        {"role": "user", "content": "Hallo?"},
+        {"role": "assistant", "content": "Antwort!"},
+    ]
     meta = {"persona": "DORIS", "model": "m1", "app": "web"}
 
-    web_ui._on_chat_like(session, history, meta, _fake_like(index=(2, 1), liked=True))
+    web_ui._on_chat_like(
+        session, history, meta, llm_history, _fake_like(index=(2, 1), liked=True)
+    )
 
     votes = _read_votes(web_ui.feedback_log_path)
     assert len(votes) == 1
@@ -935,9 +943,17 @@ def test_chat_like_downvote_on_paired_history(tmp_path):
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Frage", "Antwort")]
+    llm_history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
 
     web_ui._on_chat_like(
-        session, history, {}, _fake_like(index=(0, 1), value="Antwort", liked=False)
+        session,
+        history,
+        {},
+        llm_history,
+        _fake_like(index=(0, 1), value="Antwort", liked=False),
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
@@ -951,10 +967,19 @@ def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Prompt", None), (None, "LEAH: Hi"), (None, "DORIS: Na?")]
+    llm_history = [
+        {"role": "user", "content": "Prompt"},
+        {"role": "assistant", "content": "LEAH: Hi"},
+        {"role": "assistant", "content": "DORIS: Na?"},
+    ]
     meta = {"persona": "self-talk:LEAH,DORIS", "model": "m1", "app": "web"}
 
     web_ui._on_chat_like(
-        session, history, meta, _fake_like(index=(2, 1), value="DORIS: Na?")
+        session,
+        history,
+        meta,
+        llm_history,
+        _fake_like(index=(2, 1), value="DORIS: Na?"),
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
@@ -970,9 +995,17 @@ def test_chat_like_two_votes_append_two_lines(tmp_path):
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Frage", None), (None, "Antwort")]
+    llm_history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
 
-    web_ui._on_chat_like(session, history, {}, _fake_like(index=(1, 1), liked=True))
-    web_ui._on_chat_like(session, history, {}, _fake_like(index=(1, 1), liked=False))
+    web_ui._on_chat_like(
+        session, history, {}, llm_history, _fake_like(index=(1, 1), liked=True)
+    )
+    web_ui._on_chat_like(
+        session, history, {}, llm_history, _fake_like(index=(1, 1), liked=False)
+    )
 
     votes = _read_votes(web_ui.feedback_log_path)
     assert [v["vote"] for v in votes] == ["up", "down"]
@@ -985,26 +1018,78 @@ def test_chat_like_never_raises_on_write_error(tmp_path, caplog):
 
     with caplog.at_level(logging.ERROR):
         web_ui._on_chat_like(
-            session, [("F", None), (None, "A")], {}, _fake_like(index=(1, 1))
+            session,
+            [("F", None), (None, "A")],
+            {},
+            [{"role": "user", "content": "F"}, {"role": "assistant", "content": "A"}],
+            _fake_like(index=(1, 1)),
         )
 
     assert "Could not write feedback log" in caplog.text
 
 
-def test_chat_like_handles_garbage_input(tmp_path):
-    """Empty history, missing meta and a broken index still produce a vote line."""
+def test_chat_like_drops_a_vote_it_cannot_verify(tmp_path):
+    """Kaputter Index und keine LLM-History: lieber keine Zeile als eine falsche.
 
+    Vorher entstand hier eine Vote-Zeile aus ``evt.value`` allein. Für einen
+    Kanal, aus dem später Trainingsdaten werden (#40 → #7), ist der Verlust
+    einer Bewertung billiger als eine erfundene: ohne History lässt sich nicht
+    prüfen, ob der Text überhaupt vom Modell stammt.
+    """
     web_ui = _create_web_ui()
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
 
-    web_ui._on_chat_like(session, None, None, _fake_like(index=None, value="Antwort"))
+    web_ui._on_chat_like(
+        session, None, None, None, _fake_like(index=None, value="Antwort")
+    )
 
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["question"] == ""
-    assert vote["persona"] == ""
-    assert vote["answer"] == "Antwort"
-    assert vote["index"] == [-1, 1]
+    assert not (tmp_path / "votes.jsonl").exists()
+
+
+@pytest.mark.parametrize(
+    "beiwerk",
+    [
+        "🕵️‍♀️ LEAH blättert im lokalen Wikipedia-Archiv:\nhttp://…",
+        "🛡️ 1 nachgeschlagene Quelle(n) hat der Sicherheitsfilter verworfen …",
+        "📰 LEAH blättert durch tagesschau …",
+        "Moment, ich sortiere kurz meine Gedanken … (Kontext wird komprimiert)",
+    ],
+)
+def test_chat_like_ignores_votes_on_ui_notices(tmp_path, beiwerk):
+    """Eine Bot-Bubble ist nicht automatisch eine Modellantwort.
+
+    Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und
+    die Kontext-Kompressionswarnung stehen in derselben Spalte wie die Antwort
+    und tragen deshalb auch einen Daumen. Bisher schrieb ein Klick darauf eine
+    Zeile nach feedback_votes.jsonl — also Trainingsdaten (#40, Grundlage für
+    #7) aus UI-Text, der nie vom Modell kam.
+
+    Erkannt wird das daran, dass Beiwerk bewusst nie in die LLM-History geht.
+    """
+    web_ui = _create_web_ui()
+    session = SessionContext()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [("Frage", None), (None, beiwerk), (None, "Echte Antwort")]
+    llm_history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Echte Antwort"},
+    ]
+
+    web_ui._on_chat_like(
+        session, history, {}, llm_history, _fake_like(index=(1, 1), value=beiwerk)
+    )
+    assert not (tmp_path / "votes.jsonl").exists(), "Beiwerk wurde aufgezeichnet"
+
+    # Gegenprobe: die echte Antwort daneben zählt weiterhin.
+    web_ui._on_chat_like(
+        session,
+        history,
+        {},
+        llm_history,
+        _fake_like(index=(2, 1), value="Echte Antwort"),
+    )
+    assert _read_votes(web_ui.feedback_log_path)[0]["answer"] == "Echte Antwort"
 
 
 def test_chat_like_ignores_votes_on_user_messages(tmp_path):
@@ -1015,7 +1100,13 @@ def test_chat_like_ignores_votes_on_user_messages(tmp_path):
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [("Frage", None), (None, "Antwort")]
 
-    web_ui._on_chat_like(session, history, {}, _fake_like(index=(0, 0), value="Frage"))
+    web_ui._on_chat_like(
+        session,
+        history,
+        {},
+        [{"role": "assistant", "content": "Antwort"}],
+        _fake_like(index=(0, 0), value="Frage"),
+    )
 
     assert not (tmp_path / "votes.jsonl").exists()
 
@@ -1600,6 +1691,7 @@ def test_vote_records_the_user(tmp_path):
         session,
         [("Frage", "Antwort")],
         {"persona": "DORIS", "user": "yulyen"},
+        [{"role": "assistant", "content": "Antwort"}],
         _fake_like(index=(0, 1), value="Antwort", liked=True),
     )
 
@@ -1612,7 +1704,11 @@ def test_vote_without_meta_user_falls_back_instead_of_writing_nothing(tmp_path):
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
 
     web_ui._on_chat_like(
-        session, [("Frage", "Antwort")], {}, _fake_like(index=(0, 1), value="Antwort")
+        session,
+        [("Frage", "Antwort")],
+        {},
+        [{"role": "assistant", "content": "Antwort"}],
+        _fake_like(index=(0, 1), value="Antwort"),
     )
 
     assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "local"

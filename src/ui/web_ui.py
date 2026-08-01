@@ -1612,11 +1612,37 @@ class WebUI:
         self.feedback_log_path = os.path.join(log_dir, "feedback_votes.jsonl")
         return self.feedback_log_path
 
+    @staticmethod
+    def _is_model_answer(text: str, llm_history: list[Message] | None) -> bool:
+        """Ist dieser Bot-Text eine Antwort des Modells — oder nur Beiwerk?
+
+        In der Chat-Anzeige sind beide eine Bot-Bubble: die Antwort, aber auch
+        der Wiki-Hinweis („🕵️ … blättert im Archiv"), die
+        Kontext-Kompressionswarnung, die Briefing-Meldungen und der Hinweis auf
+        vom Guard verworfene Quellen. Ein Daumen darauf schrieb bisher eine
+        Zeile nach ``feedback_votes.jsonl``, als hätte das Modell das gesagt —
+        also Trainingsdaten (#40, Grundlage für #7) aus UI-Text.
+
+        Der Diskriminator braucht keinen neuen Zustand: **Beiwerk landet nie in
+        der LLM-History.** Die Hinweise werden ausdrücklich nur an
+        ``chat_history`` gehängt und bewusst nicht ins Kontextfenster gegeben.
+        Was dort nicht als ``assistant`` steht, ist deshalb keine Antwort.
+        """
+        candidate = (text or "").strip()
+        if not candidate:
+            return False
+        return any(
+            (message.get("role") == "assistant")
+            and (message.get("content") or "").strip() == candidate
+            for message in (llm_history or [])
+        )
+
     def _on_chat_like(
         self,
         session: SessionContext,
         chat_history: list[ChatPair] | None,
         meta: dict | None,
+        llm_history: list[Message] | None,
         evt: gr.LikeData,
     ) -> None:
         # Votes must never break the UI: any failure is logged and swallowed.
@@ -1634,6 +1660,16 @@ class WebUI:
             # so only bot answers (column 1) are recorded.
             if col != 1:
                 logging.debug("Ignoring feedback vote on a user message (row %s)", row)
+                return
+
+            # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
+            # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
+            # würde dem Modell beibringen, UI-Text zu produzieren.
+            if not self._is_model_answer(answer, llm_history):
+                logging.debug(
+                    "Ignoring feedback vote on a UI notice, not a model answer (row %s)",
+                    row,
+                )
                 return
 
             meta = meta if isinstance(meta, dict) else {}
@@ -1817,9 +1853,11 @@ class WebUI:
         )
 
         # Binding .like() auto-enables the thumb buttons on the chatbot (#40).
+        # history_state muss mit: nur daran lässt sich eine echte Antwort von
+        # einer Hinweis-Bubble unterscheiden (siehe _on_chat_like).
         chatbot.like(
             fn=self._on_chat_like,
-            inputs=[session_state, chatbot, meta_state],
+            inputs=[session_state, chatbot, meta_state, history_state],
             outputs=[],
             queue=False,
         )
