@@ -113,6 +113,55 @@ def test_parse_verdict_survives_chatty_judges():
     assert [v.score for v in verdict.verdicts] == [5, 3]
 
 
+def test_parse_verdict_reads_the_line_a_real_judge_actually_wrote():
+    # Verbatim from the failing live run (#71): the format was kept, the
+    # model just wrote the score in bold.
+    raw = "1: **5** | Hauptstadt korrekt genannt\n2: **2** | mehr als zwei Sätze"
+    verdict = parse_verdict(raw, ("a", "b"))
+    assert [v.score for v in verdict.verdicts] == [5, 2]
+    assert verdict.verdicts[0].reason == "Hauptstadt korrekt genannt"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "1: **5** | gut",
+        "**1**: 5 | gut",
+        "**1: 5** | gut",
+        "1: `5` | gut",
+        "1: __5__ | gut",
+        "- 1: **5** | gut",
+        "* **1.** 5 — gut",
+        "1: Punktzahl: 5 | gut",
+        "1) **Bewertung 5** – gut",
+        "1: 5/5 | gut",
+    ],
+)
+def test_parse_verdict_tolerates_markdown_decoration(line):
+    verdict = parse_verdict(line, ("a",))
+    assert verdict.verdicts[0].score == 5
+    assert verdict.verdicts[0].reason == "gut"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "Die Antwort war gut.\n1 Satz reicht völlig aus.",
+        "Insgesamt 5 von 5 Erwartungen erfüllt.",
+        "1. Satz: die Hauptstadt stimmt.",
+        "1: 7 | ausserhalb der Skala",
+        "1: 0 | ausserhalb der Skala",
+        "Bewertung folgt später.",
+    ],
+)
+def test_parse_verdict_still_refuses_digits_from_running_text(raw):
+    # The looser pattern must not turn any number into a score — an
+    # unanswered trait has to keep failing loudly (#71).
+    verdict = parse_verdict(raw, ("a",))
+    assert verdict.verdicts[0].score is None
+    assert verdict.average is None
+
+
 def test_parse_verdict_ignores_out_of_range_indices():
     verdict = parse_verdict("7: 5 | nonsense", ("a",))
     assert verdict.verdicts[0].score is None

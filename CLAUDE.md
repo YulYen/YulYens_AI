@@ -282,6 +282,15 @@ make evals                                           # Kurzform für --guard-onl
   so ist #62 abgenommen worden: `ctx_code_snippet_in_article_is_kept` fing an zu
   bestehen, also musste das Flag fallen. `KNOWN_GAP_IDS` in
   `tests/test_evals_cli.py` ist damit wieder leer
+- **Der Judge-Parser liest Markdown mit, aber nicht mehr (#71):** ein reales 8B-Modell
+  antwortet `1: **5** | …` statt `1: 5 | …` — formattreu, nur fett. Vorher wurde daraus
+  `score=None`, also ein Durchfaller trotz sauberer Bewertung; ein Baseline-Lauf hätte
+  lauter Nullen gemessen. `_SCORE_LINE` erlaubt jetzt Auszeichnung *um* die beiden
+  Zahlen (`**`, `__`, Backticks, Aufzählungszeichen, `Punktzahl:`, `5/5`) — die Zeile
+  muss aber weiter mit der Erwartungsnummer beginnen und die Punktzahl eine einzelne
+  1–5 sein. Jede Lockerung braucht die Gegenprobe, dass Ziffern im Fließtext weiterhin
+  `None` ergeben; `unscored` ist die einzige Schranke gegen einen stumm durchgewinkten
+  Judge
 - `expect.rule` nennt die Regel, die einen Guard-Fall fangen *soll* (#62). Nur
   `reason` zu prüfen reicht nicht: ein Fall, der von der falschen Regel gefangen
   wird, sieht sonst aus wie ein Erfolg

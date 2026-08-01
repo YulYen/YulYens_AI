@@ -71,6 +71,15 @@ Modell hat, setzt `evals.judge_model` darauf.
 Antwortet der Judge nicht im vorgegebenen Format, wird die betroffene
 Erwartung als `unscored` geführt — nie als bestanden.
 
+**Formattreue heißt nicht Textgleichheit (#71).** Ein 8B-Modell hält das Format
+ein und schreibt trotzdem `1: **5** | …` statt `1: 5 | …`. Der Parser toleriert
+deshalb Auszeichnung *um* die beiden Zahlen herum (`**`, `__`, Backticks,
+Aufzählungszeichen, `Punktzahl:`, `5/5`), aber nichts darüber hinaus: Die Zeile
+muss mit der Nummer der Erwartung beginnen und die Punktzahl eine einzelne 1–5
+sein. Wer das Muster weiter aufmacht, legt in `tests/test_evals_runner.py` die
+Gegenprobe daneben — sonst wird aus „Insgesamt 5 von 5 Erwartungen erfüllt"
+eine Bewertung, und `unscored` verliert seine Bedeutung.
+
 ## Guard-Red-Team
 
 Läuft ohne Modell und ist deshalb Teil der normalen Testsuite:

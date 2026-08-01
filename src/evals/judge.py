@@ -20,7 +20,40 @@ _SYSTEM_PROMPT = (
     "Antworte ausschließlich im vorgegebenen Format, ohne Vorrede."
 )
 
-_SCORE_LINE = re.compile(r"^\s*(\d+)\s*[:.)]\s*([1-5])\b\s*\|?\s*(.*)$", re.MULTILINE)
+# Judges answer in Markdown even when asked not to: `1: **5** | …` was the
+# real observed answer that made every trait come back unscored (#71). The
+# pattern therefore tolerates decoration *around* the two numbers — emphasis,
+# a leading bullet, a "Punktzahl:" label — but nothing that would let a digit
+# from running text pass as a score: the line still has to start with the
+# trait number, and the score still has to be a single 1–5. Anything else
+# stays `score=None` on purpose; a judge that did not answer must not look
+# like a pass.
+_EMPHASIS = r"[*_`]{0,2}"
+_SCORE_LABEL = r"(?:punktzahl|punkte|score|bewertung|note|rating)\s*[:=]?\s*"
+
+_SCORE_LINE = re.compile(
+    rf"""^[ \t]*
+        (?:[-*•+]\s+)?          # bullet: "- 1: 5 | …"
+        {_EMPHASIS}\s*
+        (\d+)                   # trait number
+        {_EMPHASIS}
+        \s*[:.)\]]\s*           # separator between number and score
+        {_EMPHASIS}\s*
+        (?:{_SCORE_LABEL})?     # "1: Punktzahl: 5 | …"
+        {_EMPHASIS}\s*
+        # The score itself. Not `\b`: "__5__" has no word boundary before the
+        # underscore, but a digit or letter glued to it means it was never a
+        # score ("12", "5Sterne").
+        ([1-5])(?![0-9A-Za-zÄÖÜäöüß])
+        (?:\s*/\s*5)?           # "5/5"
+        {_EMPHASIS}
+        \s*[|\-–—:]?\s*
+        (.*)$""",
+    re.MULTILINE | re.VERBOSE | re.IGNORECASE,
+)
+
+# Leftover decoration at the edges of the reason ("**gut**", "5 | gut**").
+_REASON_EDGE = "*_` \t"
 
 # Judge answers must be deterministic; creativity is not wanted here.
 JUDGE_OPTIONS = {"temperature": 0.0, "num_predict": 400}
@@ -82,7 +115,8 @@ def parse_verdict(raw: str, traits: tuple[str, ...]) -> JudgeVerdict:
     for match in _SCORE_LINE.finditer(raw or ""):
         index = int(match.group(1)) - 1
         if 0 <= index < len(traits) and index not in scores:
-            scores[index] = (int(match.group(2)), match.group(3).strip())
+            reason = match.group(3).strip().strip(_REASON_EDGE)
+            scores[index] = (int(match.group(2)), reason)
 
     verdicts = tuple(
         TraitVerdict(
