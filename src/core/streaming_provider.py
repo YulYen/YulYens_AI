@@ -77,6 +77,12 @@ def _render_prompt_trace(
 # `security.stream_holdback_chars` in config.yaml for when to raise it.
 _STREAM_HOLDBACK_CHARS = 32
 
+# Wie weit der Moderator hinter die Freigabemarke zurückschaut, damit ein
+# Treffer, der davor beginnt, noch vollständig im Fenster liegt. Muss bequem
+# über dem längsten Ausgangsmuster liegen; hält die Prüfung trotzdem bei O(1)
+# pro Token statt bei O(Antwortlänge).
+_CONTEXT_WINDOW_CHARS = 256
+
 
 def _output_checks_active(guard: BasicGuard | None) -> bool:
     """True when the guard actually inspects outgoing text.
@@ -140,7 +146,8 @@ class _StreamModerator:
         self.blocked = False
         self.masked = False
         self._acc = ""
-        self._emitted = 0
+        # Index in den ROHEN Text: wie viel davon bereits (maskiert) raus ist.
+        self._released = 0
 
     def _block_message(self, reason: str | None) -> str:
         self.blocked = True
@@ -157,36 +164,63 @@ class _StreamModerator:
 
         # No guard: nothing to moderate, stream the token straight through.
         if self.guard is None:
-            self._emitted += len(token)
+            self._released += len(token)
             return [token]
 
-        pol = self.guard.process_output(self._acc)
-        if pol["blocked"]:
-            return [self._block_message(pol.get("reason"))]
-
-        self.masked = self.masked or bool(pol.get("masked"))
-        masked = pol["text"]
-        safe_upto = len(masked) - self.holdback
-        if safe_upto > self._emitted:
-            chunk = masked[self._emitted : safe_upto]
-            self._emitted = safe_upto
-            return [chunk]
-        return []
+        return self._release_up_to(len(self._acc) - self.holdback)
 
     def flush(self) -> list[str]:
         """Release the held-back tail once the stream has ended."""
         if self.blocked or self.guard is None:
             return []
-        pol = self.guard.process_output(self._acc)
+        return self._release_up_to(len(self._acc))
+
+    def _release_up_to(self, frontier: int) -> list[str]:
+        """Gibt ``self._acc`` bis ``frontier`` frei — maskiert und lückenlos.
+
+        Der Index läuft über den **rohen** Text, nicht über den maskierten.
+        Vorher war es umgekehrt, und weil die Maskierung die Länge ändert
+        (``max@example.com`` → ``[PII]``), zeigte der Index nach jedem Treffer
+        auf die falsche Stelle: Modelltext verschwand oder kam doppelt.
+
+        Damit das Maskieren eines Abschnitts *für sich* dasselbe Ergebnis
+        liefert wie über den ganzen Text, darf die Freigabegrenze nie mitten in
+        einem Treffer liegen. Genau das prüft ``output_match_crossing``; liegt
+        einer quer, wird die Grenze vor seinen Anfang zurückgezogen und der
+        Rest wartet auf mehr Text.
+
+        Gearbeitet wird nur auf einem Fenster um die Grenze statt auf dem
+        gesamten bisherigen Text. Vorher lief ``process_output`` pro Token über
+        alles Bisherige — quadratisch im Antwortumfang, 1,6 s reine CPU auf
+        16.000 Zeichen.
+        """
+        guard = self.guard
+        if guard is None or frontier <= self._released:
+            return []
+
+        # Fenster: etwas vor der freigegebenen Marke (damit ein Treffer, der
+        # davor beginnt, noch sichtbar ist) bis ans Ende des Bekannten.
+        window_start = max(0, self._released - _CONTEXT_WINDOW_CHARS)
+        window = self._acc[window_start:]
+
+        # Blockieren gilt für den ganzen Stream, nicht nur für den Abschnitt.
+        pol = guard.process_output(window)
         if pol["blocked"]:
             return [self._block_message(pol.get("reason"))]
-        self.masked = self.masked or bool(pol.get("masked"))
-        masked = pol["text"]
-        if len(masked) > self._emitted:
-            chunk = masked[self._emitted :]
-            self._emitted = len(masked)
-            return [chunk]
-        return []
+
+        crossing = guard.output_match_crossing(window, frontier - window_start)
+        if crossing is not None:
+            frontier = window_start + crossing
+            if frontier <= self._released:
+                return []
+
+        segment = self._acc[self._released : frontier]
+        result = guard.process_output(segment)
+        if result["blocked"]:
+            return [self._block_message(result.get("reason"))]
+        self.masked = self.masked or bool(result.get("masked"))
+        self._released = frontier
+        return [result["text"]] if result["text"] else []
 
 
 class YulYenStreamingProvider:
@@ -454,14 +488,21 @@ class YulYenStreamingProvider:
                     if not token:
                         continue
                     token_count += 1
-                    full_reply_parts.append(token)
+                    # Aufgezeichnet wird, was der Moderator freigibt — nicht der
+                    # rohe Token. Sonst steht im Store (und im JSONL-Mitschnitt)
+                    # die unmaskierte Fassung, während der Bildschirm maskiert
+                    # ist: die Maskierung wäre dann Bildschirmschoner statt
+                    # Datenschutz, und über Verlauf, Markdown-Export und
+                    # JSON-Download käme sie vollständig wieder heraus.
                     for out in moderator.feed(token):
+                        full_reply_parts.append(out)
                         yield out
                     if moderator.blocked:
                         break
 
                 # Release the held-back tail (unless we already blocked).
                 for out in moderator.flush():
+                    full_reply_parts.append(out)
                     yield out
 
             finally:
