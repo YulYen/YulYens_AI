@@ -28,6 +28,11 @@ from ui.web_ui import (
     STREAM_OUTPUT_KEYS,
     WebUI,
 )
+from ui.webui_layout import (
+    THEME_STORAGE_KEY,
+    THEME_TOGGLE_ELEM_ID,
+    theme_restore_js,
+)
 
 
 def _build_wired(storage_cfg: dict):
@@ -241,3 +246,86 @@ def test_persona_outputs_are_bound_in_list_order(wired):
     assert persona_events, "kein Handler auf der Persona-Ausgabeliste gefunden"
     for fn in persona_events:
         assert [block._id for block in fn.outputs] == expected
+
+
+# ---- Theme-Umschalter (#69) ------------------------------------------------
+
+
+def _theme_events(wired):
+    toggle_id = wired.components["theme_toggle_btn"]._id
+    return [
+        fn
+        for fn in wired.demo.fns.values()
+        if any(target == toggle_id for target, _event in fn.targets)
+    ]
+
+
+def test_the_theme_switch_never_navigates(wired):
+    """Der eigentliche Fix: kein `?__theme=`-Link mehr irgendwo im Layout.
+
+    Ein solcher Link ist eine Navigation, also ein voller Reload — neuer
+    `session_hash`, und damit sind Persona, Streamer, `conversation_state`
+    und getippter Text weg. Im Browser nachgestellt: ein Klick warf den
+    ungesendeten Satz weg und landete zurück auf der Startseite.
+    """
+    rendered = [
+        str(getattr(block, "value", "") or "") for block in wired.demo.blocks.values()
+    ]
+    offenders = [html for html in rendered if "__theme" in html]
+    assert not offenders, offenders
+
+
+def test_the_theme_toggle_runs_without_a_server_round_trip(wired):
+    """`fn=None` + `js=` heißt für Gradio: nur das Skript, kein Request.
+
+    Daran hängt alles — sobald hier ein Python-Handler steht, gibt es wieder
+    eine Serverrunde, und mit ihr die Wege zurück zum alten Verhalten.
+    """
+    events = _theme_events(wired)
+    assert len(events) == 1, f"erwartet genau ein Event, gefunden: {len(events)}"
+    event = events[0]
+    assert event.fn is None, "der Umschalter darf keinen Backend-Handler haben"
+    assert event.js, "ohne js passiert beim Klick gar nichts"
+    assert not event.inputs and not event.outputs
+
+
+def test_the_page_restores_the_remembered_theme_on_load(wired):
+    """Ohne das Lade-Skript gilt die Wahl nur bis zum nächsten Neuladen."""
+    assert wired.demo.js, "gr.Blocks(js=…) fehlt"
+    assert THEME_STORAGE_KEY in wired.demo.js
+    # Gradio setzt sein eigenes Theme während der Initialisierung; wer davor
+    # schreibt, verliert. Deshalb muss die Wiederherstellung aufgeschoben sein.
+    assert "setTimeout" in wired.demo.js
+
+
+def test_both_scripts_stand_on_their_own(wired):
+    """Der Klick darf nicht davon abhängen, dass das Lade-Skript schon lief.
+
+    Sonst wäre ein früher Klick wirkungslos — und zwar stumm.
+    """
+    toggle_js = _theme_events(wired)[0].js
+    for script in (toggle_js, wired.demo.js):
+        assert "const apply =" in script
+        assert "classList.toggle" in script
+
+
+def test_the_toggle_offers_the_other_state(wired):
+    """Ein Knopf, der den *anderen* Zustand anbietet — nicht beide nebeneinander.
+
+    Der alte Umschalter zeigte zwei blasse Links ohne Hinweis, welcher gerade
+    gilt. Die Beschriftung wechselt jetzt mit dem Theme, deshalb müssen beide
+    Texte im Skript stehen.
+    """
+    button = wired.components["theme_toggle_btn"]
+    assert button.elem_id == THEME_TOGGLE_ELEM_ID
+    light, dark = "☀️ Hell", "🌙 Dunkel"
+    assert button.value == dark  # hell ist der Startzustand -> Dunkel anbieten
+    for script in (_theme_events(wired)[0].js, wired.demo.js):
+        assert light in script and dark in script
+
+
+@pytest.mark.parametrize("mode", ["dark", "light"])
+def test_only_a_known_value_is_restored(mode):
+    """Was aus dem `localStorage` kommt, ist Fremdeingabe wie jede andere."""
+    script = theme_restore_js("Hell", "Dunkel")
+    assert f'stored === "{mode}"' in script

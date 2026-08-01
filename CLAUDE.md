@@ -720,6 +720,30 @@ Verwandt: **`cancels` kann nur gequeuete Events abbrechen.** Zeigt die Liste auf
 ein `queue=False`-Event (z. B. das letzte Glied einer `.then()`-Kette), verweigert
 Gradio den Start der App komplett mit „Queue needs to be enabled!".
 
+### ⚠️ Ein Link ist ein Reload, und ein Reload ist eine neue Sitzung (#69)
+Der Theme-Umschalter waren zwei `<a href="?__theme=…">`. Ein Klick navigierte,
+also lud die Seite neu, also bekam Gradio einen neuen `session_hash` — und
+damit war **jeder** `gr.State` neu initialisiert: Persona, Streamer,
+`conversation_state`, Gast. Im Browser nachgestellt: getippter, noch nicht
+abgeschickter Text weg, zurück auf der Startseite. Beim Entwurf von #36 stand
+das als „der Reload ist der Preis" im Code; der Preis war aber nie kosmetisch.
+
+Dark-Mode ist im ausgelieferten Gradio-Bundle nichts als die Klasse `dark` am
+`<body>` (Funktion `Ue` in `templates/frontend/assets/Index-*.js`). Der
+Umschalter setzt sie jetzt selbst: ein `gr.Button` mit `fn=None` + `js=` —
+für Gradio heißt das `backend_fn: false`, also **kein Request**. Die Wahl liegt
+im `localStorage`, wiederhergestellt über `gr.Blocks(js=…)`.
+
+Zwei Dinge, die beim Bauen wehtaten:
+- Die Wiederherstellung muss **nach** Gradios eigener Initialisierung laufen
+  (`Je()` liest `?__theme` bzw. `prefers-color-scheme`), sonst flackert es oder
+  Gradio gewinnt — daher der `setTimeout(…, 0)`.
+- Beide Skripte sind **je für sich vollständig**. Hinge der Klick am Lade-Skript,
+  wäre ein früher Klick stumm wirkungslos.
+
+Merksatz fürs Weiterbauen: alles, was rein clientseitig ist (Theme, Fokus,
+Scrollen), gehört in `js=` — eine Navigation kostet die ganze Sitzung.
+
 ### ⚠️ Stolperfalle: Gradio `cancels` schließt Generatoren nicht (Gradio 4.44)
 `cancels=[...]` bricht nur den **asyncio-Task** ab (`task.cancel()` in
 `gradio/utils.py`); `reset_iterators` löscht bloß die Referenz — das `finally`
