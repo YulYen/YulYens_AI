@@ -174,6 +174,7 @@ Der Nutzername wird zu jedem Gespräch in der Ablage vermerkt und steht in jeder
 ## Bedienkomfort in der Web-UI
 
 - **Heller und dunkler Modus:** Oben rechts steht ein Knopf, der immer den *anderen* Modus anbietet („🌙 Dunkel" im hellen Modus, „☀️ Hell" im dunklen). Der Wechsel geschieht im Browser: kein Neuladen, und das laufende Gespräch, die gewählte Persona und getippter, noch nicht abgeschickter Text bleiben stehen. Die Wahl wird im Browser gespeichert und gilt auch beim nächsten Besuch.
+- **Startseite auf einen Blick:** Die vier Persona-Karten tragen ihre Porträts, die Funktionskarten („AI Dialog", „Gast-Persona", „Verlauf", „Frage an alle") ein schlichtes Icon. Wer wen anspricht und was nur eine Funktion ist, ist damit ohne Lesen unterscheidbar.
 - **Antwort kopieren:** Jede Nachricht im Chat hat ein Kopier-Symbol.
 - **Statuszeile:** Unter dem Chat steht nach jeder Antwort, wie voll das Kontextfenster ist (`Kontext █░░░ 424 / 8.192 Token (5 %)`) und wie schnell das Modell war (`24,0 Tok/s · erster Token nach 1,9 s`). Ab 75 % Füllstand wird die Zeile hervorgehoben — genau dort beginnt die Anwendung, den Gesprächsverlauf zu kürzen.
 

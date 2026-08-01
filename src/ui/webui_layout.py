@@ -88,6 +88,69 @@ def theme_toggle_js(light_label: str, dark_label: str) -> str:
     """
 
 
+# Icons der Funktionskarten (#70). Vorher stand `static/YUL_YEN.png` **zweimal**
+# auf der Startseite — als Bild der Karte „Gast anlegen" und der Karte
+# „Verlauf". Beide sind Funktionen, keine Personen; dasselbe Porträt zweimal
+# neben den vier Persona-Karten liest sich wie zwei weitere Gesprächspartner.
+# `ST.png` und `ALL.png` waren nicht dasselbe Bild, aber dieselbe Sorte Fehler:
+# gezeichnete Figuren neben gezeichneten Figuren. Die vier Funktionskarten
+# tragen jetzt Strich-Icons, die vier Persona-Karten ihre Porträts — der
+# Unterschied ist damit auf einen Blick sichtbar (das ist die Diagnose aus #68).
+#
+# Inline-SVG statt `gr.Image`: skaliert scharf, nimmt über `currentColor` das
+# Theme mit (#69) und spart pro Karte eine Gradio-Komponente samt Datei-Endpunkt.
+# `aria-hidden`, weil direkt darunter derselbe Sachverhalt als Text steht —
+# ein Screenreader soll ihn nicht zweimal vorlesen.
+CARD_ICONS = {
+    # Zwei Sprechblasen, die einander antworten.
+    "self_talk": """
+        <rect x="2.75" y="4" width="12.5" height="9" rx="2.5"/>
+        <path d="M6.5 13v3.2L10 13"/>
+        <rect x="8.75" y="11" width="12.5" height="9" rx="2.5"/>
+        <path d="M17.5 20v3.2L14 20"/>
+    """,
+    # Theatermaske.
+    "guest": """
+        <path d="M4 3.75h16v7.25a8 8 0 0 1-16 0V3.75z"/>
+        <path d="M8.5 9.25h2M13.5 9.25h2"/>
+        <path d="M9 13.5c.9 1 2 1.5 3 1.5s2.1-.5 3-1.5"/>
+    """,
+    # Archivkasten mit Deckel.
+    "history": """
+        <rect x="2.75" y="3.75" width="18.5" height="4.5" rx="1.25"/>
+        <path d="M4.75 8.25v11a1.25 1.25 0 0 0 1.25 1.25h12a1.25 1.25 0 0 0 1.25-1.25v-11"/>
+        <path d="M10 12.5h4"/>
+    """,
+    # Eine Frage, die sich auf mehrere verteilt.
+    "ask_all": """
+        <rect x="7" y="2.5" width="10" height="7.5" rx="2.25"/>
+        <path d="M12 10v3"/>
+        <path d="M4.5 17.5v-3a1.5 1.5 0 0 1 1.5-1.5h12a1.5 1.5 0 0 1 1.5 1.5v3"/>
+        <path d="M12 13v4.5"/>
+        <rect x="2.5" y="17.5" width="4" height="4" rx="1.25"/>
+        <rect x="10" y="17.5" width="4" height="4" rx="1.25"/>
+        <rect x="17.5" y="17.5" width="4" height="4" rx="1.25"/>
+    """,
+}
+
+
+def card_icon_html(name: str) -> str:
+    """Das Icon einer Funktionskarte als fertiges Inline-SVG.
+
+    Ein unbekannter Name ist ein Tippfehler und soll hier auffallen, nicht als
+    leere Karte im Browser.
+    """
+    return (
+        '<div class="card-icon">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" '
+        'aria-hidden="true" focusable="false">'
+        f"{CARD_ICONS[name]}"
+        "</svg>"
+        "</div>"
+    )
+
+
 # Single source of truth for the order of the "switch view" output components.
 # Every handler bound to these outputs builds a dict keyed by these names and
 # resolves it via as_persona_outputs() — never by positional index.
@@ -266,6 +329,26 @@ def build_ui(
                     object-fit: contain;
                     display:inline-block;
                 }
+                /* Icons der Funktionskarten (#70): dieselbe Höhe wie die
+                   Porträts der Persona-Karten, sonst schließen die Buttons
+                   nicht mehr bündig ab. `currentColor` nimmt das Theme mit. */
+                .card-icon {
+                    height: 150px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                .card-icon svg {
+                    height: 96px;
+                    width: 96px;
+                    color: var(--body-text-color, currentColor);
+                    opacity: 0.75;
+                }
+                .persona-card:hover .card-icon svg { opacity: 1; }
+                /* In der Ask-All-Leiste steht das Icon neben Porträts — dort
+                   ist die Kartenhöhe nicht der Maßstab. */
+                .ask-all-strip .card-icon { height: auto; }
+                .ask-all-strip .card-icon svg { height: 72px; width: 72px; }
                 .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
                 .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
                 .chat-input-row { align-items: stretch; gap:12px; }
@@ -373,14 +456,7 @@ def build_ui(
                             persona_buttons.append((key, btn))
                 with gr.Column(scale=1, min_width=170):
                     with gr.Group(elem_classes="persona-card"):
-                        gr.Image(
-                            "static/ST.png",
-                            show_label=False,
-                            container=False,
-                            show_download_button=False,
-                            show_fullscreen_button=False,
-                            elem_classes="persona-img",
-                        )
+                        gr.HTML(card_icon_html("self_talk"))
                         gr.Markdown(
                             f"<div class='name'>{self_talk_title}</div>"
                             f"<div class='desc'>{self_talk_description}</div>"
@@ -391,14 +467,7 @@ def build_ui(
 
                 with gr.Column(scale=1, min_width=170):
                     with gr.Group(elem_classes="persona-card"):
-                        gr.Image(
-                            "static/YUL_YEN.png",
-                            show_label=False,
-                            container=False,
-                            show_download_button=False,
-                            show_fullscreen_button=False,
-                            elem_classes="persona-img",
-                        )
+                        gr.HTML(card_icon_html("guest"))
                         gr.Markdown(
                             f"<div class='name'>{guest_title}</div>"
                             f"<div class='desc'>{guest_description}</div>"
@@ -411,14 +480,7 @@ def build_ui(
                 if history_enabled:
                     with gr.Column(scale=1, min_width=170):
                         with gr.Group(elem_classes="persona-card"):
-                            gr.Image(
-                                "static/YUL_YEN.png",
-                                show_label=False,
-                                container=False,
-                                show_download_button=False,
-                                show_fullscreen_button=False,
-                                elem_classes="persona-img",
-                            )
+                            gr.HTML(card_icon_html("history"))
                             gr.Markdown(
                                 f"<div class='name'>{history_title}</div>"
                                 f"<div class='desc'>{history_description}</div>"
@@ -432,14 +494,7 @@ def build_ui(
                 if broadcast_enabled:
                     with gr.Column(scale=1, min_width=170):
                         with gr.Group(elem_classes="persona-card"):
-                            gr.Image(
-                                "static/ALL.png",
-                                show_label=False,
-                                container=False,
-                                show_download_button=False,
-                                show_fullscreen_button=False,
-                                elem_classes="persona-img",
-                            )
+                            gr.HTML(card_icon_html("ask_all"))
                             gr.Markdown(
                                 f"<div class='name'>{ask_all_title}</div>"
                                 f"<div class='desc'>{ask_all_input_placeholder}</div>"
@@ -637,13 +692,9 @@ def build_ui(
             gr.Markdown(f"## {ask_all_title}")
             with gr.Row(elem_classes="ask-all-strip"):
                 if broadcast_enabled:
-                    gr.Image(
-                        "static/ALL.png",
-                        show_label=False,
-                        container=False,
-                        show_download_button=False,
-                        show_fullscreen_button=False,
-                    )
+                    # Dasselbe Icon wie auf der Karte — die Porträts daneben
+                    # zeigen, *wer* antwortet, das Icon *was* passiert.
+                    gr.HTML(card_icon_html("ask_all"), elem_classes="strip-icon")
                 for p in persona_info.values():
                     gr.Image(
                         persona_thumbnail_path_fn(p["name"]),
