@@ -31,12 +31,12 @@ def test_guard_only_run_writes_reports_and_exits_zero(tmp_path):
 
 # Die Lücken, die wir *bewusst* mitführen. Weder mehr noch weniger.
 #
-# Vorher stand hier „gar keine" — seit #50 war der Korpus lückenfrei. Diese eine
-# ist eine bewusste Entscheidung: die Injection-Regel wirft einen harmlosen
-# Artikel über `localhost` aus dem Kontext, und das ist gemessen, nicht vermutet.
-# Sie zu verschweigen wäre bequemer, aber der Korpus soll die Wirklichkeit
-# abbilden — sie ist das Abnahmekriterium für #62.
-KNOWN_GAP_IDS = {"ctx_code_snippet_in_article_is_kept"}
+# Wieder leer — und das ist der Punkt dieses Tests. `ctx_code_snippet_in_article
+# _is_kept` stand hier als Abnahmekriterium für #62: die Injection-Regel warf
+# einen harmlosen Artikel über `localhost` aus dem Kontext. Mit dem neuen
+# Regelwerk kommt er durch, also musste das Flag im Korpus fallen — genau die
+# Richtung, die ein bloßes „keine Lücken" nie gemeldet hätte.
+KNOWN_GAP_IDS: set[str] = set()
 
 
 def test_repo_corpus_carries_exactly_the_gaps_we_decided_on(tmp_path):

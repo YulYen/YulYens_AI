@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 from collections.abc import Callable, Mapping
-from typing import Any, TypedDict
+from typing import Any, NamedTuple, TypedDict
 
 
 class SecurityResult(TypedDict):
@@ -11,6 +11,23 @@ class SecurityResult(TypedDict):
     # "ok" | "prompt_injection" | "pii_detected" | "blocked_keyword" | "wrongdoing"
     reason: str
     detail: str | None  # first match / hint
+    # Name der Regel, die angeschlagen hat (#62). Ohne ihn sagt ein grüner
+    # Korpus-Fall nur „irgendetwas hat geblockt" — und eine Regel, die aus dem
+    # falschen Grund trifft, sieht genauso aus wie eine, die funktioniert.
+    rule: str | None
+
+
+class Rule(NamedTuple):
+    """Ein benanntes Muster.
+
+    Der Name ist kein Schmuck: er macht im Korpus (`expect.rule`) prüfbar,
+    *welche* Regel einen Angriff gefangen hat. Ohne das kann man eine Regel
+    verschärfen, ohne zu merken, dass ihr Fall längst von einer anderen
+    mitgenommen wurde — und dann fällt beim nächsten Umbau still eine Lücke auf.
+    """
+
+    name: str
+    pattern: re.Pattern
 
 
 _SECURITY_KEYS = (
@@ -37,6 +54,14 @@ def _load_texts(texts: Mapping[str, str] | None) -> Mapping[str, str]:
     from config.config_singleton import Config  # lazy import to avoid cycles
 
     return Config().texts
+
+
+def _named(bucket: str, patterns: list[str]) -> list[Rule]:
+    """Rohe Regexe aus der Config als benannte Regeln."""
+    return [
+        Rule(f"custom_{bucket}_{index}", re.compile(pattern, re.IGNORECASE))
+        for index, pattern in enumerate(patterns)
+    ]
 
 
 def _require_security_text(locale_key: str, texts: Mapping[str, str]) -> str:
@@ -104,13 +129,98 @@ class BasicGuard:
         self.mask_text = _require_security_text("security_mask_text", self.texts)
 
         # Defaults (deliberately conservative and compact)
+        #
+        # Zwei Entwurfsregeln aus #62, an denen die alte Liste gescheitert ist:
+        #
+        # 1. **Themenwörter sind keine Angriffe.** `localhost`, `file://`,
+        #    `/etc/passwd` und `system32\config\sam` sagen nur, *worüber* ein
+        #    Text spricht — nicht, dass er das Modell übernehmen will. Das Modell
+        #    kann ohnehin keine Dateien lesen, die Regel hat also nie etwas
+        #    geschützt; in einem Projekt, dessen Gegenstand lokale Server sind,
+        #    hat sie schlicht die eigenen Fragen geblockt. Ersatzlos gestrichen.
+        # 2. **Der Abstand zwischen Verb und Objekt ist der Präzisionskiller,
+        #    nicht die Wortliste.** `\bignoriere\b.{0,80}\b(regeln)\b` verbindet
+        #    über 80 Zeichen fast jedes Verb mit fast jedem Substantiv
+        #    („Übergehe bitte die Regeln des Kartenspiels nicht"). Die Brücken
+        #    sind kurz und dürfen keine Satz- oder Teilsatzgrenze überspringen
+        #    (`[^,.!?\n]`) — eine Anweisung an das Modell steht am Stück.
         inj = [
-            r"(?i)\bignore (?:all|previous) (?:instructions|messages)",
-            r"(?i)\bact as\b",
-            r"(?i)\b(?:reveal|print|show).{0,30}\bsystem prompt\b",
-            r"(?i)\byou are chatgpt\b",
-            r"(?i)\bbegin system prompt\b",
-            r"(?i)\bdeveloper mode\b",
+            # Verb + *modellbezogener* Bezug + Objekt. „ignore the rules" allein
+            # reicht nicht: ohne previous/your/… ist es eine Frage über Regeln.
+            Rule(
+                "ignore_previous_instructions",
+                re.compile(
+                    r"(?i)\b(?:ignore|disregard)\s+(?:all\s+(?:of\s+)?)?(?:the\s+)?"
+                    r"(?:your|previous|prior|earlier|above|preceding|system|initial"
+                    r"|original)\s+(?:\w+\s+){0,2}?"
+                    r"(?:instructions?|rules?|messages?|prompts?|directives?)\b"
+                ),
+            ),
+            Rule(
+                "ignore_previous_instructions_de",
+                re.compile(
+                    r"(?i)\b(?:ignoriere?|übergehe?|vergiss|missachte)\s+"
+                    r"(?:bitte\s+|einfach\s+){0,2}"
+                    r"(?:all|sämtlich|jeglich|deine|vorherige|vorhergehende|obige"
+                    r"|bisherige)\w*\s+(?:\w+\s+){0,2}?"
+                    r"(?:anweisungen|regeln|vorgaben|instruktionen|befehle)\b"
+                ),
+            ),
+            Rule(
+                "reveal_system_prompt",
+                re.compile(
+                    r"(?i)\b(?:reveal|print|show|output|repeat|leak"
+                    r"|verrate|zeig|zeige|gib|nenne|drucke)\b[^.!?\n]{0,30}"
+                    r"\bsystem[-\s]?prompt\b"
+                ),
+            ),
+            Rule(
+                "system_prompt_delimiter",
+                re.compile(r"(?i)\b(?:begin|end)\s+system\s+prompt\b"),
+            ),
+            # Rollenspiel *plus* privilegierte Rolle. Das alte `\bact as\b` allein
+            # blockte „Can you act as a friendly tour guide" — die Formulierung
+            # ist der Normalfall, nicht der Angriff. Erst die Rolle macht sie zu
+            # einem: „act as an unrestricted shell".
+            Rule(
+                "roleplay_privileged_role",
+                re.compile(
+                    r"(?i)\b(?:act(?:ing)?\s+as|pretend\s+(?:to\s+be|you\s+(?:are|were))"
+                    r"|roleplay\s+as|behave\s+(?:as|like)"
+                    r"|agiere?\s+als|verhalte\s+dich\s+wie"
+                    r"|spiel(?:e)?\s+die\s+rolle\s+(?:von|des|eines)"
+                    r"|tu\s+so,?\s+als\s+(?:ob\s+du|w(?:ä|ae)r(?:e)?st\s+du|seist\s+du))"
+                    r"\b[^.!?\n]{0,25}\b(?:root|admins?|administrator|superuser|sudo"
+                    r"|dan|jailbroken|unrestricted|uncensored|unfiltered|shell|kernel)\b"
+                ),
+            ),
+            # Die Rolle direkt zugewiesen — das ist eine Ansprache *an das
+            # Modell* und damit der ehrlichste Injection-Marker überhaupt.
+            Rule(
+                "assistant_role_assignment",
+                re.compile(
+                    r"(?i)\b(?:you\s+are\s+(?:now\s+)?"
+                    r"|du\s+bist\s+(?:ab\s+jetzt\s+|jetzt\s+|nun\s+)?"
+                    r"(?:im\s+|ein\s+|eine\s+|der\s+|die\s+)?"
+                    r"|sei\s+ab\s+jetzt\s+)"
+                    r"(?:root\b|admin(?:istrator)?\b|superuser\b|chatgpt\b|dan\b"
+                    r"|jailbroken\b|unrestricted\b|uncensored\b"
+                    r"|(?:developer|entwickler)[-\s]?mod(?:e|us)\b)"
+                ),
+            ),
+            # „developer mode" allein ist kein Angriff — Chrome und Android haben
+            # einen, und danach fragt man. Erst zusammen mit dem Wegfallen der
+            # Beschränkungen wird die Jailbreak-Absicht sichtbar.
+            Rule(
+                "developer_mode_jailbreak",
+                re.compile(
+                    r"(?i)\b(?:developer|dev|god|dan)\s+mode\b[^.!?\n]{0,60}"
+                    r"\b(?:restrictions?|filters?|limits?|guardrails?|unrestricted"
+                    r"|uncensored|beschränkungen|einschränkungen|filter)\b"
+                    r"|\b(?:restrictions?|filters?|unrestricted|uncensored)\b"
+                    r"[^.!?\n]{0,60}\b(?:developer|dev|god|dan)\s+mode\b"
+                ),
+            ),
             # Templating braces used in jailbreaks ("Antworte mit {system_prompt}").
             # Scoped to placeholder *names* on purpose (#50): the earlier version
             # was r"\b%?\{.*?\}%?" and matched any braces — but the leading \b
@@ -119,37 +229,32 @@ class BasicGuard:
             # variants caught). Dropping the \b would have blocked every code
             # question with braces ("if (x) { return; }", JSON, f-strings, CSS),
             # and this project talks about code constantly.
-            rf"(?i)%?\{{\s*{_INJECTION_PLACEHOLDER}\b[^}}]*\}}%?",
-            r"(?i)\bfile://|http://127\.0\.0\.1|localhost",
+            Rule(
+                "template_placeholder",
+                re.compile(rf"(?i)%?\{{\s*{_INJECTION_PLACEHOLDER}\b[^}}]*\}}%?"),
+            ),
         ]
-
-        de_inj = [
-            # "Please ignore all previous instructions ..."
-            r"(?i)\bignoriere\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
-            r"(?i)\bübergehe\b.{0,80}\b(anweisungen|regeln|vorgaben)\b",
-            # "Pretend you are root/admin/developer ..." / "Be root ..."
-            r"(?i)\btu\s+so,\s*als\s+w(?:ä|ae)rst du\b.{0,30}\b(root|admin|entwickler|system)\b",
-            r"(?i)\bsei\b.{0,20}\b(root|admin|entwickler|system)\b",
-            r"(?i)\bagier(?:e)?\b.{0,20}\bals\b.{0,30}\b(root|admin|entwickler|system)\b",
-            # "... output/show the system prompt"
-            r"(?i)\b(zeige|gib)\b.{0,40}\b(system\s?prompt|systemprompt|system\-?prompt)\b.{0,40}\b(aus|anzeigen)\b",
-            # Typical secret/file leak indicators
-            r"(?i)/etc/passwd",
-            r"(?i)\\windows\\system32\\config\\sam",
-        ]
-        inj += de_inj
 
         pii = [
-            r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b",  # E-Mail
-            r"(?i)\b(?:\+?49|0)\s?(?:\d[\s\-()]{0,2}){7,}\d\b",  # DE-Telefon (grob)
-            r"(?i)\bDE\d{20}\b",  # IBAN DE
+            Rule(
+                "email",
+                re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b"),
+            ),
+            Rule(
+                "phone_de",
+                re.compile(r"(?i)\b(?:\+?49|0)\s?(?:\d[\s\-()]{0,2}){7,}\d\b"),
+            ),
+            Rule("iban_de", re.compile(r"(?i)\bDE\d{20}\b")),
         ]
 
         block = [
-            r"(?i)\bsk-[A-Za-z0-9]{20,}\b",  # OpenAI style key
-            r"(?i)\bghp_[A-Za-z0-9]{20,}\b",  # GitHub PAT
-            r"(?i)\bAKIA[0-9A-Z]{16}\b",  # AWS Access Key
-            r"(?i)\baws_secret_access_key\b.*?[A-Za-z0-9/+]{30,}",  # AWS Secret (heur.)
+            Rule("openai_key", re.compile(r"(?i)\bsk-[A-Za-z0-9]{20,}\b")),
+            Rule("github_pat", re.compile(r"(?i)\bghp_[A-Za-z0-9]{20,}\b")),
+            Rule("aws_access_key", re.compile(r"(?i)\bAKIA[0-9A-Z]{16}\b")),
+            Rule(
+                "aws_secret_key",
+                re.compile(r"(?i)\baws_secret_access_key\b.*?[A-Za-z0-9/+]{30,}"),
+            ),
         ]
 
         # Wrongdoing: instructional violence/weaponization. Patterns target the
@@ -168,13 +273,33 @@ class BasicGuard:
             r"|assembl(?:e|es|ing)|synthesi[sz](?:e|es|ing)"
             r"|manufactur(?:e|es|ing)|creat(?:e|es|ing)|detonat(?:e|es|ing))"
         )
+        # `[^,.!?\n]` statt `.` in den Brücken: eine Bauanleitung steht in einem
+        # Teilsatz. Über ein Komma hinweg entstehen dagegen Treffer wie
+        # „Wir bauen ein Modellflugzeug, keine Bombe" — Verneinung inklusive.
         wrong = [
-            rf"(?i)\b{_make_en}\b.{{0,40}}\b{_weapon_en}\b",
-            rf"(?i)\b{_weapon_en}\b.{{0,40}}\b{_make_en}\b",
-            r"(?i)\bhow\s+to\b.{0,30}\b(kill|murder|poison)\b.{0,30}"
-            r"\b(someone|a\s+person|people|him|her|them)\b",
-            r"(?i)\b(mass|school)\s+shooting\b",
-            r"(?i)\bmaximi[sz]e\b.{0,20}\b(casualties|deaths|victims)\b",
+            Rule(
+                "weapon_construction",
+                re.compile(rf"(?i)\b{_make_en}\b[^,.!?\n]{{0,40}}\b{_weapon_en}\b"),
+            ),
+            Rule(
+                "weapon_construction_reversed",
+                re.compile(rf"(?i)\b{_weapon_en}\b[^,.!?\n]{{0,40}}\b{_make_en}\b"),
+            ),
+            Rule(
+                "kill_a_person",
+                re.compile(
+                    r"(?i)\bhow\s+to\b[^,.!?\n]{0,30}\b(?:kill|murder|poison)\b"
+                    r"[^,.!?\n]{0,30}\b(?:someone|a\s+person|people|him|her|them)\b"
+                ),
+            ),
+            Rule("mass_shooting", re.compile(r"(?i)\b(?:mass|school)\s+shooting\b")),
+            Rule(
+                "maximize_casualties",
+                re.compile(
+                    r"(?i)\bmaximi[sz]e\b[^,.!?\n]{0,20}"
+                    r"\b(?:casualties|deaths|victims)\b"
+                ),
+            ),
         ]
 
         _weapon_de = (
@@ -183,35 +308,64 @@ class BasicGuard:
             r"|biologische\s+waffen?|chemiewaffen?|chemische\s+waffen?"
             r"|atombomben?|nuklearwaffen?|schmutzige\s+bomben?|rohrbomben?)"
         )
+        # `stell(e|en|st|t)?` ist raus: es traf jedes „ich stelle …" und damit
+        # Sätze wie „Wir stellen Chemiewaffen-Konventionen im Unterricht durch".
+        # Gemeint war immer „herstellen" — das steht ohnehin schon da.
         _make_de = (
-            r"(?:bau(?:e|en|st|t)?|herstell(?:e|en|ung|t)|stell(?:e|en|st|t)?"
+            r"(?:bau(?:e|en|st|t)?|herstell(?:e|en|ung|t)"
             r"|bastel[nst]?|bastle|misch(?:e|en|st|t)?|z(?:ü|ue)nde[nst]?)"
         )
         de_wrong = [
-            rf"(?i)\bwie\b.{{0,40}}\b{_make_de}\b.{{0,40}}\b{_weapon_de}\b",
-            rf"(?i)\b{_make_de}\b.{{0,40}}\b{_weapon_de}\b",
-            rf"(?i)\b\w*anleitung\b.{{0,40}}\b{_weapon_de}\b",
-            r"(?i)\bbombenbau\b",
-            r"(?i)\bwie\b.{0,30}\b(t(?:ö|oe)te[nst]?|ermorde[nst]?"
-            r"|vergifte[nst]?)\b.{0,30}\b(jemanden|eine\s+person|menschen|ihn|sie)\b",
-            r"(?i)\b(amoklauf|schulamoklauf)\b",
+            Rule(
+                "weapon_construction_de",
+                re.compile(
+                    rf"(?i)\b{_make_de}\b[^,.!?\n]{{0,40}}\b{_weapon_de}\b",
+                ),
+            ),
+            # „herstellen" trennt sich: „Wie stelle ich Sprengstoff **her**".
+            # Deshalb steht `stell…` hier mit Pflicht-`her` statt in der
+            # Wortliste oben — dort traf es jedes „wir stellen …".
+            Rule(
+                "weapon_production_separated_de",
+                re.compile(
+                    rf"(?i)\bstell(?:e|en|st|t)?\b[^,.!?\n]{{0,30}}"
+                    rf"\b{_weapon_de}\b[^,.!?\n]{{0,30}}\bher\b"
+                ),
+            ),
+            Rule(
+                "weapon_instructions_de",
+                re.compile(rf"(?i)\b\w*anleitung\b[^.!?\n]{{0,40}}\b{_weapon_de}\b"),
+            ),
+            Rule("bombenbau_de", re.compile(r"(?i)\bbombenbau\b")),
+            Rule(
+                "kill_a_person_de",
+                re.compile(
+                    r"(?i)\bwie\b[^,.!?\n]{0,30}\b(?:t(?:ö|oe)te[nst]?|ermorde[nst]?"
+                    r"|vergifte[nst]?)\b[^,.!?\n]{0,30}"
+                    r"\b(?:jemanden|eine\s+person|menschen|ihn|sie)\b"
+                ),
+            ),
+            Rule("amoklauf_de", re.compile(r"(?i)\b(?:amoklauf|schulamoklauf)\b")),
         ]
         wrong += de_wrong
 
+        # `security.custom_patterns` bleibt eine Liste roher Regexe — die Config
+        # soll keine Regelnamen erfinden müssen. Sie bekommen einen erzeugten
+        # Namen, damit `rule` auch dort etwas Aussagekräftiges enthält.
         if custom_patterns:
             if "prompt_injection" in custom_patterns:
-                inj = custom_patterns["prompt_injection"]
+                inj = _named("prompt_injection", custom_patterns["prompt_injection"])
             if "pii" in custom_patterns:
-                pii = custom_patterns["pii"]
+                pii = _named("pii", custom_patterns["pii"])
             if "output_blocklist" in custom_patterns:
-                block = custom_patterns["output_blocklist"]
+                block = _named("output_blocklist", custom_patterns["output_blocklist"])
             if "wrongdoing" in custom_patterns:
-                wrong = custom_patterns["wrongdoing"]
+                wrong = _named("wrongdoing", custom_patterns["wrongdoing"])
 
-        self._inj = [re.compile(p, re.IGNORECASE) for p in inj]
-        self._pii = [re.compile(p, re.IGNORECASE) for p in pii]
-        self._block = [re.compile(p, re.IGNORECASE) for p in block]
-        self._wrong = [re.compile(p, re.IGNORECASE) for p in wrong]
+        self._inj = inj
+        self._pii = pii
+        self._block = block
+        self._wrong = wrong
 
     # ---- Public API -------------------------------------------------------
 
@@ -226,21 +380,21 @@ class BasicGuard:
         if self.flags.get("wrongdoing_protection"):
             if self._wrongdoing_lock_remaining > 0:
                 self._wrongdoing_lock_remaining -= 1
-                return self._bad("wrongdoing", "session_locked")
+                return self._bad("wrongdoing", "session_locked", "session_lock")
             m = self._first_match(self._wrong, text)
             if m:
                 self._wrongdoing_lock_remaining = self.wrongdoing_lock_turns
-                return self._bad("wrongdoing", m)
+                return self._bad("wrongdoing", m[1], m[0])
 
         if self.flags.get("prompt_injection_protection"):
             m = self._first_match(self._inj, text)
             if m:
-                return self._bad("prompt_injection", m)
+                return self._bad("prompt_injection", m[1], m[0])
 
         if self.flags.get("pii_protection", True):
             m = self._first_match(self._pii, text)
             if m:
-                return self._bad("pii_detected", m)
+                return self._bad("pii_detected", m[1], m[0])
 
         return self._ok()
 
@@ -251,12 +405,12 @@ class BasicGuard:
         if self.flags.get("pii_protection", True):
             m = self._first_match(self._pii, text)
             if m:
-                return self._bad("pii_detected", m)
+                return self._bad("pii_detected", m[1], m[0])
 
         if self.flags.get("output_blocklist"):
             m = self._first_match(self._block, text)
             if m:
-                return self._bad("blocked_keyword", m)
+                return self._bad("blocked_keyword", m[1], m[0])
 
         return self._ok()
 
@@ -276,8 +430,8 @@ class BasicGuard:
 
         # 1) Block secrets (only if the flag is active)
         if self.flags.get("output_blocklist"):
-            for rx in self._block:
-                if rx.search(text):
+            for rule in self._block:
+                if rule.pattern.search(text):
                     return {
                         "blocked": True,
                         "reason": "blocked_keyword",
@@ -289,8 +443,8 @@ class BasicGuard:
         out = text
         masked = False
         if self.flags.get("pii_protection"):
-            for rx in self._pii:
-                new_out = rx.sub(self.mask_text, out)
+            for rule in self._pii:
+                new_out = rule.pattern.sub(self.mask_text, out)
                 if new_out != out:
                     masked = True
                 out = new_out
@@ -310,14 +464,14 @@ class BasicGuard:
         """
         if not self.enabled or not text:
             return None
-        patterns: list[re.Pattern] = []
+        rules: list[Rule] = []
         if self.flags.get("pii_protection"):
-            patterns += self._pii
+            rules += self._pii
         if self.flags.get("output_blocklist"):
-            patterns += self._block
+            rules += self._block
         earliest: int | None = None
-        for rx in patterns:
-            for hit in rx.finditer(text):
+        for rule in rules:
+            for hit in rule.pattern.finditer(text):
                 if hit.start() < offset < hit.end():
                     start = hit.start()
                     earliest = start if earliest is None else min(earliest, start)
@@ -325,20 +479,20 @@ class BasicGuard:
 
     # ---- Helpers ----------------------------------------------------------
 
-    def _first_match(self, patterns: list[re.Pattern], text: str) -> str | None:
-        for r in patterns:
-            hit = r.search(text)
+    def _first_match(self, rules: list[Rule], text: str) -> tuple[str, str] | None:
+        """Name und Fundstelle der ersten zutreffenden Regel."""
+        for rule in rules:
+            hit = rule.pattern.search(text)
             if hit:
                 # Brief, harmless detail output
-                frag = hit.group(0)
-                return frag[:120]
+                return rule.name, hit.group(0)[:120]
         return None
 
     def _ok(self) -> SecurityResult:
-        return {"ok": True, "reason": "ok", "detail": None}
+        return {"ok": True, "reason": "ok", "detail": None, "rule": None}
 
-    def _bad(self, reason: str, detail: str) -> SecurityResult:
-        return {"ok": False, "reason": reason, "detail": detail}
+    def _bad(self, reason: str, detail: str, rule: str | None = None) -> SecurityResult:
+        return {"ok": False, "reason": reason, "detail": detail, "rule": rule}
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +502,21 @@ class BasicGuard:
 # Nachrichtenmeldung darf E-Mail-Adressen und Telefonnummern enthalten — das
 # würde reihenweise harmlose Quellen wegwerfen.
 CONTEXT_BLOCKING_REASONS = frozenset({"prompt_injection", "wrongdoing"})
+
+
+def context_verdict(guard: BasicGuard | None, text: str) -> SecurityResult | None:
+    """Der Befund, der abgerufenen Text aus dem Prompt hält — oder ``None``.
+
+    Trägt gegenüber :func:`context_rejection` zusätzlich den Regelnamen. Die
+    Eval-Suite braucht den, und sie darf ``check_input`` nicht ein zweites Mal
+    rufen: der Wrongdoing-Lock ist Sitzungszustand und würde mitzählen.
+    """
+    if guard is None or not text:
+        return None
+    result = guard.check_input(text)
+    if result["ok"]:
+        return None
+    return result if result["reason"] in CONTEXT_BLOCKING_REASONS else None
 
 
 def context_rejection(guard: BasicGuard | None, text: str) -> str | None:
@@ -363,13 +532,8 @@ def context_rejection(guard: BasicGuard | None, text: str) -> str | None:
     Das ist der realistischste Injection-Weg dieser Anwendung, weil der Inhalt
     aus Quellen stammt, die niemand Zeile für Zeile gelesen hat.
     """
-    if guard is None or not text:
-        return None
-    result = guard.check_input(text)
-    if result["ok"]:
-        return None
-    reason = result.get("reason") or ""
-    return reason if reason in CONTEXT_BLOCKING_REASONS else None
+    verdict = context_verdict(guard, text)
+    return verdict["reason"] if verdict else None
 
 
 def accepted_context(

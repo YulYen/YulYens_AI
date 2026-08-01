@@ -152,7 +152,12 @@ class _StreamModerator:
     def _block_message(self, reason: str | None) -> str:
         self.blocked = True
         return zeigefinger_message(
-            {"ok": False, "reason": reason or "blocked_keyword", "detail": ""},
+            {
+                "ok": False,
+                "reason": reason or "blocked_keyword",
+                "detail": "",
+                "rule": None,
+            },
             texts=self.guard_texts,
         )
 

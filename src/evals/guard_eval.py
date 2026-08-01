@@ -81,21 +81,27 @@ def evaluate_guard_case(
         result = guard.check_input(case.text)
         observed["ok"] = result["ok"]
         observed["reason"] = result["reason"]
+        observed["rule"] = result.get("rule")
         observed["detail"] = result.get("detail")
     elif case.stage == "context":
         # Abgerufener Fremdtext: die Frage ist nicht "blockiert der Guard das",
         # sondern "landet es im Prompt". Andere Regel als beim Eingang — ein
         # Artikel darf PII enthalten, eine Injection-Anweisung nicht.
-        from security.tinyguard import context_rejection
+        from security.tinyguard import context_verdict
 
-        rejection = context_rejection(guard, case.text)
-        observed["injected"] = rejection is None
-        observed["reason"] = rejection or "ok"
+        # `context_verdict` statt `context_rejection`: es trägt den Regelnamen
+        # mit und prüft nur *einmal* — ein zweiter `check_input`-Aufruf würde
+        # den Wrongdoing-Lock ein weiteres Mal armieren.
+        verdict = context_verdict(guard, case.text)
+        observed["injected"] = verdict is None
+        observed["reason"] = verdict["reason"] if verdict else "ok"
+        observed["rule"] = verdict.get("rule") if verdict else None
     else:
         if "ok" in expect or "reason" in expect:
             result = guard.check_output(case.text)
             observed["ok"] = result["ok"]
             observed["reason"] = result["reason"]
+            observed["rule"] = result.get("rule")
             observed["detail"] = result.get("detail")
         if "blocked" in expect or "masked" in expect:
             processed = guard.process_output(case.text)

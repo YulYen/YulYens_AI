@@ -159,14 +159,44 @@ System-Autorität.
 erste Anlauf hängte die Prüfung nur an `inject_wiki_context` — dann bekam die
 Quellen-Karte (#32) weiterhin die *ungefilterte* Liste und behauptete Quellen,
 die das Modell nie gesehen hat. Das ist exakt der Defekt, gegen den #32 gebaut
-wurde. Ausgelöst wird er von der bekannt schlechten False-Positive-Rate des
-Guards (#62): ein Artikel über `localhost` trifft die Injection-Regel. Alle
-Verbraucher — Anzeige, Injektion, `/quellen` im Terminal — gehen deshalb durch
-diese eine Methode. `inject_wiki_context`/`inject_briefing_context` behalten
-ihren `guard`-Parameter als letzte Schranke vor dem Prompt.
+wurde. Ausgelöst wurde er damals von der schlechten False-Positive-Rate des
+Guards: ein Artikel über `localhost` traf die Injection-Regel. Diese Regel ist
+seit #62 weg, der Defekt bliebe aber derselbe — ein Artikel *über*
+Prompt-Injection zitiert nun einmal Angriffssätze. Alle Verbraucher — Anzeige,
+Injektion, `/quellen` im Terminal — gehen deshalb durch diese eine Methode.
+`inject_wiki_context`/`inject_briefing_context` behalten ihren `guard`-Parameter
+als letzte Schranke vor dem Prompt.
 
 Die Rolle ist weiterhin `system` — sie nach `user` zu verschieben ändert das
 Antwortverhalten aller Personas und braucht einen Lauf am echten Modell (#60).
+
+### Das Guard-Regelwerk: benannte Regeln, kurze Brücken (#62)
+Die Muster in `security/tinyguard.py` sind `Rule(name, pattern)` statt roher
+Regex-Strings, und `check_input`/`check_output` liefern den Namen als `rule` mit.
+Der Korpus prüft ihn (`expect.rule`) — sonst sieht ein Fall, der aus dem
+**falschen** Grund geblockt wird, genauso aus wie ein Erfolg. Beim Umbau ist
+genau das aufgefallen: `ctx_weapon_instructions_in_article` wurde nie von der
+Anleitungsregel gefangen, sondern von der Bau-Regel davor.
+
+Zwei Entwurfsregeln, an denen die alte Liste gescheitert ist:
+
+1. **Themenwörter sind keine Angriffe.** `localhost`, `http://127.0.0.1`,
+   `file://`, `/etc/passwd`, `system32\config\sam` sagen nur, *worüber* ein Text
+   spricht. Das Modell kann keine Dateien lesen — die Regeln haben nie etwas
+   geschützt und dafür die eigenen Fragen des Projekts geblockt. Ersatzlos raus.
+2. **Der Abstand zwischen Verb und Objekt ist der Präzisionskiller, nicht die
+   Wortliste.** `\bübergehe\b.{0,80}\b(regeln)\b` verbindet über achtzig Zeichen
+   fast jedes Verb mit fast jedem Substantiv. Brücken sind kurz und überspringen
+   keine Teilsatzgrenze (`[^,.!?\n]` statt `.`) — eine Anweisung an das Modell
+   steht am Stück, und „Wir bauen ein Modellflugzeug, keine Bombe" ist keine.
+
+Gemessen an 20 alltäglichen Sätzen (lokale URLs, Code-Fragen, Rollenbitten):
+**vorher 8 Fehlalarme, jetzt 0**, bei unveränderter Trefferzahl auf 18 Angriffen.
+
+**Wer eine Injection-Regel ergänzt, legt in `evals/guard_redteam.yaml` den Satz
+daneben, den sie nicht treffen darf** (`ok_…`). Ohne diese Gegenprobe ist eine
+Verschärfung nicht messbar — die Recall-Seite meldet sich von selbst, die
+Precision-Seite nie.
 
 ### AppFactory
 - Baut und cached alle Komponenten (Streamer, UI, API-Provider, Store, `WikiLookup`)
@@ -243,7 +273,13 @@ make evals                                           # Kurzform für --guard-onl
 - Korpus-Loader ist streng: unbekannte Keys, kaputte Regexe, doppelte IDs und
   erwartungslose Fälle fliegen beim Laden raus
 - `known_gap: true` markiert eine dokumentierte Guard-Schwäche (gemeldet, kein
-  Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist
+  Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist. Genau
+  so ist #62 abgenommen worden: `ctx_code_snippet_in_article_is_kept` fing an zu
+  bestehen, also musste das Flag fallen. `KNOWN_GAP_IDS` in
+  `tests/test_evals_cli.py` ist damit wieder leer
+- `expect.rule` nennt die Regel, die einen Guard-Fall fangen *soll* (#62). Nur
+  `reason` zu prüfen reicht nicht: ein Fall, der von der falschen Regel gefangen
+  wird, sieht sonst aus wie ein Erfolg
 
 ## Konfiguration (config.yaml)
 
@@ -669,10 +705,9 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #67 Test-Doubles gegen die echte Schnittstelle absichern (hat an einem
-  Tag viermal zugeschlagen), #53a Identität für API/Mail, #27 Ask-All-Moderator,
+- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
   #42 Perf-Benchmark (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
-- **Aus Review-Runde 2 (#57):** #58 und #59 sind erledigt (Archiv). Offen: #62 Guard-Regelwerk,
+- **Aus Review-Runde 2 (#57):** #58, #59, #62 und #67 sind erledigt (Archiv). Offen:
   #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x,
   #65 Vote-Kanal an die Ablage, #66 Schema rekursiv
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
@@ -686,6 +721,7 @@ via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen)
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
 #32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
 #43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
+#58 Moderator-Umschreibung, #59 Ablage = Gespräch, #62 Guard-Regelwerk, #67 Test-Doubles,
 #54 Gesprächs-Ablage (SQLite), #25 Verlauf, #55 Review-Befunde, #57 Review-Befunde Runde 2.
 
 ## Sprachstrategie
