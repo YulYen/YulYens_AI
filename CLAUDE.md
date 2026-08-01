@@ -644,11 +644,12 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator, #42 Perf-Benchmark
-  (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
-- **Aus Review-Runde 2 (#57):** #58 `_StreamModerator` (verschluckter Text, roher Text im
-  Store, quadratische Laufzeit), #59 Ablage = Gespräch statt LLM-Aufruf, #62 Guard-Regelwerk,
-  #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x
+- **Quick Wins:** #67 Test-Doubles gegen die echte Schnittstelle absichern (hat an einem
+  Tag viermal zugeschlagen), #53a Identität für API/Mail, #27 Ask-All-Moderator,
+  #42 Perf-Benchmark (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
+- **Aus Review-Runde 2 (#57):** #58 und #59 sind erledigt (Archiv). Offen: #62 Guard-Regelwerk,
+  #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x,
+  #65 Vote-Kanal an die Ablage, #66 Schema rekursiv
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
