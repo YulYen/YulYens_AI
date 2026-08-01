@@ -1,5 +1,92 @@
+import json
+
 import gradio as gr
 from ui.session import SessionContext
+
+# Theme-Umschalter (#69). Der Wechsel läuft **vollständig im Browser** — genau
+# das ist der Fix: die Vorgängerfassung waren zwei `<a href="?__theme=…">`, also
+# ein voller Seitenreload. Der bringt einen neuen `session_hash`, und damit ist
+# jeder `gr.State` (Persona, Streamer, `conversation_state`, Gast) neu — ein
+# kosmetischer Klick warf getippten Text und das laufende Gespräch weg.
+#
+# Im mitgelieferten Gradio-Bundle ist Dark-Mode nichts weiter als die Klasse
+# `dark` am `<body>` (Funktion `Ue` in `assets/Index-*.js`). Die setzen wir
+# selbst; der Server erfährt davon nichts und muss es auch nicht.
+THEME_STORAGE_KEY = "yulyen-theme"
+THEME_TOGGLE_ELEM_ID = "theme-toggle"
+
+
+def _js_str(value: str) -> str:
+    """String -> JS-Literal. `ensure_ascii=False` haelt Emoji lesbar im Skript."""
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _theme_helpers_js(light_label: str, dark_label: str) -> str:
+    """Gemeinsamer Rumpf beider Skripte — beide müssen für sich lauffähig sein.
+
+    Der Umschalter darf sich nicht darauf verlassen, dass das Lade-Skript
+    vorher lief: sonst wäre ein Klick vor dem Ende des Ladens wirkungslos.
+    """
+    return f"""
+        const KEY = {_js_str(THEME_STORAGE_KEY)};
+        // Der Knopf bietet immer den *anderen* Zustand an.
+        const OTHER_LABEL = {{
+            dark: {_js_str(light_label)},
+            light: {_js_str(dark_label)},
+        }};
+        const current = () =>
+            document.body.classList.contains("dark") ? "dark" : "light";
+        const apply = (mode) => {{
+            const dark = mode === "dark";
+            document.body.classList.toggle("dark", dark);
+            // Eingebettet hängt Gradio die Klasse ans <gradio-app> statt an
+            // den Body; beides zu setzen ist billiger als die Fallunterscheidung.
+            const app = document.querySelector("gradio-app");
+            if (app) app.classList.toggle("dark", dark);
+            const host = document.getElementById({_js_str(THEME_TOGGLE_ELEM_ID)});
+            const btn =
+                host && (host.tagName === "BUTTON" ? host : host.querySelector("button"));
+            if (btn) btn.textContent = OTHER_LABEL[mode];
+        }};
+        const remember = (mode) => {{
+            // Privater Modus wirft hier — die Wahl gilt dann nur für diese Seite.
+            try {{ localStorage.setItem(KEY, mode); }} catch (e) {{}}
+        }};
+        const remembered = () => {{
+            try {{
+                const stored = localStorage.getItem(KEY);
+                return stored === "dark" || stored === "light" ? stored : null;
+            }} catch (e) {{ return null; }}
+        }};
+    """
+
+
+def theme_restore_js(light_label: str, dark_label: str) -> str:
+    """Läuft beim Laden der Seite (`gr.Blocks(js=…)`).
+
+    Der `setTimeout` ist kein Zieren: Gradio setzt sein eigenes Theme während
+    der Initialisierung (`Je()` liest `?__theme` bzw. `prefers-color-scheme`).
+    Wer davor schreibt, verliert oder flackert.
+    """
+    return f"""
+        () => {{
+            {_theme_helpers_js(light_label, dark_label)}
+            setTimeout(() => apply(remembered() || current()), 0);
+        }}
+    """
+
+
+def theme_toggle_js(light_label: str, dark_label: str) -> str:
+    """Läuft beim Klick auf den Umschalter — ohne Serverrunde, ohne Reload."""
+    return f"""
+        () => {{
+            {_theme_helpers_js(light_label, dark_label)}
+            const next = current() === "dark" ? "light" : "dark";
+            remember(next);
+            apply(next);
+        }}
+    """
+
 
 # Single source of truth for the order of the "switch view" output components.
 # Every handler bound to these outputs builds a dict keyed by these names and
@@ -150,7 +237,7 @@ def build_ui(
     file_exchange_enabled,
     history_enabled,
 ):
-    with gr.Blocks() as demo:
+    with gr.Blocks(js=theme_restore_js(theme_light_label, theme_dark_label)) as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
 
         gr.HTML(
@@ -220,24 +307,42 @@ def build_ui(
                     opacity: 0.7;
                     font-family: var(--font-mono, monospace);
                 }
-                /* Theme-Umschalter (#36): dezent oben rechts, stört den Kopf nicht */
-                .theme-switch {
-                    text-align: right;
+                /* Theme-Umschalter (#36/#69): dezent oben rechts, stört den Kopf
+                   nicht. Ein Knopf statt zweier Links — er zeigt an, wohin es
+                   geht, statt beide Zustände gleichzeitig anzubieten. */
+                .theme-switch { justify-content: flex-end; }
+                .theme-switch button {
+                    flex: 0 0 auto;
+                    width: auto;
+                    min-width: 0;
                     font-size: 0.85rem;
-                    opacity: 0.65;
+                    padding: 4px 12px;
+                    opacity: 0.75;
                 }
-                .theme-switch a { text-decoration: none; margin-left: 10px; }
+                .theme-switch button:hover { opacity: 1; }
                 </style>
             """
         )
-        # Theme-Umschalter (#36): Gradio 4.44 liest `?__theme=` beim Laden, ein
-        # Wechsel ohne Reload ist nicht vorgesehen. Deshalb schlichte Links statt
-        # eines JS-Handlers — der Reload ist der Preis, dafür kein eigener Code.
-        gr.HTML(
-            f"""<div class="theme-switch">
-                <a href="?__theme=light" title="{theme_light_label}">{theme_light_label}</a>
-                <a href="?__theme=dark" title="{theme_dark_label}">{theme_dark_label}</a>
-            </div>"""
+        # Theme-Umschalter (#69). Der Startwert ist eine Annahme — der Server
+        # weiß nicht, was der Browser gerade anzeigt; `theme_restore_js` setzt
+        # die Beschriftung beim Laden gerade.
+        with gr.Row(elem_classes="theme-switch"):
+            theme_toggle_btn = gr.Button(
+                theme_dark_label,
+                size="sm",
+                variant="secondary",
+                elem_id=THEME_TOGGLE_ELEM_ID,
+            )
+        # Bewusst hier gebunden statt in `_bind_events`: es gibt keinen
+        # Python-Handler, der gebunden werden könnte. `fn=None` heißt für
+        # Gradio "nur das Skript, keine Serverrunde" (`backend_fn: false`) —
+        # und genau daran hängt der Fix: kein Request, kein Reload, keine
+        # neue Sitzung.
+        theme_toggle_btn.click(
+            fn=None,
+            inputs=None,
+            outputs=None,
+            js=theme_toggle_js(theme_light_label, theme_dark_label),
         )
         gr.Markdown(f"# {project_title}")
 
@@ -656,5 +761,6 @@ def build_ui(
         "ask_all_sources_accordion": ask_all_sources_accordion,
         "ask_all_sources_md": ask_all_sources_md,
         "status_md": status_md,
+        "theme_toggle_btn": theme_toggle_btn,
     }
     return demo, components
