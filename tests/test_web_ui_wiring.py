@@ -31,6 +31,7 @@ from ui.web_ui import (
 from ui.webui_layout import (
     THEME_STORAGE_KEY,
     THEME_TOGGLE_ELEM_ID,
+    card_icon_html,
     theme_restore_js,
 )
 
@@ -329,3 +330,89 @@ def test_only_a_known_value_is_restored(mode):
     """Was aus dem `localStorage` kommt, ist Fremdeingabe wie jede andere."""
     script = theme_restore_js("Hell", "Dunkel")
     assert f'stored === "{mode}"' in script
+
+
+# ---- Icons der Funktionskarten (#70) ---------------------------------------
+
+
+def _rendered_html(wired):
+    import gradio as gr
+
+    return [
+        str(block.value or "")
+        for block in wired.demo.blocks.values()
+        if isinstance(block, gr.HTML)
+    ]
+
+
+def _card_icons(wired):
+    # Auf das div prüfen, nicht auf den Klassennamen — sonst zählt der
+    # Stylesheet-Block mit, der `.card-icon` ebenfalls enthält.
+    return [html for html in _rendered_html(wired) if '<div class="card-icon">' in html]
+
+
+def _image_basenames(wired):
+    """Die Dateinamen aller gerenderten Bilder.
+
+    Gradio kopiert Ausgabedateien in seinen Cache, der Pfad ist dort gehasht —
+    der Dateiname bleibt aber stehen, und nur der interessiert hier.
+    """
+    import os
+
+    import gradio as gr
+
+    names = []
+    for block in wired.demo.blocks.values():
+        if not isinstance(block, gr.Image) or not block.value:
+            continue
+        value = block.value
+        path = value.get("path", "") if isinstance(value, dict) else str(value)
+        names.append(os.path.basename(path))
+    return names
+
+
+def test_no_portrait_stands_on_a_function_card(wired):
+    """`YUL_YEN.png` stand zweimal auf der Startseite — auf zwei *Funktionen*.
+
+    Dasselbe Porträt zweimal neben den vier Persona-Karten liest sich wie zwei
+    weitere Gesprächspartner. Genau die Verwechslung, die #68 beschreibt.
+    """
+    # Übrig bleiben dürfen nur Persona-Porträts aus dem Ensemble.
+    offenders = [
+        name
+        for name in _image_basenames(wired)
+        if name not in {"thumb.webp", "full.webp"}
+    ]
+    assert not offenders, offenders
+
+
+def test_every_function_card_carries_its_own_icon(wired):
+    """Vier Funktionen, vier verschiedene Icons.
+
+    Zweimal dasselbe Icon wäre derselbe Fehler wie zweimal dasselbe Foto —
+    nur in Strichzeichnung.
+    """
+    icons = _card_icons(wired)
+    assert len(icons) == 5, f"erwartet 4 Karten + Ask-All-Leiste, gefunden {len(icons)}"
+    assert len(set(icons)) == 4, "zwei Karten teilen sich ein Icon"
+
+
+def test_the_icons_follow_the_theme(wired):
+    """`currentColor` statt fester Farbe — sonst verschwinden sie im Dunkelmodus."""
+    for icon in _card_icons(wired):
+        assert 'stroke="currentColor"' in icon
+        # Direkt darunter steht derselbe Sachverhalt als Text; ein Screenreader
+        # soll ihn nicht zweimal vorlesen.
+        assert 'aria-hidden="true"' in icon
+
+
+def test_the_personas_keep_their_portraits(wired):
+    """Nicht überkorrigieren: bei den Personas *ist* das Porträt der Sinn."""
+    portraits = [name for name in _image_basenames(wired) if name == "thumb.webp"]
+    assert len(portraits) >= 4, portraits
+
+
+def test_an_unknown_icon_name_fails_loudly():
+    """Ein Tippfehler soll hier auffallen, nicht als leere Karte im Browser."""
+    with pytest.raises(KeyError):
+        card_icon_html("verlaufff")

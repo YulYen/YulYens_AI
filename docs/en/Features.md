@@ -174,6 +174,7 @@ The “Create guest 🎭” card lets you assemble your own persona from a name,
 ## Web UI conveniences
 
 - **Light and dark mode:** A button in the top right always offers the *other* mode (“🌙 Dark” while light, “☀️ Light” while dark). The switch happens in the browser: no reload, and the running conversation, the selected persona and any typed but unsent text stay where they are. The choice is stored in the browser and still applies on your next visit.
+- **A start page you can read at a glance:** The four persona cards carry their portraits, the function cards (“AI Dialog”, “Guest persona”, “History”, “Ask all”) a plain icon. Who you can talk to and what is merely a function is distinguishable without reading.
 - **Copy an answer:** Every chat message carries a copy icon.
 - **Status line:** After each answer, the line below the chat shows how full the context window is (`Context █░░░ 424 / 8,192 tokens (5 %)`) and how fast the model was (`24.0 tok/s · first token after 1.9 s`). Past 75 % it is highlighted — that is exactly where the application starts trimming the conversation history.
 
