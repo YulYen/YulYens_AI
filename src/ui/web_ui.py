@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any
 
 import gradio as gr
 import requests
-from auth import build_auth_provider
 from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import (
@@ -163,11 +162,12 @@ class WebUI:
         self.web_port = int(web_port)
         self.texts = getattr(config, "texts", {}) or {}
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
-        # Wer bedient die UI (#53). Default DisabledAuth = Verhalten wie bisher.
-        ui_cfg = getattr(config, "ui", {}) or {}
-        self.auth = build_auth_provider(
-            ui_cfg.get("web") if isinstance(ui_cfg, dict) else None
-        )
+        # Wer bedient die UI (#53). Default DisabledAuth = kein Login.
+        self.auth = factory.get_auth_provider()
+        # Verlauf nur anbieten, wenn wirklich aufgezeichnet wird (#72): ohne
+        # Ablage — abgeschaltet oder mangels Anmeldung — ist die Karte ein
+        # Versprechen, das sich nie einlösen kann.
+        self.history_enabled = bool(factory.get_store().records)
         # Datei-Austausch (JSON rein/raus) ist abschaltbar (#54).
         self.file_exchange_enabled = is_file_exchange_enabled(self.cfg)
         self.broadcast_enabled = is_broadcast_enabled(self.cfg)
@@ -1913,12 +1913,13 @@ class WebUI:
                 queue=False,
             )
 
-        components["history_card_btn"].click(
-            fn=self._on_show_history,
-            inputs=[session_state, user_state],
-            outputs=persona_outputs,
-            queue=False,
-        )
+        if components["history_card_btn"] is not None:
+            components["history_card_btn"].click(
+                fn=self._on_show_history,
+                inputs=[session_state, user_state],
+                outputs=persona_outputs,
+                queue=False,
+            )
 
         # user_state gehört in *jeden* Verlauf-Handler: die Gesprächs-ID kommt
         # vom Client und wird von Gradio nicht gegen die Auswahlliste geprüft.
@@ -2213,6 +2214,7 @@ class WebUI:
             history_delete_label=history_delete_label,
             history_confirm_label=history_confirm_label,
             file_exchange_enabled=self.file_exchange_enabled,
+            history_enabled=self.history_enabled,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

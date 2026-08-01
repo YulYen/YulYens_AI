@@ -232,6 +232,11 @@ Streamer, Guard und Factory werden **nicht** von Hand nachgebaut, sondern über
 `streamer_double()`, `permissive_guard_double()` und `factory_double()` bezogen.
 Alle drei bauen auf `create_autospec(…, instance=True)`.
 
+`factory_double()` belegt `get_auth_provider()` und `get_store()` mit den echten
+Produktionsvorgaben (`DisabledAuth`, `NullStore`) vor — beide sind *falsy*, und
+genau dort schlägt die stille Richtung sonst zu: `gradio_auth()` wäre ein Mock
+statt `None`, `store.records` ein wahrer Mock statt `False`.
+
 Der Grund ist ein Fehler, der an einem Tag viermal zuschlug — in zwei Richtungen:
 
 | Richtung | Vorher | Jetzt |
@@ -331,6 +336,7 @@ storage:
   enabled: true              # Gesprächs-Ablage (SQLite)
   file_exchange: true        # JSON-Down-/Upload im WebUI, /save im Terminal
   history_limit: 50          # wie viele Gespräche der Verlauf zeigt
+  shared_without_login: false  # WebUI ohne Anmeldung trotzdem aufzeichnen (#72)
 
 security:
   enabled: true
@@ -410,6 +416,24 @@ transaktional), ein Fehlschlag rollt zurück und nennt die Schrittnummer.
 Bewusst weiter `executescript` statt einer Zerlegung an `;`: ein FTS5-Trigger
 bringt eigene Semikolons im `BEGIN…END`-Rumpf mit.
 
+**Ohne Anmeldung wird nichts aufgezeichnet (#72).** `DisabledAuth` — der
+Default — gibt *jedem* Besucher die Identität `local`. Alle Gespräche tragen
+damit denselben Eigentümer, und die Eigentümerprüfung unten läuft ins Leere:
+wer die Seite erreicht, sieht im Verlauf die Gespräche aller anderen, kann sie
+fortsetzen und löschen. Deshalb liefert `AppFactory.get_store()` einen
+`NullStore`, wenn `ui.type: web` ohne Anmeldung läuft — mit einer Meldung, die
+beide Auswege nennt. Der ausdrückliche Weg in den gemeinsamen Topf ist
+`storage.shared_without_login: true` (Default aus); dann warnt der Start einmal
+laut, was geteilt wird. **Terminal und API sind nicht betroffen** — dort gibt es
+keine Anmeldung, die fehlen könnte.
+
+Die Web-UI fragt die Ablage, ob sie überhaupt schreibt (`store.records`), und
+lässt die Verlauf-Karte sonst weg. Eine Karte über einem `NullStore` verspricht
+etwas, das sich nie füllen kann — das galt auch schon bei
+`storage.enabled: false`. Wer an der Karte etwas bindet, prüft deshalb auf
+`None` (wie bei Ask-All); `test_the_app_still_starts_without_a_store` hält fest,
+dass die App ohne sie startet.
+
 **Nutzergebundenes Lesen und Löschen:** `load()` und `delete()` nehmen ein
 optionales, keyword-only `user`. Mit gesetztem Wert verhält sich ein fremdes
 Gespräch wie ein nicht existierendes — die Antwort soll nicht verraten, dass es
@@ -433,7 +457,7 @@ jede Test-Session in die echte Datenbank.
 
 | Provider | Verhalten |
 |---|---|
-| `disabled` (**Default**) | kein Login, alle sind `local` — Verhalten wie vor #53 |
+| `disabled` (**Default**) | kein Login, alle sind `local` — und deshalb zeichnet die WebUI nichts auf (#72) |
 | `local` | Nutzer aus `ui.web.auth.users`, Passwörter über die `env:`-Konvention |
 | `header` | Identität aus dem Header eines vorgeschalteten Proxys |
 
@@ -455,6 +479,7 @@ ihn von außen entfernt.
 |---|---|
 | `provider: local`, aber **kein Nutzer auflösbar** (meist ein nicht durchgereichtes `env:`) | **Abbruch** (`AuthConfigError`, Exit 4) |
 | App horcht auf nicht-Loopback **ohne** konfigurierte Anmeldung | laute Warnung, Start läuft weiter |
+| WebUI **ohne** Anmeldung, `storage.enabled: true` | Ablage bleibt aus, Verlauf-Karte weg (#72); `storage.shared_without_login: true` schaltet sie mit lauter Warnung wieder ein |
 
 Der erste Fall bricht ab, weil dort jemand ausdrücklich Schutz konfiguriert hat
 und ihn sonst stillschweigend verlöre; die frühere Begründung („lieber offen und

@@ -157,6 +157,14 @@ storage:
   file_exchange: true
   # Wie viele Gespräche die Verlauf-Liste zeigt (neueste zuerst).
   history_limit: 50
+  # Ohne Anmeldung (ui.web.auth.provider = disabled) zeichnet die WebUI nichts
+  # auf, und die Verlauf-Karte bleibt weg. Grund: ohne Anmeldung sind alle
+  # Besucher derselbe Nutzer 'local' — der Verlauf wäre für jeden der Verlauf
+  # aller, samt Fortsetzen und Löschen. Wer allein am eigenen Rechner arbeitet
+  # und den Verlauf trotzdem will, setzt das hier auf true; der Start warnt
+  # dann einmal laut. Betrifft nur die WebUI: Terminal und API haben keine
+  # Anmeldung, die fehlen könnte, und zeichnen unverändert auf.
+  shared_without_login: false
 
 # --- Persona e-mail adapter -----------------------------------------------------
 # Optional IMAP/SMTP bridge: routes incoming plain-text e-mails to personas via

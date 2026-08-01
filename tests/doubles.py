@@ -40,9 +40,11 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import create_autospec
 
+from auth import DisabledAuth
 from core.factory import AppFactory
 from core.streaming_provider import YulYenStreamingProvider
 from security.tinyguard import BasicGuard
+from storage import NullStore
 
 
 def streamer_double(**overrides: Any):
@@ -92,11 +94,24 @@ def permissive_guard_double(**overrides: Any):
 def factory_double(**overrides: Any):
     """Eine AppFactory nach dem Vorbild der echten.
 
-    Ohne Vorbelegung liefert ``build_guard()`` sonst ein Mock statt eines
-    Guards, und der Kontext-Filter prüft gegen etwas, das keine Prüfung ist.
+    Vorbelegt ist, was sonst als *wahrheitswertiges* Mock durchginge und damit
+    die stille Richtung öffnet:
+
+    * ``build_guard()`` — sonst prüft der Kontext-Filter gegen etwas, das keine
+      Prüfung ist.
+    * ``get_auth_provider()`` — sonst ist ``gradio_auth()`` ein Mock statt
+      ``None``, und die Web-UI startet im Test mit einer Anmeldung, die es nicht
+      gibt.
+    * ``get_store()`` — sonst ist ``records`` ein truthy Mock, und ein Test
+      gegen eine abgeschaltete Ablage liefe gegen eine eingeschaltete.
+
+    Beide letzteren sind die echten Produktionsvorgaben, nicht Attrappen:
+    kein Login, keine Ablage.
     """
     double = create_autospec(AppFactory, instance=True)
     double.build_guard.return_value = None
+    double.get_auth_provider.return_value = DisabledAuth()
+    double.get_store.return_value = NullStore()
     return _apply(double, overrides)
 
 

@@ -30,16 +30,15 @@ from ui.web_ui import (
 )
 
 
-@pytest.fixture(scope="module")
-def wired():
-    """Die echte WebUI, gebaut und verdrahtet — ohne Server."""
+def _build_wired(storage_cfg: dict):
+    """Baut die echte WebUI und verdrahtet sie — ohne Server."""
     Config.reset_instance()
     cfg = Config("config.yaml")
     cfg.ensemble = "classic"
     cfg.override("core", {"backend": "dummy", "warm_up": False})
     cfg.override("wiki", {"mode": False})  # kein spaCy-Modell nötig
     cfg.override("ui", {"type": "web"})
-    cfg.override("storage", {"enabled": False})
+    cfg.override("storage", storage_cfg)
 
     captured: dict = {}
     real_build_ui = web_ui_module.build_ui
@@ -62,13 +61,46 @@ def wired():
         warnings.simplefilter("always")
         ui.launch()
 
-    yield SimpleNamespace(
+    return SimpleNamespace(
         ui=ui,
         demo=captured["demo"],
         components=captured["components"],
         warnings=[str(w.message) for w in caught],
     )
+
+
+@pytest.fixture(scope="module")
+def wired(tmp_path_factory):
+    """Die volle Oberfläche — mit Ablage, sonst fehlt der halbe Verlauf.
+
+    Die Ablage steht hier bewusst auf *an*: ohne sie gibt es seit #72 keine
+    Verlauf-Karte, und dieser Test prüfte deren Bindungen dann gar nicht mehr.
+    Sie liegt in einem tmp-Verzeichnis und braucht ``shared_without_login``,
+    weil die ausgelieferte Config keine Anmeldung hat.
+    """
+    store_file = tmp_path_factory.mktemp("store") / "conversations.sqlite3"
+    yield _build_wired(
+        {
+            "enabled": True,
+            "path": str(store_file),
+            "shared_without_login": True,
+        }
+    )
     Config.reset_instance()
+
+
+def test_the_app_still_starts_without_a_store(tmp_path):
+    """Ohne Ablage fällt die Verlauf-Karte weg — und nichts bindet an sie.
+
+    Der teure Fehler wäre ein `.click()` auf die nicht gebaute Karte: das
+    scheitert erst beim Verdrahten, also beim Start der App.
+    """
+    try:
+        wired = _build_wired({"enabled": False})
+        assert wired.components["history_card_btn"] is None
+        wired.demo.validate_queue_settings()
+    finally:
+        Config.reset_instance()
 
 
 def _named_events(wired):

@@ -148,6 +148,7 @@ def build_ui(
     history_delete_label,
     history_confirm_label,
     file_exchange_enabled,
+    history_enabled,
 ):
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
@@ -301,23 +302,27 @@ def build_ui(
                             guest_card_label, variant="secondary"
                         )
 
-                with gr.Column(scale=1, min_width=170):
-                    with gr.Group(elem_classes="persona-card"):
-                        gr.Image(
-                            "static/YUL_YEN.png",
-                            show_label=False,
-                            container=False,
-                            show_download_button=False,
-                            show_fullscreen_button=False,
-                            elem_classes="persona-img",
-                        )
-                        gr.Markdown(
-                            f"<div class='name'>{history_title}</div>"
-                            f"<div class='desc'>{history_description}</div>"
-                        )
-                        history_card_btn = gr.Button(
-                            history_card_label, variant="secondary"
-                        )
+                # Ohne Ablage keine Verlauf-Karte (#72) — sie könnte sich nie füllen.
+                if history_enabled:
+                    with gr.Column(scale=1, min_width=170):
+                        with gr.Group(elem_classes="persona-card"):
+                            gr.Image(
+                                "static/YUL_YEN.png",
+                                show_label=False,
+                                container=False,
+                                show_download_button=False,
+                                show_fullscreen_button=False,
+                                elem_classes="persona-img",
+                            )
+                            gr.Markdown(
+                                f"<div class='name'>{history_title}</div>"
+                                f"<div class='desc'>{history_description}</div>"
+                            )
+                            history_card_btn = gr.Button(
+                                history_card_label, variant="secondary"
+                            )
+                else:
+                    history_card_btn = None
 
                 if broadcast_enabled:
                     with gr.Column(scale=1, min_width=170):
