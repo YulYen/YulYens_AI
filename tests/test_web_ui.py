@@ -23,6 +23,8 @@ from ui.web_ui import (
 )
 from wiki.lookup import WikiLookup, WikiSnippet
 
+from tests.doubles import factory_double, streamer_double
+
 
 def test_webui_start_server_uses_configured_host_and_port():
     """`demo.launch` must be called with the configured host/port values."""
@@ -30,7 +32,7 @@ def test_webui_start_server_uses_configured_host_and_port():
     dummy_config = SimpleNamespace(texts={}, t=lambda key, **kwargs: key)
 
     web_ui = WebUI(
-        factory=Mock(),
+        factory=factory_double(),
         config=dummy_config,
         wiki=WikiLookup(),
         web_host="0.0.0.0",
@@ -44,30 +46,6 @@ def test_webui_start_server_uses_configured_host_and_port():
     demo.launch.assert_called_once_with(
         server_name="0.0.0.0", server_port=9000, show_api=False
     )
-
-
-def _streamer_double(**overrides):
-    """Ein Streamer-Double, das die Attribute eines echten Streamers hat.
-
-    Ein nacktes ``Mock()`` liefert für *jedes* Attribut ein wahrheitswertiges
-    Mock — auch für ``guard``. Produktivcode, der ``getattr(streamer, "guard",
-    None)`` fragt, bekommt dann statt ``None`` ein Objekt, das keine Prüfung
-    ist; im Zweifel läuft der Test grün, obwohl die Verdrahtung falsch ist.
-    Genau das ist beim Kontext-Filter passiert.
-
-    ``Mock(spec=YulYenStreamingProvider)`` hilft hier nicht: ``guard`` und
-    ``persona_options`` entstehen erst in ``__init__``, ``dir()`` der Klasse
-    kennt sie nicht. Deshalb eine Stelle statt 21 — ein neues Streamer-Attribut
-    wird hier einmal nachgetragen, nicht überall.
-    """
-    streamer = Mock()
-    streamer.guard = None
-    streamer.persona_options = {}
-    streamer.last_stream_stats = None
-    streamer.model_name = "dummy"
-    for name, value in overrides.items():
-        setattr(streamer, name, value)
-    return streamer
 
 
 def _create_web_ui(ui_config=None):
@@ -88,12 +66,8 @@ def _create_web_ui(ui_config=None):
             },
         },
     )
-    factory = Mock()
-    # build_guard() liefert bei einem nackten Mock ein Mock statt eines Guards —
-    # der Kontext-Filter liefe dann gegen etwas, das keine Prüfung ist.
-    factory.build_guard.return_value = None
     return WebUI(
-        factory=factory,
+        factory=factory_double(),
         config=dummy_config,
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=42, max_snippets=2),
         web_host="0.0.0.0",
@@ -108,7 +82,7 @@ def test_stream_reply_throttles_updates():
     session = SessionContext()
     tokens = [f"t{i} " for i in range(50)]
     full_text = "".join(tokens)
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(tokens)
     session.streamer = streamer
 
@@ -128,7 +102,7 @@ def test_stream_reply_always_flushes_final_state():
     web_ui = _create_web_ui()
     session = SessionContext()
     tokens = ["Hallo ", "Welt", "!"]
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(tokens)
     session.streamer = streamer
 
@@ -145,7 +119,7 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.persona_options = {"num_ctx": "4096"}
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
@@ -174,7 +148,7 @@ def test_webui_heuristic_strategy_never_instantiates_karl():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.persona_options = {"num_ctx": "4096"}
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
@@ -199,7 +173,7 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
     session = SessionContext()
     web_ui.cfg.context_management["strategy"] = "karl"
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.persona_options = {"num_ctx": "4096"}
     streamer.model_name = "chat-model"
     streamer._llm_core = Mock()
@@ -229,7 +203,7 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
 
@@ -254,7 +228,7 @@ def test_respond_streaming_keeps_session_histories_isolated():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     responses = [["Antwort 1"], ["Antwort 2"]]
     captured_messages = []
 
@@ -304,7 +278,7 @@ def test_respond_streaming_returns_chat_and_state_updates():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
 
@@ -332,7 +306,7 @@ def test_respond_streaming_appends_final_history_entries():
     chat_history: list = []
     history_state: list = []
 
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
 
@@ -700,7 +674,7 @@ def _briefing_web_ui():
         "timeout_read": 1.0,
         "feeds": [{"name": "quelle", "url": "https://example.org/rss"}],
     }
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Ant", "wort"])
     session.streamer = streamer
     return web_ui, session
@@ -1141,7 +1115,7 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     web_ui = _create_web_ui()
     session = SessionContext()
     stream = _BlockingStream("Teil ")
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = stream
     session.streamer = streamer
 
@@ -1169,7 +1143,7 @@ def test_stop_clears_the_switch_so_the_next_stream_runs():
         session
     )  # Stop ohne laufenden Stream: darf nichts kaputt machen
 
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
     session.streamer = streamer
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
@@ -1254,7 +1228,7 @@ def test_regenerate_drops_last_answer_and_streams_again():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     # Snapshot beim Aufruf: _stream_reply hängt die neue Antwort an dieselbe
     # Liste an, hinterher wäre nicht mehr sichtbar, was gesendet wurde.
     sent_snapshot = []
@@ -1292,7 +1266,7 @@ def test_regenerate_keeps_wiki_hint_rows():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Neu"])
     session.streamer = streamer
 
@@ -1418,7 +1392,7 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
     web_ui = _web_ui_with_texts()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
 
@@ -1477,7 +1451,7 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
     web_ui = _web_ui_with_texts()
     session = SessionContext()
     session.bot = "Karl"
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
 
@@ -1621,7 +1595,7 @@ def test_status_line_ignores_a_streamer_without_real_stats():
 def test_stream_reply_publishes_the_status_only_at_the_end():
     web_ui = _web_ui_with_texts()
     session = SessionContext()
-    streamer = _streamer_double()
+    streamer = streamer_double()
     streamer.persona_options = {"num_ctx": 8192}
     streamer.last_stream_stats = StreamStats(tokens=10, t_first_ms=500, t_total_ms=1000)
     streamer.stream.return_value = iter(["a", "b", "c"])
@@ -2488,33 +2462,3 @@ def test_a_rejected_upload_records_nothing(tmp_path):
     )
 
     assert store.list_conversations() == []
-
-
-def test_the_streamer_double_matches_a_real_streamer():
-    """Das Double darf nicht behaupten, was ein echter Streamer nicht hat.
-
-    Ein Double, das an der Wirklichkeit vorbeigeht, lässt Tests grün laufen,
-    die in Produktion fallen — der umgekehrte Fall (Attribut fehlt im Double)
-    hat beim Kontext-Filter genau das verursacht.
-    """
-    from core.dummy_llm_core import DummyLLMCore
-    from core.streaming_provider import YulYenStreamingProvider
-
-    echt = YulYenStreamingProvider(
-        base_url="",
-        persona="LEAH",
-        persona_prompt="",
-        persona_options={},
-        llm_core=DummyLLMCore(),
-    )
-    double = _streamer_double()
-
-    fehlend = [
-        name
-        for name in ("guard", "persona_options", "last_stream_stats", "model_name")
-        if not hasattr(echt, name)
-    ]
-    assert not fehlend, f"Das Double setzt Attribute, die es nicht gibt: {fehlend}"
-    # Und die Vorbelegung muss der eines frischen Streamers entsprechen.
-    assert double.guard == echt.guard
-    assert double.last_stream_stats == echt.last_stream_stats

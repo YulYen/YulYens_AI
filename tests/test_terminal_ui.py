@@ -7,23 +7,7 @@ from config.texts import Texts
 from ui.terminal_ui import TerminalUI
 from wiki.lookup import WikiLookup, WikiSnippet
 
-
-def _streamer_double(**overrides):
-    """Streamer-Double mit den Attributen, die ein echter Streamer hat.
-
-    Ein nacktes SimpleNamespace lässt Produktivcode an AttributeError scheitern,
-    sobald der Streamer eine Methode dazubekommt — hier wandert die Ergänzung
-    an eine Stelle statt an jede einzelne.
-    """
-    attrs = {
-        "persona_options": {},
-        "guard": None,
-        "record_conversation": lambda messages: None,
-        "stream": lambda messages: iter([]),
-        "set_conversation": lambda conversation_id: None,
-    }
-    attrs.update(overrides)
-    return SimpleNamespace(**attrs)
+from tests.doubles import factory_double, streamer_double
 
 
 def _create_terminal_ui() -> TerminalUI:
@@ -63,7 +47,7 @@ def test_terminal_ui_start_menu_shows_ask_all_when_enabled(monkeypatch, capsys) 
 def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
     ui.bot = "LEAH"
-    ui.streamer = _streamer_double(persona_options={"num_ctx": "128"})
+    ui.streamer = streamer_double(persona_options={"num_ctx": "128"})
 
     ui.history = [
         {"role": "system", "content": "Regeln"},
@@ -117,7 +101,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
     )
 
     ui = TerminalUI(
-        factory=SimpleNamespace(build_guard=lambda: None),
+        factory=factory_double(),
         config=dummy_config,
         wiki=WikiLookup(),
     )
@@ -133,7 +117,7 @@ def test_terminal_ui_broadcast_flag_hides_askall(monkeypatch, capsys) -> None:
 
 def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
-    ui.factory = SimpleNamespace(build_guard=lambda: None)
+    ui.factory = factory_double()
     question = "Testfrage"
 
     monkeypatch.setattr("builtins.input", lambda _: question)
@@ -160,7 +144,7 @@ def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> No
 
 def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
-    ui.factory = SimpleNamespace(build_guard=lambda: None)
+    ui.factory = factory_double()
     ui.wiki = WikiLookup(keyword_finder=object())
 
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
@@ -318,7 +302,7 @@ def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
     ui = _create_terminal_ui()
     ui.bot = "LEAH"
     ui.wiki = WikiLookup(keyword_finder=object())
-    ui.streamer = _streamer_double(stream=lambda messages: iter(["Antwort"]))
+    ui.streamer = streamer_double(stream=lambda messages: iter(["Antwort"]))
 
     snippets = [_snippet()]
     monkeypatch.setattr(
@@ -340,7 +324,7 @@ def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
 
 def test_ask_all_flow_records_the_injected_snippets(monkeypatch) -> None:
     ui = _create_terminal_ui()
-    ui.factory = SimpleNamespace(build_guard=lambda: None)
+    ui.factory = factory_double()
     ui.wiki = WikiLookup(keyword_finder=object())
 
     snippets = [_snippet()]

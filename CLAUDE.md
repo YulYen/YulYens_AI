@@ -197,6 +197,31 @@ pytest tests/test_ai_via_api.py  # Gezielt
 - spaCy-Modelle (`python -m spacy download de_core_news_lg`) schalten die
   Keyword-/Wiki-Tests frei; ohne Modell werden sie sauber geskippt
 
+### Test-Doubles kommen aus `tests/doubles.py` (#67)
+Streamer, Guard und Factory werden **nicht** von Hand nachgebaut, sondern über
+`streamer_double()`, `permissive_guard_double()` und `factory_double()` bezogen.
+Alle drei bauen auf `create_autospec(…, instance=True)`.
+
+Der Grund ist ein Fehler, der an einem Tag viermal zuschlug — in zwei Richtungen:
+
+| Richtung | Vorher | Jetzt |
+|---|---|---|
+| **laut** | `SimpleNamespace`/eigene Stub-Klassen fielen mit `AttributeError`, sobald der Produktivcode eine neue Methode rief | jede Methode des Originals ist automatisch da |
+| **still, teuer** | ein nacktes `Mock()` liefert für *jedes* Attribut ein wahrheitswertiges Mock; `getattr(streamer, "guard", None)` bekam nie `None`, der Test blieb grün, und es fiel erst tief im Guard mit `'Mock' object is not subscriptable` | ein nie gesetztes Instanzattribut fehlt ehrlich, `getattr(…, None)` ergibt `None` |
+
+**Klassen-Annotationen an den Kollaborateuren wären der falsche Weg.** Sie würden
+`guard` und `persona_options` in `dir()` heben — und damit die stille Richtung
+wieder öffnen. Ein Attribut, das noch niemand gesetzt hat, *soll* fehlen.
+
+**Was `create_autospec` nicht abfängt:** *Setzen* unbekannter Attribute bleibt
+erlaubt (kein `spec_set`, sonst ließe sich `persona_options` gar nicht
+vorbelegen). Ein Tippfehler in der Vorbelegung bliebe also stumm — deshalb prüft
+`test_the_presets_are_attributes_a_real_streamer_actually_has` sie gegen eine
+echte Instanz. Wer eine Vorbelegung ergänzt, trägt sie dort nach.
+
+Vorbelegt ist bewusst nur das Nötigste. `stream` liefert eine **Liste**, keinen
+`iter([])` — ein Iterator wäre nach dem ersten Aufruf stumm leer.
+
 ## Eval-Suite (#41)
 
 Messbare Antwort auf „ist das Modell besser geworden?" — das Vergleichsartefakt

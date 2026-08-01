@@ -28,6 +28,7 @@ from evals.runner import (
     run_karl_corpus,
     run_persona_corpora,
 )
+from tests.doubles import permissive_guard_double
 
 # ---- Deterministic checks -------------------------------------------------
 
@@ -276,24 +277,13 @@ def test_karl_runner_without_corpus_returns_nothing():
 # ---- Guard corpus integration -------------------------------------------
 
 
-class _AlwaysOkGuard:
-    def check_input(self, text):
-        return {"ok": True, "reason": "ok", "detail": None}
-
-    def check_output(self, text):
-        return {"ok": True, "reason": "ok", "detail": None}
-
-    def process_output(self, text):
-        return {"blocked": False, "reason": None, "text": text, "masked": False}
-
-
 def test_guard_runner_gets_a_fresh_guard_per_case():
     from evals.corpus import GuardCase
 
     made = []
 
     def _factory():
-        guard = _AlwaysOkGuard()
+        guard = permissive_guard_double()
         made.append(guard)
         return guard
 
@@ -329,7 +319,7 @@ def test_known_gap_does_not_count_as_failure():
         source="g.yaml",
     )
     run = EvalRun(model="m", judge_model=None)
-    run.guard_outcomes = run_guard_corpus(corpus, _AlwaysOkGuard)
+    run.guard_outcomes = run_guard_corpus(corpus, permissive_guard_double)
     assert run.guard_failed == 0
     assert run.guard_known_gaps == 1
     assert run.ok
