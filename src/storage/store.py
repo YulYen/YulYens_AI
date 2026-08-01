@@ -80,6 +80,11 @@ class ConversationRef:
 
 
 class ConversationStore(Protocol):
+    #: Ob diese Ablage wirklich schreibt. Die Oberfläche fragt danach, statt zu
+    #: raten: eine Verlauf-Karte über einem ``NullStore`` verspricht etwas, das
+    #: sich nie füllen kann.
+    records: bool
+
     def start(self, *, user: str, persona: str, model: str, app: str) -> str: ...
 
     def append(self, conversation_id: str, role: str, content: str) -> None: ...
@@ -99,6 +104,8 @@ class ConversationStore(Protocol):
 
 class NullStore:
     """Schreibt nichts. Für Tests und für alle, die keine Ablage wollen."""
+
+    records = False
 
     def start(self, *, user: str, persona: str, model: str, app: str) -> str:
         return ""
@@ -130,6 +137,8 @@ class SqliteStore:
     laufen nebenläufig, aber die Schreiblast ist eine Zeile pro Turn — dasselbe
     Muster, das der bisherige Log mit ``_conversation_log_lock`` benutzt hat.
     """
+
+    records = True
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)

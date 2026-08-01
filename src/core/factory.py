@@ -6,9 +6,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import config.personas as personas
+from auth import AuthProvider, build_auth_provider
 from config.config_singleton import Config
 from security.tinyguard import BasicGuard, create_guard
-from storage import ConversationStore, build_store
+from storage import ConversationStore, NullStore, build_store
 from ui.terminal_ui import TerminalUI
 from ui.web_ui import WebUI
 from wiki.lookup import WikiLookup
@@ -45,17 +46,79 @@ class AppFactory:
         self._one_shot_provider = None
         self._ui = None  # TerminalUI or WebUI
         self._store: ConversationStore | None = None
+        self._auth: AuthProvider | None = None
         self._warmed_up = False
 
     # --------- Lazy‑Singleton Getter ---------
     def get_config(self) -> Config:
         return self._cfg
 
+    def get_auth_provider(self) -> AuthProvider:
+        """Wer bedient die Web-UI (#53) — ein Provider pro Prozess.
+
+        Hier statt in der ``WebUI``, weil auch die Ablage die Antwort braucht
+        (siehe :meth:`get_store`) und ein zweiter Aufbau die Meldungen über
+        unbrauchbare Passwörter doppelt ausgeben würde.
+        """
+        if self._auth is None:
+            ui_cfg = getattr(self._cfg, "ui", {}) or {}
+            web_cfg = ui_cfg.get("web") if isinstance(ui_cfg, dict) else None
+            self._auth = build_auth_provider(web_cfg)
+        return self._auth
+
     def get_store(self) -> ConversationStore:
         """Ablage der Gespräche (#54) — ein Handle pro Prozess."""
         if self._store is None:
-            self._store = build_store(getattr(self._cfg, "storage", None))
+            storage_cfg = getattr(self._cfg, "storage", None) or {}
+            if self._recording_blocked_without_login(storage_cfg):
+                self._store = NullStore()
+            else:
+                self._store = build_store(storage_cfg)
         return self._store
+
+    def _recording_blocked_without_login(self, storage_cfg: dict) -> bool:
+        """Ohne Anmeldung wird nichts aufgezeichnet (#72).
+
+        Der Grund ist nicht das fehlende Passwort, sondern was ohne eines aus
+        der Ablage wird: ``DisabledAuth`` gibt *jedem* Besucher die Identität
+        ``local``, also tragen alle Gespräche denselben Eigentümer. Die
+        Eigentümerprüfung im Verlauf greift dann ins Leere — wer die Seite
+        erreicht, liest, öffnet, setzt fort und löscht die Gespräche aller
+        anderen. Ein gemeinsamer Topf ist ein legitimer Betriebsmodus, aber
+        keiner, in den man ohne eigenes Zutun hineinrutschen soll.
+
+        Bewusst nur für die Web-UI: Terminal und API haben keine Anmeldung,
+        die fehlen könnte. Deren Betrieb ändert sich durch diese Regel nicht.
+        """
+        ui_cfg = getattr(self._cfg, "ui", {}) or {}
+        ui_type = ui_cfg.get("type") if isinstance(ui_cfg, dict) else None
+        if ui_type != "web":
+            return False
+        if not storage_cfg.get("enabled", True):
+            return False  # ohnehin aus — build_store sagt es selbst
+        if self.get_auth_provider().identifies_users:
+            return False
+        if storage_cfg.get("shared_without_login", False):
+            logging.warning(
+                "[STORE] storage.shared_without_login ist gesetzt: die Web-UI "
+                "zeichnet ohne Anmeldung auf, und *alle* Gespräche gehören dem "
+                "Nutzer '%s'. Jeder, der die Seite erreicht, sieht im Verlauf "
+                "die Gespräche aller anderen und kann sie fortsetzen und "
+                "löschen. Nur bewusst benutzen (Einzelplatz, abgeschottetes "
+                "Netz) — sonst ui.web.auth.provider einschalten.",
+                LOCAL_USER,
+            )
+            return False
+        logging.warning(
+            "[STORE] Keine Anmeldung konfiguriert (ui.web.auth.provider = '%s') "
+            "— es werden keine Gespräche aufgezeichnet, der Verlauf bleibt aus. "
+            "Grund: ohne Anmeldung sind alle Besucher derselbe Nutzer, ein "
+            "Verlauf wäre für jeden Besucher der Verlauf aller. Entweder "
+            "ui.web.auth.provider setzen oder — für den Einzelplatz — "
+            "storage.shared_without_login: true.",
+            self.get_auth_provider().name,
+        )
+        return True
 
     def open_conversation(self, persona: str, app: str, user: str = LOCAL_USER) -> str:
         """Neues Gespräch anlegen und seine ID liefern (#54).

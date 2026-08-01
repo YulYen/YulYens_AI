@@ -152,3 +152,17 @@ def test_the_permissive_guard_lets_text_through_unchanged():
 def test_the_factory_double_returns_no_guard_by_default():
     """Sonst prüft der Kontext-Filter gegen ein Mock statt gegen einen Guard."""
     assert factory_double().build_guard() is None
+
+
+def test_the_factory_double_starts_without_login_and_without_store():
+    """Die echten Produktionsvorgaben — und beide sind *falsy*.
+
+    Genau da schlägt die stille Richtung zu: ein Mock wäre wahr, die WebUI
+    startete im Test mit einer Anmeldung, die es nicht gibt, und über einer
+    Ablage, die nichts speichert.
+    """
+    double = factory_double()
+
+    assert double.get_auth_provider().gradio_auth() is None
+    assert double.get_auth_provider().identifies_users is False
+    assert double.get_store().records is False

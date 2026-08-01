@@ -55,6 +55,11 @@ class AuthProvider(Protocol):
 
     name: str
 
+    #: Ob dieser Provider Besucher überhaupt *unterscheidet*. ``False`` heißt:
+    #: alle sind derselbe Nutzer — dann ist jede nutzergebundene Trennung
+    #: (Ablage, Verlauf, Votes) nur noch Dekoration. Siehe #72.
+    identifies_users: bool
+
     def gradio_auth(self) -> Any | None:
         """Wert für ``demo.launch(auth=…)`` — ``None`` heißt: kein Login."""
 
@@ -70,6 +75,7 @@ class DisabledAuth:
     """
 
     name = "disabled"
+    identifies_users = False
 
     def gradio_auth(self) -> None:
         return None
@@ -88,6 +94,7 @@ class LocalUsersAuth:
     """
 
     name = "local"
+    identifies_users = True
 
     def __init__(self, users: dict[str, Any] | None) -> None:
         self._users: dict[str, str] = {}
@@ -153,6 +160,7 @@ class HeaderAuth:
     """
 
     name = "header"
+    identifies_users = True
 
     def __init__(self, header_name: str = "X-Forwarded-User") -> None:
         self.header_name = (header_name or "X-Forwarded-User").strip()

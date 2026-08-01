@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 import gradio as gr
 import pytest
 import requests
+from auth import build_auth_provider
 from config.texts import Texts
 from core.streaming_provider import StreamStats
 from ui.session import SessionContext
@@ -66,8 +67,15 @@ def _create_web_ui(ui_config=None):
             },
         },
     )
+    # Die Anmeldung kommt seit #72 aus der Factory (die Ablage braucht dieselbe
+    # Antwort). Hier wird sie aus derselben ui-Config gebaut wie im Betrieb,
+    # damit die Tests ihre Absicht weiter über `ui_config` ausdrücken können.
+    factory = factory_double()
+    factory.get_auth_provider.return_value = build_auth_provider(
+        ui_config.get("web") if isinstance(ui_config, dict) else None
+    )
     return WebUI(
-        factory=factory_double(),
+        factory=factory,
         config=dummy_config,
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=42, max_snippets=2),
         web_host="0.0.0.0",

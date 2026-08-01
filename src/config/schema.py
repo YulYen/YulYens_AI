@@ -99,6 +99,7 @@ class StorageSection(BaseModel):
     path: str | None = None
     file_exchange: bool = True
     history_limit: int = Field(default=50, ge=1)
+    shared_without_login: bool = False
 
 
 class ContextManagementSection(BaseModel):
