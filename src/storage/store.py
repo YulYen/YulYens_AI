@@ -33,6 +33,11 @@ from typing import Any, Protocol
 
 from core.utils import LOCAL_USER, ensure_dir_exists
 
+# Wohin die Ablage schreibt, wenn `storage.path` nichts sagt. Als Konstante,
+# damit die Testsuite sie umbiegen kann: ein Config-Objekt ohne `storage`-Feld
+# landete sonst hier und legte die Datei im Repo an (#64f).
+DEFAULT_STORE_PATH = "data/conversations.sqlite3"
+
 # Wie viel der ersten Frage als Titel in der Liste steht.
 _TITLE_MAX_CHARS = 80
 
@@ -398,7 +403,7 @@ def build_store(storage_cfg: dict | None) -> ConversationStore:
     if not cfg.get("enabled", True):
         logging.info("[STORE] Gesprächs-Ablage ist ausgeschaltet (storage.enabled)")
         return NullStore()
-    path = str(cfg.get("path") or "data/conversations.sqlite3")
+    path = str(cfg.get("path") or DEFAULT_STORE_PATH)
     try:
         store = SqliteStore(path)
     except sqlite3.Error as exc:

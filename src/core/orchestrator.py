@@ -33,10 +33,16 @@ def iter_broadcast_events(
             placed before the user prompt for every persona.
 
     Yields:
-        ``{"type": "token", "persona": ..., "token": ..., "reply": ...}`` for
-        every streamed token (``reply`` is the cumulative text so far) and
-        ``{"type": "done", "persona": ..., "reply": ...}`` once a persona has
-        finished (``reply`` is the full, stripped text).
+        ``{"type": "token", "persona": ..., "token": ...}`` for every streamed
+        token and ``{"type": "done", "persona": ..., "reply": ...}`` once a
+        persona has finished (``reply`` is the full, stripped text).
+
+    Ein Token-Event trägt **nur** sein Token, nicht den Text bis hierhin
+    (#64d): der kumulative String wurde bei jedem Token neu gebaut und in das
+    Event gelegt — quadratisch in der Antwortlänge, und weil jedes Event seine
+    eigene Kopie festhält, auch im Speicher. Wer den laufenden Text braucht,
+    sammelt die Token in einer Liste und fügt sie zusammen, wenn er sie zeigt;
+    das tut die WebUI beim Auffrischen der Anzeige.
     """
 
     personas = (
@@ -54,15 +60,12 @@ def iter_broadcast_events(
         _open_conversation_for(factory, streamer, persona)
         reply_so_far = ""
 
+        parts: list[str] = []
         for token in streamer.stream(messages=messages):
-            reply_so_far += token
-            yield {
-                "type": "token",
-                "persona": persona,
-                "token": token,
-                "reply": reply_so_far,
-            }
+            parts.append(token)
+            yield {"type": "token", "persona": persona, "token": token}
 
+        reply_so_far = "".join(parts)
         _record(streamer, messages, reply_so_far)
         yield {"type": "done", "persona": persona, "reply": reply_so_far.strip()}
 
@@ -98,9 +101,9 @@ def iter_broadcast_events_parallel(
 ) -> Iterator[dict[str, str]]:
     """Like :func:`iter_broadcast_events`, but all personas stream concurrently.
 
-    Event format is identical; token events of different personas interleave
-    (``reply`` stays the per-persona cumulative text). Closing the generator
-    signals every worker to stop and closes its LLM stream.
+    Event format is identical; token events of different personas interleave.
+    Closing the generator signals every worker to stop and closes its LLM
+    stream.
 
     Args:
         stop_event: Optional external kill switch. Needed for Gradio cancels:
@@ -123,7 +126,7 @@ def iter_broadcast_events_parallel(
     stop = stop_event if stop_event is not None else threading.Event()
 
     def _worker(persona: str, streamer: YulYenStreamingProvider) -> None:
-        reply_so_far = ""
+        parts: list[str] = []
         messages = base_messages + [{"role": "user", "content": user_input}]
         _open_conversation_for(factory, streamer, persona)
         token_stream = streamer.stream(messages=messages)
@@ -131,16 +134,10 @@ def iter_broadcast_events_parallel(
             for token in token_stream:
                 if stop.is_set():
                     break
-                reply_so_far += token
-                events.put(
-                    {
-                        "type": "token",
-                        "persona": persona,
-                        "token": token,
-                        "reply": reply_so_far,
-                    }
-                )
+                parts.append(token)
+                events.put({"type": "token", "persona": persona, "token": token})
         finally:
+            reply_so_far = "".join(parts)
             # Triggers the provider's finally → closes the backend stream.
             token_stream.close()
             # Auch eine abgebrochene Antwort ist das, was der Nutzer gesehen

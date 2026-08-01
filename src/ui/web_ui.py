@@ -1481,12 +1481,26 @@ class WebUI:
             events_iter = iter_broadcast_events(
                 self.factory, question, context_messages=context_messages
             )
+        # Der laufende Text wird hier gesammelt, nicht vom Orchestrator in jedes
+        # Token-Event gelegt (#64d). Zusammengefügt wird nur, wenn wirklich
+        # gezeigt wird — also ein paar Mal pro Sekunde statt einmal pro Token.
+        parts: dict[str, list[str]] = {name: [] for name in replies}
+        finished: set[str] = set()
         last_flush = 0.0
         for event in events_iter:
-            replies[event["persona"]] = event["reply"] or "…"
+            persona = event["persona"]
+            if event["type"] == "done":
+                # Der fertige Text ist der maßgebliche — er ist gestrippt.
+                replies[persona] = event["reply"] or "…"
+                finished.add(persona)
+            else:
+                parts.setdefault(persona, []).append(event["token"])
 
             now = time.monotonic()
             if event["type"] == "done" or now - last_flush >= STREAM_FLUSH_INTERVAL_S:
+                for name, chunks in parts.items():
+                    if name not in finished and chunks:
+                        replies[name] = "".join(chunks)
                 last_flush = now
                 yield self._ask_all_state(
                     question,

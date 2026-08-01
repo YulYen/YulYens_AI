@@ -114,9 +114,12 @@ def test_iter_broadcast_events_yields_tokens_and_done_per_persona():
 
     token_events = [e for e in events if e["type"] == "token"]
     assert token_events, "expected streamed token events"
-    # Kumulierter Text wächst monoton und endet im vollen Reply
+    # Die Token ergeben zusammengesetzt genau die fertige Antwort. Den
+    # kumulierten Text trägt das Token-Event bewusst nicht mehr (#64d) — er
+    # wurde pro Token neu gebaut und war quadratisch in der Antwortlänge.
     alpha_tokens = [e for e in token_events if e["persona"] == "Alpha"]
-    assert alpha_tokens[-1]["reply"].strip() == "ECHO: Ping"
+    assert "".join(e["token"] for e in alpha_tokens).strip() == "ECHO: Ping"
+    assert "reply" not in alpha_tokens[-1]
 
     # Reihenfolge: alle Alpha-Events kommen vor dem ersten Beta-Event
     personas_seen = [e["persona"] for e in events]
@@ -148,9 +151,9 @@ def test_parallel_broadcast_completes_every_persona():
             e for e in events if e["type"] == "token" and e["persona"] == persona
         ]
         assert token_events, f"expected token events for {persona}"
-        assert token_events[-1]["reply"].strip() == "ECHO: Ping"
         rebuilt = "".join(e["token"] for e in token_events)
-        assert rebuilt == token_events[-1]["reply"]
+        assert rebuilt.strip() == "ECHO: Ping"
+        assert all("reply" not in e for e in token_events)
 
     assert not _broadcast_worker_threads()
 

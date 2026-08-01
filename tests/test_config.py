@@ -128,6 +128,11 @@ def _build_test_cfg(backend: str = "dummy", core_updates: dict | None = None):
                 "timeout_read": 0.1,
             }
             self.logging = {"conversation_prefix": "test_conv"}
+            # Ohne diese Zeile baut die Factory einen echten SqliteStore und
+            # legt `data/conversations.sqlite3` im Repo an (#64f): die
+            # autouse-Fixture schaltet die Ablage über `Config._load_config`
+            # ab, und an dem kommt ein handgebautes Config-Objekt vorbei.
+            self.storage = {"enabled": False}
             self.ensemble = "classic"
 
     cfg = DummyCfg()

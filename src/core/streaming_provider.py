@@ -590,6 +590,14 @@ class YulYenStreamingProvider:
         Convenience method for the API: runs a single prompt
         and returns the complete answer as a string.
         """
+        # Zuerst der Guard, dann das Netz (#64b). Vorher lief der Wiki-Lookup
+        # davor, also löste auch eine *abgelehnte* Eingabe einen Abruf mit
+        # fremdbestimmtem Suchbegriff aus — die Absage kam danach, der Abruf
+        # war da schon passiert.
+        refusal = self._input_refusal(user_input, persona)
+        if refusal is not None:
+            return refusal
+
         messages: list[dict[str, Any]] = []
 
         # Look up the Wikipedia snippet(s)
@@ -602,31 +610,19 @@ class YulYenStreamingProvider:
         # Add the user question as the last message
         messages.append({"role": "user", "content": user_input})
 
-        # Check guard input
-        refusal = self._input_refusal(user_input, persona)
-        if refusal is not None:
-            return refusal
-
-        # Run the LLM and collect the answer
+        # Der Ausgangs-Guard sitzt im Stream, nicht hier (#64a): `stream()`
+        # schickt jedes Token durch `_StreamModerator`, `run_llm_collect`
+        # liefert also bereits moderierten Text. Eine zweite `check_output`
+        # darauf sah nach Tiefenverteidigung aus, konnte aber nie anschlagen —
+        # nachgemessen mit einem Secret und einer Mailadresse im Modelltext:
+        # beide waren beim zweiten Blick längst ersetzt, das Ergebnis war jedes
+        # Mal `ok`. Wer hier wieder eine Prüfung einzieht, prüft die Maskierung,
+        # nicht das Modell.
         full_reply = run_llm_collect(self, messages)
         # Die Ablage bekommt das Gespräch, nicht den Generierungsversuch (#59).
         self.record_conversation(
             [*messages, {"role": "assistant", "content": full_reply}]
         )
-
-        # Check guard output
-        if self.guard:
-            res_out = self.guard.check_output(full_reply or "")
-            if not res_out["ok"]:
-                logging.info(
-                    "[GUARD] output blocked persona=%s reason=%s",
-                    persona,
-                    res_out.get("reason"),
-                )
-                return zeigefinger_message(
-                    res_out, texts=getattr(self.guard, "texts", None)
-                )
-
         return full_reply
 
 

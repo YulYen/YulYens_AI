@@ -320,6 +320,35 @@ def test_rate_limiter_counts_per_client():
     assert limiter.check("b", now=0) is True
 
 
+def test_rate_limiter_forgets_clients_of_past_minutes():
+    """Ein Eintrag pro Client-IP blieb sonst für immer liegen (#64c).
+
+    Der Zähler ist wertlos, sobald seine Minute vorbei ist — entfernt hat ihn
+    aber niemand. Auf einem Server, den wechselnde Adressen erreichen, wächst
+    das langsam genug, um nicht aufzufallen, und hört nie auf.
+    """
+    limiter = RateLimiter(10)
+
+    for i in range(200):
+        limiter.check(f"client-{i}", now=0)
+    assert len(limiter._windows) == 200
+
+    # Eine Minute später: der erste Schreibzugriff räumt die alte Minute ab.
+    limiter.check("neuer-client", now=60)
+    assert set(limiter._windows) == {"neuer-client"}
+
+
+def test_rate_limiter_keeps_the_clients_of_the_current_minute():
+    """Aufräumen darf nur Vergangenes treffen — sonst ist das Limit wirkungslos."""
+    limiter = RateLimiter(1)
+
+    for i in range(200):
+        assert limiter.check(f"client-{i}", now=0) is True
+    # Jeder von ihnen hat sein Kontingent verbraucht und muss das auch bleiben.
+    assert limiter.check("client-0", now=0) is False
+    assert limiter.check("client-199", now=0) is False
+
+
 def test_rate_limiter_zero_disables_the_limit():
     limiter = RateLimiter(0)
 

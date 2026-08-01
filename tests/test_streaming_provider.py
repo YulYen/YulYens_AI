@@ -617,3 +617,57 @@ def test_moderation_cost_stays_linear_in_the_answer_length():
         f"Moderation wächst überproportional: {klein * 1000:.0f} ms → "
         f"{gross * 1000:.0f} ms bei 8× Tokens"
     )
+
+
+# ---- Review-Kleinkram (#64) ------------------------------------------------
+
+
+def test_a_refused_question_never_reaches_the_wiki() -> None:
+    """Erst der Guard, dann das Netz (#64b).
+
+    Vorher lief der Wiki-Lookup **vor** der Eingangsprüfung: eine abgelehnte
+    Frage löste trotzdem einen Abruf aus — mit einem Suchbegriff, den der
+    Absender bestimmt. Die Absage kam danach, der Abruf war da schon passiert.
+    """
+    from unittest.mock import create_autospec
+
+    from wiki.lookup import WikiLookup
+
+    wiki = create_autospec(WikiLookup, instance=True)
+    wiki.snippets.return_value = ([], [])
+    provider = create_streaming_provider(guard=_block_all_guard())
+
+    answer = provider.respond_one_shot("verbotene Frage", persona="TEST", wiki=wiki)
+
+    assert "Nö." in answer
+    wiki.snippets.assert_not_called()
+
+
+def test_the_one_shot_answer_is_moderated_by_the_stream_alone() -> None:
+    """Der nachgelagerte Ausgangs-Check ist raus, die Moderation bleibt (#64a).
+
+    `run_llm_collect` sammelt bereits moderierte Token — eine zweite
+    `check_output` darauf sah nach Tiefenverteidigung aus, konnte aber nie
+    anschlagen (nachgemessen: sie meldete auf maskiertem Text jedes Mal `ok`).
+    Der Test hält fest, worauf es wirklich ankommt: dass die Maskierung im
+    One-Shot ankommt.
+    """
+    from wiki.lookup import WikiLookup
+
+    guard = BasicGuard(
+        enabled=True,
+        prompt_injection_protection=False,
+        pii_protection=True,
+        output_blocklist=False,
+    )
+    secret = "Schreib an max.mustermann@example.com und dann noch etwas Text."
+    core = FakeTokenCore([secret[i : i + 3] for i in range(0, len(secret), 3)])
+    provider = create_streaming_provider(llm_core=core, guard=guard)
+
+    answer = provider.respond_one_shot("Hallo", persona="TEST", wiki=WikiLookup())
+
+    assert "max.mustermann@example.com" not in answer
+    # Was an ihre Stelle tritt, entscheidet der Guard — hier zählt nur, dass
+    # der One-Shot dieselbe Behandlung bekommt wie der Stream.
+    assert answer != secret
+    assert "Zeigefinger" in answer
