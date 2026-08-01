@@ -1486,6 +1486,7 @@ def test_reset_updates_hide_the_sources_accordion():
 
 ASK_ALL_SOURCES_ACCORDION = ASK_ALL_OUTPUT_KEYS.index("ask_all_sources_accordion")
 ASK_ALL_SOURCES_MD = ASK_ALL_OUTPUT_KEYS.index("ask_all_sources_md")
+ASK_ALL_RESULTS = ASK_ALL_OUTPUT_KEYS.index("ask_all_results")
 
 
 def _ask_all_web_ui():
@@ -1533,7 +1534,7 @@ def test_ask_all_keeps_the_sources_in_every_yield():
     session = SessionContext()
     snippet = WikiSnippet(topic="Kiwix", snippet="Kurz.", full_length=5)
     events = [
-        {"type": "token", "persona": "LEAH", "reply": "A"},
+        {"type": "token", "persona": "LEAH", "token": "A"},
         {"type": "done", "persona": "LEAH", "reply": "AB"},
     ]
 
@@ -2470,3 +2471,54 @@ def test_a_rejected_upload_records_nothing(tmp_path):
     )
 
     assert store.list_conversations() == []
+
+
+def test_ask_all_builds_the_running_text_from_the_tokens():
+    """Der laufende Text entsteht in der Oberfläche, nicht im Orchestrator (#64d).
+
+    Vorher trug **jedes** Token-Event den kumulativen Text mit — pro Token neu
+    gebaut, also quadratisch in der Antwortlänge, und weil jedes Event seine
+    eigene Kopie festhielt, auch im Speicher. Die Anzeige darf davon nichts
+    merken: was ankommt, muss weiterhin Zeichen für Zeichen wachsen.
+    """
+    web_ui = _ask_all_web_ui()
+    session = SessionContext()
+    events = [
+        {"type": "token", "persona": "LEAH", "token": "Hal"},
+        {"type": "token", "persona": "LEAH", "token": "lo "},
+        {"type": "token", "persona": "LEAH", "token": "Welt"},
+        {"type": "done", "persona": "LEAH", "reply": "Hallo Welt"},
+    ]
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH"]),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.iter_broadcast_events", return_value=iter(events)),
+    ):
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
+
+    assert "Hallo Welt" in outputs[-1][ASK_ALL_RESULTS]["value"]
+
+
+def test_ask_all_shows_a_partial_answer_before_the_persona_is_done():
+    """Zwischenstand statt Platzhalter — sonst wäre das Streamen sinnlos.
+
+    Der Flush ist zeitgedrosselt; ein `done` löst ihn aber immer aus, deshalb
+    steht der Teiltext hier spätestens im letzten Yield einer zweiten Persona.
+    """
+    web_ui = _ask_all_web_ui()
+    session = SessionContext()
+    events = [
+        {"type": "token", "persona": "LEAH", "token": "Teil"},
+        {"type": "done", "persona": "DORIS", "reply": "Fertig"},
+    ]
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH", "DORIS"]),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.iter_broadcast_events", return_value=iter(events)),
+    ):
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage"))
+
+    results = outputs[-1][ASK_ALL_RESULTS]["value"]
+    assert "Teil" in results and "Fertig" in results

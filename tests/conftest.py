@@ -47,6 +47,7 @@ if not hasattr(_huggingface_hub, "whoami"):
     _huggingface_hub.whoami = _fallback_whoami  # type: ignore[attr-defined]
 
 
+import storage.store as store_module
 from api.app import app, set_provider
 from config.config_singleton import Config
 from core.factory import AppFactory
@@ -187,12 +188,21 @@ def _ignore_local_config_override(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _no_conversation_store_by_default(monkeypatch):
+def _no_conversation_store_by_default(monkeypatch, tmp_path):
     """Kein Test schreibt in die echte Gesprächs-Ablage (#54).
 
     Sonst würde jede Test-Session `data/conversations.sqlite3` im Repo
     vollschreiben. Tests, die den Store selbst prüfen, bauen sich einen
     SqliteStore in tmp_path.
+
+    **Zwei Riegel, weil einer nachweislich nicht reichte (#64f).** Der erste
+    schaltet die Ablage in der geladenen Config ab. Daran kam ein handgebautes
+    Config-Objekt in `test_config.py` vorbei — es geht nie durch
+    `_load_config`, hatte gar kein `storage`-Feld, und `build_store` nahm
+    seinen Default: ein voller Lauf legte `data/conversations.sqlite3` an,
+    obwohl CLAUDE.md das Gegenteil behauptete (leer, aber da). Der zweite
+    Riegel biegt deshalb den *Default-Pfad* nach `tmp_path` um: wer künftig am
+    ersten vorbeikommt, schreibt immer noch nicht ins Repo.
     """
 
     original_load_config = Config._load_config
@@ -202,4 +212,7 @@ def _no_conversation_store_by_default(monkeypatch):
         self.storage = {"enabled": False}
 
     monkeypatch.setattr(Config, "_load_config", _patched_load_config)
+    monkeypatch.setattr(
+        store_module, "DEFAULT_STORE_PATH", str(tmp_path / "conversations.sqlite3")
+    )
     yield

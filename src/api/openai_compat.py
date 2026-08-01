@@ -128,6 +128,12 @@ def _openai_cfg(cfg) -> dict:
 # ---- Rate limiting -------------------------------------------------------
 
 
+# Ab wie vielen gemerkten Clients der Rate-Limiter beim Schreiben aufräumt.
+# Klein genug, dass ein Leck nie groß wird, groß genug, dass der Normalfall
+# (ein paar Geräte im Heimnetz) nie über die Liste läuft.
+_WINDOW_SWEEP_THRESHOLD = 64
+
+
 class RateLimiter:
     """Fixed-window counter per client, in-process.
 
@@ -152,7 +158,26 @@ class RateLimiter:
             if count >= self.limit:
                 return False
             self._windows[client] = (window, count + 1)
+            self._forget_old_windows(minute)
             return True
+
+    def _forget_old_windows(self, minute: int) -> None:
+        """Einträge vergangener Minuten wegräumen (#64c).
+
+        Ein Eintrag pro Client-IP blieb bisher für immer liegen — der Zähler
+        war zwar wertlos, sobald seine Minute vorbei war, aber niemand hat ihn
+        entfernt. Auf einem Server, den wechselnde Adressen erreichen, ist das
+        ein Leck, das nur langsam genug wächst, um nicht aufzufallen.
+
+        Aufgeräumt wird beim Schreiben und nur, wenn sich etwas angesammelt
+        hat: der Normalfall (eine Handvoll Clients) zahlt nichts, der
+        pathologische Fall räumt sich selbst ab. Der Aufrufer hält das Lock.
+        """
+        if len(self._windows) <= _WINDOW_SWEEP_THRESHOLD:
+            return
+        stale = [key for key, (window, _c) in self._windows.items() if window != minute]
+        for key in stale:
+            del self._windows[key]
 
 
 _rate_limiter: RateLimiter | None = None

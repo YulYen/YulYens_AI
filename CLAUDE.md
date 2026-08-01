@@ -458,7 +458,15 @@ gesetzt (`set_conversation`). Sonst begänne jede Fortsetzung ein neues Gespräc
 Aufzeichnen darf **nie** den Stream abbrechen (wie beim Logfile davor), und eine
 unbrauchbare Datei degradiert zum `NullStore`, statt den Start zu verhindern.
 Tests laufen per autouse-Fixture gegen `storage.enabled: false` — sonst schriebe
-jede Test-Session in die echte Datenbank.
+jede Test-Session in die echte Datenbank. **Dieser Satz stimmte lange nicht ganz
+(#64f):** die Fixture hängt an `Config._load_config`, und zwei Tests bauen sich
+ein eigenes Config-Objekt, das dort nie vorbeikommt und kein `storage`-Feld
+hatte. `build_store` nahm seinen Default, ein voller Lauf legte
+`data/conversations.sqlite3` an (leer, aber da). Deshalb gibt es jetzt einen
+zweiten Riegel: die Fixture biegt zusätzlich `storage.store.DEFAULT_STORE_PATH`
+nach `tmp_path`. Wer künftig am ersten vorbeikommt, schreibt trotzdem nicht ins
+Repo — und wer ein Config-Objekt von Hand baut, sollte es ohnehin nicht tun
+(siehe `tests/doubles.py`).
 
 ### Anmeldung (#53): eine Naht, kein Sicherheitsprodukt
 `src/auth/provider.py` beantwortet „wer bedient die UI". Drei Provider über
@@ -583,7 +591,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 |---|---|
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
-| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama |
+| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token) |
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
