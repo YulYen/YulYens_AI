@@ -27,6 +27,14 @@ from typing import Any, Protocol
 from core.utils import LOCAL_USER, resolve_secret
 
 
+class AuthConfigError(RuntimeError):
+    """Die Anmeldung ist konfiguriert, aber nicht benutzbar.
+
+    Eigener Typ, damit der Startpfad ihn von anderen Fehlern unterscheiden und
+    eine verständliche Meldung ausgeben kann, statt einen Stacktrace.
+    """
+
+
 @dataclass(frozen=True)
 class Identity:
     """Wer gerade bedient. ``source`` sagt, woher das Wissen stammt."""
@@ -109,13 +117,23 @@ class LocalUsersAuth:
 
     def gradio_auth(self):
         if not self._users:
-            # Ohne gültige Nutzer wäre die App unbedienbar. Lieber offen und
-            # laut als zugesperrt und rätselhaft.
-            logging.error(
-                "[AUTH] provider='local', aber kein einziger Nutzer ist nutzbar — "
-                "die Anmeldung bleibt deshalb aus."
+            # Früher wurde hier auf "keine Anmeldung" zurückgefallen, mit der
+            # Begründung "lieber offen und laut als zugesperrt und rätselhaft".
+            # Das war die falsche Richtung: der häufigste Auslöser ist kein
+            # Tippfehler in der Nutzerliste, sondern ein nicht durchgereichtes
+            # `env:` — eine systemd-Unit ohne EnvironmentFile, ein Container
+            # ohne --env. Dann startet die App genau dort offen, wo jemand
+            # ausdrücklich eine Anmeldung konfiguriert hat.
+            #
+            # Das Fehlverhalten "zu" kostet einen Supportfall, das Fehlverhalten
+            # "offen" ist unbegrenzt. Also Abbruch, mit einer Meldung, die sagt,
+            # was zu tun ist.
+            raise AuthConfigError(
+                "ui.web.auth.provider ist 'local', aber kein einziger Nutzer hat "
+                "ein auflösbares Passwort. Meist fehlt die env:-Variable in der "
+                "Umgebung des Prozesses (systemd: EnvironmentFile, Docker: --env). "
+                "Zum bewussten Betrieb ohne Anmeldung provider auf 'disabled' setzen."
             )
-            return None
         return self.check
 
     def identity_from_request(self, request: Any) -> Identity:

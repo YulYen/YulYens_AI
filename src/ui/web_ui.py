@@ -89,6 +89,35 @@ GUEST_APP = _GUEST_APP
 # im Verlauf soll erkennbar bleiben, dass sie von außen kamen.
 IMPORT_APP = "web-import"
 
+# Adressen, bei denen nur der eigene Rechner mithört.
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _warn_if_exposed_without_login(host: str, port: int, gradio_auth: Any) -> None:
+    """Sagt es laut, wenn die App im Netz hängt und jeder ohne Login reindarf.
+
+    Der Fall entsteht leicht und unbemerkt: ``ui.web.host`` steht auf einer
+    Adresse, unter der andere die App erreichen, und ``ui.web.auth`` ist nicht
+    (mehr) konfiguriert. Beides ist je für sich harmlos und in der Config
+    weit voneinander entfernt — die Kombination ist es nicht.
+
+    Bewusst nur eine Warnung, kein Abbruch: „im LAN ohne Login" ist ein
+    legitimer Betriebsmodus für ein Heimnetz. Anders als bei einer
+    konfigurierten, aber kaputten Anmeldung — die bricht ab, weil dort jemand
+    ausdrücklich Schutz wollte.
+    """
+    if gradio_auth is not None or str(host).strip() in _LOOPBACK_HOSTS:
+        return
+    logging.warning(
+        "[SICHERHEIT] Die WebUI horcht auf %s:%s — also nicht nur lokal — und "
+        "verlangt keine Anmeldung. Jeder im selben Netz kann mitlesen und "
+        "schreiben, inklusive Verlauf und gespeicherter Gespräche. Entweder "
+        "ui.web.host auf 127.0.0.1 setzen oder ui.web.auth.provider einschalten.",
+        host,
+        port,
+    )
+
+
 # Auslieferungsdateien (WAV, JSON, Markdown) liegen in einem eigenen
 # Verzeichnis, das am Prozessende komplett verschwindet. Sie müssen den
 # Response überleben, können also nicht sofort nach dem Schreiben weg.
@@ -228,6 +257,15 @@ class WebUI:
         setter = getattr(session.streamer, "set_conversation", None)
         if callable(setter):
             setter(conversation_id)
+
+    @staticmethod
+    def _record_conversation(
+        session: SessionContext, messages: list[Message] | None
+    ) -> None:
+        """Den Gesprächsstand in die Ablage spiegeln (#59)."""
+        recorder = getattr(session.streamer, "record_conversation", None)
+        if callable(recorder):
+            recorder(list(messages or []))
 
     def _stamp_user(self, session: SessionContext, user: str) -> None:
         """Identität an den frischen Streamer geben (#53).
@@ -421,6 +459,11 @@ class WebUI:
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
+        # Jetzt — und nur jetzt — steht der Gesprächsstand fest (#59). Auch beim
+        # Abbruch: die Teilantwort ist das, was der Nutzer behält, also gehört
+        # sie in die Ablage. Vorher zeichnete `stream()` Versuche auf, weshalb
+        # „Nochmal" verdoppelte und „Stop" die Antwort ganz verlor.
+        self._record_conversation(session, message_history)
         stats = self._last_stream_stats(session)
         yield (
             None,
@@ -1612,11 +1655,37 @@ class WebUI:
         self.feedback_log_path = os.path.join(log_dir, "feedback_votes.jsonl")
         return self.feedback_log_path
 
+    @staticmethod
+    def _is_model_answer(text: str, llm_history: list[Message] | None) -> bool:
+        """Ist dieser Bot-Text eine Antwort des Modells — oder nur Beiwerk?
+
+        In der Chat-Anzeige sind beide eine Bot-Bubble: die Antwort, aber auch
+        der Wiki-Hinweis („🕵️ … blättert im Archiv"), die
+        Kontext-Kompressionswarnung, die Briefing-Meldungen und der Hinweis auf
+        vom Guard verworfene Quellen. Ein Daumen darauf schrieb bisher eine
+        Zeile nach ``feedback_votes.jsonl``, als hätte das Modell das gesagt —
+        also Trainingsdaten (#40, Grundlage für #7) aus UI-Text.
+
+        Der Diskriminator braucht keinen neuen Zustand: **Beiwerk landet nie in
+        der LLM-History.** Die Hinweise werden ausdrücklich nur an
+        ``chat_history`` gehängt und bewusst nicht ins Kontextfenster gegeben.
+        Was dort nicht als ``assistant`` steht, ist deshalb keine Antwort.
+        """
+        candidate = (text or "").strip()
+        if not candidate:
+            return False
+        return any(
+            (message.get("role") == "assistant")
+            and (message.get("content") or "").strip() == candidate
+            for message in (llm_history or [])
+        )
+
     def _on_chat_like(
         self,
         session: SessionContext,
         chat_history: list[ChatPair] | None,
         meta: dict | None,
+        llm_history: list[Message] | None,
         evt: gr.LikeData,
     ) -> None:
         # Votes must never break the UI: any failure is logged and swallowed.
@@ -1634,6 +1703,16 @@ class WebUI:
             # so only bot answers (column 1) are recorded.
             if col != 1:
                 logging.debug("Ignoring feedback vote on a user message (row %s)", row)
+                return
+
+            # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
+            # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
+            # würde dem Modell beibringen, UI-Text zu produzieren.
+            if not self._is_model_answer(answer, llm_history):
+                logging.debug(
+                    "Ignoring feedback vote on a UI notice, not a model answer (row %s)",
+                    row,
+                )
                 return
 
             meta = meta if isinstance(meta, dict) else {}
@@ -1817,9 +1896,11 @@ class WebUI:
         )
 
         # Binding .like() auto-enables the thumb buttons on the chatbot (#40).
+        # history_state muss mit: nur daran lässt sich eine echte Antwort von
+        # einer Hinweis-Bubble unterscheiden (siehe _on_chat_like).
         chatbot.like(
             fn=self._on_chat_like,
-            inputs=[session_state, chatbot, meta_state],
+            inputs=[session_state, chatbot, meta_state, history_state],
             outputs=[],
             queue=False,
         )
@@ -1994,6 +2075,7 @@ class WebUI:
         if gradio_auth is not None:
             launch_kwargs["auth"] = gradio_auth
         logging.info("WebUI-Anmeldung: provider=%s", self.auth.name)
+        _warn_if_exposed_without_login(self.web_host, self.web_port, gradio_auth)
 
         ui_cfg = getattr(self.cfg, "ui", None)
         if ui_cfg is not None:

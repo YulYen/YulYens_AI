@@ -3,8 +3,9 @@ import os
 from datetime import datetime
 from typing import Any
 
+import pytest
 from core.dummy_llm_core import DummyLLMCore
-from core.streaming_provider import YulYenStreamingProvider
+from core.streaming_provider import YulYenStreamingProvider, _StreamModerator
 from security.tinyguard import BasicGuard
 
 
@@ -33,6 +34,10 @@ class AllowAllGuard:
 
     def check_output(self, text: str) -> dict[str, Any]:
         return {"ok": True}
+
+    def output_match_crossing(self, text: str, offset: int) -> int | None:
+        # Nichts trifft zu, also läuft auch kein Treffer über die Freigabegrenze.
+        return None
 
 
 def create_streaming_provider(
@@ -393,9 +398,9 @@ def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
     monkeypatch.setattr(provider, "conversation_log_path", str(tmp_path / "conv.json"))
 
     # Ohne Anmeldung (Terminal, API) ist der lokale Nutzer die ehrliche Antwort.
-    provider._append_conversation_log("user", "erste")
+    provider._append_jsonl("user", "erste")
     provider.set_user("yulyen")
-    provider._append_conversation_log("user", "zweite")
+    provider._append_jsonl("user", "zweite")
 
     lines = [
         json.loads(line)
@@ -465,3 +470,169 @@ def test_without_a_guard_nothing_is_refused() -> None:
     provider = create_streaming_provider()
 
     assert provider._input_refusal("beliebige Frage", "TEST") is None
+
+
+# ---- Maskierung *während* des Streams (#58) ---------------------------------
+#
+# Das Gerüst, das bisher fehlte. `test_default_holdback_keeps_key_material_hidden`
+# deckt nur den Blocklist-Pfad ab — der blockt ganz oder gar nicht und ändert
+# deshalb nie die Textlänge. Die Maskierung tut genau das, und daran zerbrach die
+# Index-Rechnung im Moderator.
+
+_MASK_TEXTS = {
+    "security_mask_text": "[PII]",
+    "security_prompt_injection": "inj {detail}",
+    "security_pii_detected": "pii",
+    "security_blocked_keyword": "SECRET-BLOCKED",
+    "security_wrongdoing": "no",
+    "security_all_clear": "ok",
+}
+_MASK = "[PII]"
+
+
+def _masking_guard():
+    return BasicGuard(
+        enabled=True,
+        prompt_injection_protection=True,
+        pii_protection=True,
+        output_blocklist=True,
+        wrongdoing_protection=True,
+        texts=_MASK_TEXTS,
+    )
+
+
+def _stream_through(text, *, chunk, holdback):
+    """Fährt den Text in Häppchen durch den Moderator und sammelt die Ausgabe."""
+    moderator = _StreamModerator(_masking_guard(), _MASK_TEXTS, holdback=holdback)
+    out = []
+    for i in range(0, len(text), chunk):
+        out.extend(moderator.feed(text[i : i + chunk]))
+    out.extend(moderator.flush())
+    return "".join(out), moderator
+
+
+def _assert_nothing_lost_or_duplicated(served, raw):
+    """Der Kern: außer Maskiertem darf nichts fehlen und nichts doppelt sein.
+
+    Geprüft wird, dass sich die ausgelieferten Teilstücke der Reihe nach und
+    überschneidungsfrei im Originaltext wiederfinden — von vorn beginnend, bis
+    ans Ende. Genau das war kaputt: `_emitted` zeigte in den *maskierten* Text,
+    und nach einem Treffer sprang der Index, sodass „und dann noch" verschwand.
+    """
+    cursor = 0
+    parts = served.split(_MASK)
+    for index, part in enumerate(parts):
+        if not part:
+            continue
+        found = raw.find(part, cursor)
+        assert found >= 0, f"{part!r} steht so gar nicht im Modelltext"
+        if index == 0:
+            assert found == 0, f"Der Anfang fehlt: {served!r}"
+        cursor = found + len(part)
+    if not served.endswith(_MASK):
+        assert cursor == len(raw), f"Das Ende fehlt: {served!r}"
+
+
+# (Text, Länge des längsten Ausgangs-Treffers darin)
+_MASKING_TEXTS = [
+    ("Melde dich bei max.mustermann@example.com und dann noch viel Text danach.", 26),
+    ("Kurz: a@b.de ENDE", 6),
+    ("Zwei: erste.person@example.org und zweite.person@example.org, fertig.", 25),
+    (
+        "Sehr lange Adresse vorname.nachname.abteilung@sehr-lange-firmendomain."
+        "example.com und dann noch viel Text hinterher damit es reicht.",
+        62,
+    ),
+    ("Ruf an unter 0151 23456789 bitte.", 13),
+    ("Gar nichts Besonderes hier, nur Fließtext ohne jeden Treffer.", 0),
+    ("PII ganz am Ende: kontakt@example.com", 19),
+]
+
+
+@pytest.mark.parametrize("text, longest_match", _MASKING_TEXTS)
+@pytest.mark.parametrize("chunk", [1, 3, 4, 7, 50])
+@pytest.mark.parametrize("holdback", [0, 8, 32, 96])
+def test_streaming_never_loses_or_duplicates_model_text(
+    text, longest_match, chunk, holdback
+):
+    """Gilt immer — unabhängig davon, wie das Modell die Tokens schneidet."""
+    served, _moderator = _stream_through(text, chunk=chunk, holdback=holdback)
+
+    _assert_nothing_lost_or_duplicated(served, text)
+
+
+@pytest.mark.parametrize("text, longest_match", _MASKING_TEXTS)
+@pytest.mark.parametrize("chunk", [1, 3, 4, 7, 50])
+@pytest.mark.parametrize("holdback", [32, 96])
+def test_streaming_masks_exactly_like_one_shot_when_the_holdback_covers_it(
+    text, longest_match, chunk, holdback
+):
+    """Deckt der Holdback das Muster ab, muss gestreamt dasselbe herauskommen.
+
+    Die Einschränkung ist der dokumentierte Vertrag: „patterns longer than this
+    window can still leak their prefix" (siehe `_STREAM_HOLDBACK_CHARS`). Für
+    alles, was hineinpasst, gibt es dafür keine Ausrede.
+    """
+    if longest_match > holdback:
+        pytest.skip(f"Muster ({longest_match}) länger als der Holdback ({holdback})")
+
+    served, _moderator = _stream_through(text, chunk=chunk, holdback=holdback)
+
+    assert served == _masking_guard().process_output(text)["text"]
+
+
+def test_masked_flag_is_reported_to_the_caller():
+    _served, moderator = _stream_through("Kurz: a@b.de ENDE", chunk=2, holdback=8)
+
+    assert moderator.masked is True
+
+
+def test_secret_still_blocks_and_hides_the_key_material():
+    """Die Blocklist blockt weiterhin — und das Schlüsselmaterial bleibt verdeckt.
+
+    Bewusst nicht „gar nichts wurde ausgeliefert": Text *vor* dem Treffer darf
+    schon draußen sein, das ist seit jeher so (siehe
+    `test_default_holdback_keeps_key_material_hidden`).
+    """
+    label = "aws_secret_access_key = "
+    key_material = "aB3/xY9+" * 5
+    served, moderator = _stream_through(label + key_material, chunk=4, holdback=32)
+
+    assert moderator.blocked is True
+    assert served.endswith("SECRET-BLOCKED")
+    assert key_material[:8] not in served
+
+
+def test_moderation_cost_stays_linear_in_the_answer_length():
+    """Der Guard darf nicht mit dem Quadrat der Antwortlänge wachsen.
+
+    Vorher lief `process_output` pro Token über den *gesamten* bisherigen Text:
+    4× so viele Tokens kosteten 15,7× so viel Zeit — mit der ausgelieferten
+    Config 1.605 ms reine CPU auf 16.000 Zeichen, auf dem yieldenden Thread und
+    im parallelen Broadcast viermal gleichzeitig gegen dieselbe GIL.
+
+    Gemessen wird bewusst das *Verhältnis* und nicht die absolute Zeit: absolute
+    Schranken flackern auf unterschiedlich schnellen Runnern, das Wachstum nicht.
+    """
+    import time
+
+    def _cpu_for(n_tokens):
+        satz = "Das ist ein ganz normaler Satz ohne jeden Treffer darin. "
+        text = (satz * ((n_tokens * 4) // len(satz) + 2))[: n_tokens * 4]
+        tokens = [text[i : i + 4] for i in range(0, len(text), 4)]
+        moderator = _StreamModerator(_masking_guard(), _MASK_TEXTS, holdback=32)
+        started = time.perf_counter()
+        for token in tokens:
+            moderator.feed(token)
+        moderator.flush()
+        return time.perf_counter() - started
+
+    klein = _cpu_for(500)
+    gross = _cpu_for(4000)  # 8× so viele Tokens
+
+    # Linear wäre Faktor 8, quadratisch ~64. Großzügige Schranke gegen Rauschen,
+    # aber weit unter dem alten Verhalten.
+    assert gross < klein * 20, (
+        f"Moderation wächst überproportional: {klein * 1000:.0f} ms → "
+        f"{gross * 1000:.0f} ms bei 8× Tokens"
+    )

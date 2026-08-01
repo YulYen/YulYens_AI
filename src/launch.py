@@ -171,7 +171,17 @@ def main():
         threading.Event().wait()
         return
     else:
-        ui.launch()  # Terminal UI or Web UI
+        from auth.provider import AuthConfigError
+
+        try:
+            ui.launch()  # Terminal UI or Web UI
+        except AuthConfigError as exc:
+            # Eine konfigurierte, aber unbenutzbare Anmeldung ist ein
+            # Konfigurationsfehler, kein Absturz — also lesbar melden statt
+            # einen Stacktrace zu zeigen.
+            print(f"[Yul Yens AI] Anmeldung nicht benutzbar: {exc}", file=sys.stderr)
+            logging.error("[AUTH] Start abgebrochen: %s", exc)
+            sys.exit(4)
 
 
 def _load_config_for_cli(config_path: str | None) -> "Config":

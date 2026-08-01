@@ -77,6 +77,12 @@ def _render_prompt_trace(
 # `security.stream_holdback_chars` in config.yaml for when to raise it.
 _STREAM_HOLDBACK_CHARS = 32
 
+# Wie weit der Moderator hinter die Freigabemarke zurückschaut, damit ein
+# Treffer, der davor beginnt, noch vollständig im Fenster liegt. Muss bequem
+# über dem längsten Ausgangsmuster liegen; hält die Prüfung trotzdem bei O(1)
+# pro Token statt bei O(Antwortlänge).
+_CONTEXT_WINDOW_CHARS = 256
+
 
 def _output_checks_active(guard: BasicGuard | None) -> bool:
     """True when the guard actually inspects outgoing text.
@@ -140,7 +146,8 @@ class _StreamModerator:
         self.blocked = False
         self.masked = False
         self._acc = ""
-        self._emitted = 0
+        # Index in den ROHEN Text: wie viel davon bereits (maskiert) raus ist.
+        self._released = 0
 
     def _block_message(self, reason: str | None) -> str:
         self.blocked = True
@@ -157,36 +164,63 @@ class _StreamModerator:
 
         # No guard: nothing to moderate, stream the token straight through.
         if self.guard is None:
-            self._emitted += len(token)
+            self._released += len(token)
             return [token]
 
-        pol = self.guard.process_output(self._acc)
-        if pol["blocked"]:
-            return [self._block_message(pol.get("reason"))]
-
-        self.masked = self.masked or bool(pol.get("masked"))
-        masked = pol["text"]
-        safe_upto = len(masked) - self.holdback
-        if safe_upto > self._emitted:
-            chunk = masked[self._emitted : safe_upto]
-            self._emitted = safe_upto
-            return [chunk]
-        return []
+        return self._release_up_to(len(self._acc) - self.holdback)
 
     def flush(self) -> list[str]:
         """Release the held-back tail once the stream has ended."""
         if self.blocked or self.guard is None:
             return []
-        pol = self.guard.process_output(self._acc)
+        return self._release_up_to(len(self._acc))
+
+    def _release_up_to(self, frontier: int) -> list[str]:
+        """Gibt ``self._acc`` bis ``frontier`` frei — maskiert und lückenlos.
+
+        Der Index läuft über den **rohen** Text, nicht über den maskierten.
+        Vorher war es umgekehrt, und weil die Maskierung die Länge ändert
+        (``max@example.com`` → ``[PII]``), zeigte der Index nach jedem Treffer
+        auf die falsche Stelle: Modelltext verschwand oder kam doppelt.
+
+        Damit das Maskieren eines Abschnitts *für sich* dasselbe Ergebnis
+        liefert wie über den ganzen Text, darf die Freigabegrenze nie mitten in
+        einem Treffer liegen. Genau das prüft ``output_match_crossing``; liegt
+        einer quer, wird die Grenze vor seinen Anfang zurückgezogen und der
+        Rest wartet auf mehr Text.
+
+        Gearbeitet wird nur auf einem Fenster um die Grenze statt auf dem
+        gesamten bisherigen Text. Vorher lief ``process_output`` pro Token über
+        alles Bisherige — quadratisch im Antwortumfang, 1,6 s reine CPU auf
+        16.000 Zeichen.
+        """
+        guard = self.guard
+        if guard is None or frontier <= self._released:
+            return []
+
+        # Fenster: etwas vor der freigegebenen Marke (damit ein Treffer, der
+        # davor beginnt, noch sichtbar ist) bis ans Ende des Bekannten.
+        window_start = max(0, self._released - _CONTEXT_WINDOW_CHARS)
+        window = self._acc[window_start:]
+
+        # Blockieren gilt für den ganzen Stream, nicht nur für den Abschnitt.
+        pol = guard.process_output(window)
         if pol["blocked"]:
             return [self._block_message(pol.get("reason"))]
-        self.masked = self.masked or bool(pol.get("masked"))
-        masked = pol["text"]
-        if len(masked) > self._emitted:
-            chunk = masked[self._emitted :]
-            self._emitted = len(masked)
-            return [chunk]
-        return []
+
+        crossing = guard.output_match_crossing(window, frontier - window_start)
+        if crossing is not None:
+            frontier = window_start + crossing
+            if frontier <= self._released:
+                return []
+
+        segment = self._acc[self._released : frontier]
+        result = guard.process_output(segment)
+        if result["blocked"]:
+            return [self._block_message(result.get("reason"))]
+        self.masked = self.masked or bool(result.get("masked"))
+        self._released = frontier
+        return [result["text"]] if result["text"] else []
 
 
 class YulYenStreamingProvider:
@@ -287,15 +321,32 @@ class YulYenStreamingProvider:
         """
         self.conversation_id = (conversation_id or "").strip()
 
-    def _append_conversation_log(self, role: str, content: str) -> None:
-        """Schreibt einen Turn in den Store (und optional in den JSONL-Mitschnitt)."""
-        try:
-            self.store.append(self.conversation_id, role, content)
-        except Exception:
-            # Aufzeichnen darf den Stream nie abbrechen — dieselbe Regel wie
-            # beim Logfile davor.
-            logging.exception("Could not record turn in the conversation store")
+    def record_conversation(self, messages: list[dict[str, Any]]) -> None:
+        """Bringt die Ablage auf den Stand des Gesprächs (#59).
 
+        **Aufgerufen von der Oberfläche, nicht von ``stream()``.** Der Streamer
+        sieht nur einen Generierungs*versuch*; welcher davon zum Gespräch
+        gehört, weiß allein der Aufrufer. Solange die Aufzeichnung in
+        ``stream()`` saß, protokollierte sie Versuche: „Nochmal 🔄" hängte
+        Frage und verworfene Antwort erneut an, „Stop ⏹" ließ die Antwort ganz
+        weg, und Ask-All wie Self-Talk zeichneten gar nichts auf, weil dort nie
+        eine Gesprächs-ID gesetzt wurde.
+
+        Aufzeichnen darf den Betrieb nie stören — dieselbe Regel wie zuvor.
+        """
+        try:
+            self.store.sync(self.conversation_id, messages)
+        except Exception:
+            logging.exception("Could not record the conversation in the store")
+
+    def _append_jsonl(self, role: str, content: str) -> None:
+        """Roher Turn-Mitschnitt (opt-in, `logging.conversation_jsonl`).
+
+        Bewusst weiter *anhängend* und weiter hier: das ist das Debug-Artefakt,
+        das festhält, was tatsächlich passiert ist — verworfene Versuche
+        eingeschlossen. Damit stimmt die Rollenverteilung aus #54 endlich:
+        JSONL = roher Mitschnitt, SQLite = das Gespräch.
+        """
         if not self.jsonl_log:
             return
         try:
@@ -418,7 +469,7 @@ class YulYenStreamingProvider:
         # Record the most recent user message in the log
         for m in reversed(messages):
             if m.get("role") == "user" and m.get("content"):
-                self._append_conversation_log("user", m["content"])
+                self._append_jsonl("user", m["content"])
                 break
 
         # Apply LLM options
@@ -454,14 +505,21 @@ class YulYenStreamingProvider:
                     if not token:
                         continue
                     token_count += 1
-                    full_reply_parts.append(token)
+                    # Aufgezeichnet wird, was der Moderator freigibt — nicht der
+                    # rohe Token. Sonst steht im Store (und im JSONL-Mitschnitt)
+                    # die unmaskierte Fassung, während der Bildschirm maskiert
+                    # ist: die Maskierung wäre dann Bildschirmschoner statt
+                    # Datenschutz, und über Verlauf, Markdown-Export und
+                    # JSON-Download käme sie vollständig wieder heraus.
                     for out in moderator.feed(token):
+                        full_reply_parts.append(out)
                         yield out
                     if moderator.blocked:
                         break
 
                 # Release the held-back tail (unless we already blocked).
                 for out in moderator.flush():
+                    full_reply_parts.append(out)
                     yield out
 
             finally:
@@ -495,14 +553,14 @@ class YulYenStreamingProvider:
             # we must not persist the raw (e.g. secret) text to the log.
             if moderator.blocked:
                 logging.info("[GUARD] output blocked persona=%s", self.persona)
-                self._append_conversation_log("assistant", "[BLOCKED by guard]")
+                self._append_jsonl("assistant", "[BLOCKED by guard]")
                 full_reply = ""
             else:
                 if moderator.masked:
                     logging.info("[GUARD] output masked PII persona=%s", self.persona)
                 full_reply = "".join(full_reply_parts).strip()
             if full_reply:
-                self._append_conversation_log("assistant", full_reply)
+                self._append_jsonl("assistant", full_reply)
                 try:
                     _canon_out = full_reply
                     _hash_out = hashlib.sha256(_canon_out.encode("utf-8")).hexdigest()
@@ -519,7 +577,7 @@ class YulYenStreamingProvider:
                 "stream() failed persona=%s model=%s", self.persona, self.model_name
             )
             err = "[ERROR] LLM is not responding correctly."
-            self._append_conversation_log("assistant", err)
+            self._append_jsonl("assistant", err)
             yield err
 
     def respond_one_shot(self, user_input: str, persona: str, wiki: WikiLookup) -> str:
@@ -546,6 +604,10 @@ class YulYenStreamingProvider:
 
         # Run the LLM and collect the answer
         full_reply = run_llm_collect(self, messages)
+        # Die Ablage bekommt das Gespräch, nicht den Generierungsversuch (#59).
+        self.record_conversation(
+            [*messages, {"role": "assistant", "content": full_reply}]
+        )
 
         # Check guard output
         if self.guard:

@@ -300,8 +300,26 @@ in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
 | Artefakt | Rolle |
 |---|---|
-| `data/conversations.sqlite3` | **die Aufzeichnung** — Verlauf (#25), später Suche (#49) und Fakten (#24) |
-| `logs/conversation_*.json` | roher Mitschnitt zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
+| `data/conversations.sqlite3` | **das Gespräch**, wie der Nutzer es sieht — Verlauf (#25), später Suche (#49) und Fakten (#24) |
+| `logs/conversation_*.json` | roher Mitschnitt der *Versuche* zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
+
+**Die Rollenverteilung stimmt erst seit #59.** Vorher schrieb `stream()` beides,
+und damit protokollierte die Ablage Generierungs*versuche* statt des Gesprächs:
+„Nochmal 🔄" hängte Frage und verworfene Antwort erneut an (dreimal gedrückt →
+drei Fragen und drei Antworten im Store, während die Oberfläche eine zeigte),
+„Stop ⏹" ließ die Antwort ganz weg, und Ask-All wie Self-Talk zeichneten gar
+nichts auf, weil dort nie eine Gesprächs-ID gesetzt wurde.
+
+Jetzt gilt: **die Oberfläche besitzt den Gesprächsstand, die Ablage spiegelt
+ihn.** `stream()` schreibt nur noch den JSONL-Mitschnitt (der *soll* Versuche
+festhalten); den Store bedient `record_conversation(messages)`, aufgerufen vom
+Aufrufer, sobald der Turn steht. `ConversationStore.sync` ersetzt den ganzen
+Nachrichtenverlauf statt anzuhängen — dadurch kann keine Buchführung mehr
+auseinanderlaufen, und injizierter System-Kontext (Wiki, Briefing) bleibt
+draußen, weil er zum Prompt gehört und nicht zum Gespräch.
+
+Wer einen **neuen Antwortweg** baut, muss `record_conversation` aufrufen —
+sonst ist er wieder spurlos wie Ask-All davor.
 
 **Der Datei-Im-/Export bleibt, ist aber abschaltbar** (`storage.file_exchange`, Default an) — er ist etwas anderes als die Ablage. `conversation_io_terminal.py`
 (JSON hoch-/runterladen im WebUI, `/save` und Laden im Terminal) ist der
@@ -369,6 +387,22 @@ Persona-Buttons laufen über `functools.partial`.
 ist das eine *Trennung* von Nutzern, kein Schutz gegen Mitlesen. `header`
 vertraut dem Header bedingungslos und darf nur hinter einem Proxy laufen, der
 ihn von außen entfernt.
+
+**Zwei Richtungen, zwei Reaktionen — der Unterschied ist Absicht:**
+
+| Lage | Reaktion |
+|---|---|
+| `provider: local`, aber **kein Nutzer auflösbar** (meist ein nicht durchgereichtes `env:`) | **Abbruch** (`AuthConfigError`, Exit 4) |
+| App horcht auf nicht-Loopback **ohne** konfigurierte Anmeldung | laute Warnung, Start läuft weiter |
+
+Der erste Fall bricht ab, weil dort jemand ausdrücklich Schutz konfiguriert hat
+und ihn sonst stillschweigend verlöre; die frühere Begründung („lieber offen und
+laut") unterstellt einen Tippfehler, der häufigere Auslöser ist aber eine
+systemd-Unit ohne `EnvironmentFile` oder ein Container ohne `--env`. Der zweite
+Fall warnt nur — „im Heimnetz ohne Login" ist ein legitimer Betriebsmodus.
+
+`ui.web.host` steht seit dieser Runde auf **`127.0.0.1`**. Vorher war `0.0.0.0`
+der Default, ohne dass es irgendwo stand.
 
 **Kein OIDC direkt:** Gradios `auth=`-Callable bekommt nur Name und Passwort —
 kein Redirect-Flow, keine Token-Validierung. Keycloak & Co. laufen über
@@ -458,6 +492,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
+| **Feedback (#40)** | 👍/👎 an jeder Bot-Bubble, append-only nach `logs/feedback_votes.jsonl`. **Eine Bot-Bubble ist nicht automatisch eine Modellantwort:** Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und die Kontext-Kompressionswarnung stehen in derselben Spalte und tragen ebenfalls einen Daumen. Erkannt wird das daran, dass Beiwerk **nie in der LLM-History** landet — wer eine neue Hinweis-Bubble einführt, bekommt den Schutz dadurch geschenkt, solange er sie nicht ins Kontextfenster gibt. Ein Vote, der sich nicht gegen die History prüfen lässt, wird verworfen: für einen Trainingsdaten-Kanal (#7) ist eine verlorene Bewertung billiger als eine erfundene |
 | **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
@@ -536,22 +571,45 @@ sieht diesen Anteil **nicht** — das Modell liefert längst, die Anzeige wartet
 
 **Der Holdback ist nur die eine Hälfte.** #51 hat die Zeit bis zum *ersten*
 Token gemessen und daraus den Default abgeleitet — korrekt, aber unvollständig.
-`_StreamModerator.feed()` ruft `process_output` **pro Token über den gesamten
-bisherigen Text** auf, ist also quadratisch im Antwortumfang. Mit der
-ausgelieferten Config gemessen (nur `output_blocklist` aktiv):
+`_StreamModerator.feed()` rief `process_output` **pro Token über den gesamten
+bisherigen Text** auf, war also quadratisch im Antwortumfang. Mit #58 behoben,
+mit der ausgelieferten Config gemessen (nur `output_blocklist` aktiv):
 
-| Antwort | reine Guard-CPU |
-|---|---|
-| 200 Tokens (800 Zeichen) | 4 ms |
-| 1000 Tokens (4.000 Zeichen) | 102 ms |
-| 2000 Tokens (8.000 Zeichen) | 409 ms |
-| 4000 Tokens (16.000 Zeichen) | **1.605 ms** |
+| Antwort | vorher | jetzt |
+|---|---|---|
+| 200 Tokens (800 Zeichen) | 4 ms | 4 ms |
+| 1000 Tokens (4.000 Zeichen) | 102 ms | 23 ms |
+| 2000 Tokens (8.000 Zeichen) | 409 ms | 45 ms |
+| 4000 Tokens (16.000 Zeichen) | **1.605 ms** | **85 ms** |
 
-Zum Vergleich: mit `security.enabled: false` sind es bei 4000 Tokens 3,8 ms.
-Der Holdback kostet einmalig, dieser Anteil wächst mit jeder Antwort und läuft
-auf dem yieldenden Thread — im parallelen Broadcast viermal gleichzeitig gegen
-dieselbe GIL. Behoben wird das zusammen mit zwei weiteren Defekten desselben
-Codes in **#58**.
+Der Holdback kostet weiterhin einmalig; der wachsende Anteil ist weg, weil der
+Moderator nur noch ein Fenster um die Freigabegrenze prüft
+(`_CONTEXT_WINDOW_CHARS`) statt alles Bisherige. `test_moderation_cost_stays_
+linear_in_the_answer_length` hält das fest — es misst bewusst das *Verhältnis*,
+nicht die absolute Zeit, damit es auf langsamen Runnern nicht flackert.
+
+### ⚠️ Der Freigabe-Index läuft über den rohen Text, nicht über den maskierten
+Die Maskierung ändert die Länge (`max@example.com` → `[PII]`). Zählt man mit,
+wie viel vom *maskierten* Text schon raus ist, zeigt der Index nach dem ersten
+Treffer auf die falsche Stelle: Modelltext verschwindet oder kommt doppelt
+(belegt: aus „… Adresse [PII] und dann noch viel Text …" wurde ausgeliefert
+„… Adresse vorname.nachname.abt**viel Text** …").
+
+Deshalb zählt `_released` **rohe** Zeichen, und die Freigabegrenze darf nie
+mitten in einem Treffer liegen — das prüft `BasicGuard.output_match_crossing`
+und zieht sie sonst vor den Trefferanfang zurück. Nur dadurch liefert das
+Maskieren eines Abschnitts *für sich* dasselbe Ergebnis wie über den ganzen
+Text. Die Invariante steht als Test da: gestreamt muss herauskommen, was
+`process_output` am Stück liefert — solange das Muster in den Holdback passt.
+Passt es nicht, darf der Präfix durchrutschen; das ist die dokumentierte
+Best-effort-Grenze und keine Regression.
+
+**Aufgezeichnet wird, was der Moderator freigibt** — nicht der rohe Token.
+Vorher sammelte `stream()` die Rohtokens, und bei `pii_protection: true` stand
+im Store und im JSONL-Mitschnitt die unmaskierte Fassung, während der
+Bildschirm maskiert war. Über Verlauf, Markdown-Export und JSON-Download kam
+sie vollständig wieder heraus — die Maskierung war Bildschirmschoner statt
+Datenschutz.
 
 ### ⚠️ Stolperfalle: Button-Updates nie als eigenes Event vor den Stream hängen
 Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor dem
@@ -586,11 +644,12 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator, #42 Perf-Benchmark
-  (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
-- **Aus Review-Runde 2 (#57):** #58 `_StreamModerator` (verschluckter Text, roher Text im
-  Store, quadratische Laufzeit), #59 Ablage = Gespräch statt LLM-Aufruf, #62 Guard-Regelwerk,
-  #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x
+- **Quick Wins:** #67 Test-Doubles gegen die echte Schnittstelle absichern (hat an einem
+  Tag viermal zugeschlagen), #53a Identität für API/Mail, #27 Ask-All-Moderator,
+  #42 Perf-Benchmark (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
+- **Aus Review-Runde 2 (#57):** #58 und #59 sind erledigt (Archiv). Offen: #62 Guard-Regelwerk,
+  #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x,
+  #65 Vote-Kanal an die Ablage, #66 Schema rekursiv
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,

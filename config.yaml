@@ -32,11 +32,19 @@ ui:
     broadcast_mode: true  # enable the ensemble broadcast toggle (TerminalUI, WebUI)
     broadcast_parallel: true  # WebUI ask-all: stream all personas concurrently (needs OLLAMA_NUM_PARALLEL >= persona count for a real speedup)
   web:
-    host: "0.0.0.0"
+    # Standard ist Loopback: die App ist dann nur vom eigenen Rechner aus
+    # erreichbar. Auf "0.0.0.0" stellen, wenn andere im Netz sie benutzen
+    # sollen — dann aber bitte ui.web.auth einschalten, sonst warnt der Start
+    # (zu Recht) laut. Der frühere Standard war "0.0.0.0", also offen, ohne
+    # dass es irgendwo stand.
+    host: "127.0.0.1"
     port: 7860
     share: false  # enable to publish a public Gradio share link
-    # Anmeldung (#53). Gilt unabhängig von `share` — die App horcht oben auf
-    # 0.0.0.0, ist im LAN also ohne Login sonst offen.
+    # Anmeldung (#53). Gilt unabhängig von `share`.
+    # Ist provider auf 'local' gesetzt und lässt sich kein einziges Passwort
+    # auflösen (meist eine fehlende env:-Variable), bricht der Start ab statt
+    # ohne Anmeldung weiterzulaufen — wer Schutz konfiguriert hat, soll ihn
+    # nicht stillschweigend verlieren.
     # ACHTUNG: Basic-Auth geht über HTTP im Klartext. Ohne TLS ist das eine
     # Trennung von Nutzern, kein Schutz gegen Mitlesen.
     auth:

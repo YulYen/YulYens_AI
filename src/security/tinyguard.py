@@ -297,6 +297,32 @@ class BasicGuard:
 
         return {"blocked": False, "reason": None, "text": out, "masked": masked}
 
+    def output_match_crossing(self, text: str, offset: int) -> int | None:
+        """Beginn eines Ausgangs-Treffers, der ``offset`` überschreitet — sonst None.
+
+        Für den Streaming-Fall: der Moderator darf Text nur bis zu einer Stelle
+        freigeben, an der **kein** Treffer hindurchläuft. Sonst maskiert er
+        später eine Zeichenfolge, deren Anfang längst beim Nutzer ist.
+
+        Die Frage gehört hierher und nicht in den Moderator, weil nur der Guard
+        weiß, welche Muster gerade aktiv sind — ``process_output`` liefert nur
+        den fertigen Text, nicht die Fundstellen.
+        """
+        if not self.enabled or not text:
+            return None
+        patterns: list[re.Pattern] = []
+        if self.flags.get("pii_protection"):
+            patterns += self._pii
+        if self.flags.get("output_blocklist"):
+            patterns += self._block
+        earliest: int | None = None
+        for rx in patterns:
+            for hit in rx.finditer(text):
+                if hit.start() < offset < hit.end():
+                    start = hit.start()
+                    earliest = start if earliest is None else min(earliest, start)
+        return earliest
+
     # ---- Helpers ----------------------------------------------------------
 
     def _first_match(self, patterns: list[re.Pattern], text: str) -> str | None:

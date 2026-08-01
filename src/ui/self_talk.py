@@ -56,6 +56,16 @@ class SelfTalkRunner:
         self.turn_index = 1
         self.streamer_a = factory.get_streamer_for_persona(persona_a)
         self.streamer_b = factory.get_streamer_for_persona(persona_b)
+        # Je ein Gespräch pro Seite (#59). Ohne ID steigt die Ablage aus, und
+        # der AI-Dialog blieb spurlos.
+        for persona, streamer in (
+            (persona_a, self.streamer_a),
+            (persona_b, self.streamer_b),
+        ):
+            opener = getattr(factory, "open_conversation", None)
+            setter = getattr(streamer, "set_conversation", None)
+            if callable(opener) and callable(setter):
+                setter(opener(persona, "self-talk"))
 
         self.history_a: list[dict[str, str]] = [
             {
@@ -100,6 +110,13 @@ class SelfTalkRunner:
         else:
             self.history_b.append({"role": "assistant", "content": reply})
             self.history_a.append({"role": "user", "content": reply})
+
+        # Beide Seiten des Dialogs spiegeln (#59): der AI-Dialog erzeugt
+        # dieselben Frage-Antwort-Paare wie ein Einzelchat, zeichnete aber
+        # nichts auf, weil hier nie eine Gesprächs-ID gesetzt wurde.
+        recorder = getattr(streamer, "record_conversation", None)
+        if callable(recorder):
+            recorder(history)
 
         t_end = time.time()
         t_first_ms = (
