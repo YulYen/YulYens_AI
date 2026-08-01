@@ -113,12 +113,21 @@ class WikiLookup:
             self.timeout,
             self.max_snippets,
         )
-        return hints, accepted_context(
+        accepted = accepted_context(
             guard,
             contexts,
             text_of=lambda ctx: ctx.snippet,
             label_of=lambda ctx: ctx.topic,
         )
+        # Verworfene Quellen dem Nutzer sagen, nicht nur dem Logfile: bei der
+        # bekannten False-Positive-Rate des Guards (#62) fällt auch mal ein
+        # harmloser Artikel weg, und dann steht der Nutzer sonst vor einer
+        # schlechteren Antwort ohne erkennbaren Grund. Bewusst ohne den
+        # auslösenden Text — der gehört nicht in die Anzeige.
+        dropped = len(contexts) - len(accepted)
+        if dropped:
+            hints = [*hints, Config().t("wiki_context_dropped", count=dropped)]
+        return hints, accepted
 
 
 def lookup_wiki_snippet(

@@ -29,17 +29,33 @@ def test_guard_only_run_writes_reports_and_exits_zero(tmp_path):
     assert csv_text.strip().count("\n") == 0
 
 
-def test_repo_corpus_has_no_documented_gaps_left(tmp_path):
-    """Der Report soll keine offenen Guard-Lücken ausweisen.
+# Die Lücken, die wir *bewusst* mitführen. Weder mehr noch weniger.
+#
+# Vorher stand hier „gar keine" — seit #50 war der Korpus lückenfrei. Diese eine
+# ist eine bewusste Entscheidung: die Injection-Regel wirft einen harmlosen
+# Artikel über `localhost` aus dem Kontext, und das ist gemessen, nicht vermutet.
+# Sie zu verschweigen wäre bequemer, aber der Korpus soll die Wirklichkeit
+# abbilden — sie ist das Abnahmekriterium für #62.
+KNOWN_GAP_IDS = {"ctx_code_snippet_in_article_is_kept"}
 
-    Seit #50 ist die letzte geschlossen. Kommt hier je wieder eine Lücke dazu,
-    schlägt dieser Test fehl und verlangt eine bewusste Entscheidung, statt sie
-    unbemerkt mitlaufen zu lassen.
+
+def test_repo_corpus_carries_exactly_the_gaps_we_decided_on(tmp_path):
+    """Nicht „keine Lücken", sondern „genau diese".
+
+    Der Test schlägt in **beide** Richtungen an: eine neue Lücke verlangt eine
+    bewusste Entscheidung, und eine geschlossene verlangt, das Flag zu
+    entfernen. „Keine Lücken" hätte den zweiten Fall nie gemeldet.
     """
+    from evals.corpus import load_guard_corpus
+
+    gaps = {case.id for case in load_guard_corpus().cases if case.known_gap}
+    assert gaps == KNOWN_GAP_IDS
+
     out = tmp_path / "evals"
     assert main(["-e", "classic", "--guard-only", "--out", str(out)]) == 0
     markdown = (out / "report.md").read_text(encoding="utf-8")
-    assert "dokumentierte Lücke" not in markdown
+    for gap_id in KNOWN_GAP_IDS:
+        assert gap_id in markdown, "eine bewusst mitgeführte Lücke fehlt im Report"
 
 
 def test_known_gap_is_reported_but_does_not_fail_the_run(tmp_path, monkeypatch):

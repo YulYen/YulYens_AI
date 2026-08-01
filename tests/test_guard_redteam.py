@@ -35,13 +35,24 @@ def _fresh_guard() -> BasicGuard:
     )
 
 
-def test_corpus_is_not_empty_and_covers_both_stages():
+def test_corpus_is_not_empty_and_covers_all_three_stages():
+    """Drei Kanäle, drei Stufen.
+
+    „context" ist der abgerufene Fremdtext (Wikipedia-Snippet, RSS-Meldung),
+    der als `system`-Nachricht in den Prompt geht. Er hat eigene Regeln — PII
+    ist dort erlaubt, eine Injection-Anweisung nicht — und war lange gar nicht
+    abgedeckt, weil der Guard ihn schlicht nie gesehen hat.
+    """
     stages = {case.stage for case in CORPUS.cases}
-    assert stages == {"input", "output"}
+    assert stages == {"input", "output", "context"}
     # Guardrail against a corpus that only ever asserts "blocked": benign
     # traffic must be represented too, or the tests would pass with a guard
     # that refuses everything.
-    benign = [c for c in CORPUS.cases if c.expect.get("ok") is True]
+    benign = [
+        c
+        for c in CORPUS.cases
+        if c.expect.get("ok") is True or c.expect.get("injected") is True
+    ]
     assert len(benign) >= 4
 
 

@@ -77,6 +77,21 @@ Läuft ohne Modell und ist deshalb Teil der normalen Testsuite:
 `tests/test_guard_redteam.py` macht aus jedem Fall einen parametrisierten Test.
 Neue Angriffsmuster gehören in die YAML.
 
+**Drei Stufen, weil der Guard drei Kanäle hat:**
+
+| `stage` | Was geprüft wird | Erwartung |
+|---|---|---|
+| `input` | die Frage des Nutzers | `ok`, `reason` |
+| `output` | die Antwort des Modells | `ok`, `reason`, `blocked`, `masked` |
+| `context` | abgerufener Fremdtext (Wikipedia-Snippet, RSS-Meldung) | `injected`, `reason` |
+
+`context` ist der Kanal, den der Guard lange gar nicht gesehen hat: der Text
+geht als **`system`**-Nachricht in den Prompt, also mit mehr Gewicht als die
+Frage des Nutzers, und stammt aus Quellen, die niemand Zeile für Zeile gelesen
+hat. Dort gelten **andere** Regeln als am Eingang — verworfen wird nur bei
+`prompt_injection` und `wrongdoing`; PII ist ausdrücklich erlaubt, weil
+Impressen und Kontaktangaben in Artikeln normal sind.
+
 Zwei Sonderfälle im Report:
 
 - **`known_gap: true`** — eine dokumentierte Schwäche. Der Fall sagt, was der

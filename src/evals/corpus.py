@@ -22,8 +22,12 @@ _CHECK_KEYS = {"must_match", "must_not_match", "max_chars", "min_chars"}
 _PERSONA_CASE_KEYS = {"id", "question", "expect_traits", "checks", "note"}
 _BEHAVIOUR_CASE_KEYS = _PERSONA_CASE_KEYS
 _GUARD_CASE_KEYS = {"id", "stage", "text", "expect", "note", "known_gap"}
-_GUARD_EXPECT_KEYS = {"ok", "reason", "blocked", "masked"}
-_GUARD_STAGES = {"input", "output"}
+_GUARD_EXPECT_KEYS = {"ok", "reason", "blocked", "masked", "injected"}
+# "context" ist der dritte Kanal: abgerufener Fremdtext (Wikipedia-Snippet,
+# RSS-Meldung), der als system-Nachricht in den Prompt geht. Er hat eigene
+# Regeln — nur prompt_injection und wrongdoing verwerfen, PII ist erlaubt —
+# und braucht deshalb eine eigene Stufe, statt in "input" mitgemeint zu sein.
+_GUARD_STAGES = {"input", "output", "context"}
 
 # Placeholders substituted into check patterns at run time. Needed for the
 # three-timestamp behaviour eval (#19), where the expected answer depends on
@@ -419,11 +423,18 @@ def load_guard_corpus(base_dir: Path | None = None) -> GuardCorpus:
                     raise CorpusError(f"{where}: 'reason' must be a non-empty string.")
             elif not isinstance(value, bool):
                 raise CorpusError(f"{where}: '{key}' must be a boolean.")
-        if stage == "input" and ("blocked" in expect or "masked" in expect):
+        if stage != "output" and ("blocked" in expect or "masked" in expect):
             raise CorpusError(
                 f"{where}: 'blocked'/'masked' apply to output cases only "
                 "(input cases use 'ok' and 'reason')."
             )
+        if stage == "context" and "injected" not in expect:
+            raise CorpusError(
+                f"{where}: a context case must say whether the text ends up in "
+                "the prompt ('injected: true|false')."
+            )
+        if stage != "context" and "injected" in expect:
+            raise CorpusError(f"{where}: 'injected' applies to context cases only.")
 
         known_gap = raw.get("known_gap", False)
         if not isinstance(known_gap, bool):

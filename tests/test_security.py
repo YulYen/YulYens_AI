@@ -185,6 +185,12 @@ def test_security_texts_can_be_overridden():
 
 
 # ---- Injizierter Fremdkontext (Wiki, RSS) ----------------------------------
+#
+# Hier steht die *Verdrahtung*: dass inject_wiki_context/inject_briefing_context
+# den Guard tatsächlich anwenden und dass Anzeige und Prompt dieselbe Liste
+# sehen. Die *Angriffsmuster* selbst gehören nach evals/guard_redteam.yaml
+# (stage: context) — dort werden sie von tests/test_guard_redteam.py und der
+# Eval-CLI gemeinsam gefahren. Neue Muster also dorthin, nicht hierher.
 
 
 _CONTEXT_TEXTS = {
@@ -360,3 +366,62 @@ def test_the_sources_panel_never_lists_a_snippet_the_model_did_not_see():
         angezeigt == im_prompt
     ), f"Quellen-Anzeige zeigt {angezeigt}, im Prompt stand aber {im_prompt}"
     assert angezeigt == {"Backpulver"}
+
+
+def test_a_dropped_source_is_announced_to_the_user_not_just_to_the_log():
+    """Verworfener Kontext war nur eine WARNING im Logfile.
+
+    Bei der bekannten False-Positive-Rate (#62) fällt auch mal ein harmloser
+    Artikel weg — der Nutzer stünde dann vor einer schlechteren Antwort ohne
+    erkennbaren Grund. Der Hinweis geht über denselben Kanal wie die
+    „🕵️ … blättert im Archiv"-Meldung und erreicht damit beide Oberflächen.
+    """
+    from wiki.lookup import WikiLookup, WikiSnippet
+
+    class _Finder:
+        def find_keywords(self, question):
+            return ["Localhost"]
+
+    import wiki.lookup as lookup_module
+
+    original = lookup_module.lookup_wiki_snippet
+    lookup_module.lookup_wiki_snippet = lambda *a, **k: (
+        ["🕵️ LEAH blättert …"],
+        [WikiSnippet(topic="Localhost", snippet="… http://127.0.0.1 …")],
+    )
+    try:
+        hints, contexts = WikiLookup(keyword_finder=_Finder()).snippets(
+            "Was ist localhost?", "LEAH", _guard_for_context()
+        )
+    finally:
+        lookup_module.lookup_wiki_snippet = original
+
+    assert contexts == []
+    assert any("1" in hint and "🛡️" in hint for hint in hints), hints
+    # Der auslösende Text darf nicht in der Anzeige landen.
+    assert not any("127.0.0.1" in hint for hint in hints)
+
+
+def test_nothing_is_announced_when_nothing_was_dropped():
+    from wiki.lookup import WikiLookup, WikiSnippet
+
+    class _Finder:
+        def find_keywords(self, question):
+            return ["Backpulver"]
+
+    import wiki.lookup as lookup_module
+
+    original = lookup_module.lookup_wiki_snippet
+    lookup_module.lookup_wiki_snippet = lambda *a, **k: (
+        ["🕵️ LEAH blättert …"],
+        [WikiSnippet(topic="Backpulver", snippet="Ein Triebmittel.")],
+    )
+    try:
+        hints, contexts = WikiLookup(keyword_finder=_Finder()).snippets(
+            "Was ist Backpulver?", "LEAH", _guard_for_context()
+        )
+    finally:
+        lookup_module.lookup_wiki_snippet = original
+
+    assert len(contexts) == 1
+    assert not any("🛡️" in hint for hint in hints)
