@@ -258,6 +258,15 @@ class WebUI:
         if callable(setter):
             setter(conversation_id)
 
+    @staticmethod
+    def _record_conversation(
+        session: SessionContext, messages: list[Message] | None
+    ) -> None:
+        """Den Gesprächsstand in die Ablage spiegeln (#59)."""
+        recorder = getattr(session.streamer, "record_conversation", None)
+        if callable(recorder):
+            recorder(list(messages or []))
+
     def _stamp_user(self, session: SessionContext, user: str) -> None:
         """Identität an den frischen Streamer geben (#53).
 
@@ -450,6 +459,11 @@ class WebUI:
         # Finalize: add the completed reply to the history
         chat_history.append((None, reply))
         message_history.append({"role": "assistant", "content": reply})
+        # Jetzt — und nur jetzt — steht der Gesprächsstand fest (#59). Auch beim
+        # Abbruch: die Teilantwort ist das, was der Nutzer behält, also gehört
+        # sie in die Ablage. Vorher zeichnete `stream()` Versuche auf, weshalb
+        # „Nochmal" verdoppelte und „Stop" die Antwort ganz verlor.
+        self._record_conversation(session, message_history)
         stats = self._last_stream_stats(session)
         yield (
             None,

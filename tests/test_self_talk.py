@@ -96,3 +96,52 @@ def test_terminal_self_talk_run_handles_keyboard_interrupt(monkeypatch, capsys):
 
     out = capsys.readouterr().out
     assert "Stopping AI Dialog." in out
+
+
+def test_self_talk_records_both_sides_in_the_store(tmp_path):
+    """Der AI-Dialog zeichnete gar nichts auf (#59).
+
+    Er erzeugt dieselben Frage-Antwort-Paare wie ein Einzelchat, aber es wurde
+    nie eine Gesprächs-ID gesetzt — und `sync` steigt bei leerer ID aus.
+    Beide Seiten bekommen ein eigenes Gespräch, damit im Verlauf erkennbar
+    bleibt, welche Persona was gesagt hat.
+    """
+    from core.dummy_llm_core import DummyLLMCore
+    from core.streaming_provider import YulYenStreamingProvider
+    from storage import SqliteStore
+
+    store = SqliteStore(tmp_path / "conversations.sqlite3")
+
+    def _streamer(persona):
+        provider = YulYenStreamingProvider(
+            base_url="",
+            persona=persona,
+            persona_prompt="",
+            persona_options={},
+            model_name="dummy",
+            llm_core=DummyLLMCore(),
+            store=store,
+        )
+        return provider
+
+    factory = Mock()
+    factory.get_streamer_for_persona.side_effect = lambda p: _streamer(p)
+    factory.open_conversation.side_effect = lambda persona, app, user="local": (
+        store.start(user=user, persona=persona, model="dummy", app=app)
+    )
+
+    class _StoreTexts:
+        @staticmethod
+        def format(_key, **kwargs):
+            return f"{kwargs['persona_self']}:{kwargs['task']}"
+
+    runner = SelfTalkRunner(factory, _StoreTexts(), "Karl", "Yul", "Start")
+    runner.run_turn()
+
+    refs = store.list_conversations()
+    assert {ref.persona for ref in refs} == {"Karl", "Yul"}
+    assert {ref.app for ref in refs} == {"self-talk"}
+    # Der Sprecher der ersten Runde hat eine Antwort in seiner Ablage.
+    karl = next(ref for ref in refs if ref.persona == "Karl")
+    _r, messages = store.load(karl.id)
+    assert [m["role"] for m in messages][-1] == "assistant"

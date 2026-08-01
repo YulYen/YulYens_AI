@@ -321,15 +321,32 @@ class YulYenStreamingProvider:
         """
         self.conversation_id = (conversation_id or "").strip()
 
-    def _append_conversation_log(self, role: str, content: str) -> None:
-        """Schreibt einen Turn in den Store (und optional in den JSONL-Mitschnitt)."""
-        try:
-            self.store.append(self.conversation_id, role, content)
-        except Exception:
-            # Aufzeichnen darf den Stream nie abbrechen — dieselbe Regel wie
-            # beim Logfile davor.
-            logging.exception("Could not record turn in the conversation store")
+    def record_conversation(self, messages: list[dict[str, Any]]) -> None:
+        """Bringt die Ablage auf den Stand des Gesprächs (#59).
 
+        **Aufgerufen von der Oberfläche, nicht von ``stream()``.** Der Streamer
+        sieht nur einen Generierungs*versuch*; welcher davon zum Gespräch
+        gehört, weiß allein der Aufrufer. Solange die Aufzeichnung in
+        ``stream()`` saß, protokollierte sie Versuche: „Nochmal 🔄" hängte
+        Frage und verworfene Antwort erneut an, „Stop ⏹" ließ die Antwort ganz
+        weg, und Ask-All wie Self-Talk zeichneten gar nichts auf, weil dort nie
+        eine Gesprächs-ID gesetzt wurde.
+
+        Aufzeichnen darf den Betrieb nie stören — dieselbe Regel wie zuvor.
+        """
+        try:
+            self.store.sync(self.conversation_id, messages)
+        except Exception:
+            logging.exception("Could not record the conversation in the store")
+
+    def _append_jsonl(self, role: str, content: str) -> None:
+        """Roher Turn-Mitschnitt (opt-in, `logging.conversation_jsonl`).
+
+        Bewusst weiter *anhängend* und weiter hier: das ist das Debug-Artefakt,
+        das festhält, was tatsächlich passiert ist — verworfene Versuche
+        eingeschlossen. Damit stimmt die Rollenverteilung aus #54 endlich:
+        JSONL = roher Mitschnitt, SQLite = das Gespräch.
+        """
         if not self.jsonl_log:
             return
         try:
@@ -452,7 +469,7 @@ class YulYenStreamingProvider:
         # Record the most recent user message in the log
         for m in reversed(messages):
             if m.get("role") == "user" and m.get("content"):
-                self._append_conversation_log("user", m["content"])
+                self._append_jsonl("user", m["content"])
                 break
 
         # Apply LLM options
@@ -536,14 +553,14 @@ class YulYenStreamingProvider:
             # we must not persist the raw (e.g. secret) text to the log.
             if moderator.blocked:
                 logging.info("[GUARD] output blocked persona=%s", self.persona)
-                self._append_conversation_log("assistant", "[BLOCKED by guard]")
+                self._append_jsonl("assistant", "[BLOCKED by guard]")
                 full_reply = ""
             else:
                 if moderator.masked:
                     logging.info("[GUARD] output masked PII persona=%s", self.persona)
                 full_reply = "".join(full_reply_parts).strip()
             if full_reply:
-                self._append_conversation_log("assistant", full_reply)
+                self._append_jsonl("assistant", full_reply)
                 try:
                     _canon_out = full_reply
                     _hash_out = hashlib.sha256(_canon_out.encode("utf-8")).hexdigest()
@@ -560,7 +577,7 @@ class YulYenStreamingProvider:
                 "stream() failed persona=%s model=%s", self.persona, self.model_name
             )
             err = "[ERROR] LLM is not responding correctly."
-            self._append_conversation_log("assistant", err)
+            self._append_jsonl("assistant", err)
             yield err
 
     def respond_one_shot(self, user_input: str, persona: str, wiki: WikiLookup) -> str:
@@ -587,6 +604,10 @@ class YulYenStreamingProvider:
 
         # Run the LLM and collect the answer
         full_reply = run_llm_collect(self, messages)
+        # Die Ablage bekommt das Gespräch, nicht den Generierungsversuch (#59).
+        self.record_conversation(
+            [*messages, {"role": "assistant", "content": full_reply}]
+        )
 
         # Check guard output
         if self.guard:

@@ -398,9 +398,9 @@ def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
     monkeypatch.setattr(provider, "conversation_log_path", str(tmp_path / "conv.json"))
 
     # Ohne Anmeldung (Terminal, API) ist der lokale Nutzer die ehrliche Antwort.
-    provider._append_conversation_log("user", "erste")
+    provider._append_jsonl("user", "erste")
     provider.set_user("yulyen")
-    provider._append_conversation_log("user", "zweite")
+    provider._append_jsonl("user", "zweite")
 
     lines = [
         json.loads(line)

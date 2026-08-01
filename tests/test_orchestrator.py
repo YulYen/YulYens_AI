@@ -238,3 +238,65 @@ def test_parallel_broadcast_external_stop_event_stops_workers():
     # Beide Worker beenden sich nach dem Stop-Signal mit einem done-Event.
     assert sum(1 for e in events if e["type"] == "done") == 2
     assert not _broadcast_worker_threads()
+
+
+# ---- Ask-All landet in der Ablage (#59) -------------------------------------
+
+
+class _StoreBackedFactory(_DummyFactory):
+    """Factory mit echtem Store — wie im Betrieb, nur in einer Temp-Datei."""
+
+    def __init__(self, store):
+        super().__init__()
+        self.store = store
+
+    def get_streamer_for_persona(self, persona):
+        streamer = super().get_streamer_for_persona(persona)
+        streamer.store = self.store
+        return streamer
+
+    def open_conversation(self, persona, app, user="local"):
+        return self.store.start(user=user, persona=persona, model="dummy", app=app)
+
+
+def _broadcast_store(tmp_path):
+    from storage import SqliteStore
+
+    return SqliteStore(tmp_path / "conversations.sqlite3")
+
+
+def test_sequential_broadcast_records_one_conversation_per_persona(tmp_path):
+    """Ask-All zeichnete gar nichts auf — es wurde nie eine Gesprächs-ID gesetzt.
+
+    Dabei erzeugt der Broadcast dieselben Frage-Antwort-Paare wie ein
+    Einzelchat; im Verlauf fehlten sie trotzdem vollständig.
+    """
+    store = _broadcast_store(tmp_path)
+    factory = _StoreBackedFactory(store)
+
+    list(iter_broadcast_events(factory, "Ping", persona_names=["Alpha", "Beta"]))
+
+    refs = store.list_conversations()
+    assert {ref.persona for ref in refs} == {"Alpha", "Beta"}
+    assert {ref.app for ref in refs} == {"ask-all"}
+    for ref in refs:
+        _r, messages = store.load(ref.id)
+        assert [m["role"] for m in messages] == ["user", "assistant"]
+        assert messages[0]["content"] == "Ping"
+        assert messages[1]["content"] == "ECHO: Ping"
+
+
+def test_parallel_broadcast_records_too(tmp_path):
+    """Der parallele Pfad ist ein eigener Codeweg — also auch ein eigener Test."""
+    store = _broadcast_store(tmp_path)
+    factory = _StoreBackedFactory(store)
+
+    list(
+        iter_broadcast_events_parallel(factory, "Ping", persona_names=["Alpha", "Beta"])
+    )
+
+    refs = store.list_conversations()
+    assert {ref.persona for ref in refs} == {"Alpha", "Beta"}
+    for ref in refs:
+        _r, messages = store.load(ref.id)
+        assert messages[1]["content"] == "ECHO: Ping"

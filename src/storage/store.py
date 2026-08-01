@@ -84,6 +84,8 @@ class ConversationStore(Protocol):
 
     def append(self, conversation_id: str, role: str, content: str) -> None: ...
 
+    def sync(self, conversation_id: str, messages: list[dict[str, str]]) -> None: ...
+
     def list_conversations(
         self, *, user: str | None = None, limit: int = 50, offset: int = 0
     ) -> list[ConversationRef]: ...
@@ -102,6 +104,9 @@ class NullStore:
         return ""
 
     def append(self, conversation_id: str, role: str, content: str) -> None:
+        return None
+
+    def sync(self, conversation_id: str, messages: list[dict[str, str]]) -> None:
         return None
 
     def list_conversations(
@@ -232,6 +237,58 @@ class SqliteStore:
                     (now, conversation_id),
                 )
             self._conn.commit()
+
+    def sync(self, conversation_id: str, messages: list[dict[str, str]]) -> None:
+        """Bringt die Ablage auf den Stand des Gesprächs — als Ganzes.
+
+        **Warum ersetzen statt anhängen.** Die Oberfläche besitzt den
+        akzeptierten Gesprächszustand; die Ablage soll ihn spiegeln. Beim
+        Anhängen musste jeder Aufrufer selbst buchführen, und drei Wege taten es
+        falsch: „Nochmal 🔄" hängte Frage und verworfene Antwort ein weiteres
+        Mal an, „Stop ⏹" ließ die Antwort ganz weg, und Ask-All wie Self-Talk
+        zeichneten gar nichts auf. Mit einem Abgleich des ganzen Verlaufs kann
+        das nicht mehr auseinanderlaufen.
+
+        Nur ``user`` und ``assistant`` landen hier: injizierte
+        System-Nachrichten (Wiki, Briefing) gehören zum Prompt, nicht zum
+        Gespräch — im Verlauf wären sie Lärm.
+
+        Der Preis ist ein Rewrite der Nachrichtenzeilen pro Turn. Bei einem
+        Gespräch von 50 Turns sind das 100 kurze Zeilen in einer lokalen
+        SQLite-Datei; die verlorene Buchführung ist den Tausch wert.
+        """
+        if not conversation_id:
+            return
+        rows = [
+            (str(m.get("role")), str(m.get("content") or ""))
+            for m in messages or []
+            if m.get("role") in ("user", "assistant")
+        ]
+        now = _now()
+        first_question = next((text for role, text in rows if role == "user"), "")
+        with self._lock:
+            self._conn.execute("BEGIN")
+            try:
+                self._conn.execute(
+                    "DELETE FROM messages WHERE conversation_id = ?",
+                    (conversation_id,),
+                )
+                self._conn.executemany(
+                    "INSERT INTO messages (conversation_id, idx, role, content, ts) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [
+                        (conversation_id, idx, role, text, now)
+                        for idx, (role, text) in enumerate(rows)
+                    ],
+                )
+                self._conn.execute(
+                    "UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?",
+                    (_make_title(first_question), now, conversation_id),
+                )
+                self._conn.execute("COMMIT")
+            except Exception:
+                self._conn.execute("ROLLBACK")
+                raise
 
     def list_conversations(
         self, *, user: str | None = None, limit: int = 50, offset: int = 0

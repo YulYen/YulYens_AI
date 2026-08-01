@@ -85,25 +85,27 @@ def test_persona_name_normalized(client, monkeypatch):
 
 
 def test_api_turns_are_recorded_in_the_store(client, monkeypatch, tmp_path):
-    """Seit #54 ist der Store die Aufzeichnung, nicht mehr die Logdatei."""
+    """Seit #54 ist der Store die Aufzeichnung, nicht mehr die Logdatei.
+
+    Der Test ersetzte früher `respond_one_shot` komplett und rief die
+    Aufzeichnung von Hand — er prüfte damit seine eigene Nachbildung, nicht den
+    Weg, den eine echte Anfrage nimmt. Jetzt läuft der echte Pfad gegen das
+    Dummy-Backend, und nur der Store wird untergeschoben.
+    """
+    from core.factory import AppFactory
     from storage import SqliteStore
 
     store = SqliteStore(tmp_path / "conversations.sqlite3")
-    conversation_id = store.start(user="local", persona="LEAH", model="m", app="api")
+    monkeypatch.setattr(AppFactory, "get_store", lambda self: store)
 
-    def fake_respond(self, user_input, persona, *args, **kwargs):
-        self.store = store
-        self.set_conversation(conversation_id)
-        self._append_conversation_log("user", user_input)
-        self._append_conversation_log("assistant", "Antwort")
-        return "Antwort"
-
-    monkeypatch.setattr(YulYenStreamingProvider, "respond_one_shot", fake_respond)
     client.post("/ask", json={"question": "Wer bist du?", "persona": "leah"})
 
-    _ref, messages = store.load(conversation_id)
+    refs = store.list_conversations()
+    assert len(refs) == 1, "die API legt pro Anfrage genau ein Gespräch an"
+    _ref, messages = store.load(refs[0].id)
     assert [m["role"] for m in messages] == ["user", "assistant"]
     assert messages[0]["content"] == "Wer bist du?"
+    assert messages[1]["content"] == "ECHO: Wer bist du?"
 
 
 def _normalize(s: str) -> str:

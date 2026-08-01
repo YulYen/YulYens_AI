@@ -391,6 +391,9 @@ class TerminalUI:
         logging.info(f"[Terminal] {self.bot}: {reply}")
 
         self.history.append({"role": "assistant", "content": reply})
+        # Der Gesprächsstand steht erst hier fest (#59) — vorher zeichnete
+        # `stream()` Generierungsversuche auf.
+        self.streamer.record_conversation(self.history)
         self._maybe_create_tts_wav(reply)
         # Always ensure two trailing blank lines after the answer:
         # (If streaming already emitted \n, add only the missing ones.)

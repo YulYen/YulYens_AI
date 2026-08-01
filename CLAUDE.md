@@ -300,8 +300,26 @@ in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
 | Artefakt | Rolle |
 |---|---|
-| `data/conversations.sqlite3` | **die Aufzeichnung** — Verlauf (#25), später Suche (#49) und Fakten (#24) |
-| `logs/conversation_*.json` | roher Mitschnitt zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
+| `data/conversations.sqlite3` | **das Gespräch**, wie der Nutzer es sieht — Verlauf (#25), später Suche (#49) und Fakten (#24) |
+| `logs/conversation_*.json` | roher Mitschnitt der *Versuche* zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
+
+**Die Rollenverteilung stimmt erst seit #59.** Vorher schrieb `stream()` beides,
+und damit protokollierte die Ablage Generierungs*versuche* statt des Gesprächs:
+„Nochmal 🔄" hängte Frage und verworfene Antwort erneut an (dreimal gedrückt →
+drei Fragen und drei Antworten im Store, während die Oberfläche eine zeigte),
+„Stop ⏹" ließ die Antwort ganz weg, und Ask-All wie Self-Talk zeichneten gar
+nichts auf, weil dort nie eine Gesprächs-ID gesetzt wurde.
+
+Jetzt gilt: **die Oberfläche besitzt den Gesprächsstand, die Ablage spiegelt
+ihn.** `stream()` schreibt nur noch den JSONL-Mitschnitt (der *soll* Versuche
+festhalten); den Store bedient `record_conversation(messages)`, aufgerufen vom
+Aufrufer, sobald der Turn steht. `ConversationStore.sync` ersetzt den ganzen
+Nachrichtenverlauf statt anzuhängen — dadurch kann keine Buchführung mehr
+auseinanderlaufen, und injizierter System-Kontext (Wiki, Briefing) bleibt
+draußen, weil er zum Prompt gehört und nicht zum Gespräch.
+
+Wer einen **neuen Antwortweg** baut, muss `record_conversation` aufrufen —
+sonst ist er wieder spurlos wie Ask-All davor.
 
 **Der Datei-Im-/Export bleibt, ist aber abschaltbar** (`storage.file_exchange`, Default an) — er ist etwas anderes als die Ablage. `conversation_io_terminal.py`
 (JSON hoch-/runterladen im WebUI, `/save` und Laden im Terminal) ist der

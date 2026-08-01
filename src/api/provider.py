@@ -84,7 +84,15 @@ class AiApiProvider:
         streamer.set_conversation(
             self.factory.open_conversation(canonical_persona, "api")
         )
-        yield from streamer.stream(messages=history)
+        reply = ""
+        for token in streamer.stream(messages=history):
+            reply += token
+            yield token
+        # Erst am Ende aufzeichnen: vorher steht die Antwort nicht fest, und ein
+        # abgebrochener Stream soll nicht als vollständiger Turn dastehen (#59).
+        streamer.record_conversation(
+            [*history, {"role": "assistant", "content": reply}]
+        )
 
     def answer(self, question: str, persona: str) -> str:
         """Handles a question for the given persona and returns the answer as text."""

@@ -46,11 +46,15 @@ def iter_broadcast_events(
 
     for persona in personas:
         streamer: YulYenStreamingProvider = factory.get_streamer_for_persona(persona)
+        # Jede Persona bekommt ihr eigenes Gespräch in der Ablage (#59). Vorher
+        # wurde hier nie eine Gesprächs-ID gesetzt, weshalb der ganze
+        # Broadcast-Modus spurlos blieb — obwohl er dieselben Fragen und
+        # Antworten erzeugt wie ein Einzelchat.
+        messages = base_messages + [{"role": "user", "content": user_input}]
+        _open_conversation_for(factory, streamer, persona)
         reply_so_far = ""
 
-        for token in streamer.stream(
-            messages=base_messages + [{"role": "user", "content": user_input}]
-        ):
+        for token in streamer.stream(messages=messages):
             reply_so_far += token
             yield {
                 "type": "token",
@@ -59,7 +63,28 @@ def iter_broadcast_events(
                 "reply": reply_so_far,
             }
 
+        _record(streamer, messages, reply_so_far)
         yield {"type": "done", "persona": persona, "reply": reply_so_far.strip()}
+
+
+def _open_conversation_for(factory, streamer, persona: str) -> None:
+    """Eröffnet ein Gespräch für diese Persona — best effort.
+
+    Der Broadcast lief bisher ohne Gesprächs-ID; ``append``/``sync`` steigen bei
+    leerer ID aus, also zeichnete Ask-All nichts auf. Fehlschläge dürfen den
+    Broadcast nicht anhalten, deshalb schluckt ``open_conversation`` sie bereits.
+    """
+    opener = getattr(factory, "open_conversation", None)
+    setter = getattr(streamer, "set_conversation", None)
+    if callable(opener) and callable(setter):
+        setter(opener(persona, "ask-all"))
+
+
+def _record(streamer, messages: list[dict[str, str]], reply: str) -> None:
+    """Gesprächsstand in die Ablage spiegeln, sobald die Antwort feststeht."""
+    recorder = getattr(streamer, "record_conversation", None)
+    if callable(recorder):
+        recorder([*messages, {"role": "assistant", "content": reply.strip()}])
 
 
 def iter_broadcast_events_parallel(
@@ -99,9 +124,9 @@ def iter_broadcast_events_parallel(
 
     def _worker(persona: str, streamer: YulYenStreamingProvider) -> None:
         reply_so_far = ""
-        token_stream = streamer.stream(
-            messages=base_messages + [{"role": "user", "content": user_input}]
-        )
+        messages = base_messages + [{"role": "user", "content": user_input}]
+        _open_conversation_for(factory, streamer, persona)
+        token_stream = streamer.stream(messages=messages)
         try:
             for token in token_stream:
                 if stop.is_set():
@@ -118,6 +143,9 @@ def iter_broadcast_events_parallel(
         finally:
             # Triggers the provider's finally → closes the backend stream.
             token_stream.close()
+            # Auch eine abgebrochene Antwort ist das, was der Nutzer gesehen
+            # hat — sie gehört so in die Ablage (#59).
+            _record(streamer, messages, reply_so_far)
             events.put(
                 {"type": "done", "persona": persona, "reply": reply_so_far.strip()}
             )

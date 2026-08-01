@@ -8,6 +8,24 @@ from ui.terminal_ui import TerminalUI
 from wiki.lookup import WikiLookup, WikiSnippet
 
 
+def _streamer_double(**overrides):
+    """Streamer-Double mit den Attributen, die ein echter Streamer hat.
+
+    Ein nacktes SimpleNamespace lässt Produktivcode an AttributeError scheitern,
+    sobald der Streamer eine Methode dazubekommt — hier wandert die Ergänzung
+    an eine Stelle statt an jede einzelne.
+    """
+    attrs = {
+        "persona_options": {},
+        "guard": None,
+        "record_conversation": lambda messages: None,
+        "stream": lambda messages: iter([]),
+        "set_conversation": lambda conversation_id: None,
+    }
+    attrs.update(overrides)
+    return SimpleNamespace(**attrs)
+
+
 def _create_terminal_ui() -> TerminalUI:
     locales_dir = Path(__file__).resolve().parents[1] / "locales"
     catalog = Texts(language="de", locales_dir=locales_dir)
@@ -45,7 +63,7 @@ def test_terminal_ui_start_menu_shows_ask_all_when_enabled(monkeypatch, capsys) 
 def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
     ui.bot = "LEAH"
-    ui.streamer = SimpleNamespace(persona_options={"num_ctx": "128"})
+    ui.streamer = _streamer_double(persona_options={"num_ctx": "128"})
 
     ui.history = [
         {"role": "system", "content": "Regeln"},
@@ -300,7 +318,7 @@ def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
     ui = _create_terminal_ui()
     ui.bot = "LEAH"
     ui.wiki = WikiLookup(keyword_finder=object())
-    ui.streamer = SimpleNamespace(stream=lambda messages: iter(["Antwort"]))
+    ui.streamer = _streamer_double(stream=lambda messages: iter(["Antwort"]))
 
     snippets = [_snippet()]
     monkeypatch.setattr(

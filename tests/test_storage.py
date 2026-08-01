@@ -336,3 +336,89 @@ def test_build_store_closes_the_database_at_exit(tmp_path, monkeypatch):
     registered[0][0]()
     with pytest.raises(sqlite3.ProgrammingError):
         store.start(user="local", persona="LEAH", model="m", app="test")
+
+
+# ---- Die Ablage spiegelt das Gespräch, nicht den LLM-Aufruf (#59) -----------
+
+
+def test_sync_replaces_instead_of_appending(store):
+    """„Nochmal 🔄": die verworfene Antwort darf nicht stehen bleiben.
+
+    Beim Anhängen entstand pro Neuversuch ein weiteres Frage/Antwort-Paar —
+    dreimal „Nochmal" ergab drei identische Fragen und drei Antworten im Store,
+    obwohl die Oberfläche eine zeigte. Beim Fortsetzen sah das Modell diesen
+    erfundenen Verlauf als echten Kontext.
+    """
+    cid = store.start(user="u", persona="LEAH", model="m", app="web")
+
+    store.sync(
+        cid,
+        [
+            {"role": "user", "content": "Witz?"},
+            {"role": "assistant", "content": "Erster Versuch"},
+        ],
+    )
+    store.sync(
+        cid,
+        [
+            {"role": "user", "content": "Witz?"},
+            {"role": "assistant", "content": "Zweiter Versuch"},
+        ],
+    )
+
+    _ref, messages = store.load(cid)
+    assert [m["content"] for m in messages] == ["Witz?", "Zweiter Versuch"]
+
+
+def test_sync_keeps_the_partial_answer_of_a_stopped_stream(store):
+    """„Stop ⏹": die Teilantwort ist das, was der Nutzer behält."""
+    cid = store.start(user="u", persona="LEAH", model="m", app="web")
+
+    store.sync(
+        cid,
+        [
+            {"role": "user", "content": "Erzähl"},
+            {"role": "assistant", "content": "Es war einmal …[abgebrochen]"},
+        ],
+    )
+
+    _ref, messages = store.load(cid)
+    assert messages[1]["content"].endswith("[abgebrochen]")
+
+
+def test_sync_drops_injected_system_context(store):
+    """Wiki- und Briefing-Kontext gehören zum Prompt, nicht zum Gespräch."""
+    cid = store.start(user="u", persona="LEAH", model="m", app="web")
+
+    store.sync(
+        cid,
+        [
+            {"role": "system", "content": "=== WIKI SNIPPET 1 === …"},
+            {"role": "user", "content": "Was ist Backpulver?"},
+            {"role": "assistant", "content": "Ein Triebmittel."},
+        ],
+    )
+
+    _ref, messages = store.load(cid)
+    assert [m["role"] for m in messages] == ["user", "assistant"]
+
+
+def test_sync_updates_the_title_from_the_first_question(store):
+    cid = store.start(user="u", persona="LEAH", model="m", app="web")
+
+    store.sync(
+        cid,
+        [
+            {"role": "user", "content": "Wie geht es dir?"},
+            {"role": "assistant", "content": "Gut."},
+        ],
+    )
+
+    assert store.list_conversations()[0].title == "Wie geht es dir?"
+
+
+def test_sync_without_a_conversation_is_ignored(store):
+    """Ein Streamer ohne gesetztes Gespräch darf nichts kaputt machen."""
+    store.sync("", [{"role": "user", "content": "ins Leere"}])
+
+    assert store.list_conversations() == []
