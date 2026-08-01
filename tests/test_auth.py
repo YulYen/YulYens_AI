@@ -5,10 +5,12 @@ allem zwei Dinge: dass der Default sich exakt wie vorher verhält, und dass die
 Identität dort ankommt, wo #25/#24 sie später brauchen (Gesprächslog, Votes).
 """
 
+import logging
 from types import SimpleNamespace
 
 import pytest
 from auth import (
+    AuthConfigError,
     DisabledAuth,
     HeaderAuth,
     Identity,
@@ -70,12 +72,37 @@ def test_local_auth_drops_users_without_a_resolvable_password(caplog):
     assert "leer" in caplog.text
 
 
-def test_local_auth_without_usable_users_does_not_lock_everyone_out(caplog):
-    """Lieber offen und laut als zugesperrt und rätselhaft."""
+def test_local_auth_without_usable_users_refuses_to_start():
+    """Umgekehrte Entscheidung: zu statt offen.
+
+    Vorher fiel der Provider hier auf „keine Anmeldung" zurück, begründet mit
+    „lieber offen und laut als zugesperrt und rätselhaft". Die Begründung
+    unterstellt, der Auslöser sei ein Tippfehler in der Nutzerliste. Der
+    häufigere Auslöser ist ein nicht durchgereichtes `env:` — eine
+    systemd-Unit ohne EnvironmentFile, ein Container ohne --env. Dann startet
+    die App genau dort ohne Anmeldung, wo jemand ausdrücklich eine
+    konfiguriert hat, und niemand merkt es.
+
+    Das Fehlverhalten „zu" kostet einen Supportfall, das Fehlverhalten
+    „offen" ist unbegrenzt.
+    """
     provider = LocalUsersAuth({})
 
-    assert provider.gradio_auth() is None
-    assert "kein einziger Nutzer" in caplog.text
+    with pytest.raises(AuthConfigError) as excinfo:
+        provider.gradio_auth()
+
+    # Die Meldung muss den wahrscheinlichsten Auslöser nennen, sonst sucht
+    # jemand in der falschen Ecke.
+    assert "env:" in str(excinfo.value)
+    assert "disabled" in str(excinfo.value)
+
+
+def test_local_auth_with_one_usable_user_still_works(caplog):
+    """Gegenprobe: ein einziger auflösbarer Nutzer genügt, der Rest darf fehlen."""
+    provider = LocalUsersAuth({"ok": "geheim", "kaputt": "env:GIBT_ES_NICHT"})
+
+    assert callable(provider.gradio_auth())
+    assert provider.usernames == ["ok"]
 
 
 def test_local_auth_reads_the_name_from_the_request():
@@ -133,3 +160,38 @@ def test_login_applies_regardless_of_share(share):
     )
 
     assert provider.gradio_auth() is not None
+
+
+# ---- Warnung, wenn die App im Netz hängt und niemand sich anmelden muss ----
+
+
+@pytest.mark.parametrize(
+    "host, has_auth, expect_warning",
+    [
+        ("0.0.0.0", False, True),  # im Netz, ohne Login → laut
+        ("192.168.1.20", False, True),  # feste LAN-Adresse, ohne Login → laut
+        ("0.0.0.0", True, False),  # im Netz, aber mit Login → in Ordnung
+        ("127.0.0.1", False, False),  # nur lokal → niemanden geht es etwas an
+        ("localhost", False, False),
+        ("::1", False, False),
+    ],
+)
+def test_exposure_warning_only_when_it_matters(host, has_auth, expect_warning, caplog):
+    """Zwei harmlose Einstellungen, deren Kombination es nicht ist.
+
+    `ui.web.host` und `ui.web.auth` stehen in der Config weit auseinander. Dass
+    die App im Netz hängt *und* niemanden nach einem Passwort fragt, sieht man
+    beim Lesen deshalb leicht nicht.
+
+    Bewusst nur eine Warnung: „im Heimnetz ohne Login" ist ein legitimer
+    Betriebsmodus. Abgebrochen wird nur, wenn eine Anmeldung konfiguriert, aber
+    kaputt ist — dort wollte jemand ausdrücklich Schutz.
+    """
+    from ui.web_ui import _warn_if_exposed_without_login
+
+    with caplog.at_level(logging.WARNING):
+        _warn_if_exposed_without_login(
+            host, 7860, (lambda u, p: True) if has_auth else None
+        )
+
+    assert ("[SICHERHEIT]" in caplog.text) is expect_warning

@@ -89,6 +89,35 @@ GUEST_APP = _GUEST_APP
 # im Verlauf soll erkennbar bleiben, dass sie von außen kamen.
 IMPORT_APP = "web-import"
 
+# Adressen, bei denen nur der eigene Rechner mithört.
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
+
+
+def _warn_if_exposed_without_login(host: str, port: int, gradio_auth: Any) -> None:
+    """Sagt es laut, wenn die App im Netz hängt und jeder ohne Login reindarf.
+
+    Der Fall entsteht leicht und unbemerkt: ``ui.web.host`` steht auf einer
+    Adresse, unter der andere die App erreichen, und ``ui.web.auth`` ist nicht
+    (mehr) konfiguriert. Beides ist je für sich harmlos und in der Config
+    weit voneinander entfernt — die Kombination ist es nicht.
+
+    Bewusst nur eine Warnung, kein Abbruch: „im LAN ohne Login" ist ein
+    legitimer Betriebsmodus für ein Heimnetz. Anders als bei einer
+    konfigurierten, aber kaputten Anmeldung — die bricht ab, weil dort jemand
+    ausdrücklich Schutz wollte.
+    """
+    if gradio_auth is not None or str(host).strip() in _LOOPBACK_HOSTS:
+        return
+    logging.warning(
+        "[SICHERHEIT] Die WebUI horcht auf %s:%s — also nicht nur lokal — und "
+        "verlangt keine Anmeldung. Jeder im selben Netz kann mitlesen und "
+        "schreiben, inklusive Verlauf und gespeicherter Gespräche. Entweder "
+        "ui.web.host auf 127.0.0.1 setzen oder ui.web.auth.provider einschalten.",
+        host,
+        port,
+    )
+
+
 # Auslieferungsdateien (WAV, JSON, Markdown) liegen in einem eigenen
 # Verzeichnis, das am Prozessende komplett verschwindet. Sie müssen den
 # Response überleben, können also nicht sofort nach dem Schreiben weg.
@@ -2032,6 +2061,7 @@ class WebUI:
         if gradio_auth is not None:
             launch_kwargs["auth"] = gradio_auth
         logging.info("WebUI-Anmeldung: provider=%s", self.auth.name)
+        _warn_if_exposed_without_login(self.web_host, self.web_port, gradio_auth)
 
         ui_cfg = getattr(self.cfg, "ui", None)
         if ui_cfg is not None:

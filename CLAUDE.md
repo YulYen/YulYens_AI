@@ -370,6 +370,22 @@ ist das eine *Trennung* von Nutzern, kein Schutz gegen Mitlesen. `header`
 vertraut dem Header bedingungslos und darf nur hinter einem Proxy laufen, der
 ihn von außen entfernt.
 
+**Zwei Richtungen, zwei Reaktionen — der Unterschied ist Absicht:**
+
+| Lage | Reaktion |
+|---|---|
+| `provider: local`, aber **kein Nutzer auflösbar** (meist ein nicht durchgereichtes `env:`) | **Abbruch** (`AuthConfigError`, Exit 4) |
+| App horcht auf nicht-Loopback **ohne** konfigurierte Anmeldung | laute Warnung, Start läuft weiter |
+
+Der erste Fall bricht ab, weil dort jemand ausdrücklich Schutz konfiguriert hat
+und ihn sonst stillschweigend verlöre; die frühere Begründung („lieber offen und
+laut") unterstellt einen Tippfehler, der häufigere Auslöser ist aber eine
+systemd-Unit ohne `EnvironmentFile` oder ein Container ohne `--env`. Der zweite
+Fall warnt nur — „im Heimnetz ohne Login" ist ein legitimer Betriebsmodus.
+
+`ui.web.host` steht seit dieser Runde auf **`127.0.0.1`**. Vorher war `0.0.0.0`
+der Default, ohne dass es irgendwo stand.
+
 **Kein OIDC direkt:** Gradios `auth=`-Callable bekommt nur Name und Passwort —
 kein Redirect-Flow, keine Token-Validierung. Keycloak & Co. laufen über
 oauth2-proxy/Authelia davor, die die Identität als Header durchreichen; genau
@@ -458,6 +474,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
+| **Feedback (#40)** | 👍/👎 an jeder Bot-Bubble, append-only nach `logs/feedback_votes.jsonl`. **Eine Bot-Bubble ist nicht automatisch eine Modellantwort:** Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und die Kontext-Kompressionswarnung stehen in derselben Spalte und tragen ebenfalls einen Daumen. Erkannt wird das daran, dass Beiwerk **nie in der LLM-History** landet — wer eine neue Hinweis-Bubble einführt, bekommt den Schutz dadurch geschenkt, solange er sie nicht ins Kontextfenster gibt. Ein Vote, der sich nicht gegen die History prüfen lässt, wird verworfen: für einen Trainingsdaten-Kanal (#7) ist eine verlorene Bewertung billiger als eine erfundene |
 | **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
