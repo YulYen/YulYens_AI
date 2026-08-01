@@ -57,12 +57,23 @@ def test_unknown_section_is_flagged_as_a_typo():
     assert any("wiky" in p and "Tippfehler" in p for p in problems)
 
 
-def test_unknown_keys_inside_a_known_section_stay_allowed():
-    """extra='allow' mit Absicht: eine neue Option darf nichts blockieren."""
+def test_unknown_keys_inside_a_known_section_are_reported_now():
+    """Seit #66 wird auch tiefer gemeldet — aber weiterhin nur *gemeldet*.
+
+    Der alte Test verlangte hier Schweigen und begründete es mit
+    `extra="allow"`. Die Begründung stimmt, die Schlussfolgerung war zu weit:
+    "blockiert nicht" heißt nicht "sagt nichts". Genau in dieser Lücke lebten
+    `security.pii_protecton` und `storage.enable`.
+    """
     data = _real_config()
     data["core"]["brandneue_option"] = 42
 
-    assert validate_config(data) == []
+    problems = validate_config(data)
+
+    assert any("core.brandneue_option" in p for p in problems)
+    # Dass so ein Befund den Start nicht anhält, hält
+    # test_startup_only_warns_and_keeps_running fest — das ist der Unterschied
+    # zu extra="forbid".
 
 
 def test_out_of_range_temperature_is_reported(tmp_path):
@@ -151,3 +162,112 @@ def _ensemble_copy(tmp_path: Path) -> Path:
     target = tmp_path / "classic"
     shutil.copytree(REPO_ROOT / "ensembles" / "classic", target)
     return target
+
+
+# ---- Rekursive Prüfung (#66) -----------------------------------------------
+
+
+def _with_typo(section: tuple[str, ...], old: str, new: str) -> dict:
+    """Benennt einen echten Key der ausgelieferten Config um."""
+    data = _real_config()
+    node = data
+    for part in section:
+        node = node[part]
+    node[new] = node.pop(old)
+    return data
+
+
+@pytest.mark.parametrize(
+    "section,old,new,expected",
+    [
+        # Die drei Fälle, die das Ticket namentlich nennt …
+        (("security",), "pii_protection", "pii_protecton", "security.pii_protecton"),
+        (("storage",), "enabled", "enable", "storage.enable"),
+        (
+            ("api", "openai_compatible"),
+            "api_key",
+            "apikey",
+            "api.openai_compatible.apikey",
+        ),
+        # … und die Ebenen darunter, damit die Rekursion nicht bei zwei aufhört.
+        (("ui", "web", "auth"), "users", "user", "ui.web.auth.user"),
+        (
+            ("context_management", "karl"),
+            "model",
+            "modell",
+            "context_management.karl.modell",
+        ),
+        (("wiki", "offline"), "zim_path", "zimpath", "wiki.offline.zimpath"),
+    ],
+)
+def test_a_typo_is_reported_at_every_depth(section, old, new, expected):
+    """Vorher lief der Abgleich nur gegen die oberste Ebene (#66).
+
+    Gemeldet wurde also genau die Ebene, auf der sich niemand vertippt: dass
+    `security` richtig geschrieben ist, hilft nicht, wenn `pii_protecton`
+    darunter still ins Leere läuft — der Schutz ist dann aus, und nichts sagt
+    es. Der `ui.web.auth.user`-Fall ist derselbe, der in #63 die Anmeldung
+    lautlos entwertet hat.
+    """
+    problems = validate_config(_with_typo(section, old, new))
+
+    assert any(expected in p and "Tippfehler" in p for p in problems), problems
+
+
+@pytest.mark.parametrize(
+    "path,key",
+    [
+        (("ui", "web", "auth", "users"), "eine-neue-person"),
+        (("tts", "voices", "personas_de"), "GASTPERSONA"),
+        (("core", "knowledge_cutoffs"), "irgendein-modell:70b"),
+    ],
+)
+def test_free_form_mappings_are_data_and_stay_silent(path, key):
+    """Nutzernamen, Stimmen, Modellnamen — dort ist *jeder* Key gültig.
+
+    Diese Mappings stehen bewusst als `dict[str, Any]` im Schema; die Rekursion
+    steigt nicht ein. Täte sie es, wäre jeder angelegte Nutzer eine Warnung —
+    und Warnungen, die immer kommen, liest bald niemand mehr.
+    """
+    data = _real_config()
+    node = data
+    for part in path:
+        node = node.setdefault(part, {})
+    node[key] = "irgendwas"
+
+    assert validate_config(data) == []
+
+
+def test_a_typo_inside_a_list_entry_is_reported():
+    """Auch Listen von Untermodellen werden abgelaufen — z. B. die RSS-Feeds."""
+    data = _real_config()
+    data["briefing"]["feeds"] = [
+        {"name": "tagesschau", "url": "https://example.invalid/rss", "titel": "x"}
+    ]
+
+    problems = validate_config(data)
+
+    assert any("briefing.feeds.titel" in p for p in problems), problems
+
+
+def test_the_wording_separates_sections_from_settings():
+    """Ganz oben fehlt eine *Sektion*, weiter unten eine *Einstellung*."""
+    data = _real_config()
+    data["sicherheit"] = {}
+    data["storage"]["ablage"] = True
+
+    problems = validate_config(data)
+
+    assert any("unbekannte Sektion 'sicherheit'" in p for p in problems)
+    assert any("unbekannte Einstellung 'storage.ablage'" in p for p in problems)
+
+
+def test_every_section_of_the_shipped_config_is_modelled():
+    """Der Test, der diesen Umbau überhaupt abnimmt.
+
+    Die Rekursion ist nur so viel wert, wie das Schema die echte Config kennt:
+    jeder nicht modellierte Key wäre ab sofort eine Warnung beim *normalen*
+    Start — also ein Fehlalarm bei jedem Nutzer. Deshalb steht hier die
+    ausgelieferte Datei selbst auf dem Prüfstand, Ebene für Ebene.
+    """
+    assert validate_config(_real_config()) == []
