@@ -3,6 +3,8 @@ from unittest.mock import Mock
 from ui import self_talk
 from ui.self_talk import SelfTalkRunner, is_end_of_self_talk
 
+from tests.doubles import factory_double, streamer_double
+
 
 def test_is_end_of_self_talk_recognizes_tokens():
     assert is_end_of_self_talk("... _endegelaende_")
@@ -11,9 +13,9 @@ def test_is_end_of_self_talk_recognizes_tokens():
 
 
 def test_self_talk_runner_alternates_histories():
-    factory = Mock()
-    streamer_a = Mock()
-    streamer_b = Mock()
+    factory = factory_double()
+    streamer_a = streamer_double()
+    streamer_b = streamer_double()
     streamer_a.stream.return_value = iter(["Antwort A"])
     streamer_b.stream.return_value = iter(["Antwort B _endegelaende_"])
     factory.get_streamer_for_persona.side_effect = [streamer_a, streamer_b]
@@ -51,9 +53,9 @@ def _terminal_run_fixture(monkeypatch, replies_b):
     texts = _Catalog(terminal_self_talk_title="== AI Dialog ==")
     config = Mock(texts=texts)
 
-    factory = Mock()
-    streamer_a = Mock()
-    streamer_b = Mock()
+    factory = factory_double()
+    streamer_a = streamer_double()
+    streamer_b = streamer_double()
     streamer_a.stream.side_effect = lambda messages: iter(["Hallo von A"])
     streamer_b.stream.side_effect = lambda messages: iter(replies_b)
     factory.get_streamer_for_persona.side_effect = [streamer_a, streamer_b]
@@ -88,7 +90,7 @@ def test_terminal_self_talk_run_handles_keyboard_interrupt(monkeypatch, capsys):
         raise KeyboardInterrupt
 
     factory.get_streamer_for_persona.side_effect = None
-    streamer = Mock()
+    streamer = streamer_double()
     streamer.stream.side_effect = _interrupt
     factory.get_streamer_for_persona.return_value = streamer
 
@@ -124,7 +126,7 @@ def test_self_talk_records_both_sides_in_the_store(tmp_path):
         )
         return provider
 
-    factory = Mock()
+    factory = factory_double()
     factory.get_streamer_for_persona.side_effect = lambda p: _streamer(p)
     factory.open_conversation.side_effect = lambda persona, app, user="local": (
         store.start(user=user, persona=persona, model="dummy", app=app)

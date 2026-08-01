@@ -8,6 +8,8 @@ from core.dummy_llm_core import DummyLLMCore
 from core.streaming_provider import YulYenStreamingProvider, _StreamModerator
 from security.tinyguard import BasicGuard
 
+from tests.doubles import permissive_guard_double
+
 
 class FakeTokenCore:
     """LLM core stub that emits a predefined sequence of tokens."""
@@ -21,23 +23,6 @@ class FakeTokenCore:
 
     def warm_up(self, *_args: Any, **_kwargs: Any) -> None:
         pass
-
-
-class AllowAllGuard:
-    """Minimal guard that allows every input and output."""
-
-    def check_input(self, text: str) -> dict[str, Any]:
-        return {"ok": True}
-
-    def process_output(self, text: str) -> dict[str, Any]:
-        return {"blocked": False, "text": text}
-
-    def check_output(self, text: str) -> dict[str, Any]:
-        return {"ok": True}
-
-    def output_match_crossing(self, text: str, offset: int) -> int | None:
-        # Nichts trifft zu, also läuft auch kein Treffer über die Freigabegrenze.
-        return None
 
 
 def create_streaming_provider(
@@ -132,7 +117,7 @@ def test_streaming_writes_conversation_json_log(tmp_path) -> None:
         persona_prompt="Du bist DORIS.",
         persona_options={"temperature": 0.2},
         log_file=log_file.name,
-        guard=AllowAllGuard(),
+        guard=permissive_guard_double(),
         jsonl_log=True,
     )
 
@@ -429,19 +414,15 @@ def test_set_user_falls_back_instead_of_writing_an_empty_name(tmp_path, monkeypa
 # ---- Der Eingangs-Check des Guards steht nur noch einmal --------------------
 
 
-class _BlockAllGuard:
-    """Guard, der jede Eingabe ablehnt — mit dem Vertrag von BasicGuard."""
-
-    texts = {"security_blocked_keyword": "Nö."}
-
-    def check_input(self, text: str) -> dict[str, Any]:
-        return {"ok": False, "reason": "blocked_keyword", "detail": text[:10]}
-
-    def process_output(self, text: str) -> dict[str, Any]:
-        return {"blocked": False, "text": text}
-
-    def check_output(self, text: str) -> dict[str, Any]:
-        return {"ok": True}
+def _block_all_guard():
+    """Guard, der jede Eingabe ablehnt — sonst wie der durchlässige."""
+    guard = permissive_guard_double(texts={"security_blocked_keyword": "Nö."})
+    guard.check_input.side_effect = lambda text: {
+        "ok": False,
+        "reason": "blocked_keyword",
+        "detail": text[:10],
+    }
+    return guard
 
 
 def test_stream_and_one_shot_refuse_the_same_way() -> None:
@@ -453,7 +434,7 @@ def test_stream_and_one_shot_refuse_the_same_way() -> None:
     """
     from wiki.lookup import WikiLookup
 
-    provider = create_streaming_provider(guard=_BlockAllGuard())
+    provider = create_streaming_provider(guard=_block_all_guard())
 
     streamed = "".join(
         provider.stream(messages=[{"role": "user", "content": "verbotene Frage"}])

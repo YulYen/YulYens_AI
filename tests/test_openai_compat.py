@@ -350,22 +350,19 @@ def test_resolve_secret_reads_braced_env(monkeypatch):
 
 def _provider_with_fake_streamer(monkeypatch, captured):
     """Provider mit Dummy-Factory, der die an das Modell gehende History festhält."""
-    from unittest.mock import Mock
-
     from api.provider import AiApiProvider
 
-    streamer = Mock()
+    from tests.doubles import factory_double, streamer_double
 
     def _stream(messages):
         captured.extend(dict(m) for m in messages)
         return iter(["ok"])
 
+    streamer = streamer_double()
     streamer.stream.side_effect = _stream
-    factory = Mock()
-    streamer.guard = None
+    factory = factory_double()
     factory.get_streamer_for_persona.return_value = streamer
     factory.get_config.return_value = Config()
-    factory.build_guard.return_value = None
 
     return AiApiProvider(
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=100, max_snippets=1),

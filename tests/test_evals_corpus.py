@@ -164,6 +164,23 @@ def test_guard_known_gap_without_note_is_rejected(tmp_path):
         load_guard_corpus(tmp_path)
 
 
+def test_guard_rule_without_a_blocking_reason_is_rejected(tmp_path):
+    """`rule` sagt, *welche* Regel greifen soll — an einem sauberen Fall greift keine.
+
+    Ohne diese Prüfung stünde in einem `ok`-Fall eine Erwartung, die nie
+    erfüllbar ist: `check_input` liefert dort `rule: None`. Der Fall wäre
+    dauerhaft rot, ohne dass am Guard etwas kaputt wäre.
+    """
+    _write(
+        tmp_path,
+        "guard_redteam.yaml",
+        "cases:\n  - id: a\n    stage: input\n    text: t\n"
+        "    expect:\n      ok: true\n      reason: ok\n      rule: irgendwas\n",
+    )
+    with pytest.raises(CorpusError, match="only makes sense together"):
+        load_guard_corpus(tmp_path)
+
+
 def test_guard_non_boolean_expectation_is_rejected(tmp_path):
     _write(
         tmp_path,

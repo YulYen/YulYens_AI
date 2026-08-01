@@ -22,7 +22,7 @@ _CHECK_KEYS = {"must_match", "must_not_match", "max_chars", "min_chars"}
 _PERSONA_CASE_KEYS = {"id", "question", "expect_traits", "checks", "note"}
 _BEHAVIOUR_CASE_KEYS = _PERSONA_CASE_KEYS
 _GUARD_CASE_KEYS = {"id", "stage", "text", "expect", "note", "known_gap"}
-_GUARD_EXPECT_KEYS = {"ok", "reason", "blocked", "masked", "injected"}
+_GUARD_EXPECT_KEYS = {"ok", "reason", "rule", "blocked", "masked", "injected"}
 # "context" ist der dritte Kanal: abgerufener Fremdtext (Wikipedia-Snippet,
 # RSS-Meldung), der als system-Nachricht in den Prompt geht. Er hat eigene
 # Regeln — nur prompt_injection und wrongdoing verwerfen, PII ist erlaubt —
@@ -418,11 +418,19 @@ def load_guard_corpus(base_dir: Path | None = None) -> GuardCorpus:
             raise CorpusError(f"{where}: 'expect' must be a non-empty mapping.")
         _reject_unknown(f"{where} expect", expect, _GUARD_EXPECT_KEYS)
         for key, value in expect.items():
-            if key == "reason":
+            if key in ("reason", "rule"):
                 if not isinstance(value, str) or not value.strip():
-                    raise CorpusError(f"{where}: 'reason' must be a non-empty string.")
+                    raise CorpusError(f"{where}: '{key}' must be a non-empty string.")
             elif not isinstance(value, bool):
                 raise CorpusError(f"{where}: '{key}' must be a boolean.")
+        # `rule` haelt fest, *welche* Regel den Fall fangen soll (#62). Ein Fall,
+        # der aus dem falschen Grund gruen ist, sieht sonst aus wie ein Erfolg —
+        # und die eigentlich gemeinte Regel darf verrotten, ohne dass es auffaellt.
+        if "rule" in expect and expect.get("reason") in (None, "ok"):
+            raise CorpusError(
+                f"{where}: 'rule' only makes sense together with a blocking "
+                "'reason' — a case that passes cleanly has no rule."
+            )
         if stage != "output" and ("blocked" in expect or "masked" in expect):
             raise CorpusError(
                 f"{where}: 'blocked'/'masked' apply to output cases only "
