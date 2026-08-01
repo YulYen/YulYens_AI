@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import logging
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import requests
 from bs4 import BeautifulSoup
 from config.config_singleton import Config
+from security.tinyguard import accepted_context
 
 
 def _local(tag: str) -> str:
@@ -86,14 +88,25 @@ def fetch_briefing_items(
     return (hints, items)
 
 
-def inject_briefing_context(history: list, items: list[tuple[str, str]]) -> None:
+def inject_briefing_context(
+    history: list, items: list[tuple[str, str]], guard: Any = None
+) -> None:
     """
     Hängt wie inject_wiki_context eine Guardrail-Message und eine
     System-Message pro Meldung an die History an (mutiert in place).
+
+    ``guard`` optional, gleiche Regel wie beim Wiki: der Text kommt aus einem
+    abonnierten Feed und wird als ``system``-Nachricht eingebettet — wer den
+    Feed kontrolliert, schriebe sonst direkt in die Anweisungen des Modells.
     """
     if not items:
         return
     cfg = Config()
+    items = accepted_context(
+        guard, items, text_of=lambda item: item[1], label_of=lambda item: item[0]
+    )
+    if not items:
+        return
     history.append({"role": "system", "content": cfg.t("briefing_context_guardrail")})
 
     for idx, (source, snippet) in enumerate(items, start=1):

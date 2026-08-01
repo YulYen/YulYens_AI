@@ -66,7 +66,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── service.py           # opt-in IMAP/SMTP-Bridge (Personas per Mail)
 │   ├── wiki/
 │   │   ├── lookup.py            # WikiLookup + Snippet-Abruf (WikiSnippet) + Injektion
-│   │   ├── wikipedia_proxy.py   # HTTP-Proxy (Port 8042)
+│   │   ├── wikipedia_proxy.py   # HTTP-Proxy (Port 8042, nur 127.0.0.1, threaded)
 │   │   ├── spacy_keyword_finder.py  # NLP-Schlüsselwortextraktion
 │   │   └── kiwix_autostart.py
 │   ├── auth/
@@ -96,9 +96,10 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 36 Testmodule (inkl. test_web_ui_wiring.py)
+│   └── test_*.py                # 41 Testmodule (inkl. test_web_ui_wiring.py,
+│                                #   test_continuation.py, test_imports.py)
 ├── locales/
-│   ├── de.yaml                  # 111 UI-Texte Deutsch
+│   ├── de.yaml                  # 150 UI-Texte Deutsch (Parität mit en.yaml)
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
@@ -133,9 +134,39 @@ Config.reset_instance()        # in Tests: Isolation
 
 ### Streaming-Flow
 ```
-User-Input → SecurityGuard (pre-check) → spaCy → Wiki-Proxy (8042) → Ollama
-           → Token-Stream → SecurityGuard (post-check) → UI + TTS + JSON-Log
+User-Input ──→ SecurityGuard (Eingang) ──┐
+spaCy → Wiki-Proxy (8042) ──→ Guard (Kontext) ──┤
+briefing/feeds.py (RSS) ───→ Guard (Kontext) ──┘
+                                          → Ollama
+           → Token-Stream → SecurityGuard (Ausgang) → UI + TTS + JSON-Log
 ```
+
+**Der Guard hat zwei Eingänge, nicht einen.** Die frühere Darstellung
+(`User-Input → Guard → spaCy → Wiki-Proxy → Ollama`) las sich, als läge der
+Guard vor allem, was ins Modell geht — er sah aber ausschließlich die letzte
+`user`-Nachricht. Abgerufener Fremdtext (Wiki-Snippet, RSS-Meldung) ging an ihm
+vorbei und landete als **`system`**-Nachricht im Prompt, also mit *mehr* Gewicht
+als die Frage des Nutzers. Derselbe Satz, den der Guard beim Tippen blockt, kam
+über eine heruntergeladene ZIM-Datei ungeprüft durch.
+
+Seit dem Fix prüft `security.tinyguard.accepted_context` den Inhalt (nur
+`prompt_injection` und `wrongdoing` verwerfen — ein Artikel darf E-Mail-Adressen
+enthalten). Wer einen **dritten** Kontext-Kanal baut, muss ihn dort mit
+anschließen; ein Kanal ohne diese Prüfung ist eine Injection-Lücke mit
+System-Autorität.
+
+**Gefiltert wird in `WikiLookup.snippets()`, nicht erst beim Injizieren.** Der
+erste Anlauf hängte die Prüfung nur an `inject_wiki_context` — dann bekam die
+Quellen-Karte (#32) weiterhin die *ungefilterte* Liste und behauptete Quellen,
+die das Modell nie gesehen hat. Das ist exakt der Defekt, gegen den #32 gebaut
+wurde. Ausgelöst wird er von der bekannt schlechten False-Positive-Rate des
+Guards (#62): ein Artikel über `localhost` trifft die Injection-Regel. Alle
+Verbraucher — Anzeige, Injektion, `/quellen` im Terminal — gehen deshalb durch
+diese eine Methode. `inject_wiki_context`/`inject_briefing_context` behalten
+ihren `guard`-Parameter als letzte Schranke vor dem Prompt.
+
+Die Rolle ist weiterhin `system` — sie nach `user` zu verschieben ändert das
+Antwortverhalten aller Personas und braucht einen Lauf am echten Modell (#60).
 
 ### AppFactory
 - Baut und cached alle Komponenten (Streamer, UI, API-Provider, Store, `WikiLookup`)
@@ -289,6 +320,25 @@ Schritte nur **anhängen**, nie einen ausgelieferten Schritt ändern. Die
 FTS5-Tabelle für #49 wird Schritt 2 — SQLite bringt FTS5 mit, ein eigener Index
 ist unnötig.
 
+**Jeder Schritt läuft ganz oder gar nicht.** Vorher lief er über
+`executescript`, das die pendente Transaktion vorher committet und das Skript
+selbst nicht klammert: scheiterte Anweisung 2 von 3, blieb Anweisung 1 stehen,
+`user_version` blieb zurück — und damit war der Schritt **nie wieder** anwendbar
+(„table … already exists"). Der Store degradierte bei jedem weiteren Start zum
+`NullStore`, und die App lief weiter, ohne noch etwas aufzuzeichnen. Jetzt steht
+`BEGIN`/`COMMIT` im Skript, `user_version` wird darin gesetzt (in SQLite
+transaktional), ein Fehlschlag rollt zurück und nennt die Schrittnummer.
+Bewusst weiter `executescript` statt einer Zerlegung an `;`: ein FTS5-Trigger
+bringt eigene Semikolons im `BEGIN…END`-Rumpf mit.
+
+**Nutzergebundenes Lesen und Löschen:** `load()` und `delete()` nehmen ein
+optionales, keyword-only `user`. Mit gesetztem Wert verhält sich ein fremdes
+Gespräch wie ein nicht existierendes — die Antwort soll nicht verraten, dass es
+die ID gibt. Terminal und API rufen weiter ohne `user`. **Die WebUI muss ihn
+immer setzen:** die Gesprächs-ID kommt aus einem `gr.Dropdown`, und dessen
+`preprocess` reicht in Gradio 4.44 den Wert des Clients ungeprüft durch — die
+Auswahl im Browser ist keine Schranke.
+
 **Die Gesprächs-ID gehört der Oberfläche, nicht dem Streamer:** sie liegt im
 `gr.State` `conversation_state` und wird nach einem Streamer-Neubau erneut
 gesetzt (`set_conversation`). Sonst begänne jede Fortsetzung ein neues Gespräch.
@@ -408,7 +458,7 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
-| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH |
+| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
@@ -484,6 +534,25 @@ entfällt der Holdback automatisch, weil es dann nichts zu prüfen gibt.
 Wichtig für #17/#42: eine backendseitige Messung von „Zeit bis zum ersten Token"
 sieht diesen Anteil **nicht** — das Modell liefert längst, die Anzeige wartet.
 
+**Der Holdback ist nur die eine Hälfte.** #51 hat die Zeit bis zum *ersten*
+Token gemessen und daraus den Default abgeleitet — korrekt, aber unvollständig.
+`_StreamModerator.feed()` ruft `process_output` **pro Token über den gesamten
+bisherigen Text** auf, ist also quadratisch im Antwortumfang. Mit der
+ausgelieferten Config gemessen (nur `output_blocklist` aktiv):
+
+| Antwort | reine Guard-CPU |
+|---|---|
+| 200 Tokens (800 Zeichen) | 4 ms |
+| 1000 Tokens (4.000 Zeichen) | 102 ms |
+| 2000 Tokens (8.000 Zeichen) | 409 ms |
+| 4000 Tokens (16.000 Zeichen) | **1.605 ms** |
+
+Zum Vergleich: mit `security.enabled: false` sind es bei 4000 Tokens 3,8 ms.
+Der Holdback kostet einmalig, dieser Anteil wächst mit jeder Antwort und läuft
+auf dem yieldenden Thread — im parallelen Broadcast viermal gleichzeitig gegen
+dieselbe GIL. Behoben wird das zusammen mit zwei weiteren Defekten desselben
+Codes in **#58**.
+
 ### ⚠️ Stolperfalle: Button-Updates nie als eigenes Event vor den Stream hängen
 Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor dem
 Stream-Handler (`btn.click(toggle).then(stream)`). **Kostet ~3,5 s bis zum ersten
@@ -517,8 +586,11 @@ Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
-- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator, #42 Perf-Benchmark, #14 E-Mail-Restpunkte
+- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator, #42 Perf-Benchmark
   (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
+- **Aus Review-Runde 2 (#57):** #58 `_StreamModerator` (verschluckter Text, roher Text im
+  Store, quadratische Laufzeit), #59 Ablage = Gespräch statt LLM-Aufruf, #62 Guard-Regelwerk,
+  #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -530,7 +602,7 @@ via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen)
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
 #32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
 #43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
-#54 Gesprächs-Ablage (SQLite), #25 Verlauf.
+#54 Gesprächs-Ablage (SQLite), #25 Verlauf, #55 Review-Befunde, #57 Review-Befunde Runde 2.
 
 ## Sprachstrategie
 
@@ -546,7 +618,7 @@ POST http://127.0.0.1:8013/ask
   Body: { "question": "Hallo", "persona": "LEAH" }
   → { "answer": "..." }
 
-GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet)
+GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet) — ohne Schlüssel
 GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler)
 
 # OpenAI-kompatibel (#37) — "model" ist der Persona-Name
@@ -558,6 +630,12 @@ POST http://127.0.0.1:8013/v1/chat/completions
 ### OpenAI-Kompatibilität: worauf zu achten ist
 - **`model` = Persona**, nicht LLM. `/v1/models` listet Personas; das echte Modell
   bleibt Serversache (`core.model_name`).
+- **`api.openai_compatible.api_key` gilt für *alle* Endpunkte, auch für `/ask`** —
+  der Name sagt nur, wo die Option steht. Vorher hing `require_access` allein am
+  `/v1`-Router, während `/ask` auf demselben Port dieselbe Fähigkeit ohne
+  Schlüssel und ohne Rate-Limit anbot. Die Regel liegt in `check_api_access`,
+  die Fehler*form* bleibt pro Router verschieden (`/v1`: OpenAI, `/ask`:
+  FastAPI). Ein neuer Endpunkt, der ein LLM anspricht, gehört dort mit dran.
 - **Fehler-Bodies müssen `{"error": {...}}` auf oberster Ebene haben.** FastAPIs
   `HTTPException(detail=…)` erzeugt `{"detail": {"error": …}}` — eine Ebene zu tief,
   das offizielle openai-SDK findet die Felder dann nicht. Deshalb eigene

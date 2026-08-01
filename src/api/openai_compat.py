@@ -17,17 +17,18 @@ endpoint.
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import time
 import uuid
 from collections.abc import Iterator
 from threading import Lock
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from core.context_utils import approx_token_count
 from core.utils import resolve_secret
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -181,26 +182,40 @@ def _get_config():
     return Config()
 
 
-def require_access(
-    request: Request,
-    authorization: str | None = Header(default=None),
-) -> None:
-    """Feature flag, optional bearer key and rate limit — all from config."""
+class AccessDenied(NamedTuple):
+    """Warum ein Zugriff abgelehnt wird — ohne die Fehlerform festzulegen."""
+
+    status: int
+    message: str
+    err_type: str
+    code: str | None = None
+
+
+def check_api_access(
+    request: Request, authorization: str | None
+) -> AccessDenied | None:
+    """Bearer-Key und Rate-Limit — die Regel, unabhängig vom Endpunkt.
+
+    Bewusst als Wert statt als Exception: ``/v1`` muss den Fehler in der
+    OpenAI-Form ausliefern (``{"error": {...}}``), ``/ask`` behält FastAPIs
+    ``{"detail": ...}``, weil bestehende Aufrufer darauf hören. Die *Regel* darf
+    davon aber nicht abhängen — genau diese Trennung fehlte: der Schlüssel hing
+    an ``require_access`` und damit ausschließlich am ``/v1``-Router, während
+    ``/ask`` auf demselben Port dieselbe Fähigkeit ohne Schlüssel und ohne
+    Limit anbot.
+    """
     cfg = _get_config()
     settings = _openai_cfg(cfg)
-
-    if not bool(settings.get("enabled", True)):
-        # 404 statt 403: ein abgeschalteter Endpunkt soll aussehen, als gäbe es
-        # ihn nicht — kein Hinweis darauf, dass hier etwas zu holen wäre.
-        raise _error(404, "Not Found", "invalid_request_error")
 
     expected = resolve_secret(settings.get("api_key"))
     if expected:
         provided = ""
         if authorization and authorization.lower().startswith("bearer "):
             provided = authorization[7:].strip()
-        if provided != expected:
-            raise _error(
+        # compare_digest statt '!=': die Laufzeit soll nicht verraten, wie viele
+        # Zeichen des Schlüssels stimmen.
+        if not hmac.compare_digest(provided, expected):
+            return AccessDenied(
                 401,
                 "Incorrect API key provided.",
                 "invalid_request_error",
@@ -209,13 +224,45 @@ def require_access(
 
     client = request.client.host if request.client else "unknown"
     if not _limiter(cfg).check(client):
-        raise _error(
+        return AccessDenied(
             429,
             "Rate limit exceeded. Slow down or raise "
             "api.openai_compatible.rate_limit_per_minute.",
             "rate_limit_error",
             "rate_limit_exceeded",
         )
+    return None
+
+
+def require_access(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Zugang zu ``/v1``: Feature-Flag, dann die gemeinsame Regel."""
+    settings = _openai_cfg(_get_config())
+
+    if not bool(settings.get("enabled", True)):
+        # 404 statt 403: ein abgeschalteter Endpunkt soll aussehen, als gäbe es
+        # ihn nicht — kein Hinweis darauf, dass hier etwas zu holen wäre.
+        raise _error(404, "Not Found", "invalid_request_error")
+
+    denied = check_api_access(request, authorization)
+    if denied is not None:
+        raise _error(denied.status, denied.message, denied.err_type, denied.code)
+
+
+def require_ask_access(
+    request: Request,
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Zugang zu ``/ask`` — derselbe Schlüssel, aber FastAPIs Fehlerform.
+
+    ``/ask`` hat kein eigenes ``enabled``-Flag; es hängt an ``api.enabled``,
+    das schon darüber entscheidet, ob der Server überhaupt läuft.
+    """
+    denied = check_api_access(request, authorization)
+    if denied is not None:
+        raise HTTPException(status_code=denied.status, detail=denied.message)
 
 
 # ---- Payload helpers -----------------------------------------------------

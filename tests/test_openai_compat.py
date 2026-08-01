@@ -362,8 +362,10 @@ def _provider_with_fake_streamer(monkeypatch, captured):
 
     streamer.stream.side_effect = _stream
     factory = Mock()
+    streamer.guard = None
     factory.get_streamer_for_persona.return_value = streamer
     factory.get_config.return_value = Config()
+    factory.build_guard.return_value = None
 
     return AiApiProvider(
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=100, max_snippets=1),
@@ -380,7 +382,7 @@ def test_wiki_context_lands_directly_before_the_last_user_turn(client, monkeypat
     )
     monkeypatch.setattr(
         "api.provider.inject_wiki_context",
-        lambda history, contexts: history.append(
+        lambda history, contexts, guard=None: history.append(
             {"role": "system", "content": f"WIKI:{contexts[0].topic}"}
         ),
     )
@@ -429,7 +431,9 @@ def test_stream_messages_does_not_mutate_the_callers_history(client, monkeypatch
     )
     monkeypatch.setattr(
         "api.provider.inject_wiki_context",
-        lambda history, contexts: history.append({"role": "system", "content": "WIKI"}),
+        lambda history, contexts, guard=None: history.append(
+            {"role": "system", "content": "WIKI"}
+        ),
     )
 
     original = [{"role": "user", "content": "Frage"}]
@@ -445,3 +449,66 @@ def test_stream_messages_rejects_unknown_persona(client, monkeypatch):
 
     with pytest.raises(UnknownPersonaError):
         list(provider.stream_messages([{"role": "user", "content": "x"}], "NIEMAND"))
+
+
+# ---- Der Schlüssel gilt für alle Endpunkte, nicht nur für /v1 ---------------
+
+
+def test_the_api_key_also_guards_ask(client):
+    """/ask bot dieselbe Fähigkeit wie /v1 — auf demselben Port, ohne Schlüssel.
+
+    Der Kommentar an `api.openai_compatible.api_key` in config.yaml sagt
+    ausdrücklich „Sobald der Server im LAN hängt: setzen". Genau das half
+    nichts: `require_access` hing nur am /v1-Router.
+    """
+    Config().override("api", {"openai_compatible": {"api_key": "geheim"}})
+    body = {"question": "Hallo", "persona": "LEAH"}
+
+    assert client.post("/ask", json=body).status_code == 401
+    assert (
+        client.post(
+            "/ask", json=body, headers={"Authorization": "Bearer falsch"}
+        ).status_code
+        == 401
+    )
+    ok = client.post("/ask", json=body, headers={"Authorization": "Bearer geheim"})
+    assert ok.status_code == 200
+    assert ok.json()["answer"]
+
+
+def test_ask_keeps_fastapis_error_shape(client):
+    """Die Regel ist geteilt, die Fehlerform nicht.
+
+    Unter /v1 erwarten OpenAI-Clients `{"error": {...}}`, /ask hat seit jeher
+    FastAPIs `{"detail": ...}` — bestehende Aufrufer hören darauf.
+    """
+    Config().override("api", {"openai_compatible": {"api_key": "geheim"}})
+
+    body = client.post("/ask", json={"question": "Hallo", "persona": "LEAH"}).json()
+
+    assert "detail" in body and "error" not in body
+
+
+def test_ask_is_open_when_no_key_is_configured(client):
+    """Default bleibt offen — der Fix darf niemandem etwas wegnehmen."""
+    assert (
+        client.post("/ask", json={"question": "Hallo", "persona": "LEAH"}).status_code
+        == 200
+    )
+
+
+def test_the_rate_limit_also_covers_ask(client):
+    Config().override("api", {"openai_compatible": {"rate_limit_per_minute": 2}})
+    body = {"question": "Hallo", "persona": "LEAH"}
+
+    assert client.post("/ask", json=body).status_code == 200
+    assert client.post("/ask", json=body).status_code == 200
+    assert client.post("/ask", json=body).status_code == 429
+
+
+def test_health_stays_reachable_without_a_key(client):
+    """Liveness darf nicht am Schlüssel hängen — sonst sieht ein Monitor
+    einen gesunden Prozess als tot an."""
+    Config().override("api", {"openai_compatible": {"api_key": "geheim"}})
+
+    assert client.get("/health").status_code == 200

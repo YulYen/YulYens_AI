@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 import requests
 from config.config_singleton import Config
+from security.tinyguard import accepted_context
 
 
 @dataclass(frozen=True)
@@ -87,10 +88,22 @@ class WikiLookup:
         )
 
     def snippets(
-        self, question: str, persona_name: str
+        self, question: str, persona_name: str, guard: Any = None
     ) -> tuple[list[str], list[WikiSnippet]]:
-        """UI-Hinweise und Snippets zur Frage — leer, wenn Wiki aus ist."""
-        return lookup_wiki_snippet(
+        """UI-Hinweise und Snippets zur Frage — leer, wenn Wiki aus ist.
+
+        **Der Guard filtert hier, nicht erst beim Injizieren.** Sonst listet die
+        Quellen-Anzeige (#32) einen Ausschnitt auf, den das Modell nie gesehen
+        hat — und genau das sichtbar zu machen ist der einzige Zweck von #32.
+        Der Auslöser ist nicht exotisch: ein Artikel über ``localhost`` trifft
+        die Injection-Regel, obwohl er harmlos ist (die False-Positive-Rate des
+        Guards ist bekannt schlecht, siehe #62).
+
+        Weil alle Verbraucher — Quellen-Anzeige, Injektion, ``/quellen`` im
+        Terminal — durch diese eine Methode gehen, sehen sie zwangsläufig
+        dieselbe Liste.
+        """
+        hints, contexts = lookup_wiki_snippet(
             question,
             persona_name,
             self.keyword_finder,
@@ -99,6 +112,12 @@ class WikiLookup:
             self.limit,
             self.timeout,
             self.max_snippets,
+        )
+        return hints, accepted_context(
+            guard,
+            contexts,
+            text_of=lambda ctx: ctx.snippet,
+            label_of=lambda ctx: ctx.topic,
         )
 
 
@@ -194,18 +213,31 @@ def _full_length(data: dict, snippet: str) -> int:
     return max(reported, len(snippet))
 
 
-def inject_wiki_context(history: list, contexts: list[WikiSnippet]) -> None:
+def inject_wiki_context(
+    history: list, contexts: list[WikiSnippet], guard: Any = None
+) -> None:
     """
     If Wikipedia snippets are available, append a guardrail message and one
     system message per snippet. Each snippet block is clearly delimited.
+
+    ``guard`` ist optional, damit Aufrufer ohne Guard (und die Bestandstests)
+    unverändert bleiben. Ist einer da, fliegt ein Snippet raus, dessen Text die
+    Injection- oder Wrongdoing-Regeln auslöst: der Artikeltext kommt aus einer
+    ZIM-Datei aus dem Netz und landet als ``system``-Nachricht im Prompt — also
+    mit mehr Gewicht als die Frage des Nutzers.
     """
     if not contexts:
         return
     cfg = Config()
+    safe = accepted_context(
+        guard, contexts, text_of=lambda ctx: ctx.snippet, label_of=lambda ctx: ctx.topic
+    )
+    if not safe:
+        return
     guardrail = cfg.t("wiki_context_guardrail")
     history.append({"role": "system", "content": guardrail})
 
-    for idx, ctx in enumerate(contexts, start=1):
+    for idx, ctx in enumerate(safe, start=1):
         topic_clean = ctx.topic.replace("_", " ")
         context_message = cfg.t(
             "wiki_context_message", topic=topic_clean, snippet=ctx.snippet

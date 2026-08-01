@@ -64,8 +64,12 @@ def _create_web_ui(ui_config=None):
             },
         },
     )
+    factory = Mock()
+    # build_guard() liefert bei einem nackten Mock ein Mock statt eines Guards —
+    # der Kontext-Filter liefe dann gegen etwas, das keine Prüfung ist.
+    factory.build_guard.return_value = None
     return WebUI(
-        factory=Mock(),
+        factory=factory,
         config=dummy_config,
         wiki=WikiLookup(mode="offline", proxy_port=8042, limit=42, max_snippets=2),
         web_host="0.0.0.0",
@@ -81,6 +85,9 @@ def test_stream_reply_throttles_updates():
     tokens = [f"t{i} " for i in range(50)]
     full_text = "".join(tokens)
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
     session.streamer = streamer
@@ -102,6 +109,9 @@ def test_stream_reply_always_flushes_final_state():
     session = SessionContext()
     tokens = ["Hallo ", "Welt", "!"]
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(tokens)
     session.streamer = streamer
@@ -204,6 +214,9 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
@@ -230,6 +243,9 @@ def test_respond_streaming_keeps_session_histories_isolated():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     responses = [["Antwort 1"], ["Antwort 2"]]
     captured_messages = []
@@ -281,6 +297,9 @@ def test_respond_streaming_returns_chat_and_state_updates():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
@@ -310,6 +329,9 @@ def test_respond_streaming_appends_final_history_entries():
     history_state: list = []
 
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo"])
     session.streamer = streamer
@@ -340,7 +362,7 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
         captured["context_messages"] = list(context_messages or [])
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
 
-    def fake_inject(history, contexts):
+    def fake_inject(history, contexts, guard=None):
         history.append({"role": "system", "content": "WIKI"})
 
     with (
@@ -679,6 +701,9 @@ def _briefing_web_ui():
         "feeds": [{"name": "quelle", "url": "https://example.org/rss"}],
     }
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Ant", "wort"])
     session.streamer = streamer
@@ -713,7 +738,7 @@ def test_respond_briefing_streams_summary_with_injected_context():
     mock_fetch.assert_called_once()
     assert mock_fetch.call_args[0][2] == (1.0, 1.0)  # Timeout-Tuple aus der Config
     mock_inject.assert_called_once()
-    injected_history, injected_items = mock_inject.call_args[0]
+    injected_history, injected_items, _guard = mock_inject.call_args[0]
     assert injected_items == [("quelle: Titel", "Text")]
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
@@ -1030,6 +1055,9 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     session = SessionContext()
     stream = _BlockingStream("Teil ")
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = stream
     session.streamer = streamer
@@ -1059,6 +1087,9 @@ def test_stop_clears_the_switch_so_the_next_stream_runs():
     )  # Stop ohne laufenden Stream: darf nichts kaputt machen
 
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
     session.streamer = streamer
@@ -1145,6 +1176,9 @@ def test_regenerate_drops_last_answer_and_streams_again():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     # Snapshot beim Aufruf: _stream_reply hängt die neue Antwort an dieselbe
     # Liste an, hinterher wäre nicht mehr sichtbar, was gesendet wurde.
@@ -1184,6 +1218,9 @@ def test_regenerate_keeps_wiki_hint_rows():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Neu"])
     session.streamer = streamer
@@ -1311,6 +1348,9 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
@@ -1371,6 +1411,9 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
     session = SessionContext()
     session.bot = "Karl"
     streamer = Mock()
+    # Ausdrücklich None: bei einem Mock wäre .guard ein Auto-Attribut und
+    # der Kontext-Filter liefe gegen ein Objekt, das keine Prüfung ist.
+    streamer.guard = None
     streamer.persona_options = {}
     streamer.stream.return_value = iter(["Hi"])
     session.streamer = streamer
@@ -1739,6 +1782,7 @@ def _history_web_ui(tmp_path):
     web_ui.cfg.core = {"model_name": "m"}
     web_ui.cfg.ensemble = "classic"
     store = SqliteStore(tmp_path / "conversations.sqlite3")
+    web_ui.factory.build_guard.return_value = None
     web_ui.factory.get_store.return_value = store
     # Die Factory legt Gespräche an (#54) — hier gegen denselben Store.
     web_ui.factory.open_conversation.side_effect = lambda persona, app, user="local": (
@@ -1766,6 +1810,43 @@ def test_history_lists_only_the_signed_in_users_conversations(tmp_path):
     assert [cid for _label, cid in choices] == [mine]
 
 
+def test_no_history_handler_touches_a_foreign_conversation(tmp_path):
+    """Die Liste filterte nach Nutzer, die vier Handler dahinter nicht.
+
+    Die Gesprächs-ID kommt aus einem `gr.Dropdown`, und dessen `preprocess`
+    reicht in Gradio 4.44 den Wert des Clients ungeprüft durch — die Auswahl
+    im Browser ist also keine Schranke. Nachgestellt mit zwei angemeldeten
+    Nutzern: „bob" konnte alices Gespräch lesen, exportieren, fortsetzen und
+    **löschen**.
+
+    Bewusst alle vier Wege in einem Test: genau daran, dass eine Regel nur an
+    einem von mehreren Wegen hängt, ist das Projekt zuletzt zweimal gescheitert.
+    """
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    fremd = _fill(store, user="alice", question="Alices privates Gespräch")
+    persona_info = {"leah": {"name": "LEAH", "description": "warm"}}
+
+    # 1) Vorschau
+    assert "privates" not in web_ui._on_history_selected(fremd, "bob")["value"]
+    # 2) Öffnen/Fortsetzen
+    updates = web_ui._on_history_open(session, fremd, "bob", persona_info, "Tippe")
+    assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
+    assert session.bot is None
+    # 3) Export
+    assert web_ui._on_history_export(session, fremd, "bob")["visible"] is False
+    # 4) Löschen — der einzige unwiderrufliche Weg
+    _pick, _prev, status, _file, _confirm = web_ui._on_history_delete(
+        fremd, True, "bob"
+    )
+    assert status["value"] == web_ui._t("history_not_found")
+    assert store.load(fremd) is not None, "bob hat alices Gespräch gelöscht"
+
+    # Gegenprobe: für alice funktioniert alles unverändert.
+    assert "privates" in web_ui._on_history_selected(fremd, "alice")["value"]
+    assert web_ui._on_history_export(session, fremd, "alice")["visible"] is True
+
+
 def test_history_label_shows_date_persona_and_title(tmp_path):
     session = SessionContext()
     web_ui, store = _history_web_ui(tmp_path)
@@ -1791,7 +1872,7 @@ def test_history_preview_renders_both_roles(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store, question="Frage?")
 
-    preview = web_ui._on_history_selected(cid)["value"]
+    preview = web_ui._on_history_selected(cid, "local")["value"]
 
     assert "Frage?" in preview and "Antwort" in preview
     assert "LEAH" in preview
@@ -1803,7 +1884,7 @@ def test_history_open_makes_the_conversation_continuable(tmp_path):
     cid = _fill(store, persona="LEAH", question="Frage?")
     persona_info = {"leah": {"name": "LEAH", "description": "d"}}
 
-    updates = web_ui._on_history_open(session, cid, persona_info, "Tippe")
+    updates = web_ui._on_history_open(session, cid, "local", persona_info, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("chatbot")]["visible"] is True
     # Ohne die Gesprächs-ID würde das fortgesetzte Gespräch ins Leere schreiben.
@@ -1818,7 +1899,9 @@ def test_history_open_of_a_gone_persona_stays_readable(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
     cid = _fill(store, persona="Pirat")
 
-    updates = web_ui._on_history_open(session, cid, {"leah": {"name": "LEAH"}}, "Tippe")
+    updates = web_ui._on_history_open(
+        session, cid, "local", {"leah": {"name": "LEAH"}}, "Tippe"
+    )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_group")]["visible"] is True
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
@@ -1830,7 +1913,7 @@ def test_history_open_of_an_unknown_id_reports_it(tmp_path):
     session = SessionContext()
     web_ui, _store = _history_web_ui(tmp_path)
 
-    updates = web_ui._on_history_open(session, "gibtesnicht", {}, "Tippe")
+    updates = web_ui._on_history_open(session, "gibtesnicht", "local", {}, "Tippe")
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
 
@@ -1840,7 +1923,7 @@ def test_history_export_writes_markdown(tmp_path):
     session = SessionContext()
     cid = _fill(store, question="Frage?")
 
-    update = web_ui._on_history_export(session, cid)
+    update = web_ui._on_history_export(session, cid, "local")
 
     text = Path(update["value"]).read_text(encoding="utf-8")
     assert "Frage?" in text and "Antwort" in text
@@ -2065,7 +2148,10 @@ def test_a_guest_named_like_a_persona_is_not_continued_as_that_persona(tmp_path)
     store.append(cid, "user", "Hallo Gast")
 
     updates = web_ui._on_history_open(
-        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+        session,
+        cid,
+        "local",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
     )
 
     status = updates[PERSONA_OUTPUT_KEYS.index("history_status")]
@@ -2081,7 +2167,10 @@ def test_an_old_guest_row_without_the_marker_is_caught_by_the_name(tmp_path):
     store.append(cid, "user", "Hallo Gast")
 
     updates = web_ui._on_history_open(
-        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+        session,
+        cid,
+        "local",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
     )
 
     assert updates[PERSONA_OUTPUT_KEYS.index("history_status")]["visible"] is True
@@ -2094,7 +2183,10 @@ def test_the_real_persona_is_still_continuable(tmp_path):
     cid = _fill(store, persona="LEAH")
 
     web_ui._on_history_open(
-        session, cid, persona_info={"leah": {"name": "LEAH", "description": "warm"}}
+        session,
+        cid,
+        "local",
+        persona_info={"leah": {"name": "LEAH", "description": "warm"}},
     )
 
     assert session.bot == "LEAH"

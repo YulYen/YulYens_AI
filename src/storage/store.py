@@ -89,10 +89,10 @@ class ConversationStore(Protocol):
     ) -> list[ConversationRef]: ...
 
     def load(
-        self, conversation_id: str
+        self, conversation_id: str, *, user: str | None = None
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None: ...
 
-    def delete(self, conversation_id: str) -> bool: ...
+    def delete(self, conversation_id: str, *, user: str | None = None) -> bool: ...
 
 
 class NullStore:
@@ -110,11 +110,11 @@ class NullStore:
         return []
 
     def load(
-        self, conversation_id: str
+        self, conversation_id: str, *, user: str | None = None
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None:
         return None
 
-    def delete(self, conversation_id: str) -> bool:
+    def delete(self, conversation_id: str, *, user: str | None = None) -> bool:
         return False
 
 
@@ -138,12 +138,44 @@ class SqliteStore:
         self._migrate()
 
     def _migrate(self) -> None:
+        """Wendet die ausstehenden Schritte an — jeden ganz oder gar nicht.
+
+        Vorher lief jeder Schritt über ``executescript``. Das committet die
+        laufende Transaktion *vorher* und klammert das Skript selbst nicht:
+        scheiterte Anweisung 2 von 3, blieb Anweisung 1 stehen, während
+        ``user_version`` auf dem alten Wert blieb. Der Schritt war damit **nie
+        wieder** anwendbar — beim nächsten Start scheiterte er an „table …
+        already exists", ``build_store`` degradierte zum ``NullStore``, und die
+        App lief weiter, ohne noch irgendetwas aufzuzeichnen.
+
+        Deshalb explizit ``BEGIN``/``COMMIT``: Pythons Legacy-Modus
+        (``isolation_level=""``) eröffnet für DDL von sich aus keine
+        Transaktion. ``user_version`` wird im selben Zug gesetzt, damit Schema
+        und Versionsstand nicht auseinanderlaufen können. Das ist die
+        Vorbedingung dafür, dass Schritt 2 (FTS5 für #49) gefahrlos ausgeliefert
+        werden kann: fehlt FTS5 auf der Zielmaschine, bleibt die Datei einfach
+        auf der alten Version stehen.
+        """
         with self._lock:
             version = int(self._conn.execute("PRAGMA user_version").fetchone()[0])
             for step, sql in enumerate(_MIGRATIONS[version:], start=version + 1):
-                self._conn.executescript(sql)
-                self._conn.execute(f"PRAGMA user_version = {step}")
-                self._conn.commit()
+                # Bewusst weiter executescript mit BEGIN/COMMIT *im* Skript,
+                # statt den Text an ';' zu zerlegen: ein FTS5-Trigger bringt
+                # eigene Semikolons im BEGIN…END-Rumpf mit, und ein selbstgebauter
+                # Splitter wäre die nächste Falle. PRAGMA user_version ist in
+                # SQLite transaktional und gehört deshalb mit hinein.
+                script = f"BEGIN;\n{sql}\nPRAGMA user_version = {int(step)};\nCOMMIT;"
+                try:
+                    self._conn.executescript(script)
+                except Exception:
+                    self._conn.rollback()
+                    logging.error(
+                        "[STORE] Migrationsschritt %s fehlgeschlagen — die Datei "
+                        "bleibt unverändert auf Version %s.",
+                        step,
+                        step - 1,
+                    )
+                    raise
                 logging.info("[STORE] Schema auf Version %s gebracht", step)
 
     def close(self) -> None:
@@ -220,15 +252,27 @@ class SqliteStore:
         return [_to_ref(row) for row in rows]
 
     def load(
-        self, conversation_id: str
+        self, conversation_id: str, *, user: str | None = None
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None:
+        """Ein Gespräch samt Nachrichten — optional auf einen Nutzer beschränkt.
+
+        ``user`` ist der Schlüssel gegen den Fund aus dem Review: die Liste im
+        Verlauf filterte nach Nutzer, die Handler dahinter nahmen die ID aber
+        ungeprüft entgegen. Ein fremdes Gespräch sieht so aus wie ein nicht
+        existierendes — bewusst, damit die Antwort nicht verrät, dass es die ID
+        gibt. Terminal und API rufen weiter ohne ``user`` und sehen alles.
+        """
+        query = (
+            "SELECT c.*, (SELECT COUNT(*) FROM messages m "
+            "             WHERE m.conversation_id = c.id) AS message_count "
+            "FROM conversations c WHERE c.id = ?"
+        )
+        params: list[Any] = [conversation_id]
+        if user:
+            query += " AND c.user = ?"
+            params.append(user)
         with self._lock:
-            row = self._conn.execute(
-                "SELECT c.*, (SELECT COUNT(*) FROM messages m "
-                "             WHERE m.conversation_id = c.id) AS message_count "
-                "FROM conversations c WHERE c.id = ?",
-                (conversation_id,),
-            ).fetchone()
+            row = self._conn.execute(query, params).fetchone()
             if row is None:
                 return None
             messages = self._conn.execute(
@@ -240,11 +284,19 @@ class SqliteStore:
             {"role": m["role"], "content": m["content"]} for m in messages
         ]
 
-    def delete(self, conversation_id: str) -> bool:
+    def delete(self, conversation_id: str, *, user: str | None = None) -> bool:
+        """Löscht ein Gespräch — optional nur, wenn es dem Nutzer gehört.
+
+        Der Löschpfad ist der Grund, warum ``user`` kein optionaler Komfort ist:
+        er ist unwiderruflich.
+        """
+        query = "DELETE FROM conversations WHERE id = ?"
+        params: list[Any] = [conversation_id]
+        if user:
+            query += " AND user = ?"
+            params.append(user)
         with self._lock:
-            cursor = self._conn.execute(
-                "DELETE FROM conversations WHERE id = ?", (conversation_id,)
-            )
+            cursor = self._conn.execute(query, params)
             self._conn.commit()
             return cursor.rowcount > 0
 

@@ -530,11 +530,11 @@ class YulYenStreamingProvider:
         messages: list[dict[str, Any]] = []
 
         # Look up the Wikipedia snippet(s)
-        _wiki_hints, contexts = wiki.snippets(user_input, persona)
+        _wiki_hints, contexts = wiki.snippets(user_input, persona, self.guard)
 
         # Attach context
         if contexts:
-            inject_wiki_context(messages, contexts)
+            inject_wiki_context(messages, contexts, self.guard)
 
         # Add the user question as the last message
         messages.append({"role": "user", "content": user_input})

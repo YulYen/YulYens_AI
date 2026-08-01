@@ -34,6 +34,8 @@ from core.utils import (
     module_available,
 )
 from stt.whisper_stt import is_stt_available, transcribe_wav
+from ui.continuation import GUEST_APP as _GUEST_APP
+from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
@@ -78,9 +80,10 @@ STREAM_FLUSH_INTERVAL_S = 0.1
 # concurrently for multiple browser sessions sharing one WebUI instance.
 _feedback_log_lock = threading.Lock()
 
-# Gast-Gespräche bekommen ein eigenes `app`, damit der Verlauf sie erkennt:
-# ein Gast namens „Leah" darf nicht als die echte LEAH fortgesetzt werden.
-GUEST_APP = "web-guest"
+# GUEST_APP und die Fortsetzbarkeits-Regel liegen in ui/continuation.py, weil
+# sie das Terminal genauso braucht (es liest dieselben JSON-Dateien). Hier nur
+# re-exportiert, damit bestehende Importe aus web_ui weiter funktionieren.
+GUEST_APP = _GUEST_APP
 
 # Hochgeladene Gespräche ebenfalls: sie sind fortsetzbar wie ein eigenes, aber
 # im Verlauf soll erkennbar bleiben, dass sie von außen kamen.
@@ -457,7 +460,9 @@ class WebUI:
         yield "", chat_history, llm_history, *self._wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
-        wiki_hints, contexts = self.wiki.snippets(user_input, session.bot)
+        wiki_hints, contexts = self.wiki.snippets(
+            user_input, session.bot, getattr(session.streamer, "guard", None)
+        )
 
         # Display the UI hints (do not add them to the LLM context window)
         for wiki_hint in wiki_hints:
@@ -474,7 +479,9 @@ class WebUI:
 
         # 4) Optional: inject wiki context
         if contexts:
-            inject_wiki_context(llm_history, contexts)
+            inject_wiki_context(
+                llm_history, contexts, getattr(session.streamer, "guard", None)
+            )
 
         # 5) Send the user question to the LLM
         user_message = {"role": "user", "content": user_input}
@@ -647,7 +654,9 @@ class WebUI:
             return
 
         # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
-        inject_briefing_context(llm_history, items)
+        inject_briefing_context(
+            llm_history, items, getattr(session.streamer, "guard", None)
+        )
         llm_history.append({"role": "user", "content": briefing_prompt})
 
         if self._handle_context_warning(session, llm_history, chat_history):
@@ -972,60 +981,51 @@ class WebUI:
         )
         return as_persona_outputs(updates)
 
-    def _on_history_selected(self, conversation_id: str | None) -> Any:
+    def _on_history_selected(self, conversation_id: str | None, user: str) -> Any:
         """Vorschau des gewählten Gesprächs."""
-        loaded = self._load_from_store(conversation_id)
+        loaded = self._load_from_store(conversation_id, user)
         if loaded is None:
             return gr.update(value="")
         ref, messages = loaded
         return gr.update(value=conversation_markdown(ref, messages, self._t))
 
-    def _load_from_store(self, conversation_id: str | None):
+    def _load_from_store(self, conversation_id: str | None, user: str):
+        """Gespräch aus der Ablage — **nur** das des angemeldeten Nutzers.
+
+        Die Liste in ``_history_choices`` filtert nach Nutzer, die Handler
+        dahinter taten es nicht: die Gesprächs-ID kommt aus einem
+        ``gr.Dropdown``, und dessen ``preprocess`` reicht in Gradio 4.44 den
+        Wert des Clients ungeprüft durch (``type="value"`` → ``return payload``).
+        Wer eine fremde ID kannte, konnte das Gespräch lesen, exportieren,
+        fortsetzen und löschen — nachgestellt mit zwei angemeldeten Nutzern.
+
+        Deshalb liegt die Prüfung jetzt an der Stelle, an der alle vier
+        Handler zwangsläufig vorbeikommen, statt viermal beim Aufrufer.
+        """
         if not conversation_id:
             return None
         try:
-            return self.factory.get_store().load(str(conversation_id))
+            return self.factory.get_store().load(
+                str(conversation_id), user=user or self._fallback_user()
+            )
         except Exception:
             logging.exception("Gespräch %s nicht ladbar", conversation_id)
             return None
 
-    @staticmethod
-    def _continuable_persona(
-        persona_name: str | None,
-        app: str | None,
-        persona_info: dict[str, dict[str, Any]] | None,
-    ) -> dict[str, Any] | None:
-        """Die Ensemble-Persona zu einem Gespräch — oder None.
-
-        Zwei Hürden, weil eine allein nicht reicht: Gast-Gespräche tragen ein
-        eigenes `app`, und der Name muss exakt stimmen. Sonst öffnete ein Gast
-        namens „Leah" das Gespräch still als die echte LEAH weiter, weil die
-        Auflösung über `persona.lower()` läuft — ohne jeden Hinweis, dass ab da
-        ein anderer System-Prompt antwortet. Die Namensprüfung deckt auch
-        Gast-Gespräche ab, die vor dem eigenen `app` entstanden sind.
-
-        Bewusst auf Primitiven statt auf `ConversationRef`: **beide** Wege ins
-        Gespräch müssen dieselbe Prüfung benutzen — der Verlauf aus der Ablage
-        und der Upload einer JSON-Datei. Zwei Varianten derselben Regel waren
-        genau der Fehler (die erste Fassung schloss nur den Verlauf, über den
-        Upload war der Gast weiter als echte Persona fortsetzbar).
-        """
-        if app == GUEST_APP:
-            return None
-        persona = (persona_info or {}).get((persona_name or "").lower())
-        if not persona or persona.get("name") != persona_name:
-            return None
-        return persona
+    # Die Regel selbst steht in ui/continuation.py — sie gilt für alle drei
+    # Wege in ein gespeichertes Gespräch, auch für den im Terminal.
+    _continuable_persona = staticmethod(continuable_persona)
 
     def _on_history_open(
         self,
         session: SessionContext,
         conversation_id: str | None,
+        user: str,
         persona_info: dict[str, dict[str, Any]] | None = None,
         input_placeholder: str = "",
     ) -> tuple:
         """Gespräch in den Chat holen — fortsetzbar, nicht nur ansehbar."""
-        loaded = self._load_from_store(conversation_id)
+        loaded = self._load_from_store(conversation_id, user)
         if loaded is None:
             updates = self._reset_updates()
             updates.update(
@@ -1080,9 +1080,9 @@ class WebUI:
         return as_persona_outputs(as_dict)
 
     def _on_history_export(
-        self, session: SessionContext, conversation_id: str | None
+        self, session: SessionContext, conversation_id: str | None, user: str
     ) -> Any:
-        loaded = self._load_from_store(conversation_id)
+        loaded = self._load_from_store(conversation_id, user)
         if loaded is None:
             return gr.update(value=None, visible=False)
         ref, messages = loaded
@@ -1106,7 +1106,11 @@ class WebUI:
         deleted = False
         if conversation_id:
             try:
-                deleted = self.factory.get_store().delete(str(conversation_id))
+                # Nur eigene Gespräche: das Löschen ist der einzige der vier
+                # Verlauf-Wege, der sich nicht rückgängig machen lässt.
+                deleted = self.factory.get_store().delete(
+                    str(conversation_id), user=user or self._fallback_user()
+                )
             except Exception:
                 logging.exception("Gespräch %s nicht löschbar", conversation_id)
         choices = self._history_choices(user)
@@ -1398,10 +1402,14 @@ class WebUI:
 
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
-        wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
+        wiki_hints, contexts = self.wiki.snippets(
+            question, "ask_all", self.factory.build_guard()
+        )
         context_messages: list[Message] = []
         if contexts:
-            inject_wiki_context(context_messages, contexts)
+            # Ask-All hat hier noch keinen Streamer: der Kontext entsteht
+            # einmal für alle Personas, bevor die Worker gebaut werden.
+            inject_wiki_context(context_messages, contexts, self.factory.build_guard())
         wiki_status = "\n\n".join(hint for hint in wiki_hints if hint)
         # Die Quellen stehen hier bereits fest und reisen ab jetzt in jedem
         # Yield mit — genau wie wiki_status (#32a).
@@ -1831,9 +1839,11 @@ class WebUI:
             queue=False,
         )
 
+        # user_state gehört in *jeden* Verlauf-Handler: die Gesprächs-ID kommt
+        # vom Client und wird von Gradio nicht gegen die Auswahlliste geprüft.
         components["history_pick"].change(
             fn=self._on_history_selected,
-            inputs=[components["history_pick"]],
+            inputs=[components["history_pick"], user_state],
             outputs=[components["history_preview"]],
             queue=False,
         )
@@ -1844,14 +1854,14 @@ class WebUI:
                 persona_info=persona_info,
                 input_placeholder=input_placeholder,
             ),
-            inputs=[session_state, components["history_pick"]],
+            inputs=[session_state, components["history_pick"], user_state],
             outputs=persona_outputs,
             queue=False,
         )
 
         components["history_export_btn"].click(
             fn=self._on_history_export,
-            inputs=[session_state, components["history_pick"]],
+            inputs=[session_state, components["history_pick"], user_state],
             outputs=[components["history_file"]],
             queue=False,
         )

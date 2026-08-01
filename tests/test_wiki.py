@@ -602,3 +602,75 @@ def test_proxy_decodes_percent_escapes_in_the_term(proxy, monkeypatch):
 
     assert seen["term"] == "C++"
     assert result.payload["title"] == "C++"
+
+
+# ---- Nebenläufigkeit und Bind-Adresse des Proxys ----------------------------
+
+
+def test_proxy_serves_requests_concurrently(proxy, monkeypatch):
+    """Vier Personas im Broadcast fragen gleichzeitig — der Proxy darf sie
+    nicht hintereinander abarbeiten.
+
+    Vorher ein einfacher ``HTTPServer``: bei 300 ms Antwortzeit des Backends
+    brauchten vier gleichzeitige Lookups 1223 ms statt 311 ms, weil jede
+    Anfrage auf die vorherige wartete. Damit war die Wiki-Phase des parallelen
+    Broadcasts (#23) vollständig seriell. Der Test geht bewusst über
+    ``build_server`` — sonst prüfte er seinen eigenen Aufbau statt den echten.
+    """
+    import threading
+    import time
+    import urllib.request
+
+    backend_delay = 0.3
+
+    def _slow_fetch(term):
+        time.sleep(backend_delay)
+        return 200, _KiwixResponse(
+            "<html><body><div id='content'>Text</div></body></html>"
+        )
+
+    monkeypatch.setattr(proxy, "_fetch_kiwix", _slow_fetch)
+
+    server = proxy.build_server(0)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    port = server.server_address[1]
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+    def _fetch(index):
+        opener.open(
+            f"http://127.0.0.1:{port}/Artikel_{index}?json=1", timeout=30
+        ).read()
+
+    try:
+        threads = [threading.Thread(target=_fetch, args=(i,)) for i in range(4)]
+        started = time.perf_counter()
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        elapsed = time.perf_counter() - started
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    # Seriell wären es ~4 × backend_delay. Großzügige Schranke, damit der Test
+    # auf einem lahmen CI-Runner nicht flackert, aber den Rückfall trotzdem fängt.
+    assert elapsed < backend_delay * 2.5, (
+        f"{len(threads)} gleichzeitige Lookups brauchten {elapsed:.2f}s — "
+        "der Proxy serialisiert wieder"
+    )
+
+
+def test_proxy_binds_to_loopback_only(proxy):
+    """Der Proxy horchte auf allen Interfaces, obwohl er überall „local" heißt."""
+    server = proxy.build_server(0)
+    try:
+        assert server.server_address[0] == "127.0.0.1"
+    finally:
+        server.server_close()
+
+
+def test_proxy_handler_has_a_read_timeout(proxy):
+    """Ohne Timeout hält eine unvollständige Anfrage ihren Thread für immer."""
+    assert proxy.WikiRequestHandler.timeout is not None
+    assert 0 < proxy.WikiRequestHandler.timeout <= 30

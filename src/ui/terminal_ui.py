@@ -12,6 +12,7 @@ from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
 from ui import self_talk
+from ui.continuation import continuable_persona, persona_info_from_names
 from ui.conversation_io_terminal import load_conversation, save_conversation
 from ui.persona_chooser import prompt_persona_choice
 from wiki.lookup import (
@@ -201,6 +202,23 @@ class TerminalUI:
             print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
             return False
 
+        # Dieselbe Prüfung wie im Verlauf und beim Upload der WebUI: der Name
+        # allein reicht nicht. Ein Gast-Gespräch (`app: web-guest`) trägt einen
+        # Personennamen, aber sein System-Prompt lebte nur in jener Sitzung —
+        # es hier zu laden hieße, es still als die echte Ensemble-Persona
+        # fortzusetzen. #55 hat diese Regel für die beiden WebUI-Wege gebaut
+        # und den dritten übersehen, obwohl er dieselbe Datei liest.
+        if not continuable_persona(
+            persona_name,
+            meta.get("app"),
+            persona_info_from_names(get_all_persona_names()),
+        ):
+            msg = self._t(
+                "terminal_load_guest_not_continuable", persona_name=persona_name
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
         self._set_persona(persona_name)
         self.history = messages
         self.meta = meta
@@ -251,13 +269,18 @@ class TerminalUI:
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
         context_messages: list[dict[str, str]] = []
         if self.wiki.keyword_finder:
-            wiki_hints, contexts = self.wiki.snippets(question, "ask_all")
+            wiki_hints, contexts = self.wiki.snippets(
+                question, "ask_all", self.factory.build_guard()
+            )
             self.last_wiki_snippets = list(contexts)
             for wiki_hint in wiki_hints:
                 if wiki_hint:
                     print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
             if contexts:
-                inject_wiki_context(context_messages, contexts)
+                # Wie in der WebUI: der Broadcast baut die Streamer erst danach.
+                inject_wiki_context(
+                    context_messages, contexts, self.factory.build_guard()
+                )
 
         print(
             f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}"
@@ -332,7 +355,9 @@ class TerminalUI:
 
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
             if self.wiki.keyword_finder:
-                wiki_hints, contexts = self.wiki.snippets(user_input, self.bot)
+                wiki_hints, contexts = self.wiki.snippets(
+                    user_input, self.bot, getattr(self.streamer, "guard", None)
+                )
 
                 self.last_wiki_snippets = list(contexts)
 
@@ -343,7 +368,9 @@ class TerminalUI:
 
                 # Insert the snippet as system context (guardrail plus context)
                 if contexts:
-                    inject_wiki_context(self.history, contexts)
+                    inject_wiki_context(
+                        self.history, contexts, getattr(self.streamer, "guard", None)
+                    )
 
             # --- (2) Append the user question to history ---
             self.history.append({"role": "user", "content": user_input})
@@ -415,7 +442,9 @@ class TerminalUI:
             return
 
         # Same ordering as the wiki context: system messages first, then user turn
-        inject_briefing_context(self.history, items)
+        inject_briefing_context(
+            self.history, items, getattr(self.streamer, "guard", None)
+        )
         self.history.append(
             {"role": "user", "content": self._t("briefing_user_prompt")}
         )
