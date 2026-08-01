@@ -82,6 +82,15 @@ def evaluate_guard_case(
         observed["ok"] = result["ok"]
         observed["reason"] = result["reason"]
         observed["detail"] = result.get("detail")
+    elif case.stage == "context":
+        # Abgerufener Fremdtext: die Frage ist nicht "blockiert der Guard das",
+        # sondern "landet es im Prompt". Andere Regel als beim Eingang — ein
+        # Artikel darf PII enthalten, eine Injection-Anweisung nicht.
+        from security.tinyguard import context_rejection
+
+        rejection = context_rejection(guard, case.text)
+        observed["injected"] = rejection is None
+        observed["reason"] = rejection or "ok"
     else:
         if "ok" in expect or "reason" in expect:
             result = guard.check_output(case.text)

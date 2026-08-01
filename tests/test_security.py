@@ -185,6 +185,12 @@ def test_security_texts_can_be_overridden():
 
 
 # ---- Injizierter Fremdkontext (Wiki, RSS) ----------------------------------
+#
+# Hier steht die *Verdrahtung*: dass inject_wiki_context/inject_briefing_context
+# den Guard tatsächlich anwenden und dass Anzeige und Prompt dieselbe Liste
+# sehen. Die *Angriffsmuster* selbst gehören nach evals/guard_redteam.yaml
+# (stage: context) — dort werden sie von tests/test_guard_redteam.py und der
+# Eval-CLI gemeinsam gefahren. Neue Muster also dorthin, nicht hierher.
 
 
 _CONTEXT_TEXTS = {
