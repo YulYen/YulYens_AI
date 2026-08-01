@@ -2,6 +2,22 @@
 
 Dieses Dokument ist der Einstiegspunkt für Claude Code in diesem Projekt.
 
+## Arbeitsweise: jeder Branch frisch von `main`
+
+**Immer `git fetch origin main` und den neuen Branch von dort abzweigen** — nie
+vom Stand des vorherigen Tickets, auch nicht, wenn dessen PR „gleich gemergt
+wird". Zwei Zweige, die nacheinander entstehen, hängen sonst beide eine Zeile an
+dieselbe Stelle in `backlog.md` (oben ins Archiv), und der zweite bekommt einen
+Konflikt, sobald der erste drin ist. Genau so passiert, deshalb steht es hier:
+
+```bash
+git fetch origin main
+git checkout -b claude/<thema> origin/main
+```
+
+Ist ein PR bereits gemergt, wird er nicht weiterbenutzt — neue Arbeit heißt
+neuer Branch von `main`.
+
 ## Was ist dieses Projekt?
 
 **Yul Yen's AI Orchestra** ist ein lokal laufendes Multi-Persona-KI-Chatsystem.
