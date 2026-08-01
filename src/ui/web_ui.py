@@ -1670,6 +1670,63 @@ class WebUI:
         return self.feedback_log_path
 
     @staticmethod
+    def _store_index_of(
+        text: str,
+        row: int,
+        chat_history: list[ChatPair] | None,
+        llm_history: list[Message] | None,
+    ) -> int | None:
+        """Welche Nachricht der **Ablage** ist die angeklickte Bubble? (#65)
+
+        Der Anzeige-Index taugt dafür nicht: in ``chat_history`` stehen
+        Hinweis-Bubbles zwischen den Antworten, in der Ablage nicht. Ein Vote
+        mit `index: [2, 1]` war deshalb eine UI-Koordinate und ließ sich mit
+        nichts verbinden.
+
+        Gezählt wird stattdessen **die Position unter den Modellantworten**:
+        die k-te Antwort-Bubble ist die k-te ``assistant``-Nachricht, weil
+        Anzeige und LLM-Verlauf im Gleichschritt wachsen (auch „Nochmal 🔄"
+        entfernt aus beiden). ``ConversationStore.sync`` nummeriert genau diese
+        Folge durch — Systemkontext filtert es heraus —, also stimmt der Index
+        auf beiden Seiten.
+
+        Über Positionen statt über Texte zu zählen ist der Punkt: zweimal
+        dieselbe kurze Antwort („Ja.") im selben Gespräch ist keine Seltenheit,
+        und ein Textvergleich hätte still auf die erste gezeigt.
+        """
+        answers = {
+            (m.get("content") or "").strip()
+            for m in (llm_history or [])
+            if m.get("role") == "assistant"
+        }
+        candidate = (text or "").strip()
+        if not candidate or candidate not in answers:
+            return None
+
+        # Wievielte Antwort-Bubble ist die angeklickte?
+        seen = 0
+        for idx, pair in enumerate(chat_history or []):
+            bubble = (str(pair[1]) if len(pair) > 1 and pair[1] else "").strip()
+            if bubble and bubble in answers:
+                seen += 1
+            if idx == row:
+                break
+        if seen == 0:
+            return None
+
+        # … und die wievielte Nachricht ist das in der Ablage?
+        position = 0
+        for store_idx, message in enumerate(
+            [m for m in (llm_history or []) if m.get("role") in ("user", "assistant")]
+        ):
+            if message.get("role") != "assistant":
+                continue
+            position += 1
+            if position == seen:
+                return store_idx
+        return None
+
+    @staticmethod
     def _is_model_answer(text: str, llm_history: list[Message] | None) -> bool:
         """Ist dieser Bot-Text eine Antwort des Modells — oder nur Beiwerk?
 
@@ -1694,12 +1751,34 @@ class WebUI:
             for message in (llm_history or [])
         )
 
+    def _answer_from_store(self, conversation_id: str, index: int) -> str | None:
+        """Den aufgezeichneten Wortlaut holen — best effort (#65).
+
+        Die Ablage ist die Fassung, gegen die später jemand joint; sie hat
+        deshalb das letzte Wort über den Text. Ohne Anmeldung gibt es sie gar
+        nicht (`NullStore`, #72), also darf das hier still fehlschlagen — ein
+        Vote ohne Store-Text ist besser als kein Vote.
+        """
+        store = getattr(self.factory, "get_store", None)
+        if not conversation_id or store is None:
+            return None
+        try:
+            loaded = store().load(conversation_id)
+            if not loaded:
+                return None
+            _ref, messages = loaded
+            return str(messages[index].get("content") or "")
+        except (AttributeError, IndexError, TypeError, KeyError):
+            logging.debug("Vote: kein Text aus der Ablage für %s", conversation_id)
+            return None
+
     def _on_chat_like(
         self,
         session: SessionContext,
         chat_history: list[ChatPair] | None,
         meta: dict | None,
         llm_history: list[Message] | None,
+        conversation_id: str | None,
         evt: gr.LikeData,
     ) -> None:
         # Votes must never break the UI: any failure is logged and swallowed.
@@ -1721,13 +1800,20 @@ class WebUI:
 
             # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
             # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
-            # würde dem Modell beibringen, UI-Text zu produzieren.
-            if not self._is_model_answer(answer, llm_history):
+            # würde dem Modell beibringen, UI-Text zu produzieren. Derselbe
+            # Aufruf liefert die Stelle in der Ablage (#65).
+            message_index = self._store_index_of(answer, row, chat_history, llm_history)
+            if message_index is None:
                 logging.debug(
                     "Ignoring feedback vote on a UI notice, not a model answer (row %s)",
                     row,
                 )
                 return
+
+            conversation_id = str(conversation_id or "")
+            # Die Ablage hat das letzte Wort über den Wortlaut; die Anzeige ist
+            # nur ihre Darstellung.
+            answer = self._answer_from_store(conversation_id, message_index) or answer
 
             meta = meta if isinstance(meta, dict) else {}
             entry = {
@@ -1739,6 +1825,12 @@ class WebUI:
                 "vote": "up" if evt.liked else "down",
                 "question": find_question_for_row(chat_history, row),
                 "answer": answer,
+                # Der Join-Schlüssel (#65): ohne ihn ist eine Vote-Zeile ein
+                # loses Textpaar. `conversation_id` ist leer, wenn ohne
+                # Anmeldung nichts aufgezeichnet wird (#72) — dann bleibt der
+                # Vote das, was er vorher immer war.
+                "conversation_id": conversation_id,
+                "message_index": message_index,
                 "index": [row, col],
             }
             path = self._resolve_feedback_log_path()
@@ -1914,7 +2006,13 @@ class WebUI:
         # einer Hinweis-Bubble unterscheiden (siehe _on_chat_like).
         chatbot.like(
             fn=self._on_chat_like,
-            inputs=[session_state, chatbot, meta_state, history_state],
+            inputs=[
+                session_state,
+                chatbot,
+                meta_state,
+                history_state,
+                components["conversation_state"],
+            ],
             outputs=[],
             queue=False,
         )
