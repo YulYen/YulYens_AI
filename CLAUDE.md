@@ -336,8 +336,19 @@ make evals                                           # Kurzform für --guard-onl
 - Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
 - `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),
   `expect_traits` = LLM-as-judge 1–5 (4+ besteht, 3 nicht)
-- **Judge-Bias:** per Default bewertet das Modell sich selbst und ist nachsichtig.
-  Nur der Vergleich zweier Läufe mit gleichem Judge ist aussagekräftig (`report.csv`)
+- **Vergleiche den Ø-Score, nicht die Bestehensquote (#41a, gemessen).** Sechs Läufe
+  mit identischem Code ergaben 3–6 von 17 bestandenen Fällen (**27 % relative
+  Streuung**), aber Ø 3,57–3,79 (**1,9 %**) — der Mittelwert ist vierzehnmal
+  stabiler. Ursache ist die Schwelle: 5–7 der 17 Fälle liegen im Band 3,0–3,9,
+  also direkt unter „4 besteht", und entscheiden sich an einem Zehntelpunkt. Wer
+  Baseline gegen Adapter (#7) über die Quote vergleicht, misst Münzwürfe
+- **Judge-Bias: die Annahme hat sich nicht bestätigt.** Erwartet wurde, dass ein
+  sich selbst bewertendes Modell zu nachsichtig ist. Ein fremder Judge
+  (`qwen2.5:7b` statt `ministral-3:8b`) liefert Ø 3,71 — mitten in der Spanne der
+  Selbstbewertungen. Damit ist der Bias für dieses Paar **nicht belegt**; für
+  einen deutlich stärkeren Judge ist er weiterhin plausibel und ungemessen (hier
+  beurteilte 7B ein 8B). Der Vergleich zweier Läufe mit gleichem Judge bleibt
+  trotzdem die saubere Form (`report.csv`)
 - Der Guard-Red-Team-Korpus läuft ohne Modell als parametrisierter Test in der CI mit
   (`tests/test_guard_redteam.py`) — Angriffsmuster gehören in `evals/guard_redteam.yaml`
 - Korpus-Loader ist streng: unbekannte Keys, kaputte Regexe, doppelte IDs und
