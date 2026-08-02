@@ -18,6 +18,18 @@ git checkout -b claude/<thema> origin/main
 Ist ein PR bereits gemergt, wird er nicht weiterbenutzt — neue Arbeit heißt
 neuer Branch von `main`.
 
+### Ausnahme: eine einzelne Textdatei darf direkt auf `main`
+
+Eine übersichtliche Änderung an **genau einer** Textdatei — ein Backlog-Ticket,
+eine Zeile Doku, ein korrigierter Tippfehler — geht ohne Branch und ohne PR
+direkt auf `main`. Ein Review-Prozess für eine Zeile Prosa kostet mehr
+Aufmerksamkeit, als er einbringt.
+
+Alles andere bleibt beim PR: sobald **Code** betroffen ist oder **mehrere
+Dateien**, ist der PR die Stelle, an der man die Änderung als Ganzes sieht.
+Im Zweifel Branch — die Ausnahme ist für den offensichtlichen Fall gedacht,
+nicht für den grenzwertigen.
+
 ## Was ist dieses Projekt?
 
 **Yul Yen's AI Orchestra** ist ein lokal laufendes Multi-Persona-KI-Chatsystem.
