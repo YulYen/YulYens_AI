@@ -28,6 +28,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 from config.config_singleton import Config
+from core.context_injection import injected_message
 from security.tinyguard import accepted_context
 
 
@@ -241,12 +242,17 @@ def build_context_block(items: list[RssItem], cache: RssCache, guard: Any = None
 
 
 def inject_rss_context(history: list, block: str | None) -> None:
-    """Hängt Guardrail + **einen** System-Block an die History (in place)."""
+    """Hängt Guardrail + **einen** zitierten Meldungsblock an die History.
+
+    Wie beim Wiki (#60): die Anweisung bleibt ``system``, die Meldungen werden
+    zitierter ``user``-Fremdtext. Eine Schlagzeile ist Material, kein Befehl —
+    und ein Feed ist genau der Kanal, den man am leichtesten fremdbefüllt.
+    """
     if not block:
         return
     cfg = Config()
     history.append({"role": "system", "content": cfg.t("rss_context_guardrail")})
-    history.append({"role": "system", "content": block})
+    history.append(injected_message(cfg.t("context_quote_wrapper", body=block), "rss"))
 
 
 def build_rss_cache(rss_cfg: dict | None) -> RssCache:

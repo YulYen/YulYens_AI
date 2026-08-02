@@ -15,6 +15,7 @@ import pytest
 import requests
 from auth import build_auth_provider
 from config.texts import Texts
+from core.context_injection import is_injected
 from core.streaming_provider import StreamStats
 from rss.feeds import RssCache, RssItem
 from storage import NullStore
@@ -710,9 +711,11 @@ def test_respond_briefing_streams_summary_with_injected_context():
         outputs = list(web_ui.respond_briefing(session, [], history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
-    # Guardrail + genau ein Meldungs-Block, dann der User-Turn (#73)
-    injected = [m for m in final_state if m["role"] == "system"]
-    assert len(injected) == 2
+    # Guardrail (system) + genau ein Meldungs-Block (zitierter user-Fremdtext),
+    # dann der User-Turn (#73/#60)
+    guardrails = [m for m in final_state if m["role"] == "system"]
+    injected = [m for m in final_state if is_injected(m)]
+    assert len(guardrails) == 1 and len(injected) == 1
     assert "Titel" in injected[-1]["content"]
     # User-Bubble (Prompt), Hinweis-Bubble mit Stand, gestreamte Antwort
     assert final_chat[0] == ("briefing_user_prompt", None)
@@ -2717,8 +2720,11 @@ def test_a_news_question_pulls_the_feeds_into_the_context():
         outputs = list(web_ui.respond_streaming(session, "Was gibt's Neues?", [], []))
 
     final_state = outputs[-1][2]
-    injected = [m for m in final_state if m["role"] == "system"]
-    assert len(injected) == 2, "Guardrail + genau ein Meldungs-Block"
+    guardrails = [m for m in final_state if m["role"] == "system"]
+    injected = [m for m in final_state if is_injected(m)]
+    assert (
+        len(guardrails) == 1 and len(injected) == 1
+    ), "Guardrail + genau ein Meldungs-Block"
     assert "Bahnstreik" in injected[-1]["content"]
     assert "Linux 7" in injected[-1]["content"]
 
@@ -2731,7 +2737,7 @@ def test_a_named_source_pulls_only_that_feed():
             web_ui.respond_streaming(session, "Was sagt die Tagesschau?", [], [])
         )
 
-    block = [m for m in outputs[-1][2] if m["role"] == "system"][-1]["content"]
+    block = [m for m in outputs[-1][2] if is_injected(m)][-1]["content"]
     assert "Bahnstreik" in block
     assert "Linux 7" not in block
 

@@ -147,6 +147,10 @@ def test_the_permissive_guard_lets_text_through_unchanged():
     assert double.check_input("egal")["ok"] is True
     assert double.process_output("Hallo Welt")["text"] == "Hallo Welt"
     assert double.output_match_crossing("Hallo", 2) is None
+    # Die einzige Guard-Methode, deren durchlassende Antwort falsy ist (#60a).
+    # Ohne Vorbelegung liefert das Mock ein wahrheitswertiges Objekt, und
+    # `context_verdict` verwirft dann *jeden* injizierten Kontext — lautlos.
+    assert double.check_context_only("egal") is None
 
 
 def test_the_factory_double_returns_no_guard_by_default():

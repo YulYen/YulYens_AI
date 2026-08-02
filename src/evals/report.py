@@ -127,9 +127,20 @@ def render_markdown(run: EvalRun) -> str:
         else:
             status, note = "✅", ""
         score = _fmt_score(result.verdict.average if result.verdict else None)
+        # Pipes escapen, nicht ersetzen: in der Anmerkung steht bei einem
+        # fehlgeschlagenen `must_match` der Regex im Klartext, und dort ist `|`
+        # die Alternative. Das frühere `.replace("|", "/")` machte aus dem
+        # korrekten `(ki|programm|…)` ein `(ki/programm/…)` — ein Muster, das so
+        # nie zutreffen könnte. Wer den Report liest, sucht dann einen Fehler
+        # im Korpus, den es nicht gibt (genau das ist beim Baseline-Lauf
+        # passiert). `\|` hält die Markdown-Tabelle heil und den Regex lesbar.
+        # Die Ersetzung steht bewusst außerhalb des f-Strings: Backslashes in
+        # f-String-Ausdrücken sind erst ab Python 3.12 erlaubt, das Projekt
+        # sagt 3.10+.
+        safe_note = note.replace("|", "\\|")
         lines.append(
             f"| {result.group} | `{result.case_id}` | {status} | {score} "
-            f"| {note.replace('|', '/')} |"
+            f"| {safe_note} |"
         )
     lines.append("")
 

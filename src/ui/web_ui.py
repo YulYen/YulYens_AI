@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 import gradio as gr
 import requests
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
+from core.context_injection import conversation_only
 from core.context_utils import (
     context_near_limit,
     shrink_history_for_context,
@@ -1700,7 +1701,11 @@ class WebUI:
         try:
             payload = {
                 "meta": meta or self._build_meta(session.bot or ""),
-                "messages": messages or [],
+                # Ohne injizierten Fremdkontext — die Datei ist das Gespräch,
+                # nicht der Prompt (#60). Der Terminal-Weg filtert in
+                # `save_conversation`; dieser hier baut sein Payload selbst und
+                # braucht den Filter deshalb ausdrücklich.
+                "messages": conversation_only(messages),
             }
 
             path = self._delivery_file(session, "download", ".json")

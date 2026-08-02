@@ -4,6 +4,8 @@ import json
 from collections.abc import Iterable
 from pathlib import Path
 
+from core.context_injection import conversation_only
+
 _REQUIRED_META_KEYS: set[str] = {"created_at", "model", "persona", "app"}
 
 
@@ -39,12 +41,22 @@ def load_conversation(path: str):
 
 
 def save_conversation(path: str, meta: dict, messages: list[dict]) -> None:
+    """Gespräch als JSON ablegen — ohne injizierten Fremdkontext.
+
+    Die Aufrufer reichen ihre *Prompt*-History durch (``TerminalUI.history``,
+    im WebUI der ``gr.State``). Darin stehen Wiki-Snippets und RSS-Meldungen,
+    und die gehören nicht in eine Datei, die man weitergibt: sie sind
+    abgerufenes Material, kein Gesprächsinhalt. Vor #60 rutschten sie als
+    ``system``-Nachrichten mit hinaus, seitdem wären sie von echten Fragen des
+    Nutzers nicht mehr zu unterscheiden. Gefiltert wird deshalb hier, an der
+    einen Stelle, die alle Ausgabewege teilen.
+    """
     if not isinstance(meta, dict):
         raise ValueError("meta must be a dictionary with conversation metadata.")
     if not isinstance(messages, list):
         raise ValueError("messages must be a list of message objects.")
 
-    payload = {"meta": meta, "messages": messages}
+    payload = {"meta": meta, "messages": conversation_only(messages)}
     target = Path(path).expanduser()
     try:
         target.write_text(
