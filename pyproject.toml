@@ -3,6 +3,12 @@ line-length = 88
 target-version = ["py310"]
 
 [tool.ruff]
+# Bewusst nur `.`: die Pakete unter `src/` werden top-level importiert, ruff
+# sortiert sie deshalb wie Fremdpakete ein — so liegen die Importblöcke im
+# ganzen Repo. `src = [".", "src"]` wäre die ehrlichere Klassifizierung
+# (es ist unser Code), verlangt aber eine Umsortierung in rund fünfzig
+# Dateien; das gehört in einen eigenen Umbau und nicht in einen
+# Abhängigkeits-Sprung.
 src = ["."]
 target-version = "py310"
 
@@ -22,6 +28,7 @@ pythonpath = ["src"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "ollama: marks tests that perform real Ollama calls",
+    "browser: drives the running WebUI in a real browser (needs Playwright)",
 ]
 filterwarnings = [
     "ignore:Importing 'parser\\.split_arg_string'.*:DeprecationWarning",

@@ -1,4 +1,4 @@
-.PHONY: setup format lint types fix test test-ci test-all coverage clean run evals evals-full
+.PHONY: setup format lint types fix test test-ci test-all test-browser coverage clean run audit evals evals-full
 
 setup:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -22,17 +22,28 @@ fix:
 	python -m ruff check --fix .
 
 test:
-	pytest -q -m "not slow and not ollama"
+	pytest -q -m "not slow and not ollama and not browser"
 
 # Same scope as CI (includes slow tests, plus coverage report)
 test-ci:
-	pytest -q -m "not ollama" --cov=src --cov-report=term-missing
+	pytest -q -m "not ollama and not browser" --cov=src --cov-report=term-missing
 
 test-all:
-	pytest -q
+	pytest -q -m "not browser"
+
+# Rauchtest im echten Browser. Bewusst aus allen anderen Zielen ausgenommen:
+# er braucht Playwright *und* einen Chromium-Build und dauert ~100 s.
+#   pip install playwright && playwright install chromium
+test-browser:
+	pytest -q -m browser
 
 coverage:
-	pytest -q -m "not slow and not ollama" --cov=src --cov-report=term-missing
+	pytest -q -m "not slow and not ollama and not browser" --cov=src --cov-report=term-missing
+
+# Schwachstellen in den Abhängigkeiten gegen audit_allowlist.yaml halten (#61).
+# Braucht Netz (OSV/PyPI). `pip install pip-audit` vorausgesetzt.
+audit:
+	python scripts/audit_deps.py
 
 # Eval-Suite (#41). 'evals' braucht kein Modell, 'evals-full' braucht Ollama.
 evals:

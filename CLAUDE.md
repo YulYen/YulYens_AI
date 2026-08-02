@@ -44,7 +44,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 |---|---|
 | Sprache | Python 3.10+ |
 | LLM-Backend | Ollama (lokal) |
-| Web-UI | Gradio 4.44 |
+| Web-UI | Gradio 5.50 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
 | TTS | Piper (ONNX; Terminal: Autoplay über winsound/CLI-Player, WebUI: Browser-Playback) |
@@ -289,8 +289,39 @@ pytest tests/test_ai_via_api.py  # Gezielt
 - Test-Fixture `ollama_config`: Config gegen echtes Ollama, für `@pytest.mark.ollama`-Tests
   ohne HTTP-Client (z. B. Eval-Suite)
 - Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar
+- Marker `@pytest.mark.browser`: fährt die **laufende** WebUI im echten Chromium
+  (`make test-browser`, ~100 s). Aus allen anderen Zielen und aus der CI
+  ausgenommen, weil er Playwright *und* einen Browser-Build braucht; ohne
+  Playwright wird sauber übersprungen
 - spaCy-Modelle (`python -m spacy download de_core_news_lg`) schalten die
   Keyword-/Wiki-Tests frei; ohne Modell werden sie sauber geskippt
+
+### Der Browser-Rauchtest prüft das, was in-process unsichtbar ist
+`tests/test_web_ui_wiring.py` baut die Oberfläche ohne Server und fängt
+verrutschte Bindungen. **Was das Frontend entscheidet, sieht es nicht:** ob ein
+Generator seine Yields ausliefert, ob ein Klick die Seite neu lädt, ob ein
+Daumen ankommt. Genau diese Klasse war im Projekt teuer — #35 (Button-Tausch als
+Folge-Event kostete 3,5 s), #69 (der Theme-Link kostete die ganze Sitzung), die
+Dataframe-Stolperfalle.
+
+`tests/test_webui_browser.py` fährt deshalb die laufende App mit Dummy-Backend
+im echten Chromium: Tokens kommen an, Senden↔Stop tauscht, Statuszeile
+erscheint, der Theme-Umschalter lädt **nicht** neu (nachgestellt am getippten,
+nicht abgeschickten Text) und überlebt trotzdem einen echten Reload, die
+Verlauf-Karte fehlt ohne Anmeldung, ein Daumen landet im Vote-Log.
+
+Zwei Dinge, die beim Bauen wehtaten und beim nächsten Mal Zeit sparen:
+- **Nicht auf `networkidle` warten.** Gradio hält eine Verbindung offen, der
+  Zustand tritt nie ein — `page.goto(..., wait_until="domcontentloaded")` plus
+  ein Warten auf ein echtes Element.
+- **Über Rollen selektieren, nicht über CSS-Klassen.** Gradio hat den Daumen
+  zwischen 4.44 und 5.x von `like-button`/„like" auf `icon-button`/„Like"
+  umbenannt. `get_by_role("button", name=re.compile(r"^like$", re.I))` überlebt
+  beides; `exact=True` wäre case-sensitiv und genau hier zerbrechlich.
+
+**Der Test ist zuerst gegen die alte Version grün zu bekommen.** Bei #61 war er
+auf 4.44 grün, bevor migriert wurde — sonst ist später nicht zu unterscheiden,
+ob die Migration bricht oder das Testskript.
 
 ### Test-Doubles kommen aus `tests/doubles.py` (#67)
 Streamer, Guard und Factory werden **nicht** von Hand nachgebaut, sondern über
@@ -529,7 +560,8 @@ optionales, keyword-only `user`. Mit gesetztem Wert verhält sich ein fremdes
 Gespräch wie ein nicht existierendes — die Antwort soll nicht verraten, dass es
 die ID gibt. Terminal und API rufen weiter ohne `user`. **Die WebUI muss ihn
 immer setzen:** die Gesprächs-ID kommt aus einem `gr.Dropdown`, und dessen
-`preprocess` reicht in Gradio 4.44 den Wert des Clients ungeprüft durch — die
+`preprocess` reichte in Gradio 4.44 den Wert des Clients ungeprüft durch (die
+Lücke hinter dem Verlauf-IDOR, GHSA-26jh-r8g2-6fpr, seit #61 gehoben) — die
 Auswahl im Browser ist keine Schranke.
 
 **Die Gesprächs-ID gehört der Oberfläche, nicht dem Streamer:** sie liegt im
@@ -655,7 +687,7 @@ Account + Token bräuchte). mypy läuft seit #52 blockierend, inzwischen über `
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
-sind in `requirements-dev.txt` gepinnt** (aktuell `black==24.4.2`, `ruff==0.4.10`) —
+sind in `requirements-dev.txt` gepinnt** (aktuell `black==24.4.2`, `ruff==0.16.1`) —
 exakt dieselben Versionen in `.pre-commit-config.yaml`. Eine **abweichende lokale
 Black-Version formatiert anders und lässt die CI fehlschlagen.** Daher:
 
@@ -667,6 +699,40 @@ pre-commit install                    # Hook aktivieren (einmalig pro Clone)
 Danach formatiert jeder Commit automatisch mit der CI-Version (Hook läuft isoliert,
 unabhängig von sonstigen venv-Versionen). Tool-Versionen nur bewusst und **synchron**
 in `requirements-dev.txt` **und** `.pre-commit-config.yaml` ändern.
+
+#### Der Audit-Job ist grün für Bekanntes und rot für Neues (#61)
+`scripts/audit_deps.py` (lokal `make audit`) hält `pip-audit` gegen
+`audit_allowlist.yaml`. Nacktes `pip-audit` stünde dauerhaft rot: Gradio 5.50
+deckelt `pillow<12.0` und `starlette<1.0`, die behobenen Fassungen liegen
+darüber und sind innerhalb von 5.x nicht erreichbar. **Ein Job, der immer rot
+ist, wird ignoriert** — und entwertet dabei die Farbe der übrigen Jobs mit.
+Genau das war der erste Anlauf: `continue-on-error` hält den Workflow grün,
+die Kachel am PR bleibt trotzdem rot.
+
+Der Abgleich schlägt in **beide** Richtungen an, wie `known_gap` im
+Guard-Korpus: ein Befund, der nicht in der Liste steht, ist rot (er braucht
+eine Entscheidung); ein Eintrag, den pip-audit nicht mehr meldet, ist ebenfalls
+rot (er ist erledigt und muss raus, sonst trägt die Liste bald Altlasten statt
+Beschlüsse). **Wer einen Eintrag ergänzt, schreibt die Begründung dazu und was
+ihn auflöst** — ein Eintrag ohne Grund ist ein Stummschalter, und
+`test_audit_deps.py` besteht darauf.
+
+Nebenbefund, der die ganze Liste erklärt: **alle 30 getragenen Befunde hängen
+an Gradios eigenen Deckeln.** Gradio 6.22 erlaubt `pillow<13.0` und
+`starlette>=1.0.1` — mit #61a fallen sie sämtlich weg, bis auf
+PYSEC-2026-211, für das es gar keine Fassung gibt.
+
+#### ⚠️ Zweite Fassung derselben Falle: ein Werkzeug als Laufzeit-Abhängigkeit
+`gradio` führt **`ruff` als eigene Abhängigkeit** und fordert `>=0.9.3`. Der Pin
+`ruff==0.4.10` war damit unerfüllbar — und `pip install` sagt das nicht
+deutlich, sondern zieht eine passende Version über den Pin. Lokal lief plötzlich
+0.16.1 gegen eine Konfiguration, die für 0.4 geschrieben war, und meldete zehn
+Befunde in Dateien, die niemand angefasst hatte.
+
+Merksatz: **wenn ein gepinntes Werkzeug plötzlich anders urteilt, zuerst
+`python -m <tool> --version` gegen den Pin halten** — nicht die Meldungen
+einzeln erklären wollen. Die Ursache ist die Version, in beiden Fassungen: über
+den PATH (unten) oder über die Abhängigkeiten (hier).
 
 #### ⚠️ Bekannte Falle: PATH-Shadowing (ist schon mehrfach passiert!)
 Black/Ruff **immer als Modul aufrufen**, nie als nacktes Binary:
@@ -766,15 +832,30 @@ gesendeten Werte mit `api_info.parameters`. `gr.State` hat `skip_api = True` und
 steht dort nicht drin — **jedes Event mit einem State als Input warnt**, ohne
 dass etwas kaputt wäre. Nicht suchen, nicht "reparieren".
 
-### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (Gradio 4.44)
-Die Dataframe-Komponente **verliert Updates aus Generator-Handlern** — das Frontend
-friert nach den ersten Yields ein (gilt für `gr.update` wie Rohwerte, `str` wie
+### ⚠️ Stolperfalle: gr.Dataframe kann kein Streaming (gemessen auf Gradio 4.44)
+Die Dataframe-Komponente **verlor Updates aus Generator-Handlern** — das Frontend
+fror nach den ersten Yields ein (galt für `gr.update` wie Rohwerte, `str` wie
 `markdown`-datatype; per Minimal-Repro bestätigt). Zusätzlich: fester 500px-Scroll-
 Viewport und eine virtualisierte Tabelle, deren Mess-Klon-Zeilen DOM-Selektoren in
 Browser-Tests verfälschen. **Für live wachsende Ausgaben `gr.Markdown` (Voll-Ersatz
 pro Yield) oder `gr.Chatbot` verwenden** — so macht es die Ask-All-Ansicht.
-Verwandt: `pydantic` ist auf `2.9.2` gepinnt (>2.10 erzeugt bool-Schemas, die
-Gradio 4.44 crashen).
+
+**Unter Gradio 5 ist das nicht nachgemessen.** Der Befund stammt aus der
+4.44-Zeit; die Komponente kommt im Code nicht mehr vor, es gab also keinen
+Anlass. Wer sie einführen will, misst neu — und schreibt das Ergebnis hierher.
+Der frühere `pydantic==2.9.2`-Pin (bool-Schemas ab 2.10 ließen `gradio_client`
+1.3 abstürzen) ist mit #61 **entfallen**.
+
+### ⚠️ `gr.Chatbot` steht bewusst auf `type="tuples"` — und das ist befristet
+Das Paarformat ist seit Gradio 5 deprecated; in **6.x ist der Parameter `type`
+ersatzlos weg**, `messages` ist dort der einzige Weg. Es steht hier trotzdem,
+weil daran der Vote-Index aus #65 hängt: `_store_index_of` zählt Positionen
+unter den Antwort-Bubbles und liest `evt.index` als `[row, col]`. Unter
+`messages` ist der Index **flach** — der bestehende `except`-Zweig fiele dann
+stumm auf „letzte Antwort" zurück, und jeder Vote zeigte auf die falsche
+Nachricht. Ein stiller Fehler im Trainingsdatenkanal für #7 ist teurer als eine
+Deprecation-Warnung, deshalb ist der Wechsel ein eigenes Ticket (#61a) mit
+genau dieser Zuordnung als Abnahmebedingung.
 
 ### ⚠️ Der Guard-Holdback bestimmt die wahrgenommene Antwortzeit (#51)
 `_StreamModerator` (`core/streaming_provider.py`) hält die letzten
@@ -883,7 +964,7 @@ Zwei Dinge, die beim Bauen wehtaten:
 Merksatz fürs Weiterbauen: alles, was rein clientseitig ist (Theme, Fokus,
 Scrollen), gehört in `js=` — eine Navigation kostet die ganze Sitzung.
 
-### ⚠️ Stolperfalle: Gradio `cancels` schließt Generatoren nicht (Gradio 4.44)
+### ⚠️ Stolperfalle: Gradio `cancels` schließt Generatoren nicht (gemessen auf 4.44)
 `cancels=[...]` bricht nur den **asyncio-Task** ab (`task.cancel()` in
 `gradio/utils.py`); `reset_iterators` löscht bloß die Referenz — das `finally`
 eines laufenden Generator-Handlers wird **nicht zuverlässig ausgeführt**, im
@@ -905,7 +986,8 @@ Highlights:
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
   #42 Perf-Benchmark (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
-  (Archiv), #14 bis auf den Server-Teil (#14a). Offen: #61 Gradio 5.x
+  (Archiv), #14 bis auf den Server-Teil (#14a). #61 (Gradio 5.x) ist gehoben, die
+  Fortsetzung auf 6.x läuft als #61a weiter
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -917,6 +999,7 @@ via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen)
 #37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
 #32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
 #43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
+#61 Gradio 5.50 (+ pip-audit in der CI), #41a Report-Leitkennzahl,
 #58 Moderator-Umschreibung, #59 Ablage = Gespräch, #62 Guard-Regelwerk, #67 Test-Doubles,
 #54 Gesprächs-Ablage (SQLite), #25 Verlauf, #55 Review-Befunde, #57 Review-Befunde Runde 2.
 

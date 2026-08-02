@@ -1,13 +1,25 @@
 # --- Core runtime ---
-fastapi==0.111.1
-starlette==0.37.2
+# Gradio 5 (#61). Der 4.44.1-Pin trug sechs auf dieses Setup anwendbare
+# Advisories, darunter GHSA-26jh-r8g2-6fpr — die Dropdown-Datenvalidierung,
+# also genau der Mechanismus hinter dem Verlauf-IDOR aus Review-Runde 2.
+# Der dokumentierte Grund für den alten Pin war `gr.Dataframe`; die Komponente
+# kommt seit Längerem nicht mehr im Code vor. fastapi/starlette/pydantic zieht
+# Gradio mit, sie stehen hier nur, damit die Auflösung reproduzierbar bleibt.
+fastapi==0.141.1
+starlette==0.52.1
 uvicorn[standard]==0.30.6
-gradio==4.44.1           # bewusst fixiert (passt zu client 1.3.0)
-gradio_client==1.3.0     # explizit pinnen, um Versionskonflikte zu vermeiden
-huggingface_hub>=0.19.3,<1.0  # gradio 4.44 importiert HfFolder (in hf_hub 1.0 entfernt)
+gradio==5.50.0
+gradio_client==1.14.0    # gehört zu gradio 5.50, zusammen heben
+# gradio 5.50 deklariert pydantic<=2.12.3. Der frühere ==2.9.2-Pin ist weg:
+# er hing am bool-Schema-Crash in gradio_client 1.3, den es hier nicht gibt
+# (mit 2.12.3 und 2.13.4 gegengeprüft, beide grün — 2.12.3, weil Gradio nicht
+# mehr zusagt).
+pydantic==2.12.3
+# Kappung nicht neu geprüft: sie stammt aus der 4.44-Zeit (HfFolder in hf_hub
+# 1.0 entfernt). Sie stört nicht, also bleibt sie, bis jemand sie misst.
+huggingface_hub>=0.19.3,<1.0
 ollama>=0.1,<1.0         # Python-Client für Ollama
 requests>=2.31,<3.0
-pydantic==2.9.2          # >2.10 erzeugte bool-Schema → Crash in gradio_client
 PyYAML>=6.0,<7.0
 colorama>=0.4.6,<0.5
 beautifulsoup4>=4.12,<5.0

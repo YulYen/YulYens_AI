@@ -28,6 +28,18 @@ AnswerFn = Callable[[str, str], str]  # (persona, question) -> answer
 SummarizeFn = Callable[[list[dict]], str]  # history -> summary text
 GuardFactory = Callable[[], object]  # fresh guard per case (session state!)
 
+# Cases whose average lands in this band decide at a tenth of a point: a trait
+# passes from 4 upwards, so an average just below it flips between runs without
+# anything in the code changing. #41a measured 5 to 7 of 17 cases in this band,
+# which is where the 27 % spread of the pass rate comes from. The report names
+# them so nobody reads a flipped case as a regression.
+NEAR_THRESHOLD_LOW = 3.0
+NEAR_THRESHOLD_HIGH = 4.0
+
+
+def is_near_threshold(average: float | None) -> bool:
+    return average is not None and NEAR_THRESHOLD_LOW <= average < NEAR_THRESHOLD_HIGH
+
 
 @dataclass
 class CaseResult:
@@ -64,6 +76,10 @@ class EvalRun:
     started_at: str = field(default_factory=lambda: datetime.now().isoformat())
     results: list[CaseResult] = field(default_factory=list)
     guard_outcomes: list[GuardOutcome] = field(default_factory=list)
+    # Befunde über den *Lauf*, nicht über einen Fall: fehlender Wiki-Proxy,
+    # abgeschaltete Quellen. Sie gehören in den Report, weil sie die Zahlen
+    # darunter erklären — ein Lauf ohne Wiki misst andere Personas.
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def total(self) -> int:
@@ -90,15 +106,28 @@ class EvalRun:
         return sum(1 for o in self.guard_outcomes if o.skipped)
 
     @property
-    def average_score(self) -> float | None:
-        averages = [
+    def _scored_averages(self) -> list[float]:
+        return [
             r.verdict.average
             for r in self.results
             if r.verdict is not None and r.verdict.average is not None
         ]
+
+    @property
+    def average_score(self) -> float | None:
+        averages = self._scored_averages
         if not averages:
             return None
         return round(sum(averages) / len(averages), 2)
+
+    @property
+    def judged_count(self) -> int:
+        """The `n` behind the average — a mean over three cases means little."""
+        return len(self._scored_averages)
+
+    @property
+    def near_threshold(self) -> int:
+        return sum(1 for a in self._scored_averages if is_near_threshold(a))
 
     @property
     def ok(self) -> bool:
