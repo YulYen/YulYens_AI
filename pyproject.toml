@@ -22,6 +22,7 @@ pythonpath = ["src"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "ollama: marks tests that perform real Ollama calls",
+    "browser: drives the running WebUI in a real browser (needs Playwright)",
 ]
 filterwarnings = [
     "ignore:Importing 'parser\\.split_arg_string'.*:DeprecationWarning",
