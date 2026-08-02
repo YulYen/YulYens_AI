@@ -241,13 +241,13 @@ def test_free_form_mappings_are_data_and_stay_silent(path, key):
 def test_a_typo_inside_a_list_entry_is_reported():
     """Auch Listen von Untermodellen werden abgelaufen — z. B. die RSS-Feeds."""
     data = _real_config()
-    data["briefing"]["feeds"] = [
+    data["rss"]["feeds"] = [
         {"name": "tagesschau", "url": "https://example.invalid/rss", "titel": "x"}
     ]
 
     problems = validate_config(data)
 
-    assert any("briefing.feeds.titel" in p for p in problems), problems
+    assert any("rss.feeds.titel" in p for p in problems), problems
 
 
 def test_the_wording_separates_sections_from_settings():

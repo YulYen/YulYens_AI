@@ -108,8 +108,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   └── audio_player.py      # WAV-Wiedergabe: winsound / CLI-Player-Dispatch (#34)
 │   ├── stt/
 │   │   └── whisper_stt.py       # Spracheingabe via faster-whisper (optional, lazy)
-│   ├── briefing/
-│   │   └── feeds.py             # RSS/Atom-Briefing (spiegelt wiki/lookup.py)
+│   ├── rss/
+│   │   ├── feeds.py             # RSS/Atom als Kontextquelle: Cache + Block (#73)
+│   │   └── trigger.py           # Heuristik „ist das eine Nachrichtenfrage?"
 │   └── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
 ├── evals/                       # Eval-Korpora als YAML (siehe evals/ReadMe.md)
 │   ├── personas/*.yaml          # Goldene Fragen pro Persona
@@ -164,7 +165,7 @@ Config.reset_instance()        # in Tests: Isolation
 ```
 User-Input ──→ SecurityGuard (Eingang) ──┐
 spaCy → Wiki-Proxy (8042) ──→ Guard (Kontext) ──┤
-briefing/feeds.py (RSS) ───→ Guard (Kontext) ──┘
+rss/feeds.py (RSS-Cache) ──→ Guard (Kontext) ──┘
                                           → Ollama
            → Token-Stream → SecurityGuard (Ausgang) → UI + TTS + JSON-Log
 ```
@@ -192,7 +193,7 @@ Guards: ein Artikel über `localhost` traf die Injection-Regel. Diese Regel ist
 seit #62 weg, der Defekt bliebe aber derselbe — ein Artikel *über*
 Prompt-Injection zitiert nun einmal Angriffssätze. Alle Verbraucher — Anzeige,
 Injektion, `/quellen` im Terminal — gehen deshalb durch diese eine Methode.
-`inject_wiki_context`/`inject_briefing_context` behalten ihren `guard`-Parameter
+`inject_wiki_context` behält seinen `guard`-Parameter
 als letzte Schranke vor dem Prompt.
 
 Die Rolle ist weiterhin `system` — sie nach `user` zu verschieben ändert das
@@ -355,8 +356,11 @@ stt:
   model: "small"             # tiny | base | small | medium | large-v3
   language: "de"             # null = Auto-Erkennung
 
-briefing:
-  enabled: true              # WebUI-Button + /briefing (Terminal); Netz nur auf Klick
+rss:                         # war `briefing:` — alter Name wird gelesen + gewarnt (#73)
+  enabled: true              # EIN Schalter: Cache, Heuristik und Knopf
+  show_button: true          # Knopf getrennt abschaltbar, Quelle bleibt aktiv
+  refresh_minutes: 60        # Hintergrund-Thread; nie im Request-Pfad
+  max_chars_per_item: 400    # Budget je Meldung, alles zusammen ist EIN Block
   feeds:                     # Liste von {name, url} (RSS 2.0 oder Atom)
     - name: "tagesschau"
       url: "https://www.tagesschau.de/index~rss2.xml"
@@ -641,13 +645,44 @@ bewusst `python -m black`/`python -m ruff` auf.
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
 | **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token) |
-| **Briefing (RSS)** | Gewählte Persona fasst die Feeds aus `briefing.feeds` zusammen (WebUI-Button „Briefing 📰" bzw. `/briefing` im Terminal). Kontext-Injektion wie beim Wiki (`briefing/feeds.py`); nicht erreichbare Feeds werden mit Hint übersprungen |
+| **RSS als Quelle (#73)** | Nachrichten verhalten sich wie das Wiki: eine Quelle, die sich meldet, wenn die Frage danach ist (`rss/trigger.py`), statt eines Knopfes, der alles abkippt. Geholt wird **im Hintergrund** (`RssCache`, Start + alle `rss.refresh_minutes`) — ein Turn nimmt, was da ist, notfalls nichts. Alle Meldungen zusammen als **eine** System-Nachricht, je Meldung `max_chars_per_item` und ein Datum. Der Knopf „Briefing 📰" bzw. `/briefing` nutzt denselben Cache und ist über `rss.show_button` abschaltbar, ohne die Quelle abzuschalten |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
 | **Feedback (#40)** | 👍/👎 an jeder Bot-Bubble, append-only nach `logs/feedback_votes.jsonl`. **Eine Bot-Bubble ist nicht automatisch eine Modellantwort:** Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und die Kontext-Kompressionswarnung stehen in derselben Spalte und tragen ebenfalls einen Daumen. Erkannt wird das daran, dass Beiwerk **nie in der LLM-History** landet — wer eine neue Hinweis-Bubble einführt, bekommt den Schutz dadurch geschenkt, solange er sie nicht ins Kontextfenster gibt. Ein Vote, der sich nicht gegen die History prüfen lässt, wird verworfen: für einen Trainingsdaten-Kanal (#7) ist eine verlorene Bewertung billiger als eine erfundene. **Jede Zeile trägt seit #65 `conversation_id` + `message_index`** — ohne die ist ein Vote ein loses Textpaar, mit ihnen ein Join auf die Ablage (Persona, Modell, Zeitraum, Gesprächsverlauf davor). Der Index zählt **Positionen unter den Antwort-Bubbles**, nicht Texte: Hinweis-Bubbles stehen in der Anzeige zwischen den Antworten und in der Ablage nicht, und zweimal „Ja." im selben Gespräch ist keine Seltenheit. Den Wortlaut liefert die Ablage, nicht die Anzeige — gegen sie wird später gejoint. Ohne Anmeldung gibt es keine Ablage (#72); dann bleibt `conversation_id` leer und der Vote wird trotzdem geschrieben |
 | **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
+
+### RSS: vier Entscheidungen, die man leicht umdreht (#73)
+
+1. **Der Guard filtert *pro Meldung*, bevor zusammengefügt wird.** Seit alles in
+   *einer* System-Nachricht landet, wäre die umgekehrte Reihenfolge eine stille
+   Abschwächung: eine schräge Schlagzeile risse entweder den ganzen Block mit
+   oder rutschte in ihm durch. Derselbe Fehler wie damals bei
+   `WikiLookup.snippets()`, nur andersherum.
+2. **`items_for` holt nie selbst.** Ein Lazy-Load lässt genau die Frage zahlen,
+   die nach Ablauf der Frist zuerst kommt — zwei Feeds à 13 s Timeout im
+   Request-Pfad, die Lektion aus #51. Der Hintergrund-Thread startet in
+   `launch.py`, nicht in der Factory: `--doctor` und die Tests bauen die
+   Factory auch und dürfen nie ins Netz.
+3. **Nur Plural löst aus.** „Nachrichten" sind Nachrichten, „eine Nachricht" ist
+   eine Nachricht an den Chef; „Schlagzeilen" will Schlagzeilen, „eine
+   Schlagzeile" ist eine Wortbedeutungsfrage. Diese eine Regel ersetzt eine
+   ganze Klasse von Sonderfällen gegen Definitionsfragen. Einzelne Zeitwörter
+   („heute", „aktuell", „neu") lösen **nichts** aus — sie stehen in jedem
+   zweiten Satz.
+4. **Ein Personenbezug schlägt alles.** „Was gibt's Neues **bei dir**?" ist
+   Small Talk; der Fehlalarm wäre teuer, weil die Persona anfinge, Schlagzeilen
+   aufzusagen.
+
+Gemessen wie beim Guard (#62): die naive Wortliste traf **9 von 12** harmlosen
+Sätzen, die Fassung im Repo **0** — bei unveränderter Trefferzahl. Wer eine
+Regel ergänzt, legt in `tests/test_rss_trigger.py` den Satz daneben, den sie
+nicht treffen darf.
+
+**Die Feed-Namen sind Auslöser und kommen aus der Config** (`rss/trigger.py`,
+`feed_aliases`): „Was sagt die Tagesschau?" zieht nur diese Quelle. Wer einen
+Feed ergänzt, bekommt seinen Auslöser geschenkt — keine zweite Wortliste.
 
 ### Sitzungszustand gehört in den `gr.State`, nicht ans WebUI-Objekt
 Die `WebUI` ist ein **Singleton der AppFactory** und bedient alle Browser

@@ -16,7 +16,6 @@ from typing import TYPE_CHECKING, Any
 
 import gradio as gr
 import requests
-from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from config.personas import _load_system_prompts, get_all_persona_names, get_drink
 from core.context_utils import (
     context_near_limit,
@@ -32,6 +31,8 @@ from core.utils import (
     is_file_exchange_enabled,
     module_available,
 )
+from rss.feeds import _rss_cache_of, build_context_block, inject_rss_context
+from rss.trigger import feeds_for_question
 from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
@@ -183,9 +184,13 @@ class WebUI:
         self.stt_cfg = getattr(config, "stt", {}) or {}
         self.stt_available = bool(self.stt_cfg.get("enabled")) and is_stt_available()
         # Briefing (RSS): Button nur zeigen, wenn eingeschaltet und Feeds da sind
-        self.briefing_cfg = getattr(config, "briefing", {}) or {}
-        self.briefing_enabled = bool(self.briefing_cfg.get("enabled")) and bool(
-            self.briefing_cfg.get("feeds")
+        self.rss_cfg = getattr(config, "rss", {}) or {}
+        self.rss_cache = _rss_cache_of(factory)
+        # Die Quelle ist an, sobald Feeds konfiguriert sind; der Knopf ist eine
+        # zweite, getrennte Frage (#73).
+        self.rss_enabled = bool(self.rss_cache.feed_names)
+        self.briefing_enabled = self.rss_enabled and bool(
+            self.rss_cfg.get("show_button", True)
         )
         # Vorlesen (TTS): wie beim Mikro nur anbieten, wenn Piper installiert ist
         self.tts_cfg = getattr(config, "tts", {}) or {}
@@ -526,6 +531,20 @@ class WebUI:
                 llm_history, contexts, getattr(session.streamer, "guard", None)
             )
 
+        # 4b) Optional: RSS-Meldungen, wenn die Frage danach ist (#73).
+        #     Nichts wird hier geholt — der Cache ist schon gefüllt oder eben
+        #     nicht; ein Turn wartet nie auf das Netz.
+        rss_hint = self._inject_rss_if_asked(session, user_input, llm_history)
+        if rss_hint:
+            chat_history.append((None, rss_hint))
+            yield (
+                None,
+                chat_history,
+                llm_history,
+                *self._wiki_sources_unchanged(),
+                gr.update(),
+            )
+
         # 5) Send the user question to the LLM
         user_message = {"role": "user", "content": user_input}
         llm_history.append(user_message)
@@ -542,6 +561,48 @@ class WebUI:
 
         # 7) Stream the answer
         yield from self._stream_reply(session, llm_history, chat_history)
+
+    def _inject_rss_if_asked(
+        self, session: SessionContext, user_input: str, llm_history: list[Message]
+    ) -> str | None:
+        """Hängt den Meldungs-Block an, wenn die Frage eine Nachrichtenfrage ist.
+
+        Liefert den Hinweis für die Anzeige — oder ``None``, wenn nichts
+        injiziert wurde. Der Hinweis ist Beiwerk und landet **nicht** in der
+        LLM-History; genau daran erkennt der Vote-Kanal ihn (#40).
+        """
+        if not self.rss_enabled:
+            return None
+        names = feeds_for_question(user_input, self.rss_cache.feed_names)
+        if not names:
+            return None
+        items = self.rss_cache.items_for(list(names))
+        block, dropped = build_context_block(
+            items, self.rss_cache, getattr(session.streamer, "guard", None)
+        )
+        if not block:
+            return None
+        inject_rss_context(llm_history, block)
+        return self._rss_hint(session.bot, list(names), dropped)
+
+    def _rss_hint(self, persona: str, names: list[str], dropped: int) -> str | None:
+        """„📰 LEAH hat dazu tagesschau gelesen (Stand 14:20)."
+
+        Der Stand gehört sichtbar dazu: der Cache ist bis zu einer Stunde alt,
+        und der Nutzer soll das wissen, ohne ins Log zu schauen.
+        """
+        if not names:
+            return None
+        stamp = self.rss_cache.filled_at
+        hint = self._t(
+            "rss_hint",
+            persona_name=persona or "",
+            feed_names=", ".join(names),
+            stand=stamp.strftime("%H:%M") if stamp else "?",
+        )
+        if dropped:
+            hint = f"{hint}\n{self._t('wiki_context_dropped', count=dropped)}"
+        return hint
 
     def _streaming_button_updates(self, streaming: bool) -> tuple:
         """Send ⇄ Stop tauschen; Regenerate währenddessen sperren (#35)."""
@@ -679,27 +740,25 @@ class WebUI:
             gr.update(),
         )
 
-        timeout = (
-            float(self.briefing_cfg.get("timeout_connect", 5.0)),
-            float(self.briefing_cfg.get("timeout_read", 8.0)),
+        # Der Knopf holt nichts mehr selbst — er nimmt denselben Cache wie die
+        # automatische Injektion (#73). Damit ist er eine Abkürzung, kein
+        # zweiter Code-Pfad, und er wartet nie auf das Netz.
+        items = self.rss_cache.items_for(self.rss_cache.feed_names)
+        block, dropped = build_context_block(
+            items, self.rss_cache, getattr(session.streamer, "guard", None)
         )
-        hints, items = fetch_briefing_items(self.briefing_cfg, session.bot, timeout)
-
-        for hint in hints:
-            if hint:
-                chat_history.append((None, hint))
-        if hints:
+        hint = self._rss_hint(session.bot, self.rss_cache.feed_names, dropped)
+        if hint:
+            chat_history.append((None, hint))
             yield None, chat_history, llm_history, *keep, gr.update()
 
-        if not items:
+        if not block:
             chat_history.append((None, self._t("briefing_empty")))
             yield None, chat_history, llm_history, *keep, gr.update()
             return
 
         # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
-        inject_briefing_context(
-            llm_history, items, getattr(session.streamer, "guard", None)
-        )
+        inject_rss_context(llm_history, block)
         llm_history.append({"role": "user", "content": briefing_prompt})
 
         if self._handle_context_warning(session, llm_history, chat_history):

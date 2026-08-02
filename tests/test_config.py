@@ -1,4 +1,5 @@
 # tests/test_config.py
+import logging
 import sys
 from datetime import datetime
 
@@ -363,3 +364,51 @@ def test_config_without_ensemble_key_still_has_attribute(tmp_path):
         assert hasattr(cfg, "ensemble")
     finally:
         Config.reset_instance()
+
+
+def test_the_old_briefing_section_is_still_read(tmp_path, caplog):
+    """`briefing:` heißt seit #73 `rss:` — ohne Alias wäre das ein stiller Bruch.
+
+    Die rekursive Schema-Prüfung (#66) meldete jedem Bestandsnutzer
+    „unbekannte Sektion 'briefing'", und die Feeds wären einfach weg. Derselbe
+    Weg wie bei `ui.web.share_auth` → `auth`: lesen, warnen, nicht brechen.
+    """
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        "language: de\n"
+        "core:\n  model_name: m\n"
+        "briefing:\n"
+        "  enabled: true\n"
+        "  feeds:\n"
+        "    - name: alt\n      url: https://example.org/f\n",
+        encoding="utf-8",
+    )
+
+    Config.reset_instance()
+    with caplog.at_level(logging.WARNING):
+        cfg = Config(str(cfg_file))
+
+    assert cfg.rss["enabled"] is True
+    assert cfg.rss["feeds"][0]["name"] == "alt"
+    assert not hasattr(cfg, "briefing")
+    assert any("'rss:'" in r.message % r.args for r in caplog.records)
+    Config.reset_instance()
+
+
+def test_the_new_section_wins_over_the_old_one(tmp_path):
+    """Steht beides da, gilt `rss:` — der neue Name ist die Absicht."""
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text(
+        "language: de\n"
+        "core:\n  model_name: m\n"
+        "briefing:\n  enabled: false\n  refresh_minutes: 5\n"
+        "rss:\n  enabled: true\n",
+        encoding="utf-8",
+    )
+
+    Config.reset_instance()
+    cfg = Config(str(cfg_file))
+
+    assert cfg.rss["enabled"] is True
+    assert cfg.rss["refresh_minutes"] == 5, "unbestrittene Werte bleiben erhalten"
+    Config.reset_instance()

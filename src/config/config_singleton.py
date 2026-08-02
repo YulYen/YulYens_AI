@@ -94,6 +94,8 @@ class Config:
                 "Config value 'language' must be a non-empty string like 'de' or 'en'."
             )
 
+        _rename_briefing_to_rss(data)
+
         # Schema-Prüfung (#43): beim Start bewusst nur eine Warnung. Ein
         # laufendes Setup darf nicht an einem Schema scheitern, das die
         # persönliche config.local.yaml nie gesehen hat — hart wird es erst in
@@ -139,3 +141,26 @@ class Config:
                     raise TypeError(
                         f"Section '{section}' does not support updates."
                     ) from exc
+
+
+def _rename_briefing_to_rss(data: dict) -> None:
+    """`briefing:` heisst seit #73 `rss:` — die alte Sektion wird weitergelesen.
+
+    Umbenennen ohne Alias waere ein stiller Bruch: die rekursive Schema-Pruefung
+    (#66) meldete jedem Bestandsnutzer „unbekannte Sektion 'briefing'", und die
+    Feeds waeren einfach weg — ohne dass irgendwo steht, warum. Derselbe Weg wie
+    bei `ui.web.share_auth` -> `ui.web.auth`: lesen, warnen, nicht brechen.
+
+    Steht beides da, gewinnt `rss:` — der neue Name ist die Absicht.
+    """
+    legacy = data.pop("briefing", None)
+    if legacy is None:
+        return
+    logging.warning(
+        "[CONFIG] Die Sektion 'briefing:' heisst jetzt 'rss:' — bitte in der "
+        "config.yaml umbenennen. Sie wird vorerst weiter gelesen."
+    )
+    if not isinstance(legacy, dict):
+        return
+    current = data.get("rss")
+    data["rss"] = {**legacy, **current} if isinstance(current, dict) else legacy

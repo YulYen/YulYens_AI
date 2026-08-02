@@ -147,6 +147,12 @@ def main():
             target=factory.warm_up_model, name="ModelWarmUp", daemon=True
         ).start()
 
+    # RSS-Cache im Hintergrund füllen (#73). Bewusst hier und nicht in der
+    # Factory: ein Test oder ein `--doctor`-Lauf baut die Factory auch, soll
+    # aber nie ins Netz greifen. Der erste Lauf passiert sofort, danach im
+    # konfigurierten Takt — und ein Chat-Turn wartet nie darauf.
+    factory.get_rss_cache().start()
+
     ui = factory.get_ui()
     api_provider = factory.get_api_provider()
     email_cfg = getattr(cfg, "email_adapter", {})

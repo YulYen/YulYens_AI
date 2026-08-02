@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 import config.personas as personas
 from auth import AuthProvider, build_auth_provider
 from config.config_singleton import Config
+from rss.feeds import RssCache, build_rss_cache
 from security.tinyguard import BasicGuard, create_guard
 from storage import ConversationStore, NullStore, build_store
 from ui.terminal_ui import TerminalUI
@@ -42,6 +43,7 @@ class AppFactory:
         self._cfg = Config()
         self._keyword_finder: SpacyKeywordFinder | None = None
         self._wiki_lookup: WikiLookup | None = None
+        self._rss_cache: RssCache | None = None
         self._api_provider = None
         self._one_shot_provider = None
         self._ui = None  # TerminalUI or WebUI
@@ -162,6 +164,17 @@ class AppFactory:
                 self._cfg, self.get_keyword_finder()
             )
         return self._wiki_lookup
+
+    def get_rss_cache(self) -> RssCache:
+        """Der RSS-Cache — einmal gebaut, von allen Oberflächen geteilt (#73).
+
+        Wie `get_wiki_lookup()`: eine Quelle, ein Objekt. Der Hintergrund-Thread
+        startet hier **nicht** von selbst — das tut `launch.py`, damit ein Test
+        oder ein `--doctor`-Lauf nie ins Netz greift.
+        """
+        if self._rss_cache is None:
+            self._rss_cache = build_rss_cache(getattr(self._cfg, "rss", None))
+        return self._rss_cache
 
     def warm_up_model(self) -> None:
         """One-time model preload so the first real request hits a warm model.

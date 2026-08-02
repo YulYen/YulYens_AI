@@ -309,30 +309,44 @@ def test_context_with_pii_is_kept():
     assert any("vorstand@verein.example" in m["content"] for m in history)
 
 
-def test_a_poisoned_briefing_item_never_reaches_the_prompt():
+def _rss_block(items):
+    from rss.feeds import RssCache, build_context_block
+
+    return build_context_block(items, RssCache(feeds=[]), _guard_for_context())
+
+
+def test_a_poisoned_rss_item_never_reaches_the_prompt():
     """Dieselbe Regel für den zweiten Kontext-Kanal — RSS-Feeds."""
-    from briefing.feeds import inject_briefing_context
+    from rss.feeds import RssItem, inject_rss_context
 
+    block, dropped = _rss_block([RssItem("boesartiger-feed", "Schlagzeile", POISON)])
     history: list = []
-    inject_briefing_context(
-        history, [("boesartiger-feed: Schlagzeile", POISON)], _guard_for_context()
-    )
+    inject_rss_context(history, block)
 
+    assert dropped == 1
     assert history == []
 
 
 def test_only_one_poisoned_item_is_dropped():
-    """Ein schlechter Eintrag darf nicht das ganze Briefing wegwerfen."""
-    from briefing.feeds import inject_briefing_context
+    """Ein schlechter Eintrag darf nicht den ganzen Block wegwerfen.
 
-    history: list = []
-    inject_briefing_context(
-        history,
-        [("feed: gut", "Heute war das Wetter schön."), ("feed: boese", POISON)],
-        _guard_for_context(),
+    Seit #73 landen alle Meldungen in **einer** System-Nachricht — genau
+    deshalb muss der Guard *vor* dem Zusammenfügen filtern. Täte er es danach,
+    risse ein einziger vergifteter Eintrag den ganzen Block mit.
+    """
+    from rss.feeds import RssItem, inject_rss_context
+
+    block, dropped = _rss_block(
+        [
+            RssItem("feed", "gut", "Heute war das Wetter schön."),
+            RssItem("feed", "boese", POISON),
+        ]
     )
+    history: list = []
+    inject_rss_context(history, block)
 
     joined = " ".join(m["content"] for m in history)
+    assert dropped == 1
     assert "Wetter" in joined
     assert "Entwickler-Modus" not in joined
 

@@ -5,6 +5,7 @@ import logging
 import sys
 import threading
 import types
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -15,6 +16,7 @@ import requests
 from auth import build_auth_provider
 from config.texts import Texts
 from core.streaming_provider import StreamStats
+from rss.feeds import RssCache, RssItem
 from storage import NullStore
 from ui.session import SessionContext
 from ui.web_ui import (
@@ -677,12 +679,12 @@ def _briefing_web_ui():
     session = SessionContext()
     session.bot = "Karl"
     web_ui.briefing_enabled = True
-    web_ui.briefing_cfg = {
-        "enabled": True,
-        "timeout_connect": 1.0,
-        "timeout_read": 1.0,
-        "feeds": [{"name": "quelle", "url": "https://example.org/rss"}],
-    }
+    web_ui.rss_enabled = True
+    # Ein gefüllter Cache — der Knopf holt seit #73 nichts mehr selbst.
+    cache = RssCache(feeds=[{"name": "quelle", "url": "https://example.org/rss"}])
+    cache._items = {"quelle": [RssItem("quelle", "Titel", "Text")]}
+    cache._filled_at = datetime(2026, 7, 30, 10, 30).timestamp()
+    web_ui.rss_cache = cache
     streamer = streamer_double()
     streamer.stream.return_value = iter(["Ant", "wort"])
     session.streamer = streamer
@@ -704,26 +706,17 @@ def test_respond_briefing_streams_summary_with_injected_context():
     web_ui, session = _briefing_web_ui()
     history_state = [{"role": "user", "content": "früher"}]
 
-    with (
-        patch(
-            "ui.web_ui.fetch_briefing_items",
-            return_value=(["📰 hint"], [("quelle: Titel", "Text")]),
-        ) as mock_fetch,
-        patch("ui.web_ui.inject_briefing_context") as mock_inject,
-        patch("ui.web_ui.context_near_limit", return_value=False),
-    ):
+    with patch("ui.web_ui.context_near_limit", return_value=False):
         outputs = list(web_ui.respond_briefing(session, [], history_state))
 
-    mock_fetch.assert_called_once()
-    assert mock_fetch.call_args[0][2] == (1.0, 1.0)  # Timeout-Tuple aus der Config
-    mock_inject.assert_called_once()
-    injected_history, injected_items, _guard = mock_inject.call_args[0]
-    assert injected_items == [("quelle: Titel", "Text")]
-
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
-    # User-Bubble (Prompt), Hint-Bubble, gestreamte Antwort
+    # Guardrail + genau ein Meldungs-Block, dann der User-Turn (#73)
+    injected = [m for m in final_state if m["role"] == "system"]
+    assert len(injected) == 2
+    assert "Titel" in injected[-1]["content"]
+    # User-Bubble (Prompt), Hinweis-Bubble mit Stand, gestreamte Antwort
     assert final_chat[0] == ("briefing_user_prompt", None)
-    assert final_chat[1] == (None, "📰 hint")
+    assert final_chat[1][1].startswith("rss_hint")
     assert final_chat[-1] == (None, "Antwort")
     assert final_state[-2] == {"role": "user", "content": "briefing_user_prompt"}
     assert final_state[-1] == {"role": "assistant", "content": "Antwort"}
@@ -734,8 +727,8 @@ def test_respond_briefing_streams_summary_with_injected_context():
 def test_respond_briefing_without_items_shows_empty_note_and_skips_stream():
     web_ui, session = _briefing_web_ui()
 
-    with patch("ui.web_ui.fetch_briefing_items", return_value=(["📰 down"], [])):
-        outputs = list(web_ui.respond_briefing(session, [], []))
+    web_ui.rss_cache._items = {}  # Feeds waren nicht erreichbar
+    outputs = list(web_ui.respond_briefing(session, [], []))
 
     final_chat = outputs[-1][1]
     assert final_chat[-1] == (None, "briefing_empty")
@@ -2686,3 +2679,105 @@ def test_a_vote_still_works_without_a_store(tmp_path):
     assert vote["answer"] == "Antwort"
     assert vote["conversation_id"] == ""
     assert vote["message_index"] == 1
+
+
+# --- RSS als Kontextquelle im normalen Chat (#73) ----------------------------
+
+
+def _rss_web_ui(filled=True):
+    """WebUI mit gefülltem Cache und einer Persona im Gespräch."""
+    web_ui = _create_web_ui()
+    session = SessionContext()
+    session.bot = "LEAH"
+    cache = RssCache(
+        feeds=[
+            {"name": "tagesschau", "url": "https://example.org/a"},
+            {"name": "heise online", "url": "https://example.org/b"},
+        ]
+    )
+    if filled:
+        cache._items = {
+            "tagesschau": [RssItem("tagesschau", "Bahnstreik", "Es wird gestreikt.")],
+            "heise online": [RssItem("heise online", "Linux 7", "Neuer Kernel.")],
+        }
+        cache._filled_at = datetime(2026, 7, 30, 14, 20).timestamp()
+    web_ui.rss_cache = cache
+    web_ui.rss_enabled = True
+    streamer = streamer_double()
+    streamer.stream.return_value = iter(["Ant", "wort"])
+    session.streamer = streamer
+    return web_ui, session
+
+
+def test_a_news_question_pulls_the_feeds_into_the_context():
+    """Der Punkt des Tickets: RSS meldet sich, wenn die Frage danach ist."""
+    web_ui, session = _rss_web_ui()
+
+    with patch("ui.web_ui.context_near_limit", return_value=False):
+        outputs = list(web_ui.respond_streaming(session, "Was gibt's Neues?", [], []))
+
+    final_state = outputs[-1][2]
+    injected = [m for m in final_state if m["role"] == "system"]
+    assert len(injected) == 2, "Guardrail + genau ein Meldungs-Block"
+    assert "Bahnstreik" in injected[-1]["content"]
+    assert "Linux 7" in injected[-1]["content"]
+
+
+def test_a_named_source_pulls_only_that_feed():
+    web_ui, session = _rss_web_ui()
+
+    with patch("ui.web_ui.context_near_limit", return_value=False):
+        outputs = list(
+            web_ui.respond_streaming(session, "Was sagt die Tagesschau?", [], [])
+        )
+
+    block = [m for m in outputs[-1][2] if m["role"] == "system"][-1]["content"]
+    assert "Bahnstreik" in block
+    assert "Linux 7" not in block
+
+
+def test_small_talk_does_not_pull_the_news():
+    """Der teure Fehlalarm: die Persona finge an, Schlagzeilen aufzusagen."""
+    web_ui, session = _rss_web_ui()
+
+    with patch("ui.web_ui.context_near_limit", return_value=False):
+        outputs = list(
+            web_ui.respond_streaming(session, "Was gibt's Neues bei dir?", [], [])
+        )
+
+    assert [m for m in outputs[-1][2] if m["role"] == "system"] == []
+
+
+def test_the_hint_names_the_feeds_and_the_cache_age():
+    """Der Cache ist bis zu einer Stunde alt — das muss man sehen können."""
+    web_ui, session = _rss_web_ui()
+
+    with patch("ui.web_ui.context_near_limit", return_value=False):
+        outputs = list(web_ui.respond_streaming(session, "Neuigkeiten?", [], []))
+
+    hints = [bot for _user, bot in outputs[-1][1] if bot and "rss_hint" in str(bot)]
+    assert hints, outputs[-1][1]
+
+
+def test_an_empty_cache_injects_nothing():
+    """Feeds nicht erreichbar → die Frage läuft normal weiter, ohne Kontext."""
+    web_ui, session = _rss_web_ui(filled=False)
+
+    with patch("ui.web_ui.context_near_limit", return_value=False):
+        outputs = list(web_ui.respond_streaming(session, "Was gibt's Neues?", [], []))
+
+    assert [m for m in outputs[-1][2] if m["role"] == "system"] == []
+    assert outputs[-1][1][-1] == (None, "Antwort"), "die Antwort kommt trotzdem"
+
+
+def test_the_source_stays_active_when_only_the_button_is_off():
+    """`show_button: false` schaltet den Knopf ab, nicht die Quelle (#73)."""
+    web_ui, session = _rss_web_ui()
+    web_ui.briefing_enabled = False  # Knopf aus
+
+    with patch("ui.web_ui.context_near_limit", return_value=False):
+        outputs = list(web_ui.respond_streaming(session, "Neuigkeiten?", [], []))
+
+    assert [
+        m for m in outputs[-1][2] if m["role"] == "system"
+    ], "die automatische Injektion hängt nicht am Knopf"

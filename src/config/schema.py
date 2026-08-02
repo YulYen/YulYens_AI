@@ -233,11 +233,15 @@ class FeedEntry(BaseModel):
     url: str = Field(min_length=1)
 
 
-class BriefingSection(BaseModel):
+class RssSection(BaseModel):
     model_config = _ALLOW_EXTRA
 
     enabled: bool = False
+    # Der Knopf getrennt abschaltbar — die Quelle bleibt dann trotzdem aktiv.
+    show_button: bool = True
+    refresh_minutes: int | None = Field(default=None, ge=1)
     max_items_per_feed: int | None = Field(default=None, ge=0)
+    max_chars_per_item: int | None = Field(default=None, ge=0)
     timeout_connect: float | None = Field(default=None, ge=0)
     timeout_read: float | None = Field(default=None, ge=0)
     feeds: list[FeedEntry] | None = None
@@ -315,7 +319,10 @@ class ConfigSchema(BaseModel):
     logging: LoggingSection | None = None
     tts: TtsSection | None = None
     stt: SttSection | None = None
-    briefing: BriefingSection | None = None
+    rss: RssSection | None = None
+    # Alter Name; `Config._load_config` bennent ihn um und warnt. Hier
+    # modelliert, damit eine Bestandsdatei keine "unbekannte Sektion" meldet.
+    briefing: RssSection | None = None
     email_adapter: EmailAdapterSection | None = None
     evals: EvalsSection | None = None
 

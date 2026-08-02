@@ -5,12 +5,12 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from briefing.feeds import fetch_briefing_items, inject_briefing_context
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
+from rss.feeds import _rss_cache_of, build_context_block, inject_rss_context
 from ui import self_talk
 from ui.continuation import continuable_persona, persona_info_from_names
 from ui.conversation_io_terminal import load_conversation, save_conversation
@@ -47,9 +47,9 @@ class TerminalUI:
         self.tts_auto_wav_enabled = bool(self.tts_cfg.get("enabled")) and bool(
             self.tts_cfg.get("features", {}).get("terminal_auto_create_wav")
         )
-        self.briefing_cfg = getattr(config, "briefing", {}) or {}
-        self.briefing_enabled = bool(self.briefing_cfg.get("enabled")) and bool(
-            self.briefing_cfg.get("feeds")
+        self.rss_cache = _rss_cache_of(factory)
+        self.briefing_enabled = bool(self.rss_cache.feed_names) and bool(
+            (getattr(config, "rss", {}) or {}).get("show_button", True)
         )
 
         # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
@@ -430,24 +430,30 @@ class TerminalUI:
 
     def _handle_briefing_command(self) -> None:
         """Fetches the configured feeds and lets the persona summarize them."""
-        timeout = (
-            float(self.briefing_cfg.get("timeout_connect", 5.0)),
-            float(self.briefing_cfg.get("timeout_read", 8.0)),
+        # Derselbe Cache wie die automatische Injektion — der Knopf holt
+        # nichts mehr selbst (#73).
+        items = self.rss_cache.items_for(self.rss_cache.feed_names)
+        block, _dropped = build_context_block(
+            items, self.rss_cache, getattr(self.streamer, "guard", None)
         )
-        hints, items = fetch_briefing_items(self.briefing_cfg, self.bot, timeout)
-
-        for hint in hints:
-            if hint:
-                print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
-
-        if not items:
+        if not block:
             print(f"{Fore.YELLOW}{self._t('briefing_empty')}{Style.RESET_ALL}\n")
             return
 
-        # Same ordering as the wiki context: system messages first, then user turn
-        inject_briefing_context(
-            self.history, items, getattr(self.streamer, "guard", None)
+        stamp = self.rss_cache.filled_at
+        print(
+            f"{Fore.YELLOW}"
+            + self._t(
+                "rss_hint",
+                persona_name=self.bot or "",
+                feed_names=", ".join(self.rss_cache.feed_names),
+                stand=stamp.strftime("%H:%M") if stamp else "?",
+            )
+            + f"{Style.RESET_ALL}\n"
         )
+
+        # Same ordering as the wiki context: system messages first, then user turn
+        inject_rss_context(self.history, block)
         self.history.append(
             {"role": "user", "content": self._t("briefing_user_prompt")}
         )

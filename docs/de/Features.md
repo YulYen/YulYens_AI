@@ -178,6 +178,19 @@ Der Nutzername wird zu jedem Gespräch in der Ablage vermerkt und steht in jeder
 - **Antwort kopieren:** Jede Nachricht im Chat hat ein Kopier-Symbol.
 - **Statuszeile:** Unter dem Chat steht nach jeder Antwort, wie voll das Kontextfenster ist (`Kontext █░░░ 424 / 8.192 Token (5 %)`) und wie schnell das Modell war (`24,0 Tok/s · erster Token nach 1,9 s`). Ab 75 % Füllstand wird die Zeile hervorgehoben — genau dort beginnt die Anwendung, den Gesprächsverlauf zu kürzen.
 
+## Nachrichten als Quelle (RSS)
+
+Mit `rss.enabled: true` verhalten sich Nachrichten wie die Offline-Wikipedia: als **Quelle, die sich meldet, wenn die Frage danach ist** — nicht als Knopf, der alles abkippt.
+
+Die konfigurierten Feeds werden **im Hintergrund** geholt (beim Start und dann alle `rss.refresh_minutes`), die neuesten Meldungen liegen im Speicher. Fragt jemand „Was gibt's Neues?", „Gibt es aktuelle Nachrichten?" oder nennt eine Quelle beim Namen („Was sagt die Tagesschau?"), legt die Persona die passenden Meldungen von selbst als Kontext dazu — mit Datum je Meldung und dem Stand des Zwischenspeichers, damit aus einer Meldung von vorgestern kein „heute" wird.
+
+Zwei Eigenschaften, die im Alltag zählen:
+
+- **Ein Chat wartet nie auf das Netz.** Was noch nicht geholt ist, fehlt eben; die Antwort kommt trotzdem. Ein Feed, der gerade nicht erreichbar ist, wirft die zuletzt geholten Meldungen nicht weg.
+- **Small Talk löst nichts aus.** „Was gibt's Neues bei dir?" ist eine Frage an die Persona, keine Bitte um Schlagzeilen — die Unterscheidung ist an alltäglichen Sätzen gemessen und nicht geraten.
+
+Der Button „Briefing 📰" (bzw. `/briefing` im Terminal) gibt es weiterhin; er benutzt denselben Zwischenspeicher und lässt sich über `rss.show_button: false` ausblenden, ohne die Quelle abzuschalten. Alles zusammen abschalten: `rss.enabled: false` — dann geht die Anwendung für Nachrichten nie ins Netz.
+
 ## Wikipedia-Integration
 
 Um fundierte Antworten zu ermöglichen, kann das System bei Wissensfragen automatisch **Wikipedia-Wissen einbinden** (optional konfigurierbar). Dabei kommen folgende Mechanismen zum Einsatz:
