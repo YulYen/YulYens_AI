@@ -76,10 +76,18 @@ def permissive_guard_double(**overrides: Any):
     ``enabled``/``flags`` bleiben ungesetzt, damit ``_output_checks_active``
     ``False`` liefert und der Holdback entfällt — dasselbe Verhalten wie beim
     bisherigen Stub, nur ohne Wartungslast.
+
+    ``check_context_only`` muss ausdrücklich ``None`` liefern (#60a). Es ist
+    die einzige Guard-Methode, deren *durchlassende* Antwort falsy ist — ohne
+    Vorbelegung gäbe das Mock ein wahrheitswertiges Objekt zurück, und
+    ``context_verdict`` verwürfe jeden injizierten Kontext. Genau die stille
+    Richtung, gegen die dieses Modul gebaut wurde: die Tests blieben nicht rot,
+    sondern prüften klammheimlich das Gegenteil.
     """
     double = create_autospec(BasicGuard, instance=True)
     double.check_input.return_value = {"ok": True, "reason": "ok", "detail": None}
     double.check_output.return_value = {"ok": True, "reason": "ok", "detail": None}
+    double.check_context_only.return_value = None
     double.process_output.side_effect = lambda text: {
         "blocked": False,
         "reason": None,
