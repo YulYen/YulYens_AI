@@ -10,6 +10,7 @@ from datetime import datetime
 import pytest
 import requests
 from config.config_singleton import Config
+from core.context_injection import is_injected
 from rss.feeds import (
     RssCache,
     RssItem,
@@ -242,7 +243,10 @@ def test_everything_becomes_one_block():
 
     assert dropped == 0
     assert len(history) == 2  # Guardrail + genau ein Block
-    assert history[0]["role"] == "system" and history[1]["role"] == "system"
+    # Die Anweisung bleibt `system`, die Meldungen werden zitierter
+    # `user`-Fremdtext (#60) — eine Schlagzeile ist Material, kein Befehl.
+    assert history[0]["role"] == "system" and not is_injected(history[0])
+    assert history[1]["role"] == "user" and is_injected(history[1])
     assert "Erste" in history[1]["content"] and "Zweite" in history[1]["content"]
     assert "10:30" in history[1]["content"], "der Stand gehört an den Block"
 

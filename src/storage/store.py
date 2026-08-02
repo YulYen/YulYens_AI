@@ -31,6 +31,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
+from core.context_injection import is_injected
 from core.utils import LOCAL_USER, ensure_dir_exists
 
 # Wohin die Ablage schreibt, wenn `storage.path` nichts sagt. Als Konstante,
@@ -263,9 +264,16 @@ class SqliteStore:
         zeichneten gar nichts auf. Mit einem Abgleich des ganzen Verlaufs kann
         das nicht mehr auseinanderlaufen.
 
-        Nur ``user`` und ``assistant`` landen hier: injizierte
-        System-Nachrichten (Wiki, Briefing) gehören zum Prompt, nicht zum
-        Gespräch — im Verlauf wären sie Lärm.
+        Nur ``user`` und ``assistant`` landen hier, und davon nur das, was
+        nicht injizierter Fremdkontext ist: Wiki-Snippets und RSS-Meldungen
+        gehören zum Prompt, nicht zum Gespräch — im Verlauf wären sie Lärm.
+
+        **Die Rollenprüfung allein reicht seit #60 nicht mehr.** Der Fremdtext
+        steht jetzt als ``user`` im Prompt (er soll keine Systemautorität
+        haben), sähe hier also aus wie eine Frage des Nutzers. Ohne
+        ``is_injected`` landete ab diesem Umbau jeder abgerufene Artikel in der
+        Ablage — und über Verlauf, Markdown-Export und JSON-Download wieder
+        heraus.
 
         Der Preis ist ein Rewrite der Nachrichtenzeilen pro Turn. Bei einem
         Gespräch von 50 Turns sind das 100 kurze Zeilen in einer lokalen
@@ -276,7 +284,7 @@ class SqliteStore:
         rows = [
             (str(m.get("role")), str(m.get("content") or ""))
             for m in messages or []
-            if m.get("role") in ("user", "assistant")
+            if m.get("role") in ("user", "assistant") and not is_injected(m)
         ]
         now = _now()
         first_question = next((text for role, text in rows if role == "user"), "")

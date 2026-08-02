@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 import requests
 from config.config_singleton import Config
+from core.context_injection import injected_message
 from security.tinyguard import accepted_context
 
 
@@ -227,13 +228,18 @@ def inject_wiki_context(
 ) -> None:
     """
     If Wikipedia snippets are available, append a guardrail message and one
-    system message per snippet. Each snippet block is clearly delimited.
+    quoted context message per snippet. Each snippet block is clearly delimited.
+
+    **Die Anweisung bleibt ``system``, der Artikeltext wird ``user`` (#60).**
+    Die Trennung ist der ganze Punkt: das Guardrail ist unser eigener Satz und
+    darf Systemautorität haben, der Snippet-Text kommt aus einer
+    heruntergeladenen ZIM-Datei und darf sie nicht haben. Vorher stand beides
+    als ``system`` im Prompt, ein Artikel *über* Prompt-Injection also auf
+    derselben Ebene wie die Anweisung, ihr zu folgen.
 
     ``guard`` ist optional, damit Aufrufer ohne Guard (und die Bestandstests)
     unverändert bleiben. Ist einer da, fliegt ein Snippet raus, dessen Text die
-    Injection- oder Wrongdoing-Regeln auslöst: der Artikeltext kommt aus einer
-    ZIM-Datei aus dem Netz und landet als ``system``-Nachricht im Prompt — also
-    mit mehr Gewicht als die Frage des Nutzers.
+    Injection- oder Wrongdoing-Regeln auslöst.
     """
     if not contexts:
         return
@@ -251,7 +257,7 @@ def inject_wiki_context(
         context_message = cfg.t(
             "wiki_context_message", topic=topic_clean, snippet=ctx.snippet
         )
-        formatted_context = (
-            f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
+        body = f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
+        history.append(
+            injected_message(cfg.t("context_quote_wrapper", body=body), "wiki")
         )
-        history.append({"role": "system", "content": formatted_context})
