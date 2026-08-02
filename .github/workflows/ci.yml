@@ -27,18 +27,18 @@ jobs:
   audit:
     # Bekannte Schwachstellen in den gepinnten Abhängigkeiten (#61).
     #
-    # Bewusst **nicht blockierend**: der Stand hat Befunde, für die es keine
-    # Fassung gibt, die dieses Projekt heute einsetzen kann — Gradio 5.50 ist
-    # das Ende der 5er-Reihe, die Fixes liegen in 6.x, und 6.x entfernt das
-    # Chatbot-Paarformat und `gr.Blocks(js=…)` (siehe Backlog). Ein Job, der
-    # deshalb dauerhaft rot stünde, würde binnen zwei Wochen ignoriert.
+    # Blockierend, aber nicht naiv: nacktes `pip-audit` stünde hier dauerhaft
+    # rot, weil Gradio 5.50 `pillow<12.0` und `starlette<1.0` deckelt und die
+    # Fassungen damit unerreichbar sind. Ein Job, der immer rot ist, wird
+    # ignoriert — dann entwertet er die Farbe für alle anderen mit.
     #
-    # Sein Zweck ist die Sichtbarkeit: ein Pin soll bewusst getragen werden
-    # statt vergessen. Sobald der Sprung auf 6.x steht, gehört `continue-on-
-    # error` weg — dann ist Rot wieder ein Befund und keine Dauerlage.
+    # `scripts/audit_deps.py` hält den Befundstand deshalb gegen
+    # `audit_allowlist.yaml`: bewusst getragene Befunde sind grün, ein neuer
+    # ist rot, und ein Eintrag, den pip-audit nicht mehr meldet, ebenfalls —
+    # sonst wächst die Liste still zu. Dasselbe Muster wie `known_gap` im
+    # Guard-Korpus.
     name: Abhängigkeiten prüfen (pip-audit)
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,9 +46,9 @@ jobs:
           python-version: "3.10"
           cache: pip
       - name: Install pip-audit
-        run: pip install pip-audit
+        run: pip install pip-audit PyYAML
       - name: Audit
-        run: python -m pip_audit -r requirements.txt --progress-spinner off
+        run: python scripts/audit_deps.py
 
   types:
     # Typprüfung nur für src/core (#52). Blockierend — ein Job, der auch gelb

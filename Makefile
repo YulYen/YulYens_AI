@@ -1,4 +1,4 @@
-.PHONY: setup format lint types fix test test-ci test-all test-browser coverage clean run evals evals-full
+.PHONY: setup format lint types fix test test-ci test-all test-browser coverage clean run audit evals evals-full
 
 setup:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -39,6 +39,11 @@ test-browser:
 
 coverage:
 	pytest -q -m "not slow and not ollama and not browser" --cov=src --cov-report=term-missing
+
+# Schwachstellen in den Abhängigkeiten gegen audit_allowlist.yaml halten (#61).
+# Braucht Netz (OSV/PyPI). `pip install pip-audit` vorausgesetzt.
+audit:
+	python scripts/audit_deps.py
 
 # Eval-Suite (#41). 'evals' braucht kein Modell, 'evals-full' braucht Ollama.
 evals:

@@ -700,6 +700,28 @@ Danach formatiert jeder Commit automatisch mit der CI-Version (Hook läuft isoli
 unabhängig von sonstigen venv-Versionen). Tool-Versionen nur bewusst und **synchron**
 in `requirements-dev.txt` **und** `.pre-commit-config.yaml` ändern.
 
+#### Der Audit-Job ist grün für Bekanntes und rot für Neues (#61)
+`scripts/audit_deps.py` (lokal `make audit`) hält `pip-audit` gegen
+`audit_allowlist.yaml`. Nacktes `pip-audit` stünde dauerhaft rot: Gradio 5.50
+deckelt `pillow<12.0` und `starlette<1.0`, die behobenen Fassungen liegen
+darüber und sind innerhalb von 5.x nicht erreichbar. **Ein Job, der immer rot
+ist, wird ignoriert** — und entwertet dabei die Farbe der übrigen Jobs mit.
+Genau das war der erste Anlauf: `continue-on-error` hält den Workflow grün,
+die Kachel am PR bleibt trotzdem rot.
+
+Der Abgleich schlägt in **beide** Richtungen an, wie `known_gap` im
+Guard-Korpus: ein Befund, der nicht in der Liste steht, ist rot (er braucht
+eine Entscheidung); ein Eintrag, den pip-audit nicht mehr meldet, ist ebenfalls
+rot (er ist erledigt und muss raus, sonst trägt die Liste bald Altlasten statt
+Beschlüsse). **Wer einen Eintrag ergänzt, schreibt die Begründung dazu und was
+ihn auflöst** — ein Eintrag ohne Grund ist ein Stummschalter, und
+`test_audit_deps.py` besteht darauf.
+
+Nebenbefund, der die ganze Liste erklärt: **alle 30 getragenen Befunde hängen
+an Gradios eigenen Deckeln.** Gradio 6.22 erlaubt `pillow<13.0` und
+`starlette>=1.0.1` — mit #61a fallen sie sämtlich weg, bis auf
+PYSEC-2026-211, für das es gar keine Fassung gibt.
+
 #### ⚠️ Zweite Fassung derselben Falle: ein Werkzeug als Laufzeit-Abhängigkeit
 `gradio` führt **`ruff` als eigene Abhängigkeit** und fordert `>=0.9.3`. Der Pin
 `ruff==0.4.10` war damit unerfüllbar — und `pip install` sagt das nicht
