@@ -125,6 +125,7 @@ All central settings are controlled through `config.yaml`. Important toggles:
 - `tts.enabled`: enables/disables text-to-speech.
 - `tts.features.terminal_auto_create_wav`: creates one WAV file per reply in terminal mode and plays it — Windows via `winsound`, Linux/macOS via `paplay`/`aplay`/`ffplay` or `afplay`. Without an available player you still get the file in `out/`.
 - `api.openai_compatible`: enables the OpenAI-compatible endpoints (`/v1/models`, `/v1/chat/completions`) that let third-party clients such as Open WebUI talk to the personas. **Once `api.host` is no longer `127.0.0.1`, set an `api_key` here** — preferably as `"env:YULYEN_API_KEY"` rather than a literal. `rate_limit_per_minute` caps requests per client.
+- `email_adapter.allowed_senders`: **mandatory once `email_adapter.enabled: true`.** Only listed senders get an answer — either a full address (`max@example.org`) or a whole domain (`@my-domain.example`). Without the list the adapter refuses to start and logs why; the rest of the application keeps running. **When upgrading an existing installation this is the one thing to add** — before, anyone who knew the persona address could drive the personas. Related: `email_adapter.max_body_chars` caps how much mail text is adopted (prompt *and* the quote in the reply).
 - `security.stream_holdback_chars`: **the knob to turn when replies feel slow to start.** The output guard holds back this many characters so a password or email address is never half-visible before it is recognised. The price: nothing appears until that many characters exist. Measured in the browser (24 chars/s): `96` → first word after ~4.1 s, `32` (default) → ~1.9 s, `0` → ~0.4 s. The default of 32 targets the common case: local, single user. **Raise it to 96** as soon as the server is reachable by others (`api.host`/`ui.web.host` other than `127.0.0.1`, a Gradio share link, the mail adapter) or real credentials appear in conversations — that also hides the text *around* a secret.
 
 Example:
@@ -245,6 +246,8 @@ python src/launch.py --doctor
 ```
 
 Exit code 1 signals a critical failure (handy for scripts).
+
+`config.yaml` itself is checked as well: unknown keys are reported at **every** level, so `security.pii_protecton` instead of `pii_protection` or `storage.enable` instead of `enabled` no longer pass silently — a typo that otherwise just means the setting never takes effect. On a normal start this is only a log warning (a working setup must not fail over a schema), in the doctor it is a hard finding.
 
 - **Terminal UI**
   - Use in the terminal when `ui.type: "terminal"`

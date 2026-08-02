@@ -381,6 +381,8 @@ security:
 
 email_adapter:
   enabled: false             # opt-in IMAP/SMTP-Bridge (Personas per Mail)
+  allowed_senders: []        # PFLICHT bei enabled: true (#14e)
+  max_body_chars: 4000       # Kappt Prompt *und* Antwortzitat (#14h)
 
 context_management:
   strategy: "heuristic"      # "heuristic" (Default) | "karl" (LLM-Zusammenfassung)
@@ -820,9 +822,8 @@ Highlights:
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
   #42 Perf-Benchmark (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
-- **Aus Review-Runde 2 (#57):** #58, #59, #62 und #67 sind erledigt (Archiv). Offen:
-  #14 E-Mail-Adapter härten (Reply-To-Reflexion, endlose Dubletten), #61 Gradio 5.x,
-  #65 Vote-Kanal an die Ablage, #66 Schema rekursiv
+- **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
+  (Archiv), #14 bis auf den Server-Teil (#14a). Offen: #61 Gradio 5.x
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
@@ -836,6 +837,30 @@ via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen)
 #43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
 #58 Moderator-Umschreibung, #59 Ablage = Gespräch, #62 Guard-Regelwerk, #67 Test-Doubles,
 #54 Gesprächs-Ablage (SQLite), #25 Verlauf, #55 Review-Befunde, #57 Review-Befunde Runde 2.
+
+### E-Mail-Adapter: die Reihenfolge ist die Regel (#14)
+
+Der Adapter (`email_adapter/service.py`, opt-in) ist der einzige Kanal, über den
+**Fremde** die Instanz erreichen — und der einzige, der unter der Domain des
+Betreibers nach außen sendet. Vier Regeln, die man beim nächsten Umbau leicht
+umdreht und die dann teuer sind:
+
+1. **Geantwortet wird an `From`, nie an `Reply-To`.** Über `Reply-To` ließ sich
+   die Instanz dazu bringen, an einen *Dritten* zu schreiben — mit gültigem
+   SPF/DKIM der eigenen Domain und dem Text des Absenders im Zitat. Dieselbe
+   Zeile speist die Schleifenerkennung; mit `Reply-To` war auch die umgehbar.
+2. **Erst markieren, dann senden.** Andersherum kostet ein fehlgeschlagenes
+   Markieren nicht *eine* Antwort, sondern *jede*: die Mail bleibt UNSEEN und
+   wird bei jedem Poll neu beantwortet (gemessen: 4 Zyklen, 4 identische
+   Antworten, `run_once()` meldete jedes Mal 0). `_mark_processed` fällt
+   deshalb auf `\Seen` zurück, wenn das Verschieben scheitert.
+3. **Ohne `allowed_senders` startet der Adapter nicht.** Fail-closed wie bei
+   fehlenden Zugangsdaten: der Dienst kostet LLM-Läufe und verschickt Mail.
+4. **Gekürzt wird einmal beim Lesen** (`max_body_chars`), nicht an jeder
+   Verwendungsstelle — Prompt und Antwortzitat erben es dadurch.
+
+Nicht behoben und deshalb ticketiert (#14a): der IMAP-Ordnertrenner wird
+geraten statt per `LIST` erfragt. Regel 2 nimmt dem Fehler die Katastrophe.
 
 ## Sprachstrategie
 

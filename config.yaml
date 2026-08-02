@@ -176,6 +176,20 @@ email_adapter:
   address_persona_map:
     # lea@example.de: LEAH
     # peter@example.de: PETER
+
+  # Wer den Adapter benutzen darf. PFLICHT, sobald enabled: true — ohne diese
+  # Liste faehrt jeder, der die Adresse kennt, die Personas (und verbraucht
+  # LLM-Laeufe). Eintraege sind entweder eine volle Adresse oder eine ganze
+  # Domain ("@example.org").
+  allowed_senders:
+    # - max@example.org
+    # - "@meine-domain.de"
+
+  # Obergrenze fuer den uebernommenen Mailtext. Gilt einmal beim Lesen, also
+  # auch fuer das Zitat in der Antwort — sonst laesst sich ueber den Adapter
+  # beliebig viel fremder Text weitertransportieren.
+  max_body_chars: 4000
+
   imap:
     host: "imap.example.de"
     port: 993

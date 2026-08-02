@@ -124,6 +124,7 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Scha
 - `tts.enabled`: schaltet Text-to-Speech ein/aus.
 - `tts.features.terminal_auto_create_wav`: erzeugt im Terminal-Modus pro Antwort eine WAV-Datei und spielt sie ab — Windows über `winsound`, Linux/macOS über `paplay`/`aplay`/`ffplay` bzw. `afplay`. Ohne verfügbaren Player bleibt es bei der Datei in `out/`.
 - `api.openai_compatible`: schaltet die OpenAI-kompatiblen Endpunkte frei (`/v1/models`, `/v1/chat/completions`), mit denen fremde Clients wie Open WebUI mit den Personas sprechen. **Sobald `api.host` nicht mehr auf `127.0.0.1` steht, gehört hier ein `api_key` gesetzt** — am besten als `"env:YULYEN_API_KEY"` statt im Klartext. `rate_limit_per_minute` begrenzt Anfragen pro Client.
+- `email_adapter.allowed_senders`: **Pflichtfeld, sobald `email_adapter.enabled: true` steht.** Nur wer hier eingetragen ist, bekommt eine Antwort — als volle Adresse (`max@example.org`) oder als ganze Domain (`@meine-domain.de`). Fehlt die Liste, startet der Adapter nicht und schreibt den Grund ins Log; die übrige Anwendung läuft weiter. **Beim Aktualisieren einer bestehenden Installation ist das der eine Handgriff, den man nachziehen muss** — vorher konnte jeder, der die Persona-Adresse kennt, die Personas fahren. Verwandt: `email_adapter.max_body_chars` begrenzt, wie viel Mailtext übernommen wird (Prompt *und* Zitat in der Antwort).
 - `security.stream_holdback_chars`: **die Stellschraube, wenn die Antwort „spät losläuft".** Der Ausgangs-Guard hält so viele Zeichen zurück, damit ein Passwort oder eine E-Mail-Adresse nicht schon halb sichtbar ist, bevor er sie erkennt. Der Preis: vor so vielen Zeichen erscheint gar nichts. Im Browser gemessen (24 Zeichen/s): `96` → erstes Wort nach ~4,1 s, `32` (Standard) → ~1,9 s, `0` → ~0,4 s. Der Standard 32 ist auf den typischen Fall gemünzt: lokal, ein Nutzer. **Auf 96 erhöhen**, sobald der Server für andere erreichbar ist (`api.host`/`ui.web.host` ≠ `127.0.0.1`, Gradio-Share-Link, E-Mail-Adapter) oder echte Zugangsdaten in den Gesprächen vorkommen — dann bleibt auch der Text *um* ein Secret herum verdeckt.
 
 Beispiel:
@@ -255,6 +256,8 @@ python src/launch.py --doctor
 ```
 
 Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
+
+Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf **jeder** Ebene gemeldet, also auch `security.pii_protecton` statt `pii_protection` oder `storage.enable` statt `enabled` — ein Tippfehler, der sonst still dazu führt, dass die Einstellung gar nicht greift. Beim normalen Start ist das nur eine Warnung im Log (ein laufendes Setup soll nicht an einem Schema scheitern), im Doktor ein harter Befund.
 
 - **Terminal-UI**
   - Bei `ui.type: "terminal"` im Terminal nutzen

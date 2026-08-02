@@ -264,6 +264,13 @@ class MailProcessingSection(BaseModel):
     search_criteria: str | None = None
 
 
+class MailQuoteSection(BaseModel):
+    model_config = _ALLOW_EXTRA
+
+    attribution: str | None = None
+    attribution_no_date: str | None = None
+
+
 class EmailAdapterSection(BaseModel):
     model_config = _ALLOW_EXTRA
 
@@ -271,9 +278,17 @@ class EmailAdapterSection(BaseModel):
     poll_interval_seconds: int | None = Field(default=None, ge=1)
     # Nach Mailadresse geschlüsselt — Daten, kein Schema.
     address_persona_map: dict[str, Any] | None = None
+    # Adressen oder ganze Domains (`@example.org`); Pflicht bei enabled (#14e).
+    allowed_senders: list[str] | None = None
+    max_body_chars: int | None = Field(default=None, ge=0)
     imap: MailboxSection | None = None
     smtp: MailboxSection | None = None
     processing: MailProcessingSection | None = None
+    # Wird von `launch.py` aus den Locale-Texten gefüllt und von
+    # `EmailAdapterConfig.from_mapping` gelesen — stand aber in keinem Modell.
+    # Seit der rekursiven Prüfung (#66) wäre das eine Warnung bei jedem, der
+    # den Block von Hand setzt.
+    quote: MailQuoteSection | None = None
 
 
 class EvalsSection(BaseModel):

@@ -1,5 +1,6 @@
 from email.message import EmailMessage
 
+import pytest
 from email_adapter.service import EmailAdapterConfig, EmailAdapterService
 
 
@@ -18,6 +19,9 @@ class FakeImap:
         self.commands = []
         self.created = []
         self.logged_out = False
+        # Schalter für die Fehlerfälle aus #14f.
+        self.fail_copy = False
+        self.fail_store = False
 
     def login(self, user, password):
         self.commands.append(("login", user, password))
@@ -35,7 +39,11 @@ class FakeImap:
         if command_l == "fetch":
             uid = args[0]
             return "OK", [(b"BODY[]", self.raw_messages[uid])]
-        if command_l in {"copy", "store"}:
+        if command_l == "copy":
+            return ("NO", []) if self.fail_copy else ("OK", [])
+        if command_l == "store":
+            if self.fail_store:
+                raise OSError("IMAP STORE failed")
             return "OK", []
         raise AssertionError(f"Unexpected IMAP uid command: {command} {args}")
 
@@ -71,14 +79,31 @@ class FakeSmtp:
         self.quit_called = True
 
 
-def _raw_mail(*, sender="max@example.org", to="lea@example.de", body="Hallo Leah"):
+def _raw_mail(
+    *,
+    sender="max@example.org",
+    to="lea@example.de",
+    body="Hallo Leah",
+    headers=None,
+):
     msg = EmailMessage()
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = "Frage"
     msg["Message-ID"] = "<msg-1@example.org>"
+    for name, value in (headers or {}).items():
+        msg[name] = value
     msg.set_content(body)
     return msg.as_bytes()
+
+
+def _service(imap, smtp, provider=None, **cfg_overrides):
+    return EmailAdapterService(
+        _cfg(**cfg_overrides),
+        provider or FakeProvider(),
+        imap_factory=lambda _cfg: imap,
+        smtp_factory=lambda _cfg: smtp,
+    )
 
 
 def _cfg(**overrides):
@@ -86,6 +111,7 @@ def _cfg(**overrides):
         "enabled": True,
         "poll_interval_seconds": 1,
         "address_persona_map": {"lea@example.de": "LEAH"},
+        "allowed_senders": ["max@example.org"],
         "imap": {
             "host": "imap.example.de",
             "username": "imap-user@example.de",
@@ -253,3 +279,200 @@ def test_email_adapter_resolves_environment_secret(monkeypatch):
 
     assert cfg.imap_password == "from-env"
     assert cfg.smtp_password == "from-env"
+
+
+# ---- Härtung aus Review-Runde 2 (#14) --------------------------------------
+
+
+def test_the_reply_goes_to_from_not_to_reply_to():
+    """Der Reflektor (#14d).
+
+    Mit `Reply-To` konnte ein fremder Absender die Instanz dazu bringen, an
+    einen **Dritten** zu schreiben — vom Mailserver des Betreibers, also mit
+    gültigem SPF/DKIM seiner Domain, und mit dem Text des Absenders wörtlich im
+    Zitat. Beantwortet wird deshalb `From`.
+    """
+    imap = FakeImap(
+        {b"101": _raw_mail(headers={"Reply-To": "opfer@fremde-domain.example"})}
+    )
+    smtp = FakeSmtp()
+    service = _service(imap, smtp)
+
+    assert service.run_once() == 1
+
+    reply = smtp.messages[0]
+    assert reply["To"] == "max@example.org"
+    assert "opfer@fremde-domain.example" not in str(reply)
+
+
+def test_reply_to_cannot_smuggle_past_the_loop_protection():
+    """Dieselbe Zeile speiste die Schleifenerkennung (#14d).
+
+    Wer `From` auf eine Systemadresse setzte und `Reply-To` woandershin, kam an
+    der Prüfung „nicht der eigenen Adresse antworten" vorbei.
+    """
+    imap = FakeImap(
+        {
+            b"101": _raw_mail(
+                sender="lea@example.de",  # eine Systemadresse
+                headers={"Reply-To": "opfer@fremde-domain.example"},
+            )
+        }
+    )
+    smtp = FakeSmtp()
+    service = _service(imap, smtp, allowed_senders=["@fremde-domain.example"])
+
+    assert service.run_once() == 0
+    assert smtp.messages == []
+
+
+def test_a_sender_outside_the_allowlist_gets_no_answer():
+    """Vorher konnte jeder, der die Adresse kennt, die Personas fahren (#14e)."""
+    imap = FakeImap({b"101": _raw_mail(sender="fremder@woanders.example")})
+    smtp = FakeSmtp()
+    provider = FakeProvider()
+    service = _service(imap, smtp, provider)
+
+    assert service.run_once() == 0
+    assert provider.calls == []  # kein LLM-Lauf für Fremde
+    assert smtp.messages == []
+    # Trotzdem als erledigt markiert, sonst taucht sie bei jedem Poll neu auf.
+    assert imap.created == ["Processed"]
+
+
+def test_a_whole_domain_can_be_allowed():
+    """Für ein privates Setup meist genau das, was man will (#14e)."""
+    imap = FakeImap({b"101": _raw_mail(sender="irgendwer@example.org")})
+    smtp = FakeSmtp()
+    service = _service(imap, smtp, allowed_senders=["@example.org"])
+
+    assert service.run_once() == 1
+    assert smtp.messages[0]["To"] == "irgendwer@example.org"
+
+
+def test_a_similar_domain_is_not_allowed():
+    """`@example.org` darf nicht auf `evil-example.org` passen."""
+    imap = FakeImap({b"101": _raw_mail(sender="wer@evil-example.org")})
+    smtp = FakeSmtp()
+    service = _service(imap, smtp, allowed_senders=["@example.org"])
+
+    assert service.run_once() == 0
+    assert smtp.messages == []
+
+
+def test_the_adapter_refuses_to_start_without_an_allowlist():
+    """Fail-closed wie bei fehlenden Zugangsdaten (#14e).
+
+    Der Dienst kostet LLM-Läufe und verschickt Mail unter der Domain des
+    Betreibers — ohne Allowlist gäbe es dafür keinerlei Schranke.
+    """
+    cfg = _cfg(allowed_senders=[])
+
+    with pytest.raises(ValueError, match="allowed_senders"):
+        cfg.validate()
+
+
+def test_nothing_is_sent_when_the_mail_cannot_be_marked():
+    """Der 1440-Mails-Fall (#14f).
+
+    Vorher wurde erst gesendet und dann markiert. Scheiterte das Markieren,
+    blieb die Mail UNSEEN und wurde bei jedem Poll erneut beantwortet — bei
+    60-s-Poll 1440 Mails am Tag an denselben Empfänger, jede mit einem
+    LLM-Lauf. Jetzt gilt: kein Markieren, kein Senden.
+    """
+    imap = FakeImap({b"101": _raw_mail()})
+    imap.fail_store = True  # auch der \Seen-Fallback scheitert
+    smtp = FakeSmtp()
+    service = _service(imap, smtp)
+
+    assert service.run_once() == 0
+    assert smtp.messages == [], "es darf nichts rausgehen, was nicht markiert ist"
+
+
+def test_a_failed_move_still_marks_the_mail_as_seen():
+    """Der Fallback (#14f).
+
+    Ein falscher Ordnertrenner (`INBOX.` statt `INBOX/`, siehe #14a), Quota
+    oder fehlende Rechte lassen das Verschieben scheitern. `\\Seen` reicht,
+    damit die UNSEEN-Suche die Mail nicht ein zweites Mal findet.
+    """
+    imap = FakeImap({b"101": _raw_mail()})
+    imap.fail_copy = True
+    smtp = FakeSmtp()
+    service = _service(imap, smtp)
+
+    assert service.run_once() == 1
+    assert len(smtp.messages) == 1
+    seen_flags = [
+        cmd
+        for cmd in imap.commands
+        if cmd[:2] == ("uid", "store") and "\\Seen" in str(cmd)
+    ]
+    assert seen_flags, f"kein \\Seen gesetzt: {imap.commands}"
+
+
+def test_the_reply_is_marked_as_an_automatic_answer():
+    """RFC 3834 (#14g) — ein gut erzogener Autoresponder antwortet darauf nicht."""
+    imap = FakeImap({b"101": _raw_mail()})
+    smtp = FakeSmtp()
+    service = _service(imap, smtp)
+
+    assert service.run_once() == 1
+    assert smtp.messages[0]["Auto-Submitted"] == "auto-replied"
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Auto-Submitted": "auto-replied"},
+        {"Auto-Submitted": "auto-generated"},
+        {"Precedence": "bulk"},
+        {"Precedence": "list"},
+        {"List-Id": "<news.example.org>"},
+        {"List-Unsubscribe": "<mailto:x@example.org>"},
+    ],
+)
+def test_automated_mail_is_not_answered(headers):
+    """Sonst dreht sich der Adapter mit dem nächsten Abwesenheitsassistenten
+    im Kreis — beide Seiten halten sich für höflich (#14g)."""
+    imap = FakeImap({b"101": _raw_mail(headers=headers)})
+    smtp = FakeSmtp()
+    provider = FakeProvider()
+    service = _service(imap, smtp, provider)
+
+    assert service.run_once() == 0
+    assert provider.calls == []
+    assert smtp.messages == []
+
+
+def test_auto_submitted_no_is_a_normal_mail():
+    """`Auto-Submitted: no` heißt laut RFC ausdrücklich *nicht* automatisch."""
+    imap = FakeImap({b"101": _raw_mail(headers={"Auto-Submitted": "no"})})
+    smtp = FakeSmtp()
+    service = _service(imap, smtp)
+
+    assert service.run_once() == 1
+
+
+def test_an_oversized_body_is_cut_once_for_prompt_and_quote():
+    """Ein Limit, eine Kürzung (#14h).
+
+    Gekürzt wird beim Lesen, deshalb erben Prompt *und* Zitat sie automatisch.
+    Sonst könnte ein Fremder über das Zitat beliebig viel Text durch die
+    Instanz an einen Dritten weitertransportieren.
+    """
+    imap = FakeImap({b"101": _raw_mail(body="A" * 5000)})
+    smtp = FakeSmtp()
+    provider = FakeProvider()
+    service = _service(imap, smtp, provider, max_body_chars=100)
+
+    assert service.run_once() == 1
+
+    prompt = provider.calls[0][0]
+    assert len(prompt) < 200
+    assert prompt.endswith("[…]")
+    # Kein ununterbrochener Lauf über dem Limit — weder in der Antwort noch im
+    # Zitat. (Zählen ginge hier schief: beides steht in derselben Mail.)
+    quoted = smtp.messages[0].get_content()
+    assert "A" * 101 not in quoted
+    assert "[…]" in quoted
