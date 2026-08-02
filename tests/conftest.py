@@ -6,6 +6,7 @@ import types
 from urllib.parse import urlparse
 
 import pytest
+import requests
 
 # ---------------------------------------------------------------------------
 # Optional dependency fallbacks
@@ -187,24 +188,57 @@ def _ignore_local_config_override(monkeypatch):
     yield
 
 
+_LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1", "[::1]", "0.0.0.0"}
+
+
+def _is_loopback(url: object) -> bool:
+    try:
+        host = urlparse(str(url)).hostname or ""
+    except ValueError:
+        return False
+    return host.lower() in _LOOPBACK_HOSTS
+
+
 @pytest.fixture(autouse=True)
 def _no_feed_requests(monkeypatch):
-    """Kein Test zieht je einen RSS-Feed (#73).
+    """Kein Test geht ins **Internet** (#73) — lokale Dienste bleiben erreichbar.
 
     Der Riegel sitzt an `requests.get`, nicht an einer Config-Option: eine
     Option kann ein Test überschreiben, und dann hängt die Suite an einem
     Netzwerk-Timeout — oder, schlimmer, an einer echten Nachrichtenlage, die
     sich stündlich ändert. Wer HTTP wirklich prüfen will, fälscht es selbst
     (siehe `tests/test_rss.py`) und überschreibt diesen Riegel dabei.
+
+    **Loopback ist ausgenommen, und das ist keine Aufweichung, sondern die
+    Reparatur eines zu breiten Riegels.** `monkeypatch.setattr` auf
+    `rss.feeds.requests.get` sah nach einer engen Naht aus, war aber die
+    breiteste denkbare: `rss.feeds` und `wiki.lookup` machen beide ein nacktes
+    `import requests` und teilen sich **dasselbe Modulobjekt**: das Attribut
+    wurde global ersetzt. Damit lief auch jeder Wiki-Abruf über den lokalen
+    Proxy ins `_refuse` — und `kiwix_autostart.is_up()` gleich mit, das
+    `Exception` breit abfängt und den `AssertionError` als „Kiwix läuft nicht"
+    deutete. Ergebnis auf einer Maschine mit laufendem Kiwix: ein zweiter
+    `kiwix-serve` wurde auf den belegten Port gestartet, sieben Sekunden
+    vergeblich gewartet, danach scheiterten die Abrufe. `test_api_contract`
+    konnte so auf **keinem** Rechner bestehen; in der CI fiel es nie auf, weil
+    der `ollama`-Marker die Fälle überspringt.
+
+    Externe Hosts bleiben verboten — der eigentliche Zweck (keine echte
+    Nachrichtenlage, keine Netz-Timeouts) ist unberührt.
     """
 
-    def _refuse(*_args, **_kwargs):
+    real_get = requests.get
+
+    def _guarded(url=None, *args, **kwargs):
+        target = url if url is not None else kwargs.get("url")
+        if _is_loopback(target):
+            return real_get(target, *args, **kwargs)
         raise AssertionError(
-            "Ein Test wollte ins Netz (requests.get). Feeds und HTTP gehören "
-            "gefälscht — siehe tests/test_rss.py."
+            f"Ein Test wollte ins Netz (requests.get {target!r}). Feeds und "
+            "externes HTTP gehören gefälscht — siehe tests/test_rss.py."
         )
 
-    monkeypatch.setattr("rss.feeds.requests.get", _refuse)
+    monkeypatch.setattr(requests, "get", _guarded)
     yield
 
 
