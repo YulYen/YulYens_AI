@@ -178,6 +178,19 @@ The “Create guest 🎭” card lets you assemble your own persona from a name,
 - **Copy an answer:** Every chat message carries a copy icon.
 - **Status line:** After each answer, the line below the chat shows how full the context window is (`Context █░░░ 424 / 8,192 tokens (5 %)`) and how fast the model was (`24.0 tok/s · first token after 1.9 s`). Past 75 % it is highlighted — that is exactly where the application starts trimming the conversation history.
 
+## News as a source (RSS)
+
+With `rss.enabled: true`, news behaves like the offline Wikipedia: a **source that speaks up when the question calls for it** — not a button that dumps everything.
+
+The configured feeds are fetched **in the background** (at start-up and then every `rss.refresh_minutes`), and the latest items sit in memory. Ask “What's new?”, “Any current news?” or name a source (“What does the Tagesschau say?”) and the persona adds the matching items as context by itself — with a date per item and the age of the cache, so an item from two days ago does not become “today”.
+
+Two properties that matter in practice:
+
+- **A chat never waits for the network.** Whatever has not been fetched is simply missing; the answer still arrives. A feed that is temporarily unreachable does not discard the items fetched earlier.
+- **Small talk triggers nothing.** “What's new with you?” is a question to the persona, not a request for headlines — the distinction is measured against everyday sentences rather than guessed.
+
+The “Briefing 📰” button (and `/briefing` in the terminal) still exists; it uses the same cache and can be hidden with `rss.show_button: false` without disabling the source. To switch everything off: `rss.enabled: false` — then the application never goes online for news.
+
 ## Wikipedia integration
 
 To deliver well-grounded answers, the system can automatically **incorporate Wikipedia knowledge** for factual queries (configurable option). It relies on the following mechanisms:

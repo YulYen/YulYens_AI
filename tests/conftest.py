@@ -188,6 +188,27 @@ def _ignore_local_config_override(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_feed_requests(monkeypatch):
+    """Kein Test zieht je einen RSS-Feed (#73).
+
+    Der Riegel sitzt an `requests.get`, nicht an einer Config-Option: eine
+    Option kann ein Test überschreiben, und dann hängt die Suite an einem
+    Netzwerk-Timeout — oder, schlimmer, an einer echten Nachrichtenlage, die
+    sich stündlich ändert. Wer HTTP wirklich prüfen will, fälscht es selbst
+    (siehe `tests/test_rss.py`) und überschreibt diesen Riegel dabei.
+    """
+
+    def _refuse(*_args, **_kwargs):
+        raise AssertionError(
+            "Ein Test wollte ins Netz (requests.get). Feeds und HTTP gehören "
+            "gefälscht — siehe tests/test_rss.py."
+        )
+
+    monkeypatch.setattr("rss.feeds.requests.get", _refuse)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def _no_conversation_store_by_default(monkeypatch, tmp_path):
     """Kein Test schreibt in die echte Gesprächs-Ablage (#54).
 

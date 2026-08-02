@@ -87,9 +87,16 @@ stt:
   language: "de"           # null = Auto-Erkennung
 
 # --- Briefing (RSS): Persona fasst konfigurierte Feeds zusammen -------------------------------------------------
-briefing:
-  enabled: true            # Briefing-Button (WebUI) + /briefing (Terminal); Netz-Fetch nur auf Klick/Kommando
+# --- RSS/News als Kontextquelle (#73) -------------------------------------
+# Ein Schalter fuer alles: Hintergrund-Cache, automatische Injektion und den
+# Briefing-Knopf. Die frueher hier stehende Sektion hiess `briefing:` und wird
+# weiterhin gelesen (mit Warnung) — bitte umbenennen.
+rss:
+  enabled: true
+  show_button: true          # den "Briefing"-Knopf getrennt abschaltbar machen
+  refresh_minutes: 60        # Feeds werden im Hintergrund geholt, nie im Chat
   max_items_per_feed: 4
+  max_chars_per_item: 400    # Budget je Meldung; alles zusammen ist EIN Block
   timeout_connect: 5.0
   timeout_read: 8.0
   feeds:
@@ -98,7 +105,6 @@ briefing:
     - name: "heise online"
       url: "https://www.heise.de/rss/heise-atom.xml"
 
-# --- Wiki settings (including spaCy-Keyword-Finder) -------------------------------------------------------------
 wiki:
   # offline uses Kiwix, online calls Wikipedia, false disables wiki snippets
   mode: offline

@@ -43,6 +43,7 @@ from unittest.mock import create_autospec
 from auth import DisabledAuth
 from core.factory import AppFactory
 from core.streaming_provider import YulYenStreamingProvider
+from rss.feeds import RssCache
 from security.tinyguard import BasicGuard
 from storage import NullStore
 
@@ -104,14 +105,19 @@ def factory_double(**overrides: Any):
       gibt.
     * ``get_store()`` — sonst ist ``records`` ein truthy Mock, und ein Test
       gegen eine abgeschaltete Ablage liefe gegen eine eingeschaltete.
+    * ``get_rss_cache()`` — sonst ist ``feed_names`` ein truthy Mock, und der
+      Briefing-Knopf erscheint in einer Oberfläche ohne konfigurierte Feeds
+      (#73). Genau so aufgefallen: ein Test, der „standardmäßig aus" prüft,
+      bekam „an".
 
-    Beide letzteren sind die echten Produktionsvorgaben, nicht Attrappen:
-    kein Login, keine Ablage.
+    Alle drei sind die echten Produktionsvorgaben, nicht Attrappen: kein
+    Login, keine Ablage, keine Feeds.
     """
     double = create_autospec(AppFactory, instance=True)
     double.build_guard.return_value = None
     double.get_auth_provider.return_value = DisabledAuth()
     double.get_store.return_value = NullStore()
+    double.get_rss_cache.return_value = RssCache(feeds=[])
     return _apply(double, overrides)
 
 
