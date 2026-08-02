@@ -196,8 +196,44 @@ Injektion, `/quellen` im Terminal — gehen deshalb durch diese eine Methode.
 `inject_wiki_context` behält seinen `guard`-Parameter
 als letzte Schranke vor dem Prompt.
 
-Die Rolle ist weiterhin `system` — sie nach `user` zu verschieben ändert das
-Antwortverhalten aller Personas und braucht einen Lauf am echten Modell (#60).
+### Die Rollenverschiebung wirkt nicht — der Guard schon (#60/#60a)
+
+Abgerufener Fremdtext steht seit #60 als zitierter **`user`**-Block im Prompt
+(`[FREMDTEXT ANFANG] … [FREMDTEXT ENDE]`), die Guardrails bleiben `system`, weil
+sie unsere eigene Anweisung sind. Jede injizierte Nachricht trägt einen Marker
+(`core/context_injection.py`); **wer einen dritten Kontext-Kanal baut, benutzt
+`injected_message`** — sonst landet der Fremdtext in der Ablage, im Verlauf, im
+Markdown-Export und im JSON-Download, weil `system` bis dahin nebenbei das
+Trennmerkmal war.
+
+**Die Erwartung hinter dem Ticket hat sich aber nicht bestätigt, und das ist die
+wichtigere Hälfte.** Am echten Modell gemessen (`ministral-3:8b`, drei Arme:
+alte Rolle / neuer Guardrail-Wortlaut / #60, je 5 Läufe): eine im Artikeltext
+versteckte Anweisung wurde in **15 von 15** Fällen befolgt — in allen drei Armen
+gleich. PETER wird zum Piraten, wechselt auf Englisch, hängt den Fremdsatz an,
+egal ob der Text als `system` oder als zitierter `user`-Block kommt. **Ein
+8B-Modell behandelt Rollengrenzen nicht als Vertrauensgrenze.** Die
+Rollentrennung ist damit saubere Begriffsbildung und Defense-in-Depth für
+stärkere Modelle — keine Absicherung. Wer sie als erledigten Schutz abhakt,
+irrt.
+
+Was wirkt, ist der Guard. Er fing vorher **eine von vier** realistischen
+Nutzlasten; #60a ergänzt drei Regeln (`persona_override`,
+`standing_answer_instruction`, `fake_system_notice`) und kommt auf 4/4, bei 0
+Fehlalarmen auf 12 harmlosen Fremdtexten.
+
+**Diese Regeln liegen in einem eigenen, kontext-exklusiven Topf
+(`BasicGuard.check_context_only`, nur von `context_verdict` gerufen) — und das
+ist der Entwurf, nicht ein Implementierungsdetail.** Der Nutzer darf, was ein
+heruntergeladener Artikel nicht darf: seine Persona umdefinieren (Gast-Persona
+#28, Self-Talk) und ein Antwortformat für alle folgenden Turns vorgeben.
+Stünden die Muster in `inj`, blockte der Guard genau die Bedienung, für die das
+Projekt gebaut ist. Wer hier eine Regel ergänzt, entscheidet also zuerst: *darf
+der Nutzer das?* Wenn ja, gehört sie in `context_only`.
+
+Und die Ehrlichkeitsschranke: das hebt die Latte für *diese* Formulierungen.
+Regex gegen Prompt-Injection in Fremdtext bleibt ein Wettrüsten — wer
+umformuliert, kommt durch.
 
 ### Das Guard-Regelwerk: benannte Regeln, kurze Brücken (#62)
 Die Muster in `security/tinyguard.py` sind `Rule(name, pattern)` statt roher
