@@ -93,6 +93,54 @@ def _build_summarize_fn(factory, cfg):
     return _summarize
 
 
+def _port_open(port: int, timeout: float = 0.3) -> bool:
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(timeout)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def ensure_wiki_proxy(cfg, run) -> None:
+    """Start the wiki proxy for a full run — and say so when it stays down.
+
+    Without this a run measured the personas *without* Wikipedia while the
+    config said `wiki.mode: offline`, and nothing in the report mentioned it.
+    Two runs that differ only in "was the proxy up" then look like a model
+    change. Reuses launch.py's starter, which already handles "already
+    running" and waits for readiness; the reachability check afterwards is
+    ours, because the starter does not report it back.
+    """
+    import logging
+
+    from core.utils import _wiki_mode_enabled
+
+    wiki_cfg = dict(getattr(cfg, "wiki", {}) or {})
+    if not _wiki_mode_enabled(wiki_cfg.get("mode")):
+        return
+
+    port = int(wiki_cfg.get("proxy_port", 8042))
+    try:
+        # launch.py imports no gradio at module level, so a batch job may use it.
+        from launch import start_wiki_proxy_thread
+
+        start_wiki_proxy_thread()
+    except Exception as exc:  # a broken proxy must not abort the eval run
+        logging.warning(f"[EVALS] Wiki proxy could not be started: {exc}")
+
+    if _port_open(port):
+        return
+
+    message = (
+        f"Wiki-Proxy auf Port {port} nicht erreichbar, `wiki.mode` steht aber "
+        f"auf `{wiki_cfg.get('mode')}`. Die Personas wurden **ohne Wikipedia** "
+        f"gemessen — dieser Lauf ist mit einem Lauf mit Wiki nicht vergleichbar."
+    )
+    logging.warning(f"[EVALS] {message}")
+    print(f"WARNUNG: {message}")
+    run.warnings.append(message)
+
+
 _PROTECTION_FLAGS = (
     "prompt_injection_protection",
     "pii_protection",
@@ -156,6 +204,11 @@ def main(argv: list[str] | None = None) -> int:
     run.guard_outcomes = list(guard_outcomes)
 
     if not args.guard_only:
+        # Vor dem ersten Modelllauf: der Proxy muss stehen, bevor die erste
+        # Frage durch WikiLookup geht. Ein --guard-only-Lauf braucht ihn nicht
+        # und soll weiterhin ohne alles laufen — das ist sein Zweck.
+        ensure_wiki_proxy(cfg, run)
+
         from core.factory import AppFactory
 
         factory = AppFactory()
@@ -212,9 +265,22 @@ def main(argv: list[str] | None = None) -> int:
     if run.guard_known_gaps:
         print(f"  {run.guard_known_gaps} dokumentierte Lücke(n), siehe Report")
     if run.total:
-        print(f"Fälle: {run.passed}/{run.total} bestanden, {run.errors} Fehler")
+        # Reihenfolge wie im Report (#41a): erst der stabile Mittelwert, dann
+        # die Quote. Wer nur die erste Zeile liest, soll die brauchbare lesen.
         if run.average_score is not None:
-            print(f"Ø Judge-Score: {run.average_score:.2f}/5")
+            print(
+                f"Ø Judge-Score: {run.average_score:.2f}/5 "
+                f"({run.judged_count} bewertete Fälle) — Leitkennzahl"
+            )
+            if run.near_threshold:
+                print(
+                    f"  {run.near_threshold} davon dicht an der Schwelle "
+                    f"(Ø 3,0–3,9) und damit zwischen Läufen wackelig"
+                )
+        print(
+            f"Fälle: {run.passed}/{run.total} bestanden, {run.errors} Fehler"
+            + (" — schwankt zwischen Läufen" if run.average_score is not None else "")
+        )
     print(f"Report: {out_dir / 'report.md'}")
 
     return 0 if run.ok else 1

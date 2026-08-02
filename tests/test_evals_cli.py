@@ -7,7 +7,8 @@ network, no gradio import. It is the reason the guard corpus can gate CI.
 import pytest
 from config.config_singleton import Config
 
-from evals.cli import main
+from evals.cli import ensure_wiki_proxy, main
+from evals.runner import EvalRun
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +28,80 @@ def test_guard_only_run_writes_reports_and_exits_zero(tmp_path):
     assert "Guard-Red-Team" in markdown
     # No model ran, so there are no cases — only the CSV header.
     assert csv_text.strip().count("\n") == 0
+
+
+# ---- Wiki-Proxy (#41a) ----------------------------------------------------
+#
+# Ein voller Lauf ohne Proxy misst die Personas ohne Wikipedia. Das darf
+# passieren — aber nicht stillschweigend, sonst liest man den Unterschied
+# zweier Läufe als Modelländerung.
+
+
+class _WikiCfg:
+    def __init__(self, mode, port=8042):
+        self.wiki = {"mode": mode, "proxy_port": port}
+
+
+def test_a_guard_only_run_never_starts_the_proxy(monkeypatch, tmp_path):
+    """Der Guard-Lauf ist der, der auf jeder Maschine läuft — ohne alles."""
+    called = []
+    monkeypatch.setattr(
+        "evals.cli.ensure_wiki_proxy", lambda cfg, run: called.append(cfg)
+    )
+    main(["-e", "classic", "--guard-only", "--out", str(tmp_path)])
+    assert called == []
+
+
+def test_no_proxy_is_started_when_wiki_is_switched_off(monkeypatch):
+    monkeypatch.setattr(
+        "evals.cli._port_open", lambda *a, **k: pytest.fail("darf nicht prüfen")
+    )
+    run = EvalRun(model="m", judge_model=None)
+    ensure_wiki_proxy(_WikiCfg(False), run)
+    assert run.warnings == []
+
+
+def test_an_unreachable_proxy_is_reported_instead_of_measured_around(monkeypatch):
+    monkeypatch.setattr("evals.cli._port_open", lambda *a, **k: False)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "launch",
+        type("M", (), {"start_wiki_proxy_thread": staticmethod(lambda: None)}),
+    )
+    run = EvalRun(model="m", judge_model=None)
+    ensure_wiki_proxy(_WikiCfg("offline"), run)
+
+    assert len(run.warnings) == 1
+    assert "ohne Wikipedia" in run.warnings[0]
+
+
+def test_a_reachable_proxy_is_silent(monkeypatch):
+    monkeypatch.setattr("evals.cli._port_open", lambda *a, **k: True)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "launch",
+        type("M", (), {"start_wiki_proxy_thread": staticmethod(lambda: None)}),
+    )
+    run = EvalRun(model="m", judge_model=None)
+    ensure_wiki_proxy(_WikiCfg("offline"), run)
+    assert run.warnings == []
+
+
+def test_a_broken_proxy_start_does_not_abort_the_run(monkeypatch):
+    """Ein kaputter Proxy kostet den Wiki-Kontext, nicht den ganzen Lauf."""
+
+    def _boom():
+        raise RuntimeError("kein Port frei")
+
+    monkeypatch.setattr("evals.cli._port_open", lambda *a, **k: False)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "launch",
+        type("M", (), {"start_wiki_proxy_thread": staticmethod(_boom)}),
+    )
+    run = EvalRun(model="m", judge_model=None)
+    ensure_wiki_proxy(_WikiCfg("offline"), run)
+    assert len(run.warnings) == 1
 
 
 # Die Lücken, die wir *bewusst* mitführen. Weder mehr noch weniger.
