@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import pytest
 from core.context_injection import is_injected
-
 from evals.injection_probe import (
     ARMS,
     FRAGE,

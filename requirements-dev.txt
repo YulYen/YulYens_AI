@@ -1,7 +1,12 @@
 # Development tooling (formatting, linting, tests).
 # Pinned so CI and local runs agree on formatting decisions.
 black==24.4.2
-ruff==0.4.10
+# Ruff-Sprung ist von Gradio 5 erzwungen, nicht gewählt: `gradio` führt ruff
+# als *Laufzeit*-Abhängigkeit und fordert >=0.9.3 — der alte Pin 0.4.10 war
+# damit unerfüllbar, und ein `pip install` zog stillschweigend eine andere
+# Version über den Pin. Genau die Falle, die CLAUDE.md fürs PATH-Shadowing
+# beschreibt, nur über die Abhängigkeiten statt über den PATH.
+ruff==0.16.1
 # Typprüfung nur für src/core (#52) — Konfiguration in pyproject.toml.
 mypy==1.10.1
 types-requests

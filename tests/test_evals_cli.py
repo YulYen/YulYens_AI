@@ -6,7 +6,6 @@ network, no gradio import. It is the reason the guard corpus can gate CI.
 
 import pytest
 from config.config_singleton import Config
-
 from evals.cli import ensure_wiki_proxy, main
 from evals.runner import EvalRun
 

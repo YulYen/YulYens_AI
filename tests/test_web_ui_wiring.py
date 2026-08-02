@@ -135,7 +135,11 @@ def test_every_handler_accepts_its_bound_inputs(wired):
     """
     for name, fn in _named_events(wired):
         params = get_function_params(fn.fn)
-        required = sum(1 for _n, has_default, _d in params if not has_default)
+        # Gradios interne Tupelbreite hat sich zwischen 4.44 und 5.x geändert
+        # (3 → 4 Felder). Nur das zweite Feld interessiert hier, deshalb wird
+        # positionsweise statt entpackend gelesen — das überlebt die nächste
+        # Erweiterung ebenfalls.
+        required = sum(1 for param in params if not param[1])
         takes_varargs = any(
             p.kind is inspect.Parameter.VAR_POSITIONAL
             for p in inspect.signature(fn.fn).parameters.values()

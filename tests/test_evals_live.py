@@ -11,7 +11,6 @@ test.
 
 import pytest
 from core.factory import AppFactory
-
 from evals.corpus import load_persona_corpora
 from evals.judge import Judge
 from evals.runner import build_answer_fn, run_persona_corpora

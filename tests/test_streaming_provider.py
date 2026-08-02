@@ -234,7 +234,7 @@ def test_holdback_delays_the_first_visible_output() -> None:
     Anzeige geht. Bei den 4 Tokens/s des Messaufbaus waren das die gemessenen
     ~4 s bis zum ersten sichtbaren Wort im Browser.
     """
-    core = CountingTokenCore(["Wort%d " % i for i in range(1, 40)])
+    core = CountingTokenCore([f"Wort{i} " for i in range(1, 40)])
     provider = create_streaming_provider(
         llm_core=core, guard=BasicGuard(True, True, True, True)
     )
@@ -244,7 +244,7 @@ def test_holdback_delays_the_first_visible_output() -> None:
 
 
 def test_without_holdback_the_first_token_goes_out_at_once() -> None:
-    core = CountingTokenCore(["Wort%d " % i for i in range(1, 40)])
+    core = CountingTokenCore([f"Wort{i} " for i in range(1, 40)])
     provider = create_streaming_provider(
         llm_core=core, guard=BasicGuard(True, True, True, True)
     )
@@ -520,8 +520,10 @@ _MASKING_TEXTS = [
     ("Kurz: a@b.de ENDE", 6),
     ("Zwei: erste.person@example.org und zweite.person@example.org, fertig.", 25),
     (
-        "Sehr lange Adresse vorname.nachname.abteilung@sehr-lange-firmendomain."
-        "example.com und dann noch viel Text hinterher damit es reicht.",
+        (
+            "Sehr lange Adresse vorname.nachname.abteilung@sehr-lange-firmendomain."
+            "example.com und dann noch viel Text hinterher damit es reicht."
+        ),
         62,
     ),
     ("Ruf an unter 0151 23456789 bitte.", 13),

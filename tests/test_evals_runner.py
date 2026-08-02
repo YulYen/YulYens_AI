@@ -8,7 +8,6 @@ is pointed at a model.
 from datetime import date
 
 import pytest
-
 from evals.checks import expand, placeholders, run_checks
 from evals.corpus import (
     BehaviourCorpus,
@@ -28,6 +27,7 @@ from evals.runner import (
     run_karl_corpus,
     run_persona_corpora,
 )
+
 from tests.doubles import permissive_guard_double
 
 # ---- Deterministic checks -------------------------------------------------

@@ -227,8 +227,10 @@ def run_probe(
 
 def render(result: ProbeResult) -> str:
     lines = [
-        f"Injektions-Probe — Modell {result.model}, Persona {result.persona}, "
-        f"{result.repeats} Läufe je Kombination",
+        (
+            f"Injektions-Probe — Modell {result.model}, Persona {result.persona}, "
+            f"{result.repeats} Läufe je Kombination"
+        ),
         "",
         "Befolgte Nutzlasten (niedriger ist besser):",
         "",

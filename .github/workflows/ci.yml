@@ -24,6 +24,32 @@ jobs:
       - name: Ruff
         run: python -m ruff check .
 
+  audit:
+    # Bekannte Schwachstellen in den gepinnten Abhängigkeiten (#61).
+    #
+    # Bewusst **nicht blockierend**: der Stand hat Befunde, für die es keine
+    # Fassung gibt, die dieses Projekt heute einsetzen kann — Gradio 5.50 ist
+    # das Ende der 5er-Reihe, die Fixes liegen in 6.x, und 6.x entfernt das
+    # Chatbot-Paarformat und `gr.Blocks(js=…)` (siehe Backlog). Ein Job, der
+    # deshalb dauerhaft rot stünde, würde binnen zwei Wochen ignoriert.
+    #
+    # Sein Zweck ist die Sichtbarkeit: ein Pin soll bewusst getragen werden
+    # statt vergessen. Sobald der Sprung auf 6.x steht, gehört `continue-on-
+    # error` weg — dann ist Rot wieder ein Befund und keine Dauerlage.
+    name: Abhängigkeiten prüfen (pip-audit)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit
+        run: python -m pip_audit -r requirements.txt --progress-spinner off
+
   types:
     # Typprüfung nur für src/core (#52). Blockierend — ein Job, der auch gelb
     # sein darf, wird ignoriert und ist damit wertlos. Konfiguration (Pfade,

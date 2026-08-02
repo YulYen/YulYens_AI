@@ -542,7 +542,16 @@ def build_ui(
             gr.Markdown("---")
 
         greeting_md = gr.Markdown("", visible=False)
-        chatbot = gr.Chatbot(label="", visible=False, show_copy_button=True)
+        # `type` ausdrücklich, nicht geerbt: Gradio 5 warnt sonst über den
+        # Default. Das Paar-Format ist in 5.x deprecated und fällt erst in
+        # einer späteren Hauptversion weg — der Wechsel auf `messages` ist ein
+        # eigener Umbau, weil daran der Vote-Index aus #65 hängt (die k-te
+        # Antwort-Bubble ist die k-te `assistant`-Nachricht). Solange hier
+        # `tuples` steht, ist das eine getroffene Entscheidung und kein
+        # übersehener Default.
+        chatbot = gr.Chatbot(
+            label="", visible=False, show_copy_button=True, type="tuples"
+        )
         # Quellen-Transparenz (#32): zugeklappt direkt unter dem Chat. Zeigt den
         # Text, den das Modell tatsächlich als Kontext bekommen hat — inklusive
         # der Länge, damit ein an wiki.snippet_limit gekürzter Artikel als
@@ -670,8 +679,10 @@ def build_ui(
             guest_start_btn = gr.Button(guest_start_label, variant="primary")
 
         # Verlauf (#25) auf der Ablage aus #54 — bewusst ein Dropdown statt
-        # gr.Dataframe: die Komponente verliert in Gradio 4.44 Updates aus
-        # Generatoren und verfälscht mit Mess-Zeilen die Browser-Tests.
+        # gr.Dataframe: die Komponente verlor in Gradio 4.44 Updates aus
+        # Generatoren und verfälschte mit Mess-Zeilen die Browser-Tests.
+        # Unter Gradio 5 ist das **nicht nachgemessen** — der Wechsel stünde
+        # ohnehin nur zur Debatte, wenn jemand einen Grund dafür hätte.
         with gr.Group(visible=False) as history_group:
             gr.Markdown(f"## {history_title}")
             history_status = gr.Markdown("", visible=False)
@@ -719,8 +730,9 @@ def build_ui(
                     elem_classes="new-chat-btn",
                 )
             # Bewusst Markdown statt gr.Dataframe: die Dataframe-Komponente
-            # verliert in Gradio 4.44 Streaming-Updates aus Generatoren
-            # (Frontend friert nach den ersten Yields ein).
+            # verlor in Gradio 4.44 Streaming-Updates aus Generatoren
+            # (Frontend fror nach den ersten Yields ein). Unter Gradio 5 nicht
+            # nachgemessen; Markdown trägt hier ohnehin.
             ask_all_results = gr.Markdown(
                 "",
                 visible=False,

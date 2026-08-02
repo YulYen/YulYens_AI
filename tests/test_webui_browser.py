@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import glob
 import json
+import re
 import threading
 import time
 import warnings
@@ -258,8 +259,12 @@ def test_a_thumb_on_an_answer_is_written_to_the_vote_log(page, live_app):
     _ask(page, "Bewerte mich")
     expect(page.get_by_text("ECHO: Bewerte mich")).to_be_visible(timeout=30_000)
 
-    # Gradio beschriftet den Daumen klein und vergibt eine eigene Klasse.
-    page.locator("button.like-button:visible").last.click()
+    # Über die Rolle statt über Klassen: Gradio benennt den Daumen zwischen
+    # 4.44 und 5.x unterschiedlich (`like-button` und „like" gegen
+    # `icon-button` und „Like"). Der verankerte Regex trennt Like von Dislike
+    # und ist gegen die Schreibweise unempfindlich — `exact=True` wäre
+    # case-sensitiv und damit genau an dieser Stelle zerbrechlich.
+    page.get_by_role("button", name=re.compile(r"^like$", re.I)).last.click()
 
     votes = live_app.workdir / "feedback_votes.jsonl"
     deadline = time.monotonic() + 10
