@@ -29,6 +29,7 @@ from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
 
+import gradio as gr
 import pytest
 
 pytest.importorskip("playwright", reason="playwright not installed")
@@ -97,7 +98,6 @@ def live_app(tmp_path_factory):
     from config.config_singleton import Config
     from core.dummy_llm_core import DummyLLMCore
     from core.factory import AppFactory
-    from ui.web_ui import WebUI
 
     workdir = tmp_path_factory.mktemp("webui")
 
@@ -121,15 +121,31 @@ def live_app(tmp_path_factory):
 
     captured: dict = {}
 
-    def _capture(self, demo):
-        captured["demo"] = demo
-
     with patch("ui.web_ui.module_available", lambda name: name != "faster_whisper"):
         ui = AppFactory().get_ui()
     sys.modules["tts.piper_tts"] = _fake_piper_module()
 
+    # `_start_server` läuft **echt**. Der erste Anlauf fing es ab und rief
+    # `demo.launch()` selbst — damit prüfte der Browser-Test alles außer dem
+    # Startpfad, und genau dort saßen zwei Gradio-6-Brüche (`show_api` weg,
+    # `js` nur noch an `launch()`). Abgefangen wird deshalb erst eine Ebene
+    # tiefer: `Blocks.launch` bekommt die echten Argumente der App und nur
+    # Host/Port/Blockieren von uns.
+    real_launch = gr.Blocks.launch
+
+    def _launch_nonblocking(self, **kwargs):
+        captured["demo"] = self
+        captured["kwargs"] = dict(kwargs)
+        kwargs.update(
+            server_name="127.0.0.1",
+            server_port=None,
+            prevent_thread_lock=True,
+            quiet=True,
+        )
+        return real_launch(self, **kwargs)
+
     with (
-        patch.object(WebUI, "_start_server", _capture),
+        patch.object(gr.Blocks, "launch", _launch_nonblocking),
         patch.object(DummyLLMCore, "stream_chat", _slow_stream),
         warnings.catch_warnings(),
     ):
@@ -137,13 +153,6 @@ def live_app(tmp_path_factory):
         ui.launch()
 
         demo = captured["demo"]
-        # prevent_thread_lock: launch() würde sonst blockieren.
-        demo.launch(
-            server_name="127.0.0.1",
-            prevent_thread_lock=True,
-            show_api=False,
-            quiet=True,
-        )
         try:
             yield type(
                 "LiveApp",
@@ -152,6 +161,7 @@ def live_app(tmp_path_factory):
                     "url": demo.local_url,
                     "workdir": workdir,
                     "ui": ui,
+                    "launch_kwargs": captured["kwargs"],
                 },
             )
         finally:
@@ -400,7 +410,10 @@ def test_read_aloud_delivers_a_playable_file(page):
     assert delivered, "der Browser hat nie eine .wav-Datei angefordert"
 
     url, status = delivered[-1]
-    assert status == 200, f"WAV nicht ausgeliefert: HTTP {status} für {url}"
+    # 206 ist kein Fehler: der Player fordert Audio als Range-Request an, und
+    # Gradio 6 beantwortet das mit Teilinhalt. Nur 200 zu erlauben wäre eine
+    # Aussage über den Transportweg, nicht über die Auslieferung.
+    assert status in (200, 206), f"WAV nicht ausgeliefert: HTTP {status} für {url}"
     body = page.request.get(url).body()
     assert body.startswith(b"RIFF"), "keine WAV-Daten am Ende der Leitung"
 
@@ -412,3 +425,17 @@ def test_the_app_serves_without_a_backend_thread_dying(live_app):
     """Ein Sanity-Check, der ohne Browser auskommt."""
     assert live_app.url.startswith("http://127.0.0.1")
     assert any(t.is_alive() for t in threading.enumerate())
+
+
+def test_the_real_start_path_hands_over_the_load_script(live_app):
+    """Diese Fixture faehrt `_start_server` echt — hier steht, warum das zaehlt.
+
+    Der erste Anlauf fing `_start_server` ab und rief `demo.launch()` selbst.
+    Damit lief der Browser-Test an genau dem Pfad vorbei, auf dem zwei
+    Gradio-6-Brueche sassen: `show_api` gibt es nicht mehr (TypeError beim
+    Start), und `js` wirkt nur noch an `launch()`.
+    """
+    kwargs = live_app.launch_kwargs
+    assert kwargs.get("js"), "das Lade-Skript erreicht launch() nicht"
+    assert "show_api" not in kwargs, "show_api gibt es in Gradio 6 nicht mehr"
+    assert "api" not in (kwargs.get("footer_links") or [])

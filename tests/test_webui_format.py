@@ -266,3 +266,54 @@ def test_status_line_ignores_a_streamer_without_real_stats():
     session = SessionContext(streamer=SimpleNamespace(last_stream_stats="kaputt"))
 
     assert WebUI._last_stream_stats(session) is None
+
+
+# ---- Die Form, in der das Frontend zurueckliefert (#61a) -------------------
+
+
+def test_bubble_text_reads_the_shape_gradio_sends_back():
+    """Was wir hineingeben, ist nicht, was zurueckkommt.
+
+    Gradio 6 reicht eine Anzeige-Zeile aufbereitet zurueck: `content` ist dort
+    eine **Liste von Teilen**, keine Zeichenkette. Mit `str()` daraus wurde
+    `"[{'text': …}]"` — und der Vote-Abgleich (#65) fand den Text nie im
+    LLM-Verlauf wieder. Jede Bewertung fiel lautlos unter den Tisch.
+    """
+    from ui.webui_format import bubble_text
+
+    from_frontend = {
+        "role": "assistant",
+        "metadata": None,
+        "content": [{"type": "text", "text": "ECHO: Bewerte mich"}],
+    }
+    assert bubble_text(from_frontend) == "ECHO: Bewerte mich"
+
+
+def test_bubble_text_still_reads_a_plain_string():
+    """Beide Formen stehen im selben Verlauf nebeneinander.
+
+    Zeilen, die wir gerade selbst angehaengt haben, sind noch Strings; erst
+    die Runde ueber das Frontend macht Listen daraus.
+    """
+    from ui.webui_format import bot_bubble, bubble_text
+
+    assert bubble_text(bot_bubble("Antwort")) == "Antwort"
+
+
+def test_bubble_text_survives_junk_instead_of_guessing():
+    from ui.webui_format import bubble_text
+
+    assert bubble_text(None) == ""
+    assert bubble_text({"role": "assistant"}) == ""
+    assert bubble_text({"role": "assistant", "content": []}) == ""
+    # Teile ohne Text (z. B. ein Bild) tragen nichts zum Wortlaut bei.
+    assert bubble_text({"content": [{"type": "image", "path": "/x.png"}]}) == ""
+
+
+def test_find_question_reads_the_frontend_shape_too():
+    """Sonst stuende in der Vote-Zeile eine Frage wie `[{'text': …}]`."""
+    history = [
+        {"role": "user", "content": [{"type": "text", "text": "Frage?"}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "Antwort"}]},
+    ]
+    assert find_question_for_row(history, 1) == "Frage?"

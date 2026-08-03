@@ -48,8 +48,15 @@ def test_webui_start_server_uses_configured_host_and_port():
 
     web_ui._start_server(demo)
 
+    # `js` reist seit Gradio 6 hier mit — ohne Aufbau der Oberflaeche gibt es
+    # noch kein Lade-Skript, deshalb None (#61a).
+    # `show_api` ist in Gradio 6 durch `footer_links` ersetzt, `js` reist
+    # seit dort ebenfalls hier mit — ohne Aufbau der Oberflaeche noch None.
     demo.launch.assert_called_once_with(
-        server_name="0.0.0.0", server_port=9000, show_api=False
+        server_name="0.0.0.0",
+        server_port=9000,
+        footer_links=["gradio", "settings"],
+        js=None,
     )
 
 
@@ -1078,6 +1085,42 @@ def test_an_undecipherable_index_is_dropped_instead_of_guessed(tmp_path):
     )
 
     assert not (tmp_path / "votes.jsonl").exists()
+
+
+def test_the_vote_survives_the_shape_the_frontend_sends_back(tmp_path):
+    """Der Verlauf kommt aus Gradio 6 mit `content` als **Liste** zurueck.
+
+    Genau daran fiel der Vote stumm aus: der Text fand sich nie im
+    LLM-Verlauf wieder, `message_index` blieb None, es wurde nichts
+    geschrieben — ohne Fehler, ohne Warnung, ohne Zeile.
+    """
+    web_ui = _create_web_ui()
+    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
+    history = [
+        {
+            "role": "user",
+            "metadata": None,
+            "content": [{"type": "text", "text": "Frage"}],
+        },
+        {
+            "role": "assistant",
+            "metadata": None,
+            "content": [{"type": "text", "text": "Antwort"}],
+        },
+    ]
+    llm_history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
+
+    web_ui._on_chat_like(
+        SessionContext(), history, {}, llm_history, "c", _fake_like(index=1)
+    )
+
+    vote = _read_votes(web_ui.feedback_log_path)[0]
+    assert vote["message_index"] == 1
+    assert vote["answer"] == "Antwort"
+    assert vote["question"] == "Frage"
 
 
 def test_a_notice_before_the_first_answer_does_not_shift_it(tmp_path):

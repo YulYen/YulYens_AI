@@ -43,6 +43,7 @@ from ui.session import SessionContext
 from ui.webui_format import (
     ChatMessage,
     bot_bubble,
+    bubble_text,
     conversation_markdown,
     find_question_for_row,
     format_ask_all_results,
@@ -59,6 +60,7 @@ from ui.webui_layout import (
     STREAM_OUTPUT_KEYS,
     as_persona_outputs,
     build_ui,
+    theme_restore_js,
 )
 from wiki.lookup import (
     WikiLookup,
@@ -1777,7 +1779,7 @@ class WebUI:
         seen = 0
         for idx, message in enumerate(chat_history or []):
             if message.get("role") == "assistant":
-                bubble = (message.get("content") or "").strip()
+                bubble = bubble_text(message).strip()
                 if bubble and bubble in answers:
                     seen += 1
             if idx == row:
@@ -1881,7 +1883,7 @@ class WebUI:
                 logging.debug("Ignoring feedback vote on a user message (row %s)", row)
                 return
 
-            answer = str(message.get("content") or evt.value)
+            answer = bubble_text(message) or str(evt.value)
 
             # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
             # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
@@ -2265,7 +2267,13 @@ class WebUI:
         launch_kwargs: dict[str, Any] = {
             "server_name": self.web_host,
             "server_port": self.web_port,
-            "show_api": False,
+            # `show_api=False` gibt es in Gradio 6 nicht mehr; `footer_links`
+            # hat es ersetzt. Die Absicht bleibt dieselbe: die API-Seite nicht
+            # im Fuß anbieten. „gradio" und „settings" bleiben stehen.
+            "footer_links": ["gradio", "settings"],
+            # Seit Gradio 6 gehört das Lade-Skript hierher, nicht an
+            # `gr.Blocks(js=…)` — dort wird es stillschweigend verworfen (#61a).
+            "js": getattr(self, "theme_load_js", None),
         }
 
         # Anmeldung gilt jetzt unabhängig von `share` (#53): die App horcht per
@@ -2336,6 +2344,10 @@ class WebUI:
         sources_label = ui.get("web_sources_label", "Quellen 📚")
         theme_light_label = ui.get("web_theme_light", "☀️ Hell")
         theme_dark_label = ui.get("web_theme_dark", "🌙 Dunkel")
+        # Das Lade-Skript des Theme-Umschalters (#69) wandert in Gradio 6 vom
+        # Blocks-Konstruktor nach `launch()`. Es hier zu merken hält
+        # `build_ui` frei davon und macht es für den Verdrahtungstest greifbar.
+        self.theme_load_js = theme_restore_js(theme_light_label, theme_dark_label)
         guest_card_label = ui.get("guest_card_label", "Gast anlegen")
         guest_title = ui.get("guest_title", "Gast-Persona")
         guest_description = ui.get(

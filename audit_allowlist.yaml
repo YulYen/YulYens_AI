@@ -12,62 +12,13 @@
 # Ein Eintrag ist eine Entscheidung, kein Stummschalter. Wer einen ergänzt,
 # schreibt dazu, warum der Befund getragen wird und was ihn auflöst.
 #
-# Stand: 2026-08-02, nach dem Sprung auf Gradio 5.50.
+# **Zurzeit leer, und das ist der Punkt.** Unter Gradio 5.50 standen hier 30
+# Befunde (7× gradio, 18× pillow, 5× starlette) — alle nicht behebbar, weil
+# Gradio selbst `pillow<12.0` und `starlette<1.0` deckelte. Mit dem Sprung auf
+# 6.22 (#61a) sind sie sämtlich weg; auch PYSEC-2026-211, für das es unter
+# 5.x überhaupt keine Fassung gab. Dass die Liste leer werden *musste*, hat
+# der Abgleich selbst gemeldet: stehengebliebene Einträge sind rot.
+#
+# Stand: 2026-08-03, nach dem Sprung auf Gradio 6.22.
 
-groups:
-  - package: gradio
-    reason: >-
-      Behoben erst in 6.6.0 bis 6.16.0; PYSEC-2026-211 hat überhaupt keine
-      Fassung. 5.50.0 ist das Ende der 5er-Reihe, es gibt also nichts, wohin
-      man innerhalb von 5.x ausweichen könnte. Der Sprung auf 6.x ist #61a und
-      hängt an zwei echten Umbauten (Chatbot-Paarformat entfällt ersatzlos,
-      `gr.Blocks(js=…)` wandert nach `launch()`).
-    ids:
-      - PYSEC-2026-211 # ohne Fassung, auch in 6.x
-      - PYSEC-2026-63
-      - PYSEC-2026-64
-      - PYSEC-2026-65
-      - PYSEC-2026-66
-      - PYSEC-2026-2178
-      - PYSEC-2026-2179
-
-  - package: pillow
-    reason: >-
-      Behoben in 12.1.1 bis 12.3.0 — aber **Gradio 5.50 deckelt `pillow<12.0`**.
-      Die Fassungen sind damit nicht erreichbar, solange wir auf 5.x stehen;
-      ein eigener Pin würde die Auflösung nur unlösbar machen. Gradio 6.22
-      erlaubt `pillow<13.0`, mit #61a fällt diese ganze Gruppe weg. pillow ist
-      eine reine Transitiv-Abhängigkeit: das Projekt verarbeitet keine
-      hochgeladenen Bilder, die Persona-Porträts sind mitgelieferte Dateien.
-    ids:
-      - PYSEC-2026-165
-      - PYSEC-2026-2249
-      - PYSEC-2026-2250
-      - PYSEC-2026-2251
-      - PYSEC-2026-2252
-      - PYSEC-2026-2253
-      - PYSEC-2026-2254
-      - PYSEC-2026-2255
-      - PYSEC-2026-2256
-      - PYSEC-2026-2257
-      - PYSEC-2026-2874
-      - PYSEC-2026-3451
-      - PYSEC-2026-3453
-      - PYSEC-2026-3454
-      - PYSEC-2026-3493
-      - PYSEC-2026-3494
-      - PYSEC-2026-3495
-      - PYSEC-2026-3496
-
-  - package: starlette
-    reason: >-
-      Behoben in 1.0.1 bis 1.3.1 — aber **Gradio 5.50 deckelt `starlette<1.0`**.
-      Gleiche Lage wie bei pillow: nicht erreichbar innerhalb von 5.x, in
-      Gradio 6.22 auf `starlette>=1.0.1,<2.0` gehoben und damit mit #61a
-      erledigt.
-    ids:
-      - PYSEC-2026-161
-      - PYSEC-2026-248
-      - PYSEC-2026-249
-      - PYSEC-2026-2280
-      - PYSEC-2026-2281
+groups: []

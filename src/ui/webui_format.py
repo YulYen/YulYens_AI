@@ -35,6 +35,40 @@ Message = dict[str, str]
 ChatPair = ChatMessage
 
 
+def bubble_text(message: Any) -> str:
+    """Der Text einer Anzeige-Zeile — egal in welcher Form sie ankommt.
+
+    **Was wir hineingeben, ist nicht, was zurückkommt.** Wir bauen
+    ``{"role": …, "content": "Text"}``; Gradio 6 reicht die Zeile aber
+    aufbereitet zurück::
+
+        {"role": "assistant", "metadata": None,
+         "content": [{"type": "text", "text": "ECHO: …"}]}
+
+    ``content`` ist dort also eine **Liste von Teilen**, keine Zeichenkette.
+    Wer sie mit ``str()`` nimmt, bekommt ``"[{'text': …}]"`` — und genau daran
+    scheiterte der Vote-Abgleich (#65) stumm: der Text fand sich nie im
+    LLM-Verlauf wieder, jede Bewertung fiel lautlos unter den Tisch.
+
+    Deshalb liest **jeder** Verbraucher den Text durch diese Funktion. Eine
+    Liste ist ein Verlauf aus dem Frontend, ein String einer, den wir selbst
+    gerade angehängt haben — beide Formen stehen im selben Verlauf
+    nebeneinander.
+    """
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(part.get("text") or "")
+            for part in content
+            if isinstance(part, dict) and part.get("text")
+        )
+    return "" if content is None else str(content)
+
+
 def bot_bubble(text: str) -> ChatMessage:
     """Eine Bot-Bubble. Auch für Hinweise, die nie ins Kontextfenster gehen."""
     return {"role": "assistant", "content": text}
@@ -173,5 +207,5 @@ def find_question_for_row(chat_history: list[ChatMessage] | None, row: int) -> s
     for index in range(row, -1, -1):
         message = chat_history[index]
         if isinstance(message, dict) and message.get("role") == "user":
-            return str(message.get("content") or "")
+            return bubble_text(message)
     return ""
