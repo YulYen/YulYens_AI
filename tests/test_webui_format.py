@@ -130,15 +130,31 @@ def test_context_bar_fills_proportionally():
 # ---- Chatverlauf und Gesprächs-Markdown -------------------------------------
 
 
-def test_messages_to_chat_history_pairs_question_and_answer():
-    pairs = messages_to_chat_history(
+def test_messages_to_chat_history_keeps_question_and_answer_as_two_rows():
+    """Seit #61a ist eine Anzeige-Zeile *eine* Nachricht (messages-Format)."""
+    rows = messages_to_chat_history(
         [
             {"role": "user", "content": "Frage"},
             {"role": "assistant", "content": "Antwort"},
         ]
     )
 
-    assert pairs == [("Frage", "Antwort")]
+    assert rows == [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
+
+
+def test_messages_to_chat_history_drops_injected_system_context():
+    """Fremdtext gehoert zum Prompt, nicht ins Gespraech (#60)."""
+    rows = messages_to_chat_history(
+        [
+            {"role": "system", "content": "[FREMDTEXT] …"},
+            {"role": "user", "content": "Frage"},
+        ]
+    )
+
+    assert rows == [{"role": "user", "content": "Frage"}]
 
 
 def test_messages_to_chat_history_keeps_an_unanswered_question():
@@ -149,13 +165,16 @@ def test_messages_to_chat_history_keeps_an_unanswered_question():
         ]
     )
 
-    assert pairs == [("Erste", None), ("Zweite", None)]
+    assert pairs == [
+        {"role": "user", "content": "Erste"},
+        {"role": "user", "content": "Zweite"},
+    ]
 
 
 def test_messages_to_chat_history_keeps_a_lone_answer():
     """Wiki-Hinweise sind Bot-Zeilen ohne Frage — sie dürfen nicht verschwinden."""
     assert messages_to_chat_history([{"role": "assistant", "content": "Hinweis"}]) == [
-        (None, "Hinweis")
+        {"role": "assistant", "content": "Hinweis"}
     ]
 
 
@@ -215,19 +234,28 @@ def test_format_ask_all_results_makes_one_section_per_persona():
 
 
 def test_find_question_walks_back_to_the_nearest_user_row():
-    history = [("Frage?", None), (None, "🕵️ Hinweis"), (None, "Antwort")]
+    history = [
+        {"role": "user", "content": "Frage?"},
+        {"role": "assistant", "content": "🕵️ Hinweis"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
 
     assert find_question_for_row(history, 2) == "Frage?"
 
 
-def test_find_question_handles_the_paired_layout_of_loaded_conversations():
-    assert find_question_for_row([("Frage?", "Antwort")], 0) == "Frage?"
+def test_find_question_walks_back_over_an_answer_row():
+    """Ein geladenes Gespraech steht als Folge einzelner Nachrichten da."""
+    history = [
+        {"role": "user", "content": "Frage?"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
+    assert find_question_for_row(history, 1) == "Frage?"
 
 
 def test_find_question_returns_empty_on_garbage():
     assert find_question_for_row([], 0) == ""
     assert find_question_for_row(None, 3) == ""
-    assert find_question_for_row([(None, "nur Bot")], 5) == ""
+    assert find_question_for_row([{"role": "assistant", "content": "nur Bot"}], 5) == ""
 
 
 def test_status_line_ignores_a_streamer_without_real_stats():

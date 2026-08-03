@@ -542,15 +542,11 @@ def build_ui(
             gr.Markdown("---")
 
         greeting_md = gr.Markdown("", visible=False)
-        # `type` ausdrücklich, nicht geerbt: Gradio 5 warnt sonst über den
-        # Default. Das Paar-Format ist in 5.x deprecated und fällt erst in
-        # einer späteren Hauptversion weg — der Wechsel auf `messages` ist ein
-        # eigener Umbau, weil daran der Vote-Index aus #65 hängt (die k-te
-        # Antwort-Bubble ist die k-te `assistant`-Nachricht). Solange hier
-        # `tuples` steht, ist das eine getroffene Entscheidung und kein
-        # übersehener Default.
+        # `messages` seit #61a: das Paarformat ist in Gradio 5 deprecated und
+        # in 6 ersatzlos weg. Der Vote-Index (#65) hängt daran — `evt.index`
+        # ist hier ein flacher Index, kein `[row, col]`; siehe `_on_chat_like`.
         chatbot = gr.Chatbot(
-            label="", visible=False, show_copy_button=True, type="tuples"
+            label="", visible=False, show_copy_button=True, type="messages"
         )
         # Quellen-Transparenz (#32): zugeklappt direkt unter dem Chat. Zeigt den
         # Text, den das Modell tatsächlich als Kontext bekommen hat — inklusive

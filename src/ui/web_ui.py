@@ -41,6 +41,8 @@ from ui.conversation_io_terminal import load_conversation
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
 from ui.webui_format import (
+    ChatMessage,
+    bot_bubble,
     conversation_markdown,
     find_question_for_row,
     format_ask_all_results,
@@ -48,6 +50,7 @@ from ui.webui_format import (
     format_wiki_sources,
     history_label,
     messages_to_chat_history,
+    user_bubble,
 )
 from ui.webui_layout import (
     ASK_ALL_OUTPUT_KEYS,
@@ -68,7 +71,8 @@ if TYPE_CHECKING:
     from core.factory import AppFactory
 
 # One chatbot entry: (user_text, bot_text) — either side may be None.
-ChatPair = tuple[str | None, str | None]
+# Anzeige-Nachricht im `messages`-Format (#61a) — siehe webui_format.
+ChatPair = ChatMessage
 Message = dict[str, str]
 
 # Wie oft gestreamte Updates höchstens an den Browser gehen (Sekunden). Ohne
@@ -338,7 +342,7 @@ class WebUI:
         self,
         session: SessionContext,
         llm_history: list[Message],
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
     ) -> bool:
 
         if not context_near_limit(llm_history, session.streamer.persona_options):
@@ -347,7 +351,7 @@ class WebUI:
         drink = get_drink(session.bot)
         warn = self._t("context_wait_message", persona_name=session.bot, drink=drink)
 
-        chat_history.append((None, warn))
+        chat_history.append(bot_bubble(warn))
 
         persona_options = getattr(session.streamer, "persona_options", {}) or {}
         llm_history[:] = shrink_history_for_context(
@@ -417,7 +421,7 @@ class WebUI:
         self,
         session: SessionContext,
         message_history: list[Message],
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
     ) -> Iterator[tuple]:
         # Die Quellen-Slots stehen vor dem Stream schon fest und bleiben hier
         # unangetastet — gr.update() ohne Wert ist ein No-op für die Anzeige.
@@ -446,7 +450,7 @@ class WebUI:
                     last_flush = now
                     yield (
                         None,
-                        chat_history + [(None, reply)],
+                        chat_history + [bot_bubble(reply)],
                         message_history,
                         *keep,
                         status_keep,
@@ -463,7 +467,7 @@ class WebUI:
             reply += self._t("web_stream_stopped_suffix")
 
         # Finalize: add the completed reply to the history
-        chat_history.append((None, reply))
+        chat_history.append(bot_bubble(reply))
         message_history.append({"role": "assistant", "content": reply})
         # Jetzt — und nur jetzt — steht der Gesprächsstand fest (#59). Auch beim
         # Abbruch: die Teilantwort ist das, was der Nutzer behält, also gehört
@@ -483,7 +487,7 @@ class WebUI:
         self,
         session: SessionContext,
         user_input: str,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
 
@@ -505,7 +509,7 @@ class WebUI:
         #    Die Quellen der vorigen Antwort gehören nicht zur neuen Frage und
         #    verschwinden deshalb sofort (#32).
         logging.debug("User input received (%d chars)", len(user_input))
-        chat_history.append((user_input, None))
+        chat_history.append(user_bubble(user_input))
         yield "", chat_history, llm_history, *self._wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
@@ -516,7 +520,7 @@ class WebUI:
         # Display the UI hints (do not add them to the LLM context window)
         for wiki_hint in wiki_hints:
             if wiki_hint:
-                chat_history.append((None, wiki_hint))
+                chat_history.append(bot_bubble(wiki_hint))
         if wiki_hints or contexts:
             yield (
                 None,
@@ -537,7 +541,7 @@ class WebUI:
         #     nicht; ein Turn wartet nie auf das Netz.
         rss_hint = self._inject_rss_if_asked(session, user_input, llm_history)
         if rss_hint:
-            chat_history.append((None, rss_hint))
+            chat_history.append(bot_bubble(rss_hint))
             yield (
                 None,
                 chat_history,
@@ -639,7 +643,7 @@ class WebUI:
         self,
         session: SessionContext,
         user_input: str,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
@@ -649,7 +653,7 @@ class WebUI:
     def respond_briefing_with_controls(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
@@ -659,7 +663,7 @@ class WebUI:
     def regenerate_with_controls(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
@@ -681,7 +685,7 @@ class WebUI:
     def _on_regenerate(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         """Letzte Antwort verwerfen und mit identischem Kontext neu streamen.
@@ -706,7 +710,7 @@ class WebUI:
         llm_history.pop()
         # In der Anzeige ist die Antwort die letzte Bot-Zeile; Wiki-/Briefing-Hints
         # sind ebenfalls Bot-Zeilen, stehen aber davor und bleiben stehen.
-        if chat_history and chat_history[-1][0] is None:
+        if chat_history and chat_history[-1].get("role") == "assistant":
             chat_history.pop()
         yield gr.update(), chat_history, llm_history, *keep, gr.update()
 
@@ -720,7 +724,7 @@ class WebUI:
     def respond_briefing(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
@@ -731,7 +735,7 @@ class WebUI:
 
         llm_history = list(history_state or [])
         briefing_prompt = self._t("briefing_user_prompt")
-        chat_history.append((briefing_prompt, None))
+        chat_history.append(user_bubble(briefing_prompt))
         # Kein Wiki im Spiel — die Quellen der vorigen Antwort sind hier hinfällig.
         yield (
             gr.update(),
@@ -750,11 +754,11 @@ class WebUI:
         )
         hint = self._rss_hint(session.bot, self.rss_cache.feed_names, dropped)
         if hint:
-            chat_history.append((None, hint))
+            chat_history.append(bot_bubble(hint))
             yield None, chat_history, llm_history, *keep, gr.update()
 
         if not block:
-            chat_history.append((None, self._t("briefing_empty")))
+            chat_history.append(bot_bubble(self._t("briefing_empty")))
             yield None, chat_history, llm_history, *keep, gr.update()
             return
 
@@ -1393,9 +1397,9 @@ class WebUI:
     def _run_self_talk_stream(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message],
-    ) -> Iterator[tuple[list[ChatPair], list[Message]]]:
+    ) -> Iterator[tuple[list[ChatMessage], list[Message]]]:
         runner = session.self_talk_runner
         if runner is None:
             return
@@ -1422,8 +1426,8 @@ class WebUI:
                     now = time.monotonic()
                     if now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                         last_flush = now
-                        yield chat_history + [(None, progressive)], history_state
-                chat_history.append((None, shown_reply))
+                        yield chat_history + [bot_bubble(progressive)], history_state
+                chat_history.append(bot_bubble(shown_reply))
                 history_state.append({"role": "assistant", "content": shown_reply})
                 yield chat_history, history_state
                 if should_stop:
@@ -1737,15 +1741,15 @@ class WebUI:
     def _store_index_of(
         text: str,
         row: int,
-        chat_history: list[ChatPair] | None,
+        chat_history: list[ChatMessage] | None,
         llm_history: list[Message] | None,
     ) -> int | None:
         """Welche Nachricht der **Ablage** ist die angeklickte Bubble? (#65)
 
         Der Anzeige-Index taugt dafür nicht: in ``chat_history`` stehen
         Hinweis-Bubbles zwischen den Antworten, in der Ablage nicht. Ein Vote
-        mit `index: [2, 1]` war deshalb eine UI-Koordinate und ließ sich mit
-        nichts verbinden.
+        mit `index: 2` (vor #61a: `[2, 1]`) war deshalb eine UI-Koordinate und
+        ließ sich mit nichts verbinden.
 
         Gezählt wird stattdessen **die Position unter den Modellantworten**:
         die k-te Antwort-Bubble ist die k-te ``assistant``-Nachricht, weil
@@ -1767,12 +1771,15 @@ class WebUI:
         if not candidate or candidate not in answers:
             return None
 
-        # Wievielte Antwort-Bubble ist die angeklickte?
+        # Wievielte Antwort-Bubble ist die angeklickte? Seit #61a ist eine
+        # Anzeige-Zeile *eine* Nachricht, der Zähler liest also `role` statt
+        # der zweiten Spalte — die Zählregel selbst bleibt dieselbe.
         seen = 0
-        for idx, pair in enumerate(chat_history or []):
-            bubble = (str(pair[1]) if len(pair) > 1 and pair[1] else "").strip()
-            if bubble and bubble in answers:
-                seen += 1
+        for idx, message in enumerate(chat_history or []):
+            if message.get("role") == "assistant":
+                bubble = (message.get("content") or "").strip()
+                if bubble and bubble in answers:
+                    seen += 1
             if idx == row:
                 break
         if seen == 0:
@@ -1839,7 +1846,7 @@ class WebUI:
     def _on_chat_like(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair] | None,
+        chat_history: list[ChatMessage] | None,
         meta: dict | None,
         llm_history: list[Message] | None,
         conversation_id: str | None,
@@ -1847,20 +1854,34 @@ class WebUI:
     ) -> None:
         # Votes must never break the UI: any failure is logged and swallowed.
         try:
-            row, col = -1, 1
-            answer = str(evt.value)
+            # Seit #61a ist `evt.index` ein **flacher** Index in die
+            # Anzeigeliste, kein `[row, col]` mehr. Ein nicht deutbarer Index
+            # wird verworfen statt geraten: der frühere `except`-Zweig ließ
+            # `row = -1` stehen, und der Zähler unten sah dann *alle* Bubbles
+            # und schrieb den Vote auf die **letzte** Antwort. Ein falsch
+            # zugeordneter Vote ist teurer als ein fehlender — für #7 ist eine
+            # verlorene Bewertung billiger als eine erfundene.
             try:
-                row, col = int(evt.index[0]), int(evt.index[1])
-                answer = str(chat_history[row][col])
-            except (TypeError, ValueError, IndexError):
+                row = int(evt.index)  # type: ignore[arg-type]
+            except (TypeError, ValueError):
                 logging.warning("Feedback vote with unexpected index %r", evt.index)
+                return
 
-            # Gradio 4.44 renders the thumbs on the user row as well (live
-            # verified). A vote on one's own question is no training signal,
-            # so only bot answers (column 1) are recorded.
-            if col != 1:
+            message = (
+                (chat_history or [])[row]
+                if 0 <= row < len(chat_history or [])
+                else None
+            )
+            if not isinstance(message, dict):
+                logging.warning("Feedback vote on index %s outside the history", row)
+                return
+
+            # Eine Bewertung der eigenen Frage ist kein Trainingssignal.
+            if message.get("role") != "assistant":
                 logging.debug("Ignoring feedback vote on a user message (row %s)", row)
                 return
+
+            answer = str(message.get("content") or evt.value)
 
             # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
             # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
@@ -1895,7 +1916,9 @@ class WebUI:
                 # Vote das, was er vorher immer war.
                 "conversation_id": conversation_id,
                 "message_index": message_index,
-                "index": [row, col],
+                # Die UI-Koordinate bleibt zur Diagnose daneben stehen; seit
+                # #61a ist sie ein flacher Index statt [row, col].
+                "index": row,
             }
             path = self._resolve_feedback_log_path()
             with _feedback_log_lock:
