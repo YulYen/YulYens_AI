@@ -21,14 +21,12 @@ from config.config_singleton import Config
 from core.factory import AppFactory
 from gradio.utils import get_function_params
 from ui import web_ui as web_ui_module
-from ui.web_ui import (
+from ui.web_ui import WebUI
+from ui.webui_layout import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
     STREAM_CONTROL_KEYS,
     STREAM_OUTPUT_KEYS,
-    WebUI,
-)
-from ui.webui_layout import (
     THEME_STORAGE_KEY,
     THEME_TOGGLE_ELEM_ID,
     card_icon_html,
@@ -295,12 +293,35 @@ def test_the_theme_toggle_runs_without_a_server_round_trip(wired):
 
 
 def test_the_page_restores_the_remembered_theme_on_load(wired):
-    """Ohne das Lade-Skript gilt die Wahl nur bis zum nächsten Neuladen."""
-    assert wired.demo.js, "gr.Blocks(js=…) fehlt"
-    assert THEME_STORAGE_KEY in wired.demo.js
+    """Ohne das Lade-Skript gilt die Wahl nur bis zum nächsten Neuladen.
+
+    Das Skript hängt seit Gradio 6 an `launch(js=…)` statt am
+    Blocks-Konstruktor — dort wird es stillschweigend verworfen (#61a).
+    `WebUI` merkt es sich, damit `_start_server` es weiterreichen kann.
+    """
+    script = wired.ui.theme_load_js
+    assert script, "das Lade-Skript fehlt"
+    assert THEME_STORAGE_KEY in script
     # Gradio setzt sein eigenes Theme während der Initialisierung; wer davor
     # schreibt, verliert. Deshalb muss die Wiederherstellung aufgeschoben sein.
-    assert "setTimeout" in wired.demo.js
+    assert "setTimeout" in script
+
+
+def test_the_load_script_is_handed_to_launch_not_to_blocks(wired):
+    """Die Bruchstelle selbst: `gr.Blocks(js=…)` wirkt in Gradio 6 nicht mehr.
+
+    Gradio warnt zwar beim Konstruktor, aber `demo.js` bleibt `None` — der
+    Theme-Umschalter hätte still aufgehört, die Wahl zu überleben. Deshalb
+    wird hier festgehalten, wohin das Skript geht.
+    """
+    captured: dict = {}
+
+    class _Demo:
+        def launch(self, **kwargs):
+            captured.update(kwargs)
+
+    WebUI._start_server(wired.ui, _Demo())
+    assert captured.get("js") == wired.ui.theme_load_js
 
 
 def test_both_scripts_stand_on_their_own(wired):
@@ -309,7 +330,7 @@ def test_both_scripts_stand_on_their_own(wired):
     Sonst wäre ein früher Klick wirkungslos — und zwar stumm.
     """
     toggle_js = _theme_events(wired)[0].js
-    for script in (toggle_js, wired.demo.js):
+    for script in (toggle_js, wired.ui.theme_load_js):
         assert "const apply =" in script
         assert "classList.toggle" in script
 
@@ -325,7 +346,7 @@ def test_the_toggle_offers_the_other_state(wired):
     assert button.elem_id == THEME_TOGGLE_ELEM_ID
     light, dark = "☀️ Hell", "🌙 Dunkel"
     assert button.value == dark  # hell ist der Startzustand -> Dunkel anbieten
-    for script in (_theme_events(wired)[0].js, wired.demo.js):
+    for script in (_theme_events(wired)[0].js, wired.ui.theme_load_js):
         assert light in script and dark in script
 
 
@@ -420,3 +441,19 @@ def test_an_unknown_icon_name_fails_loudly():
     """Ein Tippfehler soll hier auffallen, nicht als leere Karte im Browser."""
     with pytest.raises(KeyError):
         card_icon_html("verlaufff")
+
+
+def test_the_load_script_is_a_plain_block_and_the_toggle_a_function(wired):
+    """Zwei Skripte, zwei Formen — und die Verwechslung ist stumm.
+
+    Gradio 6 fuehrt `launch(js=…)` als Anweisungsblock aus. Eine Pfeilfunktion
+    wird dort zwar ausgewertet, aber nie gerufen: im Browser gemessen lief der
+    Rumpf null Mal. Der Umschalter am Knopf ist dagegen ein Event-Handler und
+    braucht die Funktionsform.
+    """
+    load = wired.ui.theme_load_js.strip()
+    assert not load.startswith("() =>"), "Lade-Skript darf keine Pfeilfunktion sein"
+    assert "setTimeout" in load
+
+    toggle = _theme_events(wired)[0].js.strip()
+    assert toggle.startswith("() =>"), "der Klick-Handler braucht die Funktionsform"

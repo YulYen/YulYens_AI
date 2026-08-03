@@ -10,7 +10,6 @@ import threading
 import time
 from collections.abc import Iterator
 from datetime import datetime
-from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -26,7 +25,6 @@ from core.orchestrator import iter_broadcast_events, iter_broadcast_events_paral
 from core.streaming_provider import StreamStats
 from core.system_checks import fetch_model_names
 from core.utils import (
-    ensure_dir_exists,
     is_broadcast_enabled,
     is_broadcast_parallel,
     is_file_exchange_enabled,
@@ -38,24 +36,26 @@ from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
+from ui.feedback import FeedbackLog
+from ui.history_access import ConversationHistory
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
+from ui.webui_events import bind_events
 from ui.webui_format import (
+    ChatMessage,
+    bot_bubble,
     conversation_markdown,
-    find_question_for_row,
     format_ask_all_results,
     format_status_line,
     format_wiki_sources,
-    history_label,
     messages_to_chat_history,
+    user_bubble,
 )
 from ui.webui_layout import (
-    ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
-    STREAM_CONTROL_KEYS,
-    STREAM_OUTPUT_KEYS,
     as_persona_outputs,
     build_ui,
+    theme_restore_js,
 )
 from wiki.lookup import (
     WikiLookup,
@@ -68,7 +68,8 @@ if TYPE_CHECKING:
     from core.factory import AppFactory
 
 # One chatbot entry: (user_text, bot_text) — either side may be None.
-ChatPair = tuple[str | None, str | None]
+# Anzeige-Nachricht im `messages`-Format (#61a) — siehe webui_format.
+ChatPair = ChatMessage
 Message = dict[str, str]
 
 # Wie oft gestreamte Updates höchstens an den Browser gehen (Sekunden). Ohne
@@ -338,7 +339,7 @@ class WebUI:
         self,
         session: SessionContext,
         llm_history: list[Message],
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
     ) -> bool:
 
         if not context_near_limit(llm_history, session.streamer.persona_options):
@@ -347,7 +348,7 @@ class WebUI:
         drink = get_drink(session.bot)
         warn = self._t("context_wait_message", persona_name=session.bot, drink=drink)
 
-        chat_history.append((None, warn))
+        chat_history.append(bot_bubble(warn))
 
         persona_options = getattr(session.streamer, "persona_options", {}) or {}
         llm_history[:] = shrink_history_for_context(
@@ -417,7 +418,7 @@ class WebUI:
         self,
         session: SessionContext,
         message_history: list[Message],
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
     ) -> Iterator[tuple]:
         # Die Quellen-Slots stehen vor dem Stream schon fest und bleiben hier
         # unangetastet — gr.update() ohne Wert ist ein No-op für die Anzeige.
@@ -446,7 +447,7 @@ class WebUI:
                     last_flush = now
                     yield (
                         None,
-                        chat_history + [(None, reply)],
+                        chat_history + [bot_bubble(reply)],
                         message_history,
                         *keep,
                         status_keep,
@@ -463,7 +464,7 @@ class WebUI:
             reply += self._t("web_stream_stopped_suffix")
 
         # Finalize: add the completed reply to the history
-        chat_history.append((None, reply))
+        chat_history.append(bot_bubble(reply))
         message_history.append({"role": "assistant", "content": reply})
         # Jetzt — und nur jetzt — steht der Gesprächsstand fest (#59). Auch beim
         # Abbruch: die Teilantwort ist das, was der Nutzer behält, also gehört
@@ -483,7 +484,7 @@ class WebUI:
         self,
         session: SessionContext,
         user_input: str,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
 
@@ -505,7 +506,7 @@ class WebUI:
         #    Die Quellen der vorigen Antwort gehören nicht zur neuen Frage und
         #    verschwinden deshalb sofort (#32).
         logging.debug("User input received (%d chars)", len(user_input))
-        chat_history.append((user_input, None))
+        chat_history.append(user_bubble(user_input))
         yield "", chat_history, llm_history, *self._wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
@@ -516,7 +517,7 @@ class WebUI:
         # Display the UI hints (do not add them to the LLM context window)
         for wiki_hint in wiki_hints:
             if wiki_hint:
-                chat_history.append((None, wiki_hint))
+                chat_history.append(bot_bubble(wiki_hint))
         if wiki_hints or contexts:
             yield (
                 None,
@@ -537,7 +538,7 @@ class WebUI:
         #     nicht; ein Turn wartet nie auf das Netz.
         rss_hint = self._inject_rss_if_asked(session, user_input, llm_history)
         if rss_hint:
-            chat_history.append((None, rss_hint))
+            chat_history.append(bot_bubble(rss_hint))
             yield (
                 None,
                 chat_history,
@@ -639,7 +640,7 @@ class WebUI:
         self,
         session: SessionContext,
         user_input: str,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
@@ -649,7 +650,7 @@ class WebUI:
     def respond_briefing_with_controls(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
@@ -659,7 +660,7 @@ class WebUI:
     def regenerate_with_controls(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         yield from self._with_stream_controls(
@@ -681,7 +682,7 @@ class WebUI:
     def _on_regenerate(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         """Letzte Antwort verwerfen und mit identischem Kontext neu streamen.
@@ -706,7 +707,7 @@ class WebUI:
         llm_history.pop()
         # In der Anzeige ist die Antwort die letzte Bot-Zeile; Wiki-/Briefing-Hints
         # sind ebenfalls Bot-Zeilen, stehen aber davor und bleiben stehen.
-        if chat_history and chat_history[-1][0] is None:
+        if chat_history and chat_history[-1].get("role") == "assistant":
             chat_history.pop()
         yield gr.update(), chat_history, llm_history, *keep, gr.update()
 
@@ -720,7 +721,7 @@ class WebUI:
     def respond_briefing(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message] | None,
     ) -> Iterator[tuple]:
         """Wie respond_streaming, nur mit RSS-Feeds statt Wiki als Kontext."""
@@ -731,7 +732,7 @@ class WebUI:
 
         llm_history = list(history_state or [])
         briefing_prompt = self._t("briefing_user_prompt")
-        chat_history.append((briefing_prompt, None))
+        chat_history.append(user_bubble(briefing_prompt))
         # Kein Wiki im Spiel — die Quellen der vorigen Antwort sind hier hinfällig.
         yield (
             gr.update(),
@@ -750,11 +751,11 @@ class WebUI:
         )
         hint = self._rss_hint(session.bot, self.rss_cache.feed_names, dropped)
         if hint:
-            chat_history.append((None, hint))
+            chat_history.append(bot_bubble(hint))
             yield None, chat_history, llm_history, *keep, gr.update()
 
         if not block:
-            chat_history.append((None, self._t("briefing_empty")))
+            chat_history.append(bot_bubble(self._t("briefing_empty")))
             yield None, chat_history, llm_history, *keep, gr.update()
             return
 
@@ -1049,29 +1050,19 @@ class WebUI:
         return as_persona_outputs(updates)
 
     # ---------- Verlauf (#25) ----------
-    def _history_choices(self, user: str) -> list[tuple[str, str]]:
-        """Gespräche des angemeldeten Nutzers — Beschriftung und ID.
-
-        Die Filterung nach Nutzer ist der Grund, warum #53 vor diesem Ticket
-        kam: ohne sie zeigt eine Verlaufsliste jedem alles.
-        """
+    @property
+    def _history(self) -> ConversationHistory:
+        """Nutzergebundener Zugriff auf die Ablage — siehe ui/history_access."""
         storage_cfg = getattr(self.cfg, "storage", None) or {}
-        try:
-            limit = max(1, int(storage_cfg.get("history_limit", 50)))
-        except (TypeError, ValueError):
-            limit = 50
-        try:
-            refs = self.factory.get_store().list_conversations(
-                user=user or self._fallback_user(), limit=limit
-            )
-        except Exception:
-            logging.exception("Verlauf konnte nicht gelesen werden")
-            return []
-        return [(history_label(ref), ref.id) for ref in refs]
+        return ConversationHistory(
+            self.factory.get_store,
+            limit=storage_cfg.get("history_limit", 50),
+            fallback_user=self._fallback_user(),
+        )
 
     def _on_show_history(self, session: SessionContext, user: str) -> tuple:
         session.clear_persona()
-        choices = self._history_choices(user)
+        choices = self._history.choices(user)
         updates = self._reset_updates()
         updates.update(
             grid_group=gr.update(visible=False),
@@ -1086,34 +1077,11 @@ class WebUI:
 
     def _on_history_selected(self, conversation_id: str | None, user: str) -> Any:
         """Vorschau des gewählten Gesprächs."""
-        loaded = self._load_from_store(conversation_id, user)
+        loaded = self._history.load(conversation_id, user)
         if loaded is None:
             return gr.update(value="")
         ref, messages = loaded
         return gr.update(value=conversation_markdown(ref, messages, self._t))
-
-    def _load_from_store(self, conversation_id: str | None, user: str):
-        """Gespräch aus der Ablage — **nur** das des angemeldeten Nutzers.
-
-        Die Liste in ``_history_choices`` filtert nach Nutzer, die Handler
-        dahinter taten es nicht: die Gesprächs-ID kommt aus einem
-        ``gr.Dropdown``, und dessen ``preprocess`` reicht in Gradio 4.44 den
-        Wert des Clients ungeprüft durch (``type="value"`` → ``return payload``).
-        Wer eine fremde ID kannte, konnte das Gespräch lesen, exportieren,
-        fortsetzen und löschen — nachgestellt mit zwei angemeldeten Nutzern.
-
-        Deshalb liegt die Prüfung jetzt an der Stelle, an der alle vier
-        Handler zwangsläufig vorbeikommen, statt viermal beim Aufrufer.
-        """
-        if not conversation_id:
-            return None
-        try:
-            return self.factory.get_store().load(
-                str(conversation_id), user=user or self._fallback_user()
-            )
-        except Exception:
-            logging.exception("Gespräch %s nicht ladbar", conversation_id)
-            return None
 
     # Die Regel selbst steht in ui/continuation.py — sie gilt für alle drei
     # Wege in ein gespeichertes Gespräch, auch für den im Terminal.
@@ -1128,7 +1096,7 @@ class WebUI:
         input_placeholder: str = "",
     ) -> tuple:
         """Gespräch in den Chat holen — fortsetzbar, nicht nur ansehbar."""
-        loaded = self._load_from_store(conversation_id, user)
+        loaded = self._history.load(conversation_id, user)
         if loaded is None:
             updates = self._reset_updates()
             updates.update(
@@ -1185,7 +1153,7 @@ class WebUI:
     def _on_history_export(
         self, session: SessionContext, conversation_id: str | None, user: str
     ) -> Any:
-        loaded = self._load_from_store(conversation_id, user)
+        loaded = self._history.load(conversation_id, user)
         if loaded is None:
             return gr.update(value=None, visible=False)
         ref, messages = loaded
@@ -1206,17 +1174,10 @@ class WebUI:
                 gr.update(),
             )
 
-        deleted = False
-        if conversation_id:
-            try:
-                # Nur eigene Gespräche: das Löschen ist der einzige der vier
-                # Verlauf-Wege, der sich nicht rückgängig machen lässt.
-                deleted = self.factory.get_store().delete(
-                    str(conversation_id), user=user or self._fallback_user()
-                )
-            except Exception:
-                logging.exception("Gespräch %s nicht löschbar", conversation_id)
-        choices = self._history_choices(user)
+        # Nur eigene Gespräche: das Löschen ist der einzige der vier
+        # Verlauf-Wege, der sich nicht rückgängig machen lässt.
+        deleted = self._history.delete(conversation_id, user)
+        choices = self._history.choices(user)
         message = "history_deleted" if deleted else "history_not_found"
         return (
             gr.update(choices=choices, value=None),
@@ -1393,9 +1354,9 @@ class WebUI:
     def _run_self_talk_stream(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair],
+        chat_history: list[ChatMessage],
         history_state: list[Message],
-    ) -> Iterator[tuple[list[ChatPair], list[Message]]]:
+    ) -> Iterator[tuple[list[ChatMessage], list[Message]]]:
         runner = session.self_talk_runner
         if runner is None:
             return
@@ -1422,8 +1383,8 @@ class WebUI:
                     now = time.monotonic()
                     if now - last_flush >= STREAM_FLUSH_INTERVAL_S:
                         last_flush = now
-                        yield chat_history + [(None, progressive)], history_state
-                chat_history.append((None, shown_reply))
+                        yield chat_history + [bot_bubble(progressive)], history_state
+                chat_history.append(bot_bubble(shown_reply))
                 history_state.append({"role": "assistant", "content": shown_reply})
                 yield chat_history, history_state
                 if should_stop:
@@ -1724,525 +1685,76 @@ class WebUI:
             value=success, visible=True
         )
 
-    def _resolve_feedback_log_path(self) -> str:
-        if self.feedback_log_path:
-            return self.feedback_log_path
+    @property
+    def _feedback(self) -> FeedbackLog:
+        """Die Vote-Aufzeichnung (#40/#65), herausgelöst nach `ui/feedback.py`.
+
+        Lazy, weil `feedback_log_path` von Tests nach dem Bau gesetzt wird.
+        """
         log_cfg = getattr(self.cfg, "logging", None)
         log_dir = log_cfg.get("dir", "logs") if isinstance(log_cfg, dict) else "logs"
-        ensure_dir_exists(log_dir)
-        self.feedback_log_path = os.path.join(log_dir, "feedback_votes.jsonl")
-        return self.feedback_log_path
-
-    @staticmethod
-    def _store_index_of(
-        text: str,
-        row: int,
-        chat_history: list[ChatPair] | None,
-        llm_history: list[Message] | None,
-    ) -> int | None:
-        """Welche Nachricht der **Ablage** ist die angeklickte Bubble? (#65)
-
-        Der Anzeige-Index taugt dafür nicht: in ``chat_history`` stehen
-        Hinweis-Bubbles zwischen den Antworten, in der Ablage nicht. Ein Vote
-        mit `index: [2, 1]` war deshalb eine UI-Koordinate und ließ sich mit
-        nichts verbinden.
-
-        Gezählt wird stattdessen **die Position unter den Modellantworten**:
-        die k-te Antwort-Bubble ist die k-te ``assistant``-Nachricht, weil
-        Anzeige und LLM-Verlauf im Gleichschritt wachsen (auch „Nochmal 🔄"
-        entfernt aus beiden). ``ConversationStore.sync`` nummeriert genau diese
-        Folge durch — Systemkontext filtert es heraus —, also stimmt der Index
-        auf beiden Seiten.
-
-        Über Positionen statt über Texte zu zählen ist der Punkt: zweimal
-        dieselbe kurze Antwort („Ja.") im selben Gespräch ist keine Seltenheit,
-        und ein Textvergleich hätte still auf die erste gezeigt.
-        """
-        answers = {
-            (m.get("content") or "").strip()
-            for m in (llm_history or [])
-            if m.get("role") == "assistant"
-        }
-        candidate = (text or "").strip()
-        if not candidate or candidate not in answers:
-            return None
-
-        # Wievielte Antwort-Bubble ist die angeklickte?
-        seen = 0
-        for idx, pair in enumerate(chat_history or []):
-            bubble = (str(pair[1]) if len(pair) > 1 and pair[1] else "").strip()
-            if bubble and bubble in answers:
-                seen += 1
-            if idx == row:
-                break
-        if seen == 0:
-            return None
-
-        # … und die wievielte Nachricht ist das in der Ablage?
-        position = 0
-        for store_idx, message in enumerate(
-            [m for m in (llm_history or []) if m.get("role") in ("user", "assistant")]
-        ):
-            if message.get("role") != "assistant":
-                continue
-            position += 1
-            if position == seen:
-                return store_idx
-        return None
-
-    @staticmethod
-    def _is_model_answer(text: str, llm_history: list[Message] | None) -> bool:
-        """Ist dieser Bot-Text eine Antwort des Modells — oder nur Beiwerk?
-
-        In der Chat-Anzeige sind beide eine Bot-Bubble: die Antwort, aber auch
-        der Wiki-Hinweis („🕵️ … blättert im Archiv"), die
-        Kontext-Kompressionswarnung, die Briefing-Meldungen und der Hinweis auf
-        vom Guard verworfene Quellen. Ein Daumen darauf schrieb bisher eine
-        Zeile nach ``feedback_votes.jsonl``, als hätte das Modell das gesagt —
-        also Trainingsdaten (#40, Grundlage für #7) aus UI-Text.
-
-        Der Diskriminator braucht keinen neuen Zustand: **Beiwerk landet nie in
-        der LLM-History.** Die Hinweise werden ausdrücklich nur an
-        ``chat_history`` gehängt und bewusst nicht ins Kontextfenster gegeben.
-        Was dort nicht als ``assistant`` steht, ist deshalb keine Antwort.
-        """
-        candidate = (text or "").strip()
-        if not candidate:
-            return False
-        return any(
-            (message.get("role") == "assistant")
-            and (message.get("content") or "").strip() == candidate
-            for message in (llm_history or [])
+        recorder = FeedbackLog(
+            self.feedback_log_path,
+            log_dir=log_dir,
+            store_loader=self._store_text,
+            fallback_user=self._fallback_user,
         )
+        self.feedback_log_path = recorder.path
+        return recorder
 
-    def _answer_from_store(self, conversation_id: str, index: int) -> str | None:
+    def _store_text(self, conversation_id: str, index: int) -> str | None:
         """Den aufgezeichneten Wortlaut holen — best effort (#65).
 
         Die Ablage ist die Fassung, gegen die später jemand joint; sie hat
         deshalb das letzte Wort über den Text. Ohne Anmeldung gibt es sie gar
-        nicht (`NullStore`, #72), also darf das hier still fehlschlagen — ein
-        Vote ohne Store-Text ist besser als kein Vote.
+        nicht (`NullStore`, #72), also darf das hier still fehlschlagen.
         """
         store = getattr(self.factory, "get_store", None)
-        if not conversation_id or store is None:
+        if store is None:
             return None
-        try:
-            loaded = store().load(conversation_id)
-            if not loaded:
-                return None
-            _ref, messages = loaded
-            return str(messages[index].get("content") or "")
-        except (AttributeError, IndexError, TypeError, KeyError):
-            logging.debug("Vote: kein Text aus der Ablage für %s", conversation_id)
+        loaded = store().load(conversation_id)
+        if not loaded:
             return None
+        _ref, messages = loaded
+        return str(messages[index].get("content") or "")
 
     def _on_chat_like(
         self,
         session: SessionContext,
-        chat_history: list[ChatPair] | None,
+        chat_history: list[ChatMessage] | None,
         meta: dict | None,
         llm_history: list[Message] | None,
         conversation_id: str | None,
         evt: gr.LikeData,
     ) -> None:
-        # Votes must never break the UI: any failure is logged and swallowed.
-        try:
-            row, col = -1, 1
-            answer = str(evt.value)
-            try:
-                row, col = int(evt.index[0]), int(evt.index[1])
-                answer = str(chat_history[row][col])
-            except (TypeError, ValueError, IndexError):
-                logging.warning("Feedback vote with unexpected index %r", evt.index)
+        """Naht zwischen Gradios Event und der Aufzeichnung.
 
-            # Gradio 4.44 renders the thumbs on the user row as well (live
-            # verified). A vote on one's own question is no training signal,
-            # so only bot answers (column 1) are recorded.
-            if col != 1:
-                logging.debug("Ignoring feedback vote on a user message (row %s)", row)
-                return
-
-            # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
-            # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
-            # würde dem Modell beibringen, UI-Text zu produzieren. Derselbe
-            # Aufruf liefert die Stelle in der Ablage (#65).
-            message_index = self._store_index_of(answer, row, chat_history, llm_history)
-            if message_index is None:
-                logging.debug(
-                    "Ignoring feedback vote on a UI notice, not a model answer (row %s)",
-                    row,
-                )
-                return
-
-            conversation_id = str(conversation_id or "")
-            # Die Ablage hat das letzte Wort über den Wortlaut; die Anzeige ist
-            # nur ihre Darstellung.
-            answer = self._answer_from_store(conversation_id, message_index) or answer
-
-            meta = meta if isinstance(meta, dict) else {}
-            entry = {
-                "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
-                "app": meta.get("app", "web"),
-                "user": meta.get("user") or self._fallback_user(),
-                "persona": meta.get("persona") or session.bot or "",
-                "model": meta.get("model", ""),
-                "vote": "up" if evt.liked else "down",
-                "question": find_question_for_row(chat_history, row),
-                "answer": answer,
-                # Der Join-Schlüssel (#65): ohne ihn ist eine Vote-Zeile ein
-                # loses Textpaar. `conversation_id` ist leer, wenn ohne
-                # Anmeldung nichts aufgezeichnet wird (#72) — dann bleibt der
-                # Vote das, was er vorher immer war.
-                "conversation_id": conversation_id,
-                "message_index": message_index,
-                "index": [row, col],
-            }
-            path = self._resolve_feedback_log_path()
-            with _feedback_log_lock:
-                with open(path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except (OSError, TypeError, ValueError, AttributeError):
-            logging.exception("Could not write feedback log %s", self.feedback_log_path)
-
-    def _bind_events(
-        self,
-        components: dict[str, Any],
-        persona_info: dict[str, dict[str, Any]],
-        greeting_template: str,
-        input_placeholder: str,
-    ) -> None:
-        chatbot = components["chatbot"]
-        input_box = components["input_box"]
-        send_btn = components["send_btn"]
-        new_chat_btn = components["new_chat_btn"]
-        download_btn = components["download_btn"]
-        download_file = components["download_file"]
-        save_status = components["save_status"]
-        history_state = components["history_state"]
-        meta_state = components["meta_state"]
-        ask_all_results = components["ask_all_results"]
-        ask_all_question = components["ask_all_question"]
-        ask_all_submit = components["ask_all_submit"]
-        ask_all_new_chat = components["ask_all_new_chat"]
-        ask_all_card_btn = components["ask_all_card_btn"]
-        ask_all_outputs = [components[key] for key in ASK_ALL_OUTPUT_KEYS]
-        self_talk_card_btn = components["self_talk_card_btn"]
-        self_talk_status = components["self_talk_status"]
-        self_talk_persona_a = components["self_talk_persona_a"]
-        self_talk_persona_b = components["self_talk_persona_b"]
-        self_talk_prompt = components["self_talk_prompt"]
-        self_talk_start_btn = components["self_talk_start_btn"]
-        load_input = components["load_input"]
-        load_status = components["load_status"]
-        model_dropdown = components["model_dropdown"]
-        model_status = components["model_status"]
-        mic_audio = components["mic_audio"]
-        briefing_btn = components["briefing_btn"]
-        read_aloud_btn = components["read_aloud_btn"]
-        tts_audio = components["tts_audio"]
-        stop_btn = components["stop_btn"]
-        regenerate_btn = components["regenerate_btn"]
-
-        # Same order as the update dicts resolved via _as_persona_outputs()
-        persona_outputs = [components[key] for key in PERSONA_OUTPUT_KEYS]
-
-        # Parameter, die aus `inputs=` kommen, stehen bewusst ohne Default da:
-        # ein Handler, der stillschweigend auf einen leeren Nutzer zurückfällt,
-        # schreibt Gespräche unter der falschen Identität weg.
-        user_state = components["user_state"]
-        # Persona, Streamer und Kill-Switches dieser Browser-Sitzung (siehe
-        # ui/session.py). Steht bewusst als *erster* Input jedes Handlers, der
-        # sie braucht — die Reihenfolge hier ist die Parameterreihenfolge dort.
-        session_state = components["session_state"]
-
-        # Identität einmal pro Browser-Sitzung einsammeln (#53).
-        components["demo"].load(
-            fn=self._on_page_load, inputs=[], outputs=[user_state], queue=False
-        )
-
-        for key, btn in components["persona_buttons"]:
-            btn.click(
-                fn=partial(
-                    self._on_persona_selected,
-                    key=key,
-                    persona_info=persona_info,
-                    greeting_template=greeting_template,
-                    input_placeholder=input_placeholder,
-                ),
-                inputs=[session_state, user_state],
-                outputs=persona_outputs,
-                queue=False,
-            )
-
-        load_input.upload(
-            fn=partial(
-                self._on_load_conversation,
-                persona_info=persona_info,
-                input_placeholder=input_placeholder,
-            ),
-            inputs=[session_state, load_input],
-            outputs=persona_outputs,
-            queue=False,
-        )
-
-        # Profi-Option: .change feuert nur bei Nutzer-Interaktion, nicht beim
-        # Initialwert; bewusst außerhalb der PERSONA_OUTPUT_KEYS gehalten.
-        model_dropdown.change(
-            fn=self._on_model_selected,
-            inputs=[session_state, model_dropdown, components["conversation_state"]],
-            outputs=[model_status],
-            queue=False,
-        )
-
-        # queue=True: die Whisper-Transkription dauert Sekunden (erste
-        # Aufnahme lädt zusätzlich das Modell).
-        mic_audio.stop_recording(
-            fn=self._on_mic_recorded,
-            inputs=[mic_audio, input_box],
-            outputs=[input_box, mic_audio],
-            queue=True,
-        )
-
-        # Stream-Steuerung (#35): die Button-Updates reisen in denselben Yields
-        # mit (siehe _with_stream_controls) — ein vorgeschaltetes Event hätte den
-        # ersten Token um Sekunden verzögert. Aus demselben Grund hängen auch die
-        # Quellen (#32) an denselben Yields.
-        stream_buttons = [components[key] for key in STREAM_CONTROL_KEYS]
-        stream_outputs = [
-            *(components[key] for key in STREAM_OUTPUT_KEYS),
-            *stream_buttons,
-        ]
-
-        input_submit_evt = input_box.submit(
-            fn=self.respond_streaming_with_controls,
-            inputs=[session_state, input_box, chatbot, history_state],
-            outputs=stream_outputs,
-            queue=True,
-        )
-
-        send_click_evt = send_btn.click(
-            fn=self.respond_streaming_with_controls,
-            inputs=[session_state, input_box, chatbot, history_state],
-            outputs=stream_outputs,
-            queue=True,
-        )
-
-        # Kein `cancels`: der Kill-Switch beendet den Generator geordnet, damit
-        # die Teilantwort im Verlauf bleibt.
-        stop_btn.click(
-            fn=self._on_stop_stream,
-            inputs=[session_state],
-            outputs=stream_buttons,
-            queue=False,
-        )
-
-        regenerate_evt = regenerate_btn.click(
-            fn=self.regenerate_with_controls,
-            inputs=[session_state, chatbot, history_state],
-            outputs=stream_outputs,
-            queue=True,
-        )
-
-        download_btn.click(
-            fn=self._on_download_conversation,
-            inputs=[session_state, history_state, meta_state],
-            outputs=[download_file, save_status],
-            queue=False,
-        )
-
-        briefing_evt = briefing_btn.click(
-            fn=self.respond_briefing_with_controls,
-            inputs=[session_state, chatbot, history_state],
-            outputs=stream_outputs,
-            queue=True,
-        )
-
-        # queue=True: die Piper-Synthese längerer Antworten dauert Sekunden
-        read_aloud_btn.click(
-            fn=self._on_read_aloud,
-            inputs=[session_state, history_state],
-            outputs=[tts_audio],
-            queue=True,
-        )
-
-        # Binding .like() auto-enables the thumb buttons on the chatbot (#40).
-        # history_state muss mit: nur daran lässt sich eine echte Antwort von
-        # einer Hinweis-Bubble unterscheiden (siehe _on_chat_like).
-        chatbot.like(
-            fn=self._on_chat_like,
-            inputs=[
-                session_state,
-                chatbot,
-                meta_state,
-                history_state,
-                components["conversation_state"],
-            ],
-            outputs=[],
-            queue=False,
-        )
-
-        if ask_all_card_btn is not None:
-            ask_all_card_btn.click(
-                fn=self._on_show_ask_all,
-                inputs=[session_state],
-                outputs=persona_outputs,
-                queue=False,
-            )
-
-        if components["history_card_btn"] is not None:
-            components["history_card_btn"].click(
-                fn=self._on_show_history,
-                inputs=[session_state, user_state],
-                outputs=persona_outputs,
-                queue=False,
-            )
-
-        # user_state gehört in *jeden* Verlauf-Handler: die Gesprächs-ID kommt
-        # vom Client und wird von Gradio nicht gegen die Auswahlliste geprüft.
-        components["history_pick"].change(
-            fn=self._on_history_selected,
-            inputs=[components["history_pick"], user_state],
-            outputs=[components["history_preview"]],
-            queue=False,
-        )
-
-        components["history_open_btn"].click(
-            fn=partial(
-                self._on_history_open,
-                persona_info=persona_info,
-                input_placeholder=input_placeholder,
-            ),
-            inputs=[session_state, components["history_pick"], user_state],
-            outputs=persona_outputs,
-            queue=False,
-        )
-
-        components["history_export_btn"].click(
-            fn=self._on_history_export,
-            inputs=[session_state, components["history_pick"], user_state],
-            outputs=[components["history_file"]],
-            queue=False,
-        )
-
-        components["history_delete_btn"].click(
-            fn=self._on_history_delete,
-            inputs=[
-                components["history_pick"],
-                components["history_confirm"],
-                user_state,
-            ],
-            outputs=[
-                components["history_pick"],
-                components["history_preview"],
-                components["history_status"],
-                components["history_file"],
-                components["history_confirm"],
-            ],
-            queue=False,
-        )
-
-        components["guest_card_btn"].click(
-            fn=self._on_show_guest,
-            inputs=[session_state],
-            outputs=persona_outputs,
-            queue=False,
-        )
-
-        components["guest_start_btn"].click(
-            fn=partial(
-                self._on_start_guest,
-                greeting_template=greeting_template,
-                input_placeholder=input_placeholder,
-            ),
-            inputs=[
-                session_state,
-                components["guest_name"],
-                components["guest_prompt"],
-                components["guest_temperature"],
-                user_state,
-            ],
-            outputs=persona_outputs,
-            queue=False,
-        )
-
-        if self_talk_card_btn is not None:
-            self_talk_card_btn.click(
-                fn=self._on_show_self_talk,
-                inputs=[session_state],
-                outputs=persona_outputs,
-                queue=False,
-            )
-
-        self_talk_stream_evt = self_talk_start_btn.click(
-            fn=self._on_start_self_talk,
-            inputs=[
-                session_state,
-                self_talk_persona_a,
-                self_talk_persona_b,
-                self_talk_prompt,
-            ],
-            outputs=[
-                self_talk_status,
-                chatbot,
-                history_state,
-                input_box,
-                send_btn,
-                new_chat_btn,
-                meta_state,
-                load_status,
-            ],
-            queue=False,
-        ).then(
-            fn=self._run_self_talk_stream,
-            inputs=[session_state, chatbot, history_state],
-            outputs=[chatbot, history_state],
-            queue=True,
-        )
-
-        ask_all_submit_evt = ask_all_submit.click(
-            fn=self._on_submit_ask_all,
-            inputs=[session_state, ask_all_question, ask_all_results],
-            outputs=ask_all_outputs,
-            queue=True,
-        )
-
-        ask_all_question_evt = ask_all_question.submit(
-            fn=self._on_submit_ask_all,
-            inputs=[session_state, ask_all_question, ask_all_results],
-            outputs=ask_all_outputs,
-            queue=True,
-        )
-
-        # "New conversation" bricht laufende Streams aktiv ab (#2): das Schließen
-        # des Generators löst über GeneratorExit das finally in
-        # YulYenStreamingProvider.stream aus, das den LLM-Stream beendet.
-        new_chat_btn.click(
-            fn=self._on_reset_to_start,
-            inputs=[session_state],
-            outputs=persona_outputs,
-            queue=False,
-            cancels=[
-                input_submit_evt,
-                send_click_evt,
-                self_talk_stream_evt,
-                briefing_evt,
-                regenerate_evt,
-            ],
-        )
-
-        ask_all_new_chat.click(
-            fn=self._on_reset_to_start,
-            inputs=[session_state],
-            outputs=persona_outputs,
-            queue=False,
-            cancels=[ask_all_submit_evt, ask_all_question_evt],
+        Hier wird nur ausgepackt: `evt.index` ist seit #61a ein flacher Index,
+        `evt.liked` das Daumenzeichen. Alles Weitere entscheidet `FeedbackLog`
+        — dort steht es prüfbar ohne Oberfläche.
+        """
+        self._feedback.record(
+            row=getattr(evt, "index", None),
+            liked=bool(getattr(evt, "liked", False)),
+            value=getattr(evt, "value", ""),
+            chat_history=chat_history,
+            llm_history=llm_history,
+            meta=meta,
+            conversation_id=conversation_id,
+            persona=session.bot or "",
         )
 
     def _start_server(self, demo: gr.Blocks) -> None:
         launch_kwargs: dict[str, Any] = {
             "server_name": self.web_host,
             "server_port": self.web_port,
-            "show_api": False,
+            # `show_api=False` gibt es in Gradio 6 nicht mehr; `footer_links`
+            # hat es ersetzt. Die Absicht bleibt dieselbe: die API-Seite nicht
+            # im Fuß anbieten. „gradio" und „settings" bleiben stehen.
+            "footer_links": ["gradio", "settings"],
+            # Seit Gradio 6 gehört das Lade-Skript hierher, nicht an
+            # `gr.Blocks(js=…)` — dort wird es stillschweigend verworfen (#61a).
+            "js": getattr(self, "theme_load_js", None),
         }
 
         # Anmeldung gilt jetzt unabhängig von `share` (#53): die App horcht per
@@ -2313,6 +1825,10 @@ class WebUI:
         sources_label = ui.get("web_sources_label", "Quellen 📚")
         theme_light_label = ui.get("web_theme_light", "☀️ Hell")
         theme_dark_label = ui.get("web_theme_dark", "🌙 Dunkel")
+        # Das Lade-Skript des Theme-Umschalters (#69) wandert in Gradio 6 vom
+        # Blocks-Konstruktor nach `launch()`. Es hier zu merken hält
+        # `build_ui` frei davon und macht es für den Verdrahtungstest greifbar.
+        self.theme_load_js = theme_restore_js(theme_light_label, theme_dark_label)
         guest_card_label = ui.get("guest_card_label", "Gast anlegen")
         guest_title = ui.get("guest_title", "Gast-Persona")
         guest_description = ui.get(
@@ -2396,7 +1912,8 @@ class WebUI:
         # Reopening the demo as a context lets us keep the existing structure
         # while still registering the events correctly.
         with demo:
-            self._bind_events(
+            bind_events(
+                self,
                 components,
                 persona_info,
                 greeting_template,

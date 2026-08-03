@@ -44,7 +44,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 |---|---|
 | Sprache | Python 3.10+ |
 | LLM-Backend | Ollama (lokal) |
-| Web-UI | Gradio 5.50 |
+| Web-UI | Gradio 6.22 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
 | TTS | Piper (ONNX; Terminal: Autoplay über winsound/CLI-Player, WebUI: Browser-Playback) |
@@ -83,6 +83,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── webui_layout.py      # Gradio-Layout-Builder + Ausgabe-Key-Listen
 │   │   ├── webui_format.py      # Reine Formatierer (Statuszeile, Quellen, Markdown)
 │   │   ├── session.py           # SessionContext: Zustand *einer* Browser-Sitzung
+│   │   ├── feedback.py          # 👍/👎-Votes + Schlüssel in die Ablage (#40/#65)
+│   │   ├── webui_events.py      # Verdrahtung der Gradio-Events (#56)
+│   │   ├── history_access.py    # nutzergebundener Zugriff auf die Ablage (#25)
 │   │   ├── conversation_io_terminal.py  # JSON-Im-/Export (Austausch, nicht Ablage)
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
@@ -717,10 +720,11 @@ Beschlüsse). **Wer einen Eintrag ergänzt, schreibt die Begründung dazu und wa
 ihn auflöst** — ein Eintrag ohne Grund ist ein Stummschalter, und
 `test_audit_deps.py` besteht darauf.
 
-Nebenbefund, der die ganze Liste erklärt: **alle 30 getragenen Befunde hängen
-an Gradios eigenen Deckeln.** Gradio 6.22 erlaubt `pillow<13.0` und
-`starlette>=1.0.1` — mit #61a fallen sie sämtlich weg, bis auf
-PYSEC-2026-211, für das es gar keine Fassung gibt.
+Nebenbefund, der die ganze Liste erklärte: **alle 30 getragenen Befunde hingen
+an Gradios eigenen Deckeln** (`pillow<12.0`, `starlette<1.0`). Mit dem Sprung
+auf Gradio 6.22 (#61a) sind sie sämtlich weg — auch PYSEC-2026-211, für das es
+unter 5.x gar keine Fassung gab. **Die Liste ist jetzt leer**, und der Abgleich
+hat das selbst eingefordert: stehengebliebene Einträge sind rot.
 
 #### ⚠️ Zweite Fassung derselben Falle: ein Werkzeug als Laufzeit-Abhängigkeit
 `gradio` führt **`ruff` als eigene Abhängigkeit** und fordert `>=0.9.3`. Der Pin
@@ -846,16 +850,35 @@ Anlass. Wer sie einführen will, misst neu — und schreibt das Ergebnis hierher
 Der frühere `pydantic==2.9.2`-Pin (bool-Schemas ab 2.10 ließen `gradio_client`
 1.3 abstürzen) ist mit #61 **entfallen**.
 
-### ⚠️ `gr.Chatbot` steht bewusst auf `type="tuples"` — und das ist befristet
-Das Paarformat ist seit Gradio 5 deprecated; in **6.x ist der Parameter `type`
-ersatzlos weg**, `messages` ist dort der einzige Weg. Es steht hier trotzdem,
-weil daran der Vote-Index aus #65 hängt: `_store_index_of` zählt Positionen
-unter den Antwort-Bubbles und liest `evt.index` als `[row, col]`. Unter
-`messages` ist der Index **flach** — der bestehende `except`-Zweig fiele dann
-stumm auf „letzte Antwort" zurück, und jeder Vote zeigte auf die falsche
-Nachricht. Ein stiller Fehler im Trainingsdatenkanal für #7 ist teurer als eine
-Deprecation-Warnung, deshalb ist der Wechsel ein eigenes Ticket (#61a) mit
-genau dieser Zuordnung als Abnahmebedingung.
+### ⚠️ Der Chat läuft im `messages`-Format — und was zurückkommt, ist anders
+Seit #61a ist eine Anzeige-Zeile *eine* Nachricht (`{"role", "content"}`); das
+Paarformat ist in Gradio 6 ersatzlos weg. Drei Dinge, die dabei teuer waren:
+
+1. **`content` kommt als Liste zurück, nicht als String.** Wir hängen
+   `{"role": "assistant", "content": "Text"}` an; Gradio reicht die Zeile als
+   `{"role": …, "metadata": None, "content": [{"type": "text", "text": …}]}`
+   zurück. Mit `str()` wird daraus `"[{'text': …}]"`. **Jeder Verbraucher liest
+   den Text durch `webui_format.bubble_text`** — beide Formen stehen im selben
+   Verlauf nebeneinander (frisch angehängte Zeilen sind noch Strings).
+2. **`evt.index` ist flach**, kein `[row, col]`. Ein nicht deutbarer Index wird
+   **verworfen statt geraten**: der frühere Rückfall auf „letzte Antwort" schrieb
+   eine plausibel aussehende, falsch zugeordnete Trainingszeile (#65 → #7).
+3. Die Zählregel selbst ist unverändert: die k-te Antwort-Bubble ist die k-te
+   `assistant`-Nachricht im Verlauf, Hinweis-Bubbles zählen nicht mit.
+
+### ⚠️ Zwei Skripte, zwei Formen — und die Verwechslung ist stumm (#69/#61a)
+Der Theme-Umschalter hat zwei Teile, und Gradio 6 will sie **unterschiedlich**:
+
+| Teil | wohin | Form |
+|---|---|---|
+| Laden (Wahl wiederherstellen) | `demo.launch(js=…)` | **reiner Anweisungsblock** |
+| Klick (umschalten) | `Button.click(js=…)` | Pfeilfunktion `() => {…}` |
+
+`gr.Blocks(js=…)` gibt es nicht mehr — Gradio warnt zwar, aber `demo.js` bleibt
+`None`. Und `launch(js=…)` **ignoriert eine Pfeilfunktion stillschweigend**: im
+Browser gemessen lief der Rumpf null Mal, als nackter Block einmal. Beides
+zusammen hätte den Umschalter still um seine Persistenz gebracht — sichtbar
+erst als „das Theme vergisst sich beim Neuladen".
 
 ### ⚠️ Der Guard-Holdback bestimmt die wahrgenommene Antwortzeit (#51)
 `_StreamModerator` (`core/streaming_provider.py`) hält die letzten

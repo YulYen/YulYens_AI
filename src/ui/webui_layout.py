@@ -62,17 +62,22 @@ def _theme_helpers_js(light_label: str, dark_label: str) -> str:
 
 
 def theme_restore_js(light_label: str, dark_label: str) -> str:
-    """Läuft beim Laden der Seite (`gr.Blocks(js=…)`).
+    """Läuft beim Laden der Seite — seit Gradio 6 über `launch(js=…)`.
+
+    **Bewusst ein reiner Anweisungsblock, keine Pfeilfunktion.** Gradio 5
+    erwartete am Blocks-Konstruktor ein `() => {…}` und rief es auf; Gradio 6
+    führt den String direkt aus und **ignoriert eine Pfeilfunktion
+    stillschweigend** — sie wird ausgewertet, aber nie gerufen. Im Browser
+    gemessen: mit Pfeilfunktion lief der Rumpf null Mal, als nackter Block
+    einmal. Der Umschalter am Knopf (`theme_toggle_js`) braucht weiterhin die
+    Funktionsform, denn dort ist es ein Event-Handler.
 
     Der `setTimeout` ist kein Zieren: Gradio setzt sein eigenes Theme während
-    der Initialisierung (`Je()` liest `?__theme` bzw. `prefers-color-scheme`).
-    Wer davor schreibt, verliert oder flackert.
+    der Initialisierung. Wer davor schreibt, verliert oder flackert.
     """
     return f"""
-        () => {{
-            {_theme_helpers_js(light_label, dark_label)}
-            setTimeout(() => apply(remembered() || current()), 0);
-        }}
+        {_theme_helpers_js(light_label, dark_label)}
+        setTimeout(function () {{ apply(remembered() || current()); }}, 0);
     """
 
 
@@ -300,7 +305,13 @@ def build_ui(
     file_exchange_enabled,
     history_enabled,
 ):
-    with gr.Blocks(js=theme_restore_js(theme_light_label, theme_dark_label)) as demo:
+    # Kein `js=` mehr am Blocks-Konstruktor: Gradio 6 hat die Parameter nach
+    # `launch()` verschoben. Es *warnt* zwar, aber `demo.js` bleibt `None` —
+    # das Lade-Skript des Theme-Umschalters (#69) hörte damit still auf zu
+    # wirken. Gemeldet hat das nur der Verdrahtungstest; im Browser wäre es
+    # als „Theme wird nach dem Neuladen vergessen" aufgefallen, also spät.
+    # Das Skript reicht `WebUI._start_server` an `launch()` weiter.
+    with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
 
         gr.HTML(
@@ -441,8 +452,7 @@ def build_ui(
                                 persona_thumbnail_path_fn(p["name"]),
                                 show_label=False,
                                 container=False,
-                                show_download_button=False,
-                                show_fullscreen_button=False,
+                                buttons=[],
                                 elem_classes="persona-img",
                             )
                             gr.Markdown(
@@ -534,24 +544,19 @@ def build_ui(
                     focus_img = gr.Image(
                         show_label=False,
                         container=False,
-                        show_download_button=False,
-                        show_fullscreen_button=False,
+                        buttons=[],
                     )
                 with gr.Column(scale=3):
                     focus_md = gr.Markdown("")
             gr.Markdown("---")
 
         greeting_md = gr.Markdown("", visible=False)
-        # `type` ausdrücklich, nicht geerbt: Gradio 5 warnt sonst über den
-        # Default. Das Paar-Format ist in 5.x deprecated und fällt erst in
-        # einer späteren Hauptversion weg — der Wechsel auf `messages` ist ein
-        # eigener Umbau, weil daran der Vote-Index aus #65 hängt (die k-te
-        # Antwort-Bubble ist die k-te `assistant`-Nachricht). Solange hier
-        # `tuples` steht, ist das eine getroffene Entscheidung und kein
-        # übersehener Default.
-        chatbot = gr.Chatbot(
-            label="", visible=False, show_copy_button=True, type="tuples"
-        )
+        # `messages` seit #61a: das Paarformat ist in Gradio 5 deprecated und
+        # in 6 ersatzlos weg — den Parameter `type` gibt es dort nicht mehr,
+        # er steht hier also nicht. Der Vote-Index (#65) hängt daran:
+        # `evt.index` ist ein flacher Index, kein `[row, col]`; siehe
+        # `_on_chat_like`. `buttons` ersetzt `show_copy_button` (Gradio 6).
+        chatbot = gr.Chatbot(label="", visible=False, buttons=["copy"])
         # Quellen-Transparenz (#32): zugeklappt direkt unter dem Chat. Zeigt den
         # Text, den das Modell tatsächlich als Kontext bekommen hat — inklusive
         # der Länge, damit ein an wiki.snippet_limit gekürzter Artikel als
@@ -592,7 +597,7 @@ def build_ui(
             autoplay=True,
             interactive=False,
             show_label=False,
-            show_download_button=False,
+            buttons=[],
             elem_classes="tts-audio",
         )
         with gr.Row(elem_classes="chat-input-row"):
@@ -628,7 +633,7 @@ def build_ui(
                 visible=False,
                 scale=2,
                 min_width=200,
-                show_download_button=False,
+                buttons=[],
                 waveform_options=gr.WaveformOptions(show_recording_waveform=False),
                 elem_classes="mic-input",
             )
@@ -711,8 +716,7 @@ def build_ui(
                         persona_thumbnail_path_fn(p["name"]),
                         show_label=False,
                         container=False,
-                        show_download_button=False,
-                        show_fullscreen_button=False,
+                        buttons=[],
                     )
             ask_all_status = gr.Markdown("", visible=False)
             ask_all_question = gr.Textbox(

@@ -20,11 +20,11 @@ from core.streaming_provider import StreamStats
 from rss.feeds import RssCache, RssItem
 from storage import NullStore
 from ui.session import SessionContext
-from ui.web_ui import (
+from ui.web_ui import WebUI
+from ui.webui_layout import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
     STREAM_OUTPUT_KEYS,
-    WebUI,
 )
 from wiki.lookup import WikiLookup, WikiSnippet
 
@@ -48,8 +48,15 @@ def test_webui_start_server_uses_configured_host_and_port():
 
     web_ui._start_server(demo)
 
+    # `js` reist seit Gradio 6 hier mit — ohne Aufbau der Oberflaeche gibt es
+    # noch kein Lade-Skript, deshalb None (#61a).
+    # `show_api` ist in Gradio 6 durch `footer_links` ersetzt, `js` reist
+    # seit dort ebenfalls hier mit — ohne Aufbau der Oberflaeche noch None.
     demo.launch.assert_called_once_with(
-        server_name="0.0.0.0", server_port=9000, show_api=False
+        server_name="0.0.0.0",
+        server_port=9000,
+        footer_links=["gradio", "settings"],
+        js=None,
     )
 
 
@@ -105,7 +112,7 @@ def test_stream_reply_throttles_updates():
 
     assert len(outputs) < len(tokens) / 2
     final_chat = outputs[-1][1]
-    assert final_chat[-1] == (None, full_text)
+    assert final_chat[-1] == {"role": "assistant", "content": full_text}
 
 
 def test_stream_reply_always_flushes_final_state():
@@ -123,7 +130,7 @@ def test_stream_reply_always_flushes_final_state():
         outputs = list(web_ui._stream_reply(session, [], []))
 
     final_chat = outputs[-1][1]
-    assert final_chat[-1] == (None, "Hallo Welt!")
+    assert final_chat[-1] == {"role": "assistant", "content": "Hallo Welt!"}
     assert outputs[-1][2][-1] == {"role": "assistant", "content": "Hallo Welt!"}
 
 
@@ -307,7 +314,7 @@ def test_respond_streaming_returns_chat_and_state_updates():
 
     assert outputs
     assert all(len(item) == len(STREAM_OUTPUT_KEYS) for item in outputs)
-    assert chat_history[-1] == (None, "Hi")
+    assert chat_history[-1] == {"role": "assistant", "content": "Hi"}
     assert history_state == []
 
 
@@ -464,7 +471,10 @@ def test_run_self_talk_stream_yields_alternating_messages():
 
     assert outputs
     final_chat, final_state = outputs[-1]
-    assert final_chat[-2:] == [(None, "Karl: Hallo"), (None, "Yul: Hi")]
+    assert final_chat[-2:] == [
+        {"role": "assistant", "content": "Karl: Hallo"},
+        {"role": "assistant", "content": "Yul: Hi"},
+    ]
     assert final_state[-2:] == [
         {"role": "assistant", "content": "Karl: Hallo"},
         {"role": "assistant", "content": "Yul: Hi"},
@@ -718,9 +728,9 @@ def test_respond_briefing_streams_summary_with_injected_context():
     assert len(guardrails) == 1 and len(injected) == 1
     assert "Titel" in injected[-1]["content"]
     # User-Bubble (Prompt), Hinweis-Bubble mit Stand, gestreamte Antwort
-    assert final_chat[0] == ("briefing_user_prompt", None)
-    assert final_chat[1][1].startswith("rss_hint")
-    assert final_chat[-1] == (None, "Antwort")
+    assert final_chat[0] == {"role": "user", "content": "briefing_user_prompt"}
+    assert final_chat[1]["content"].startswith("rss_hint")
+    assert final_chat[-1] == {"role": "assistant", "content": "Antwort"}
     assert final_state[-2] == {"role": "user", "content": "briefing_user_prompt"}
     assert final_state[-1] == {"role": "assistant", "content": "Antwort"}
     # Copy-Disziplin: das übergebene gr.State-Objekt bleibt unangetastet
@@ -734,7 +744,7 @@ def test_respond_briefing_without_items_shows_empty_note_and_skips_stream():
     outputs = list(web_ui.respond_briefing(session, [], []))
 
     final_chat = outputs[-1][1]
-    assert final_chat[-1] == (None, "briefing_empty")
+    assert final_chat[-1] == {"role": "assistant", "content": "briefing_empty"}
     session.streamer.stream.assert_not_called()
 
 
@@ -875,7 +885,7 @@ def test_reset_updates_hides_read_aloud_button_and_player():
 # --- Feedback votes (#40) ---------------------------------------------------
 
 
-def _fake_like(index=(2, 1), value="Antwort!", liked=True):
+def _fake_like(index=2, value="Antwort!", liked=True):
     return SimpleNamespace(index=index, value=value, liked=liked)
 
 
@@ -884,69 +894,47 @@ def _read_votes(path):
         return [json.loads(line) for line in f]
 
 
-def test_chat_like_appends_upvote_jsonl(tmp_path):
-    """The backwards walk skips UI-only rows (wiki hint) to find the question."""
+def test_chat_like_unpacks_the_gradio_event(tmp_path):
+    """Die **Naht**: `_on_chat_like` packt `evt` aus, mehr nicht (#56).
 
+    Die Regeln selbst stehen in `tests/test_feedback.py` und laufen dort ohne
+    Gradio und ohne WebUI. Hier wird nur geprueft, dass Index, Daumen und
+    Wortlaut aus dem Event richtig ankommen — genau das ist das Stueck, das
+    `FeedbackLog` nicht selbst pruefen kann.
+    """
     web_ui = _create_web_ui()
-    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Hallo?", None), (None, "wiki hint"), (None, "Antwort!")]
-    # Der Wiki-Hinweis steht bewusst nicht in der LLM-History — daran erkennt
-    # der Handler, dass er kein Modelltext ist.
-    llm_history = [
-        {"role": "user", "content": "Hallo?"},
-        {"role": "assistant", "content": "Antwort!"},
-    ]
-    meta = {"persona": "DORIS", "model": "m1", "app": "web"}
-
-    web_ui._on_chat_like(
-        session, history, meta, llm_history, "c-1", _fake_like(index=(2, 1), liked=True)
-    )
-
-    votes = _read_votes(web_ui.feedback_log_path)
-    assert len(votes) == 1
-    vote = votes[0]
-    assert vote["vote"] == "up"
-    assert vote["question"] == "Hallo?"
-    assert vote["answer"] == "Antwort!"
-    assert vote["persona"] == "DORIS"
-    assert vote["model"] == "m1"
-    assert vote["index"] == [2, 1]
-    assert vote["ts"]
-
-
-def test_chat_like_downvote_on_paired_history(tmp_path):
-    """Loaded conversations pair (question, answer) in a single row."""
-
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Frage", "Antwort")]
-    llm_history = [
+    history = [
         {"role": "user", "content": "Frage"},
         {"role": "assistant", "content": "Antwort"},
     ]
 
     web_ui._on_chat_like(
-        session,
+        SessionContext(),
         history,
-        {},
-        llm_history,
+        {"persona": "DORIS", "model": "m1"},
+        list(history),
         "c-1",
-        _fake_like(index=(0, 1), value="Antwort", liked=False),
+        _fake_like(index=1, value="Antwort", liked=False),
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
+    assert vote["index"] == 1
     assert vote["vote"] == "down"
-    assert vote["question"] == "Frage"
     assert vote["answer"] == "Antwort"
+    assert vote["message_index"] == 1
 
 
 def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
+    """Zweite Naht-Aussage: die Persona kommt aus `meta`, sonst aus der Sitzung."""
     web_ui = _create_web_ui()
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Prompt", None), (None, "LEAH: Hi"), (None, "DORIS: Na?")]
+    history = [
+        {"role": "user", "content": "Prompt"},
+        {"role": "assistant", "content": "LEAH: Hi"},
+        {"role": "assistant", "content": "DORIS: Na?"},
+    ]
     llm_history = [
         {"role": "user", "content": "Prompt"},
         {"role": "assistant", "content": "LEAH: Hi"},
@@ -960,144 +948,13 @@ def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
         meta,
         llm_history,
         "c-1",
-        _fake_like(index=(2, 1), value="DORIS: Na?"),
+        _fake_like(index=2, value="DORIS: Na?"),
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
     assert vote["question"] == "Prompt"
     assert vote["persona"] == "self-talk:LEAH,DORIS"
     assert vote["answer"] == "DORIS: Na?"
-
-
-def test_chat_like_two_votes_append_two_lines(tmp_path):
-    """Append-only event log: a revote adds a line, consumers dedup by index."""
-
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Frage", None), (None, "Antwort")]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        session, history, {}, llm_history, "c-1", _fake_like(index=(1, 1), liked=True)
-    )
-    web_ui._on_chat_like(
-        session, history, {}, llm_history, "c-1", _fake_like(index=(1, 1), liked=False)
-    )
-
-    votes = _read_votes(web_ui.feedback_log_path)
-    assert [v["vote"] for v in votes] == ["up", "down"]
-
-
-def test_chat_like_never_raises_on_write_error(tmp_path, caplog):
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path)  # a directory → OSError on open
-
-    with caplog.at_level(logging.ERROR):
-        web_ui._on_chat_like(
-            session,
-            [("F", None), (None, "A")],
-            {},
-            [{"role": "user", "content": "F"}, {"role": "assistant", "content": "A"}],
-            "c-1",
-            _fake_like(index=(1, 1)),
-        )
-
-    assert "Could not write feedback log" in caplog.text
-
-
-def test_chat_like_drops_a_vote_it_cannot_verify(tmp_path):
-    """Kaputter Index und keine LLM-History: lieber keine Zeile als eine falsche.
-
-    Vorher entstand hier eine Vote-Zeile aus ``evt.value`` allein. Für einen
-    Kanal, aus dem später Trainingsdaten werden (#40 → #7), ist der Verlust
-    einer Bewertung billiger als eine erfundene: ohne History lässt sich nicht
-    prüfen, ob der Text überhaupt vom Modell stammt.
-    """
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-
-    web_ui._on_chat_like(
-        session, None, None, None, "", _fake_like(index=None, value="Antwort")
-    )
-
-    assert not (tmp_path / "votes.jsonl").exists()
-
-
-@pytest.mark.parametrize(
-    "beiwerk",
-    [
-        "🕵️‍♀️ LEAH blättert im lokalen Wikipedia-Archiv:\nhttp://…",
-        "🛡️ 1 nachgeschlagene Quelle(n) hat der Sicherheitsfilter verworfen …",
-        "📰 LEAH blättert durch tagesschau …",
-        "Moment, ich sortiere kurz meine Gedanken … (Kontext wird komprimiert)",
-    ],
-)
-def test_chat_like_ignores_votes_on_ui_notices(tmp_path, beiwerk):
-    """Eine Bot-Bubble ist nicht automatisch eine Modellantwort.
-
-    Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und
-    die Kontext-Kompressionswarnung stehen in derselben Spalte wie die Antwort
-    und tragen deshalb auch einen Daumen. Bisher schrieb ein Klick darauf eine
-    Zeile nach feedback_votes.jsonl — also Trainingsdaten (#40, Grundlage für
-    #7) aus UI-Text, der nie vom Modell kam.
-
-    Erkannt wird das daran, dass Beiwerk bewusst nie in die LLM-History geht.
-    """
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Frage", None), (None, beiwerk), (None, "Echte Antwort")]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Echte Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        session,
-        history,
-        {},
-        llm_history,
-        "c-1",
-        _fake_like(index=(1, 1), value=beiwerk),
-    )
-    assert not (tmp_path / "votes.jsonl").exists(), "Beiwerk wurde aufgezeichnet"
-
-    # Gegenprobe: die echte Antwort daneben zählt weiterhin.
-    web_ui._on_chat_like(
-        session,
-        history,
-        {},
-        llm_history,
-        "c-1",
-        _fake_like(index=(2, 1), value="Echte Antwort"),
-    )
-    assert _read_votes(web_ui.feedback_log_path)[0]["answer"] == "Echte Antwort"
-
-
-def test_chat_like_ignores_votes_on_user_messages(tmp_path):
-    """Gradio also shows thumbs on the user row — those votes carry no signal."""
-
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Frage", None), (None, "Antwort")]
-
-    web_ui._on_chat_like(
-        session,
-        history,
-        {},
-        [{"role": "assistant", "content": "Antwort"}],
-        "c-1",
-        _fake_like(index=(0, 0), value="Frage"),
-    )
-
-    assert not (tmp_path / "votes.jsonl").exists()
 
 
 # ---- Stream-Steuerung: Stop + Regenerate (#35) -------------------------------
@@ -1145,7 +1002,7 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
         outputs.extend(generator)
 
     final_chat = outputs[-1][1]
-    reply = final_chat[-1][1]
+    reply = final_chat[-1]["content"]
     assert reply.startswith("Teil ")
     assert "web_stream_stopped_suffix" in reply  # Locale-Key via Test-Stub
     assert stream.closed, "der Token-Stream muss beim Stop geschlossen werden"
@@ -1171,7 +1028,7 @@ def test_stop_clears_the_switch_so_the_next_stream_runs():
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
         outputs = list(web_ui._stream_reply(session, [], []))
 
-    assert outputs[-1][1][-1] == (None, "Hallo Welt")
+    assert outputs[-1][1][-1] == {"role": "assistant", "content": "Hallo Welt"}
     assert session.stream_stop is None
 
 
@@ -1211,8 +1068,15 @@ def test_stream_controls_flip_buttons_on_the_first_yield():
     web_ui = _create_web_ui()
 
     def _fake_stream():
-        yield ("", [("Frage", None)], [])
-        yield (None, [("Frage", None), (None, "Teil")], [])
+        yield ("", [{"role": "user", "content": "Frage"}], [])
+        yield (
+            None,
+            [
+                {"role": "user", "content": "Frage"},
+                {"role": "assistant", "content": "Teil"},
+            ],
+            [],
+        )
 
     outputs = list(web_ui._with_stream_controls(_fake_stream()))
 
@@ -1232,11 +1096,21 @@ def test_stream_controls_repeat_real_values_in_the_final_yield():
     final_state = [{"role": "assistant", "content": "fertig"}]
 
     def _fake_stream():
-        yield (None, [("Frage", None), (None, "fertig")], final_state)
+        yield (
+            None,
+            [
+                {"role": "user", "content": "Frage"},
+                {"role": "assistant", "content": "fertig"},
+            ],
+            final_state,
+        )
 
     outputs = list(web_ui._with_stream_controls(_fake_stream()))
 
-    assert outputs[-1][1] == [("Frage", None), (None, "fertig")]
+    assert outputs[-1][1] == [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "fertig"},
+    ]
     assert outputs[-1][2] is final_state
 
 
@@ -1262,7 +1136,10 @@ def test_regenerate_drops_last_answer_and_streams_again():
     streamer.stream.side_effect = _stream
     session.streamer = streamer
 
-    chat_history = [("Frage", None), (None, "Alte Antwort")]
+    chat_history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Alte Antwort"},
+    ]
     history_state = [
         {"role": "user", "content": "Frage"},
         {"role": "assistant", "content": "Alte Antwort"},
@@ -1272,8 +1149,8 @@ def test_regenerate_drops_last_answer_and_streams_again():
         outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
-    assert final_chat[-1] == (None, "Neue Antwort")
-    assert "Alte Antwort" not in [row[1] for row in final_chat]
+    assert final_chat[-1] == {"role": "assistant", "content": "Neue Antwort"}
+    assert "Alte Antwort" not in [row["content"] for row in final_chat]
     # Die Frage bleibt im LLM-Kontext, nur die Antwort wurde ersetzt.
     assert final_state[0] == {"role": "user", "content": "Frage"}
     assert final_state[-1] == {"role": "assistant", "content": "Neue Antwort"}
@@ -1292,7 +1169,11 @@ def test_regenerate_keeps_wiki_hint_rows():
     streamer.stream.return_value = iter(["Neu"])
     session.streamer = streamer
 
-    chat_history = [("Frage", None), (None, "🕵️ Hinweis"), (None, "Alte Antwort")]
+    chat_history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "🕵️ Hinweis"},
+        {"role": "assistant", "content": "Alte Antwort"},
+    ]
     history_state = [
         {"role": "user", "content": "Frage"},
         {"role": "assistant", "content": "Alte Antwort"},
@@ -1301,7 +1182,7 @@ def test_regenerate_keeps_wiki_hint_rows():
     with patch("ui.web_ui.time.monotonic", return_value=1000.0):
         outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
 
-    rows = [row[1] for row in outputs[-1][1]]
+    rows = [row.get("content") for row in outputs[-1][1]]
     assert "🕵️ Hinweis" in rows
     assert "Alte Antwort" not in rows
 
@@ -1312,7 +1193,7 @@ def test_regenerate_without_an_answer_warns_and_changes_nothing():
     session.bot = "Karl"
     session.streamer = Mock()
 
-    chat_history = [("Frage", None)]
+    chat_history = [{"role": "user", "content": "Frage"}]
     history_state = [{"role": "user", "content": "Frage"}]
 
     with patch("ui.web_ui.gr.Warning") as warning:
@@ -1464,7 +1345,7 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
     first_token_yield = next(
         i
         for i, (_, _, chat) in enumerate(snapshots)
-        if chat and chat[-1] == (None, "Hi")
+        if chat and chat[-1] == {"role": "assistant", "content": "Hi"}
     )
     assert first_source_yield < first_token_yield
 
@@ -1677,40 +1558,6 @@ def test_persona_selection_stamps_the_user_into_meta():
 
     meta = updates[PERSONA_OUTPUT_KEYS.index("meta_state")]
     assert meta["user"] == "yulyen"
-
-
-def test_vote_records_the_user(tmp_path):
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-
-    web_ui._on_chat_like(
-        session,
-        [("Frage", "Antwort")],
-        {"persona": "DORIS", "user": "yulyen"},
-        [{"role": "assistant", "content": "Antwort"}],
-        "c-1",
-        _fake_like(index=(0, 1), value="Antwort", liked=True),
-    )
-
-    assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "yulyen"
-
-
-def test_vote_without_meta_user_falls_back_instead_of_writing_nothing(tmp_path):
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-
-    web_ui._on_chat_like(
-        session,
-        [("Frage", "Antwort")],
-        {},
-        [{"role": "assistant", "content": "Antwort"}],
-        "c-1",
-        _fake_like(index=(0, 1), value="Antwort"),
-    )
-
-    assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "local"
 
 
 def test_page_load_reads_the_identity_from_the_request():
@@ -2334,7 +2181,7 @@ def test_history_limit_comes_from_the_config(tmp_path):
     for i in range(4):
         _fill(store, question=f"Frage {i}")
 
-    assert len(web_ui._history_choices("local")) == 2
+    assert len(web_ui._history.choices("local")) == 2
 
 
 def test_history_limit_falls_back_on_nonsense(tmp_path):
@@ -2342,7 +2189,7 @@ def test_history_limit_falls_back_on_nonsense(tmp_path):
     web_ui.cfg.storage = {"history_limit": "viele"}
     _fill(store)
 
-    assert len(web_ui._history_choices("local")) == 1
+    assert len(web_ui._history.choices("local")) == 1
 
 
 # ---- Der Upload-Weg ist derselbe Weg (Review-Nachtrag) ----------------------
@@ -2543,139 +2390,29 @@ def test_ask_all_shows_a_partial_answer_before_the_persona_is_done():
 # --- Vote-Kanal an der Ablage (#65) -----------------------------------------
 
 
-def test_a_vote_carries_the_join_key(tmp_path):
-    """Ohne Gesprächs-ID ist eine Vote-Zeile ein loses Textpaar (#65).
-
-    Für #7 zählt der Join: welche Persona, welches Modell, welcher Zeitraum,
-    welcher Gesprächsverlauf davor. All das steht in der Ablage — man muss die
-    Zeile nur hinzeigen lassen können.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Frage", None), (None, "Antwort")]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "conv-42", _fake_like(index=(1, 1))
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["conversation_id"] == "conv-42"
-    assert vote["message_index"] == 1
-
-
-def test_the_index_counts_positions_not_texts(tmp_path):
-    """Zweimal dieselbe Antwort im selben Gespräch — der Klassiker.
-
-    Ein Textvergleich hätte still auf die erste gezeigt und den Vote der
-    falschen Stelle zugeordnet. Gezählt wird deshalb die Position unter den
-    Antwort-Bubbles.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [("Erste?", None), (None, "Ja."), ("Zweite?", None), (None, "Ja.")]
-    llm_history = [
-        {"role": "user", "content": "Erste?"},
-        {"role": "assistant", "content": "Ja."},
-        {"role": "user", "content": "Zweite?"},
-        {"role": "assistant", "content": "Ja."},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c", _fake_like(index=(3, 1))
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["message_index"] == 3  # die zweite Antwort, nicht die erste
-    assert vote["question"] == "Zweite?"
-
-
-def test_notices_between_answers_do_not_shift_the_index(tmp_path):
-    """Genau deshalb taugt der Anzeige-Index nicht als Referenz.
-
-    In der Anzeige steht der Wiki-Hinweis zwischen den Antworten, in der
-    Ablage nicht — `index: [3, 1]` zeigt dort auf etwas anderes.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        ("Frage", None),
-        (None, "🕵️ LEAH blättert im Archiv …"),
-        (None, "Erste Antwort"),
-        ("Noch was", None),
-        (None, "Zweite Antwort"),
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Erste Antwort"},
-        {"role": "user", "content": "Noch was"},
-        {"role": "assistant", "content": "Zweite Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c", _fake_like(index=(4, 1))
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["message_index"] == 3
-    assert vote["index"] == [4, 1]  # die UI-Koordinate bleibt zur Diagnose stehen
-
-
-def test_the_store_has_the_last_word_on_the_wording(tmp_path):
-    """Aufgezeichnet wird der Wortlaut der Ablage, nicht der der Anzeige.
-
-    Die Anzeige ist eine Darstellung; joinen wird später jemand gegen die
-    Ablage. Gehen die beiden auseinander, gewinnt die Ablage — sonst zeigt der
-    Vote auf eine Zeile, die anders lautet als er selbst.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    ref = SimpleNamespace(id="c-9")
-    store = SimpleNamespace(
-        load=lambda cid, **kw: (
-            ref,
-            [
-                {"role": "user", "content": "Frage"},
-                {"role": "assistant", "content": "Wortlaut aus der Ablage"},
-            ],
-        )
-    )
-    web_ui.factory.get_store = lambda: store
-    history = [("Frage", None), (None, "Wortlaut der Anzeige")]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Wortlaut der Anzeige"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c-9", _fake_like(index=(1, 1))
-    )
-
-    assert _read_votes(web_ui.feedback_log_path)[0]["answer"] == (
-        "Wortlaut aus der Ablage"
-    )
-
-
 def test_a_vote_still_works_without_a_store(tmp_path):
-    """Ohne Anmeldung zeichnet die WebUI nichts auf (#72) — der Vote bleibt.
+    """Dritte Naht-Aussage: `WebUI._store_text` ueber einem `NullStore`.
 
-    Eine verlorene Bewertung wäre der teurere Verlust: dann fehlt der einzige
-    Kanal, über den ein Mensch dem Modell etwas sagt.
+    Ohne Anmeldung zeichnet die WebUI nichts auf (#72) — der Vote bleibt
+    trotzdem. Eine verlorene Bewertung waere der teurere Verlust: dann fehlt
+    der einzige Kanal, ueber den ein Mensch dem Modell etwas sagt. Dass
+    `FeedbackLog` mit einem *werfenden* Loader zurechtkommt, steht in
+    `test_feedback.py`; hier geht es um den Weg dorthin.
     """
     web_ui = _create_web_ui()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     web_ui.factory.get_store = lambda: NullStore()
-    history = [("Frage", None), (None, "Antwort")]
+    history = [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
     llm_history = [
         {"role": "user", "content": "Frage"},
         {"role": "assistant", "content": "Antwort"},
     ]
 
     web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "", _fake_like(index=(1, 1))
+        SessionContext(), history, {}, llm_history, "", _fake_like(index=1)
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
@@ -2761,7 +2498,11 @@ def test_the_hint_names_the_feeds_and_the_cache_age():
     with patch("ui.web_ui.context_near_limit", return_value=False):
         outputs = list(web_ui.respond_streaming(session, "Neuigkeiten?", [], []))
 
-    hints = [bot for _user, bot in outputs[-1][1] if bot and "rss_hint" in str(bot)]
+    hints = [
+        row.get("content")
+        for row in outputs[-1][1]
+        if "rss_hint" in str(row.get("content"))
+    ]
     assert hints, outputs[-1][1]
 
 
@@ -2773,7 +2514,10 @@ def test_an_empty_cache_injects_nothing():
         outputs = list(web_ui.respond_streaming(session, "Was gibt's Neues?", [], []))
 
     assert [m for m in outputs[-1][2] if m["role"] == "system"] == []
-    assert outputs[-1][1][-1] == (None, "Antwort"), "die Antwort kommt trotzdem"
+    assert outputs[-1][1][-1] == {
+        "role": "assistant",
+        "content": "Antwort",
+    }, "die Antwort kommt trotzdem"
 
 
 def test_the_source_stays_active_when_only_the_button_is_off():

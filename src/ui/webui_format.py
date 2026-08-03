@@ -20,35 +20,78 @@ if TYPE_CHECKING:
     from core.streaming_provider import StreamStats
     from storage import ConversationRef
 
-# Ein Chatbot-Eintrag: (User-Text, Bot-Text) — beide Seiten dürfen None sein.
-ChatPair = tuple[str | None, str | None]
+# Ein Chatbot-Eintrag im `messages`-Format: {"role": …, "content": …}.
+#
+# Bis #61a waren das Paare `(User-Text, Bot-Text)`. Gradio 6 hat den Parameter
+# `type` ersatzlos entfernt — das Paarformat existiert dort nicht mehr. Der
+# Wechsel ist deshalb erzwungen, aber er ist auch der ehrlichere Entwurf: eine
+# Anzeige-Zeile ist *eine* Nachricht, und das Paar konnte Zustände tragen, die
+# es nie gab (beide Seiten gefüllt in einer Zeile, die live nie so entsteht).
+ChatMessage = dict[str, str]
 Message = dict[str, str]
 
+# Übergangsname. Wer ihn noch importiert, bekommt jetzt das neue Format —
+# das ist Absicht: eine stille Weiterverwendung der Paare wäre schlimmer.
+ChatPair = ChatMessage
 
-def messages_to_chat_history(messages: list[Message] | None) -> list[ChatPair]:
-    """LLM-Verlauf in die Paar-Form der Chatbot-Komponente bringen."""
-    chat_history: list[ChatPair] = []
-    pending_user = None
 
-    for item in messages or []:
-        role = item.get("role")
-        content = item.get("content")
+def bubble_text(message: Any) -> str:
+    """Der Text einer Anzeige-Zeile — egal in welcher Form sie ankommt.
 
-        if role == "user":
-            if pending_user is not None:
-                chat_history.append((pending_user, None))
-            pending_user = content
-        elif role == "assistant":
-            if pending_user is not None:
-                chat_history.append((pending_user, content))
-                pending_user = None
-            else:
-                chat_history.append((None, content))
+    **Was wir hineingeben, ist nicht, was zurückkommt.** Wir bauen
+    ``{"role": …, "content": "Text"}``; Gradio 6 reicht die Zeile aber
+    aufbereitet zurück::
 
-    if pending_user is not None:
-        chat_history.append((pending_user, None))
+        {"role": "assistant", "metadata": None,
+         "content": [{"type": "text", "text": "ECHO: …"}]}
 
-    return chat_history
+    ``content`` ist dort also eine **Liste von Teilen**, keine Zeichenkette.
+    Wer sie mit ``str()`` nimmt, bekommt ``"[{'text': …}]"`` — und genau daran
+    scheiterte der Vote-Abgleich (#65) stumm: der Text fand sich nie im
+    LLM-Verlauf wieder, jede Bewertung fiel lautlos unter den Tisch.
+
+    Deshalb liest **jeder** Verbraucher den Text durch diese Funktion. Eine
+    Liste ist ein Verlauf aus dem Frontend, ein String einer, den wir selbst
+    gerade angehängt haben — beide Formen stehen im selben Verlauf
+    nebeneinander.
+    """
+    if not isinstance(message, dict):
+        return ""
+    content = message.get("content")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(part.get("text") or "")
+            for part in content
+            if isinstance(part, dict) and part.get("text")
+        )
+    return "" if content is None else str(content)
+
+
+def bot_bubble(text: str) -> ChatMessage:
+    """Eine Bot-Bubble. Auch für Hinweise, die nie ins Kontextfenster gehen."""
+    return {"role": "assistant", "content": text}
+
+
+def user_bubble(text: str) -> ChatMessage:
+    return {"role": "user", "content": text}
+
+
+def messages_to_chat_history(messages: list[Message] | None) -> list[ChatMessage]:
+    """LLM-Verlauf in die Anzeigeform bringen.
+
+    Seit #61a ist das fast eine Identität — Anzeige und Verlauf haben dieselbe
+    Form. Der Unterschied bleibt inhaltlich: die Anzeige trägt zusätzlich
+    Hinweis-Bubbles, die nie in den LLM-Verlauf gehen, und der Verlauf kann
+    injizierten Fremdkontext tragen, der nie angezeigt wird. Deshalb wird hier
+    weiterhin gefiltert statt durchgereicht.
+    """
+    return [
+        {"role": str(item.get("role")), "content": str(item.get("content") or "")}
+        for item in messages or []
+        if item.get("role") in ("user", "assistant")
+    ]
 
 
 def context_bar(ratio: float, width: int = 12) -> str:
@@ -151,19 +194,18 @@ def conversation_markdown(ref: ConversationRef, messages: list[Message], t: Any)
     return "\n".join(lines)
 
 
-def find_question_for_row(chat_history: list[ChatPair] | None, row: int) -> str:
+def find_question_for_row(chat_history: list[ChatMessage] | None, row: int) -> str:
     """Die Frage, zu der die bewertete Antwort gehört (#40).
 
-    Live chat appends (question, None) and (None, answer) as separate rows
-    (with optional (None, wiki_hint) rows in between), while loaded
-    conversations pair (question, answer) — walking backwards from the liked
-    row to the nearest user text covers both layouts.
+    Rückwärts ab der bewerteten Zeile zur nächsten Nutzer-Nachricht: zwischen
+    Frage und Antwort können Hinweis-Bubbles stehen (Wiki, RSS, Kompression),
+    und ein geladenes Gespräch fängt nicht zwingend mit einer Frage an.
     """
     if not chat_history:
         return ""
     row = min(row, len(chat_history) - 1)
-    for r in range(row, -1, -1):
-        pair = chat_history[r]
-        if pair and pair[0] is not None:
-            return str(pair[0])
+    for index in range(row, -1, -1):
+        message = chat_history[index]
+        if isinstance(message, dict) and message.get("role") == "user":
+            return bubble_text(message)
     return ""

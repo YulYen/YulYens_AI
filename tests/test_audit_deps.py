@@ -102,10 +102,16 @@ def test_the_output_names_what_to_do_about_a_new_finding():
 # ---- Die ausgelieferte Liste ---------------------------------------------
 
 
-def test_the_shipped_allowlist_is_readable_and_gives_every_entry_a_reason():
-    """Ein Eintrag ohne Begründung ist ein Stummschalter, kein Beschluss."""
+def test_the_shipped_allowlist_gives_every_entry_a_reason():
+    """Ein Eintrag ohne Begründung ist ein Stummschalter, kein Beschluss.
+
+    Eine **leere** Liste ist ausdrücklich in Ordnung — sie ist der
+    Zielzustand, und seit #61a (Gradio 6) ist er erreicht. Der frühere
+    `assert reasons` verlangte das Gegenteil und hätte genau den Tag rot
+    gemacht, an dem die letzte Altlast wegfällt: eine Momentaufnahme als
+    Prinzip verkleidet.
+    """
     reasons = load_allowlist(DEFAULT_ALLOWLIST)
-    assert reasons, "die ausgelieferte Liste ist leer"
     for vuln_id, reason in reasons.items():
         assert len(reason) > 40, f"{vuln_id} hat keine brauchbare Begründung"
         assert reason.startswith("["), f"{vuln_id} nennt kein Paket"

@@ -130,15 +130,31 @@ def test_context_bar_fills_proportionally():
 # ---- Chatverlauf und Gesprächs-Markdown -------------------------------------
 
 
-def test_messages_to_chat_history_pairs_question_and_answer():
-    pairs = messages_to_chat_history(
+def test_messages_to_chat_history_keeps_question_and_answer_as_two_rows():
+    """Seit #61a ist eine Anzeige-Zeile *eine* Nachricht (messages-Format)."""
+    rows = messages_to_chat_history(
         [
             {"role": "user", "content": "Frage"},
             {"role": "assistant", "content": "Antwort"},
         ]
     )
 
-    assert pairs == [("Frage", "Antwort")]
+    assert rows == [
+        {"role": "user", "content": "Frage"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
+
+
+def test_messages_to_chat_history_drops_injected_system_context():
+    """Fremdtext gehoert zum Prompt, nicht ins Gespraech (#60)."""
+    rows = messages_to_chat_history(
+        [
+            {"role": "system", "content": "[FREMDTEXT] …"},
+            {"role": "user", "content": "Frage"},
+        ]
+    )
+
+    assert rows == [{"role": "user", "content": "Frage"}]
 
 
 def test_messages_to_chat_history_keeps_an_unanswered_question():
@@ -149,13 +165,16 @@ def test_messages_to_chat_history_keeps_an_unanswered_question():
         ]
     )
 
-    assert pairs == [("Erste", None), ("Zweite", None)]
+    assert pairs == [
+        {"role": "user", "content": "Erste"},
+        {"role": "user", "content": "Zweite"},
+    ]
 
 
 def test_messages_to_chat_history_keeps_a_lone_answer():
     """Wiki-Hinweise sind Bot-Zeilen ohne Frage — sie dürfen nicht verschwinden."""
     assert messages_to_chat_history([{"role": "assistant", "content": "Hinweis"}]) == [
-        (None, "Hinweis")
+        {"role": "assistant", "content": "Hinweis"}
     ]
 
 
@@ -215,19 +234,28 @@ def test_format_ask_all_results_makes_one_section_per_persona():
 
 
 def test_find_question_walks_back_to_the_nearest_user_row():
-    history = [("Frage?", None), (None, "🕵️ Hinweis"), (None, "Antwort")]
+    history = [
+        {"role": "user", "content": "Frage?"},
+        {"role": "assistant", "content": "🕵️ Hinweis"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
 
     assert find_question_for_row(history, 2) == "Frage?"
 
 
-def test_find_question_handles_the_paired_layout_of_loaded_conversations():
-    assert find_question_for_row([("Frage?", "Antwort")], 0) == "Frage?"
+def test_find_question_walks_back_over_an_answer_row():
+    """Ein geladenes Gespraech steht als Folge einzelner Nachrichten da."""
+    history = [
+        {"role": "user", "content": "Frage?"},
+        {"role": "assistant", "content": "Antwort"},
+    ]
+    assert find_question_for_row(history, 1) == "Frage?"
 
 
 def test_find_question_returns_empty_on_garbage():
     assert find_question_for_row([], 0) == ""
     assert find_question_for_row(None, 3) == ""
-    assert find_question_for_row([(None, "nur Bot")], 5) == ""
+    assert find_question_for_row([{"role": "assistant", "content": "nur Bot"}], 5) == ""
 
 
 def test_status_line_ignores_a_streamer_without_real_stats():
@@ -238,3 +266,54 @@ def test_status_line_ignores_a_streamer_without_real_stats():
     session = SessionContext(streamer=SimpleNamespace(last_stream_stats="kaputt"))
 
     assert WebUI._last_stream_stats(session) is None
+
+
+# ---- Die Form, in der das Frontend zurueckliefert (#61a) -------------------
+
+
+def test_bubble_text_reads_the_shape_gradio_sends_back():
+    """Was wir hineingeben, ist nicht, was zurueckkommt.
+
+    Gradio 6 reicht eine Anzeige-Zeile aufbereitet zurueck: `content` ist dort
+    eine **Liste von Teilen**, keine Zeichenkette. Mit `str()` daraus wurde
+    `"[{'text': …}]"` — und der Vote-Abgleich (#65) fand den Text nie im
+    LLM-Verlauf wieder. Jede Bewertung fiel lautlos unter den Tisch.
+    """
+    from ui.webui_format import bubble_text
+
+    from_frontend = {
+        "role": "assistant",
+        "metadata": None,
+        "content": [{"type": "text", "text": "ECHO: Bewerte mich"}],
+    }
+    assert bubble_text(from_frontend) == "ECHO: Bewerte mich"
+
+
+def test_bubble_text_still_reads_a_plain_string():
+    """Beide Formen stehen im selben Verlauf nebeneinander.
+
+    Zeilen, die wir gerade selbst angehaengt haben, sind noch Strings; erst
+    die Runde ueber das Frontend macht Listen daraus.
+    """
+    from ui.webui_format import bot_bubble, bubble_text
+
+    assert bubble_text(bot_bubble("Antwort")) == "Antwort"
+
+
+def test_bubble_text_survives_junk_instead_of_guessing():
+    from ui.webui_format import bubble_text
+
+    assert bubble_text(None) == ""
+    assert bubble_text({"role": "assistant"}) == ""
+    assert bubble_text({"role": "assistant", "content": []}) == ""
+    # Teile ohne Text (z. B. ein Bild) tragen nichts zum Wortlaut bei.
+    assert bubble_text({"content": [{"type": "image", "path": "/x.png"}]}) == ""
+
+
+def test_find_question_reads_the_frontend_shape_too():
+    """Sonst stuende in der Vote-Zeile eine Frage wie `[{'text': …}]`."""
+    history = [
+        {"role": "user", "content": [{"type": "text", "text": "Frage?"}]},
+        {"role": "assistant", "content": [{"type": "text", "text": "Antwort"}]},
+    ]
+    assert find_question_for_row(history, 1) == "Frage?"
