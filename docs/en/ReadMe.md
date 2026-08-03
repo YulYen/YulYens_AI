@@ -296,11 +296,25 @@ the question correctly and cites his source:
 
 Fast local run (dummy backend, without slow tests):
 ```bash
-pytest -q -m "not slow and not ollama"    # same as: make test
+pytest -q -m "not slow and not ollama and not browser"    # same as: make test
 ```
 
 More variants (see `Makefile`): `make test-all` (full suite),
-`make coverage` (with coverage report), `make lint` / `make format` (Ruff/Black).
+`make coverage` (with coverage report), `make lint` / `make format` (Ruff/Black),
+`make audit` (check the dependencies' known vulnerabilities against
+`audit_allowlist.yaml` — needs network access).
+
+**The browser smoke test sits beside these, not among them:**
+```bash
+make test-browser
+```
+It drives the *running* web UI with the dummy backend in a real Chromium and
+checks what stays invisible in-process — whether tokens arrive, whether "Send"
+turns into "Stop" mid-stream, whether the theme toggle reloads the page,
+whether a file actually reaches the browser. That needs Playwright **and** a
+browser build (`pip install playwright && playwright install chromium`), which
+is exactly why it is excluded from `make test` and from CI. Without Playwright
+it skips cleanly.
 
 ---
 

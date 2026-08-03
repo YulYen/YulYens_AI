@@ -36,13 +36,16 @@ Alternativ / shortcut: `make setup` führt die Schritte 2–4 aus.
 ## Tests
 - Schneller lokaler Durchlauf (wie `make test`):
   ```bash
-  pytest -q -m "not slow and not ollama"
+  pytest -q -m "not slow and not ollama and not browser"
   ```
 - Vollständige Suite (Run the full test suite with):
   ```bash
-  pytest -q
+  pytest -q -m "not browser"
   ```
 - Tests mit Marker `ollama` laufen nur, wenn lokal ein Ollama-Server erreichbar ist.
+- Marker `browser` fährt die laufende WebUI im echten Chromium (`make test-browser`).
+  Er ist aus allen anderen Zielen und aus der CI ausgenommen, weil er Playwright
+  **und** einen Browser-Build braucht; ohne Playwright wird sauber übersprungen.
 
 ## PR Flow
 - Submit small, focused pull requests.

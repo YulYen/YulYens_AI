@@ -1,5 +1,16 @@
 # Framework-Update (Patch-Level) — Juni 2026
 
+> **Historischer Bericht, Stand Juni 2026 — die Pins darin gelten nicht mehr.**
+> Der Abschnitt „Was bewusst NICHT geändert wurde" ist inzwischen überholt:
+> Gradio steht auf **6.22** (#61/#61a), der `pydantic==2.9.2`-Pin ist ersatzlos
+> entfallen, `starlette` auf 1.x, und `ruff` musste auf **0.16.1**, weil Gradio
+> ruff als eigene Laufzeit-Abhängigkeit führt und `>=0.9.3` fordert — der alte
+> Pin war damit unerfüllbar.
+>
+> Der Text bleibt trotzdem, wie er war: er hält fest, was damals mit welcher
+> Begründung entschieden wurde, und genau das ist sein Wert. Wer den **aktuellen**
+> Stand sucht, findet ihn in `requirements.txt` und in CLAUDE.md.
+
 Konservatives **Patch-Level-Update** der Backend-Frameworks. Nur die dritte
 Versionsstelle (X.Y.**Z**) wurde erhöht, Minor und Major bleiben fix — keine
 Breaking Changes zu erwarten. Gradio/UI wurde **bewusst nicht angefasst**.

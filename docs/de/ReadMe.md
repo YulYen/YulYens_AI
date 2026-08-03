@@ -306,11 +306,25 @@ trotzdem korrekt und nennt seine Quelle:
 
 Schneller lokaler Durchlauf (Dummy-Backend, ohne langsame Tests):
 ```bash
-pytest -q -m "not slow and not ollama"    # entspricht: make test
+pytest -q -m "not slow and not ollama and not browser"    # entspricht: make test
 ```
 
 Weitere Varianten (siehe `Makefile`): `make test-all` (komplette Suite),
-`make coverage` (mit Coverage-Report), `make lint` / `make format` (Ruff/Black).
+`make coverage` (mit Coverage-Report), `make lint` / `make format` (Ruff/Black),
+`make audit` (bekannte Schwachstellen der Abhängigkeiten gegen
+`audit_allowlist.yaml` halten — braucht Netz).
+
+**Der Browser-Rauchtest steht bewusst daneben**, nicht dabei:
+```bash
+make test-browser
+```
+Er fährt die *laufende* WebUI mit Dummy-Backend im echten Chromium und prüft,
+was in-process unsichtbar bleibt — ob Tokens ankommen, ob „Senden" während des
+Streams zu „Stop" wird, ob der Theme-Umschalter die Seite neu lädt, ob eine
+Datei beim Browser ankommt. Dafür braucht er Playwright **und** einen
+Browser-Build (`pip install playwright && playwright install chromium`), und
+genau deshalb ist er aus `make test` und aus der CI ausgenommen. Fehlt
+Playwright, wird sauber übersprungen.
 
 ---
 
