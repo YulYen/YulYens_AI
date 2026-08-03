@@ -18,6 +18,42 @@ git checkout -b claude/<thema> origin/main
 Ist ein PR bereits gemergt, wird er nicht weiterbenutzt — neue Arbeit heißt
 neuer Branch von `main`.
 
+## Doku gehört zur Änderung, nicht danach
+
+**Vor dem Commit wird geprüft, was die Änderung an Doku veraltet — nicht auf
+Nachfrage.** Der Anlass steht als Test da: `make test` bekam ein `not browser`
+dazu, die Doku behielt ihr altes Kommando samt der Zeile „entspricht: make
+test". Wer sie kopierte, zog sich Playwright-Tests herein. Aufgefallen ist das
+erst, als jemand nachfragte.
+
+Die Durchsicht dauert eine Minute und geht immer gleich:
+
+| Was geändert wurde | Wo es nachgezogen werden muss |
+|---|---|
+| Makefile-Ziel, Testkommando, Marker | `docs/{de,en}/ReadMe.md`, `CONTRIBUTING.md` |
+| Config-Schalter | beide ReadMes (Schalterliste) + `config.yaml`-Kommentar |
+| Nutzerseitiges Verhalten | `docs/{de,en}/Features.md` |
+| Entwurfsentscheidung, Stolperfalle | diese Datei |
+| Ticketstand | `backlog.md` |
+| Abhängigkeits-Pin | `requirements*.txt`-Kommentar; bei Bedarf `.pre-commit-config.yaml` |
+
+**`tests/test_docs_consistency.py` nimmt davon den mechanischen Teil ab:** jedes
+`pytest`-Kommando in der lebenden Doku muss eines sein, das der Makefile auch
+benutzt, und jedes Makefile-Ziel steht in der Doku oder mit Begründung auf der
+Ausnahmeliste. Beides schlägt in beide Richtungen an, wie `known_gap` im
+Guard-Korpus.
+
+**Was der Test nicht kann, ist der größere Teil.** Ob ein Absatz noch stimmt,
+sagt kein `assert` — nur, ob ein Kommando noch existiert. Die englische Fassung
+ist außerdem eine Übersetzung: ändert sich die deutsche, ändert sich beide.
+
+**Datierte Berichte werden nicht nachgezogen.** `docs/framework_update_juni_2026.md`
+und `docs/modellwechsel_juni_2026.md` halten fest, was *damals* mit welcher
+Begründung entschieden wurde; ihren Inhalt anzupassen fälscht die Aufzeichnung.
+Wenn ihre Aussagen überholt sind, kommt ein datierter Hinweis davor — so
+geschehen, als Gradio 6 den dortigen `gradio==4.44.1`-Beschluss aufhob. Der Test
+lässt diese Dateien deshalb ausdrücklich aus (`LIVING_DOCS`).
+
 ### Ausnahme: eine einzelne Textdatei darf direkt auf `main`
 
 Eine übersichtliche Änderung an **genau einer** Textdatei — ein Backlog-Ticket,

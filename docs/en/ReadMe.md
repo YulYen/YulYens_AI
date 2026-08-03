@@ -299,10 +299,13 @@ Fast local run (dummy backend, without slow tests):
 pytest -q -m "not slow and not ollama and not browser"    # same as: make test
 ```
 
-More variants (see `Makefile`): `make test-all` (full suite),
-`make coverage` (with coverage report), `make lint` / `make format` (Ruff/Black),
+More variants (see `Makefile`): `make test-all` (full suite), `make test-ci`
+(same scope as CI, with coverage), `make coverage`, `make lint` / `make format`
+(Ruff/Black), `make types` (mypy over `src/core`, `src/storage`, `src/auth`),
 `make audit` (check the dependencies' known vulnerabilities against
-`audit_allowlist.yaml` — needs network access).
+`audit_allowlist.yaml` — needs network access) and `make evals` /
+`make evals-full` (eval suite, see `evals/ReadMe.md`; only the full variant
+needs a model).
 
 **The browser smoke test sits beside these, not among them:**
 ```bash

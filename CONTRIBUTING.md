@@ -28,6 +28,8 @@ Alternativ / shortcut: `make setup` führt die Schritte 2–4 aus.
 
 ## Code Style
 - Use **Black** and **Ruff** for formatting and linting (`make format` / `make lint`).
+- Typprüfung mit mypy: `make types` (blockierend über `src/core`, `src/storage`,
+  `src/auth`; Konfiguration in `pyproject.toml`).
 - Maximum line length: **88 characters**.
 - **Wichtig:** Black/Ruff sind in `requirements-dev.txt` gepinnt (identisch zu
   `.pre-commit-config.yaml`). Eine abweichende lokale Black-Version formatiert
@@ -43,6 +45,9 @@ Alternativ / shortcut: `make setup` führt die Schritte 2–4 aus.
   pytest -q -m "not browser"
   ```
 - Tests mit Marker `ollama` laufen nur, wenn lokal ein Ollama-Server erreichbar ist.
+- Umfang wie in der CI, mit Coverage: `make test-ci`.
+- Eval-Suite: `make evals` (Guard-Teil, braucht kein Modell) bzw. `make evals-full`
+  (voll, braucht Ollama) — Details in `evals/ReadMe.md`.
 - Marker `browser` fährt die laufende WebUI im echten Chromium (`make test-browser`).
   Er ist aus allen anderen Zielen und aus der CI ausgenommen, weil er Playwright
   **und** einen Browser-Build braucht; ohne Playwright wird sauber übersprungen.
