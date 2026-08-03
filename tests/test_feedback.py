@@ -215,3 +215,115 @@ def test_the_user_falls_back_instead_of_writing_nothing(tmp_path):
         conversation_id="c",
     )
     assert _lines(tmp_path / "votes.jsonl")[0]["user"] == "notnagel"
+
+
+# ---- Formen und Faelle, die aus test_web_ui.py hierher gehoeren (#56) ------
+
+
+def test_the_shape_the_frontend_sends_back_is_understood(tmp_path):
+    """Gradio 6 reicht `content` als **Liste von Teilen** zurueck (#61a).
+
+    Daran fiel der Vote lautlos aus: der Text fand sich nie im LLM-Verlauf
+    wieder, `message_index` blieb None, es wurde nichts geschrieben — ohne
+    Fehler, ohne Warnung, ohne Zeile.
+    """
+    log = _log(tmp_path)
+    history = [
+        {
+            "role": "user",
+            "metadata": None,
+            "content": [{"type": "text", "text": "Frage"}],
+        },
+        {
+            "role": "assistant",
+            "metadata": None,
+            "content": [{"type": "text", "text": "Antwort"}],
+        },
+    ]
+    llm = [_bubble("user", "Frage"), _bubble("assistant", "Antwort")]
+
+    assert log.record(
+        row=1,
+        liked=True,
+        value="Antwort",
+        chat_history=history,
+        llm_history=llm,
+        meta={},
+        conversation_id="c",
+    )
+    vote = _lines(tmp_path / "votes.jsonl")[0]
+    assert vote["message_index"] == 1
+    assert vote["answer"] == "Antwort"
+    assert vote["question"] == "Frage"
+
+
+def test_a_notice_before_the_first_answer_does_not_shift_it(tmp_path):
+    """Gegenprobe zur Zaehlregel an der *ersten* Antwort.
+
+    Der Hinweis steht vor ihr, also liegt sie in der Anzeige auf 2 und in der
+    Ablage auf 1. Ein Zaehler, der Hinweise mitzaehlt, traefe nur hier daneben
+    — nicht bei der letzten Antwort.
+    """
+    log = _log(tmp_path)
+    history = [
+        _bubble("user", "Frage"),
+        _bubble("assistant", "🕵️ blättert im Archiv …"),
+        _bubble("assistant", "Erste Antwort"),
+        _bubble("user", "Noch was"),
+        _bubble("assistant", "Zweite Antwort"),
+    ]
+    llm = [
+        _bubble("user", "Frage"),
+        _bubble("assistant", "Erste Antwort"),
+        _bubble("user", "Noch was"),
+        _bubble("assistant", "Zweite Antwort"),
+    ]
+
+    log.record(
+        row=2,
+        liked=True,
+        value="Erste Antwort",
+        chat_history=history,
+        llm_history=llm,
+        meta={},
+        conversation_id="c",
+    )
+    vote = _lines(tmp_path / "votes.jsonl")[0]
+    assert vote["message_index"] == 1
+    assert vote["answer"] == "Erste Antwort"
+
+
+def test_two_votes_append_two_lines(tmp_path):
+    """Append-only: eine Neubewertung haengt an, Verbraucher entdoppeln selbst."""
+    log = _log(tmp_path)
+    history = [_bubble("user", "Frage"), _bubble("assistant", "Antwort")]
+
+    for liked in (True, False):
+        log.record(
+            row=1,
+            liked=liked,
+            value="Antwort",
+            chat_history=history,
+            llm_history=list(history),
+            meta={},
+            conversation_id="c",
+        )
+
+    votes = _lines(tmp_path / "votes.jsonl")
+    assert [v["vote"] for v in votes] == ["up", "down"]
+
+
+def test_the_meta_user_wins_over_the_fallback(tmp_path):
+    log = _log(tmp_path, fallback_user=lambda: "notnagel")
+    history = [_bubble("user", "Frage"), _bubble("assistant", "Antwort")]
+
+    log.record(
+        row=1,
+        liked=True,
+        value="Antwort",
+        chat_history=history,
+        llm_history=list(history),
+        meta={"user": "yulyen"},
+        conversation_id="c",
+    )
+    assert _lines(tmp_path / "votes.jsonl")[0]["user"] == "yulyen"

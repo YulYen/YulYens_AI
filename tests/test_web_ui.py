@@ -20,11 +20,11 @@ from core.streaming_provider import StreamStats
 from rss.feeds import RssCache, RssItem
 from storage import NullStore
 from ui.session import SessionContext
-from ui.web_ui import (
+from ui.web_ui import WebUI
+from ui.webui_layout import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
     STREAM_OUTPUT_KEYS,
-    WebUI,
 )
 from wiki.lookup import WikiLookup, WikiSnippet
 
@@ -894,72 +894,39 @@ def _read_votes(path):
         return [json.loads(line) for line in f]
 
 
-def test_chat_like_appends_upvote_jsonl(tmp_path):
-    """The backwards walk skips UI-only rows (wiki hint) to find the question."""
+def test_chat_like_unpacks_the_gradio_event(tmp_path):
+    """Die **Naht**: `_on_chat_like` packt `evt` aus, mehr nicht (#56).
 
+    Die Regeln selbst stehen in `tests/test_feedback.py` und laufen dort ohne
+    Gradio und ohne WebUI. Hier wird nur geprueft, dass Index, Daumen und
+    Wortlaut aus dem Event richtig ankommen — genau das ist das Stueck, das
+    `FeedbackLog` nicht selbst pruefen kann.
+    """
     web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Hallo?"},
-        {"role": "assistant", "content": "wiki hint"},
-        {"role": "assistant", "content": "Antwort!"},
-    ]
-    # Der Wiki-Hinweis steht bewusst nicht in der LLM-History — daran erkennt
-    # der Handler, dass er kein Modelltext ist.
-    llm_history = [
-        {"role": "user", "content": "Hallo?"},
-        {"role": "assistant", "content": "Antwort!"},
-    ]
-    meta = {"persona": "DORIS", "model": "m1", "app": "web"}
-
-    web_ui._on_chat_like(
-        session, history, meta, llm_history, "c-1", _fake_like(index=2, liked=True)
-    )
-
-    votes = _read_votes(web_ui.feedback_log_path)
-    assert len(votes) == 1
-    vote = votes[0]
-    assert vote["vote"] == "up"
-    assert vote["question"] == "Hallo?"
-    assert vote["answer"] == "Antwort!"
-    assert vote["persona"] == "DORIS"
-    assert vote["model"] == "m1"
-    assert vote["index"] == 2
-    assert vote["ts"]
-
-
-def test_chat_like_downvote_on_a_loaded_conversation(tmp_path):
-    """Ein geladenes Gespraech steht als Folge einzelner Nachrichten da."""
-
-    web_ui = _create_web_ui()
-    session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
     history = [
         {"role": "user", "content": "Frage"},
         {"role": "assistant", "content": "Antwort"},
     ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
 
     web_ui._on_chat_like(
-        session,
+        SessionContext(),
         history,
-        {},
-        llm_history,
+        {"persona": "DORIS", "model": "m1"},
+        list(history),
         "c-1",
         _fake_like(index=1, value="Antwort", liked=False),
     )
 
     vote = _read_votes(web_ui.feedback_log_path)[0]
+    assert vote["index"] == 1
     assert vote["vote"] == "down"
-    assert vote["question"] == "Frage"
     assert vote["answer"] == "Antwort"
+    assert vote["message_index"] == 1
 
 
 def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
+    """Zweite Naht-Aussage: die Persona kommt aus `meta`, sonst aus der Sitzung."""
     web_ui = _create_web_ui()
     session = SessionContext()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
@@ -988,250 +955,6 @@ def test_chat_like_selftalk_uses_start_prompt_and_meta_persona(tmp_path):
     assert vote["question"] == "Prompt"
     assert vote["persona"] == "self-talk:LEAH,DORIS"
     assert vote["answer"] == "DORIS: Na?"
-
-
-def test_chat_like_two_votes_append_two_lines(tmp_path):
-    """Append-only event log: a revote adds a line, consumers dedup by index."""
-
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        session, history, {}, llm_history, "c-1", _fake_like(index=1, liked=True)
-    )
-    web_ui._on_chat_like(
-        session, history, {}, llm_history, "c-1", _fake_like(index=1, liked=False)
-    )
-
-    votes = _read_votes(web_ui.feedback_log_path)
-    assert [v["vote"] for v in votes] == ["up", "down"]
-
-
-def test_chat_like_never_raises_on_write_error(tmp_path, caplog):
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path)  # a directory → OSError on open
-
-    with caplog.at_level(logging.ERROR):
-        web_ui._on_chat_like(
-            session,
-            [{"role": "user", "content": "F"}, {"role": "assistant", "content": "A"}],
-            {},
-            [{"role": "user", "content": "F"}, {"role": "assistant", "content": "A"}],
-            "c-1",
-            _fake_like(index=1),
-        )
-
-    assert "Could not write feedback log" in caplog.text
-
-
-def test_chat_like_drops_a_vote_it_cannot_verify(tmp_path):
-    """Kaputter Index und keine LLM-History: lieber keine Zeile als eine falsche.
-
-    Vorher entstand hier eine Vote-Zeile aus ``evt.value`` allein. Für einen
-    Kanal, aus dem später Trainingsdaten werden (#40 → #7), ist der Verlust
-    einer Bewertung billiger als eine erfundene: ohne History lässt sich nicht
-    prüfen, ob der Text überhaupt vom Modell stammt.
-    """
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-
-    web_ui._on_chat_like(
-        session, None, None, None, "", _fake_like(index=None, value="Antwort")
-    )
-
-    assert not (tmp_path / "votes.jsonl").exists()
-
-
-def test_an_undecipherable_index_is_dropped_instead_of_guessed(tmp_path):
-    """Der stille Fehler, den #61a beseitigt hat — mit voller History.
-
-    Unter dem Paarformat war `evt.index` ein `[row, col]`. Kam etwas anderes
-    an, ließ der frühere `except`-Zweig `row = -1` stehen; der Zähler sah dann
-    *alle* Bubbles und schrieb den Vote auf die **letzte** Antwort. Bei
-    vorhandener History entstand so eine plausibel aussehende, falsch
-    zugeordnete Trainingszeile — die teuerste Sorte Fehler in diesem Kanal.
-
-    Der bestehende Nachbar-Test greift hier nicht: dort fehlt zusätzlich die
-    History, er bestünde also auch mit dem alten Rückfall.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Erste?"},
-        {"role": "assistant", "content": "Erste Antwort"},
-        {"role": "user", "content": "Zweite?"},
-        {"role": "assistant", "content": "Letzte Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(),
-        history,
-        {},
-        list(history),
-        "c",
-        # Die alte Paar-Koordinate: heute nicht mehr deutbar.
-        _fake_like(index=(3, 1), value="Letzte Antwort"),
-    )
-
-    assert not (tmp_path / "votes.jsonl").exists()
-
-
-def test_the_vote_survives_the_shape_the_frontend_sends_back(tmp_path):
-    """Der Verlauf kommt aus Gradio 6 mit `content` als **Liste** zurueck.
-
-    Genau daran fiel der Vote stumm aus: der Text fand sich nie im
-    LLM-Verlauf wieder, `message_index` blieb None, es wurde nichts
-    geschrieben — ohne Fehler, ohne Warnung, ohne Zeile.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {
-            "role": "user",
-            "metadata": None,
-            "content": [{"type": "text", "text": "Frage"}],
-        },
-        {
-            "role": "assistant",
-            "metadata": None,
-            "content": [{"type": "text", "text": "Antwort"}],
-        },
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c", _fake_like(index=1)
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["message_index"] == 1
-    assert vote["answer"] == "Antwort"
-    assert vote["question"] == "Frage"
-
-
-def test_a_notice_before_the_first_answer_does_not_shift_it(tmp_path):
-    """Gegenprobe zur Zählregel an der *ersten* Antwort.
-
-    Der Wiki-Hinweis steht vor ihr, also liegt sie in der Anzeige auf 2 und in
-    der Ablage auf 1. Ein Zähler, der Hinweise mitzählte, träfe hier daneben —
-    und zwar nur hier, nicht bei der letzten Antwort.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "🕵️ LEAH blättert im Archiv …"},
-        {"role": "assistant", "content": "Erste Antwort"},
-        {"role": "user", "content": "Noch was"},
-        {"role": "assistant", "content": "Zweite Antwort"},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Erste Antwort"},
-        {"role": "user", "content": "Noch was"},
-        {"role": "assistant", "content": "Zweite Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c", _fake_like(index=2)
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["message_index"] == 1
-    assert vote["answer"] == "Erste Antwort"
-    assert vote["question"] == "Frage"
-
-
-@pytest.mark.parametrize(
-    "beiwerk",
-    [
-        "🕵️‍♀️ LEAH blättert im lokalen Wikipedia-Archiv:\nhttp://…",
-        "🛡️ 1 nachgeschlagene Quelle(n) hat der Sicherheitsfilter verworfen …",
-        "📰 LEAH blättert durch tagesschau …",
-        "Moment, ich sortiere kurz meine Gedanken … (Kontext wird komprimiert)",
-    ],
-)
-def test_chat_like_ignores_votes_on_ui_notices(tmp_path, beiwerk):
-    """Eine Bot-Bubble ist nicht automatisch eine Modellantwort.
-
-    Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und
-    die Kontext-Kompressionswarnung stehen in derselben Spalte wie die Antwort
-    und tragen deshalb auch einen Daumen. Bisher schrieb ein Klick darauf eine
-    Zeile nach feedback_votes.jsonl — also Trainingsdaten (#40, Grundlage für
-    #7) aus UI-Text, der nie vom Modell kam.
-
-    Erkannt wird das daran, dass Beiwerk bewusst nie in die LLM-History geht.
-    """
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": beiwerk},
-        {"role": "assistant", "content": "Echte Antwort"},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Echte Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        session,
-        history,
-        {},
-        llm_history,
-        "c-1",
-        _fake_like(index=1, value=beiwerk),
-    )
-    assert not (tmp_path / "votes.jsonl").exists(), "Beiwerk wurde aufgezeichnet"
-
-    # Gegenprobe: die echte Antwort daneben zählt weiterhin.
-    web_ui._on_chat_like(
-        session,
-        history,
-        {},
-        llm_history,
-        "c-1",
-        _fake_like(index=2, value="Echte Antwort"),
-    )
-    assert _read_votes(web_ui.feedback_log_path)[0]["answer"] == "Echte Antwort"
-
-
-def test_chat_like_ignores_votes_on_user_messages(tmp_path):
-    """Gradio also shows thumbs on the user row — those votes carry no signal."""
-
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        session,
-        history,
-        {},
-        [{"role": "assistant", "content": "Antwort"}],
-        "c-1",
-        _fake_like(index=0, value="Frage"),
-    )
-
-    assert not (tmp_path / "votes.jsonl").exists()
 
 
 # ---- Stream-Steuerung: Stop + Regenerate (#35) -------------------------------
@@ -1835,46 +1558,6 @@ def test_persona_selection_stamps_the_user_into_meta():
 
     meta = updates[PERSONA_OUTPUT_KEYS.index("meta_state")]
     assert meta["user"] == "yulyen"
-
-
-def test_vote_records_the_user(tmp_path):
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-
-    web_ui._on_chat_like(
-        session,
-        [
-            {"role": "user", "content": "Frage"},
-            {"role": "assistant", "content": "Antwort"},
-        ],
-        {"persona": "DORIS", "user": "yulyen"},
-        [{"role": "assistant", "content": "Antwort"}],
-        "c-1",
-        _fake_like(index=1, value="Antwort", liked=True),
-    )
-
-    assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "yulyen"
-
-
-def test_vote_without_meta_user_falls_back_instead_of_writing_nothing(tmp_path):
-    web_ui = _create_web_ui()
-    session = SessionContext()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-
-    web_ui._on_chat_like(
-        session,
-        [
-            {"role": "user", "content": "Frage"},
-            {"role": "assistant", "content": "Antwort"},
-        ],
-        {},
-        [{"role": "assistant", "content": "Antwort"}],
-        "c-1",
-        _fake_like(index=1, value="Antwort"),
-    )
-
-    assert _read_votes(web_ui.feedback_log_path)[0]["user"] == "local"
 
 
 def test_page_load_reads_the_identity_from_the_request():
@@ -2707,138 +2390,14 @@ def test_ask_all_shows_a_partial_answer_before_the_persona_is_done():
 # --- Vote-Kanal an der Ablage (#65) -----------------------------------------
 
 
-def test_a_vote_carries_the_join_key(tmp_path):
-    """Ohne Gesprächs-ID ist eine Vote-Zeile ein loses Textpaar (#65).
-
-    Für #7 zählt der Join: welche Persona, welches Modell, welcher Zeitraum,
-    welcher Gesprächsverlauf davor. All das steht in der Ablage — man muss die
-    Zeile nur hinzeigen lassen können.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "conv-42", _fake_like(index=1)
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["conversation_id"] == "conv-42"
-    assert vote["message_index"] == 1
-
-
-def test_the_index_counts_positions_not_texts(tmp_path):
-    """Zweimal dieselbe Antwort im selben Gespräch — der Klassiker.
-
-    Ein Textvergleich hätte still auf die erste gezeigt und den Vote der
-    falschen Stelle zugeordnet. Gezählt wird deshalb die Position unter den
-    Antwort-Bubbles.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Erste?"},
-        {"role": "assistant", "content": "Ja."},
-        {"role": "user", "content": "Zweite?"},
-        {"role": "assistant", "content": "Ja."},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Erste?"},
-        {"role": "assistant", "content": "Ja."},
-        {"role": "user", "content": "Zweite?"},
-        {"role": "assistant", "content": "Ja."},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c", _fake_like(index=3)
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["message_index"] == 3  # die zweite Antwort, nicht die erste
-    assert vote["question"] == "Zweite?"
-
-
-def test_notices_between_answers_do_not_shift_the_index(tmp_path):
-    """Genau deshalb taugt der Anzeige-Index nicht als Referenz.
-
-    In der Anzeige steht der Wiki-Hinweis zwischen den Antworten, in der
-    Ablage nicht — `index: [3, 1]` zeigt dort auf etwas anderes.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "🕵️ LEAH blättert im Archiv …"},
-        {"role": "assistant", "content": "Erste Antwort"},
-        {"role": "user", "content": "Noch was"},
-        {"role": "assistant", "content": "Zweite Antwort"},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Erste Antwort"},
-        {"role": "user", "content": "Noch was"},
-        {"role": "assistant", "content": "Zweite Antwort"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c", _fake_like(index=4)
-    )
-
-    vote = _read_votes(web_ui.feedback_log_path)[0]
-    assert vote["message_index"] == 3
-    assert vote["index"] == 4  # die UI-Koordinate bleibt zur Diagnose stehen
-
-
-def test_the_store_has_the_last_word_on_the_wording(tmp_path):
-    """Aufgezeichnet wird der Wortlaut der Ablage, nicht der der Anzeige.
-
-    Die Anzeige ist eine Darstellung; joinen wird später jemand gegen die
-    Ablage. Gehen die beiden auseinander, gewinnt die Ablage — sonst zeigt der
-    Vote auf eine Zeile, die anders lautet als er selbst.
-    """
-    web_ui = _create_web_ui()
-    web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")
-    ref = SimpleNamespace(id="c-9")
-    store = SimpleNamespace(
-        load=lambda cid, **kw: (
-            ref,
-            [
-                {"role": "user", "content": "Frage"},
-                {"role": "assistant", "content": "Wortlaut aus der Ablage"},
-            ],
-        )
-    )
-    web_ui.factory.get_store = lambda: store
-    history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Wortlaut der Anzeige"},
-    ]
-    llm_history = [
-        {"role": "user", "content": "Frage"},
-        {"role": "assistant", "content": "Wortlaut der Anzeige"},
-    ]
-
-    web_ui._on_chat_like(
-        SessionContext(), history, {}, llm_history, "c-9", _fake_like(index=1)
-    )
-
-    assert _read_votes(web_ui.feedback_log_path)[0]["answer"] == (
-        "Wortlaut aus der Ablage"
-    )
-
-
 def test_a_vote_still_works_without_a_store(tmp_path):
-    """Ohne Anmeldung zeichnet die WebUI nichts auf (#72) — der Vote bleibt.
+    """Dritte Naht-Aussage: `WebUI._store_text` ueber einem `NullStore`.
 
-    Eine verlorene Bewertung wäre der teurere Verlust: dann fehlt der einzige
-    Kanal, über den ein Mensch dem Modell etwas sagt.
+    Ohne Anmeldung zeichnet die WebUI nichts auf (#72) — der Vote bleibt
+    trotzdem. Eine verlorene Bewertung waere der teurere Verlust: dann fehlt
+    der einzige Kanal, ueber den ein Mensch dem Modell etwas sagt. Dass
+    `FeedbackLog` mit einem *werfenden* Loader zurechtkommt, steht in
+    `test_feedback.py`; hier geht es um den Weg dorthin.
     """
     web_ui = _create_web_ui()
     web_ui.feedback_log_path = str(tmp_path / "votes.jsonl")

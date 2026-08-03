@@ -21,14 +21,12 @@ from config.config_singleton import Config
 from core.factory import AppFactory
 from gradio.utils import get_function_params
 from ui import web_ui as web_ui_module
-from ui.web_ui import (
+from ui.web_ui import WebUI
+from ui.webui_layout import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
     STREAM_CONTROL_KEYS,
     STREAM_OUTPUT_KEYS,
-    WebUI,
-)
-from ui.webui_layout import (
     THEME_STORAGE_KEY,
     THEME_TOGGLE_ELEM_ID,
     card_icon_html,
