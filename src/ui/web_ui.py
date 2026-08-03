@@ -26,7 +26,6 @@ from core.orchestrator import iter_broadcast_events, iter_broadcast_events_paral
 from core.streaming_provider import StreamStats
 from core.system_checks import fetch_model_names
 from core.utils import (
-    ensure_dir_exists,
     is_broadcast_enabled,
     is_broadcast_parallel,
     is_file_exchange_enabled,
@@ -38,14 +37,13 @@ from stt.whisper_stt import is_stt_available, transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
+from ui.feedback import FeedbackLog
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
 from ui.webui_format import (
     ChatMessage,
     bot_bubble,
-    bubble_text,
     conversation_markdown,
-    find_question_for_row,
     format_ask_all_results,
     format_status_line,
     format_wiki_sources,
@@ -1730,120 +1728,38 @@ class WebUI:
             value=success, visible=True
         )
 
-    def _resolve_feedback_log_path(self) -> str:
-        if self.feedback_log_path:
-            return self.feedback_log_path
+    @property
+    def _feedback(self) -> FeedbackLog:
+        """Die Vote-Aufzeichnung (#40/#65), herausgelöst nach `ui/feedback.py`.
+
+        Lazy, weil `feedback_log_path` von Tests nach dem Bau gesetzt wird.
+        """
         log_cfg = getattr(self.cfg, "logging", None)
         log_dir = log_cfg.get("dir", "logs") if isinstance(log_cfg, dict) else "logs"
-        ensure_dir_exists(log_dir)
-        self.feedback_log_path = os.path.join(log_dir, "feedback_votes.jsonl")
-        return self.feedback_log_path
-
-    @staticmethod
-    def _store_index_of(
-        text: str,
-        row: int,
-        chat_history: list[ChatMessage] | None,
-        llm_history: list[Message] | None,
-    ) -> int | None:
-        """Welche Nachricht der **Ablage** ist die angeklickte Bubble? (#65)
-
-        Der Anzeige-Index taugt dafür nicht: in ``chat_history`` stehen
-        Hinweis-Bubbles zwischen den Antworten, in der Ablage nicht. Ein Vote
-        mit `index: 2` (vor #61a: `[2, 1]`) war deshalb eine UI-Koordinate und
-        ließ sich mit nichts verbinden.
-
-        Gezählt wird stattdessen **die Position unter den Modellantworten**:
-        die k-te Antwort-Bubble ist die k-te ``assistant``-Nachricht, weil
-        Anzeige und LLM-Verlauf im Gleichschritt wachsen (auch „Nochmal 🔄"
-        entfernt aus beiden). ``ConversationStore.sync`` nummeriert genau diese
-        Folge durch — Systemkontext filtert es heraus —, also stimmt der Index
-        auf beiden Seiten.
-
-        Über Positionen statt über Texte zu zählen ist der Punkt: zweimal
-        dieselbe kurze Antwort („Ja.") im selben Gespräch ist keine Seltenheit,
-        und ein Textvergleich hätte still auf die erste gezeigt.
-        """
-        answers = {
-            (m.get("content") or "").strip()
-            for m in (llm_history or [])
-            if m.get("role") == "assistant"
-        }
-        candidate = (text or "").strip()
-        if not candidate or candidate not in answers:
-            return None
-
-        # Wievielte Antwort-Bubble ist die angeklickte? Seit #61a ist eine
-        # Anzeige-Zeile *eine* Nachricht, der Zähler liest also `role` statt
-        # der zweiten Spalte — die Zählregel selbst bleibt dieselbe.
-        seen = 0
-        for idx, message in enumerate(chat_history or []):
-            if message.get("role") == "assistant":
-                bubble = bubble_text(message).strip()
-                if bubble and bubble in answers:
-                    seen += 1
-            if idx == row:
-                break
-        if seen == 0:
-            return None
-
-        # … und die wievielte Nachricht ist das in der Ablage?
-        position = 0
-        for store_idx, message in enumerate(
-            [m for m in (llm_history or []) if m.get("role") in ("user", "assistant")]
-        ):
-            if message.get("role") != "assistant":
-                continue
-            position += 1
-            if position == seen:
-                return store_idx
-        return None
-
-    @staticmethod
-    def _is_model_answer(text: str, llm_history: list[Message] | None) -> bool:
-        """Ist dieser Bot-Text eine Antwort des Modells — oder nur Beiwerk?
-
-        In der Chat-Anzeige sind beide eine Bot-Bubble: die Antwort, aber auch
-        der Wiki-Hinweis („🕵️ … blättert im Archiv"), die
-        Kontext-Kompressionswarnung, die Briefing-Meldungen und der Hinweis auf
-        vom Guard verworfene Quellen. Ein Daumen darauf schrieb bisher eine
-        Zeile nach ``feedback_votes.jsonl``, als hätte das Modell das gesagt —
-        also Trainingsdaten (#40, Grundlage für #7) aus UI-Text.
-
-        Der Diskriminator braucht keinen neuen Zustand: **Beiwerk landet nie in
-        der LLM-History.** Die Hinweise werden ausdrücklich nur an
-        ``chat_history`` gehängt und bewusst nicht ins Kontextfenster gegeben.
-        Was dort nicht als ``assistant`` steht, ist deshalb keine Antwort.
-        """
-        candidate = (text or "").strip()
-        if not candidate:
-            return False
-        return any(
-            (message.get("role") == "assistant")
-            and (message.get("content") or "").strip() == candidate
-            for message in (llm_history or [])
+        recorder = FeedbackLog(
+            self.feedback_log_path,
+            log_dir=log_dir,
+            store_loader=self._store_text,
+            fallback_user=self._fallback_user,
         )
+        self.feedback_log_path = recorder.path
+        return recorder
 
-    def _answer_from_store(self, conversation_id: str, index: int) -> str | None:
+    def _store_text(self, conversation_id: str, index: int) -> str | None:
         """Den aufgezeichneten Wortlaut holen — best effort (#65).
 
         Die Ablage ist die Fassung, gegen die später jemand joint; sie hat
         deshalb das letzte Wort über den Text. Ohne Anmeldung gibt es sie gar
-        nicht (`NullStore`, #72), also darf das hier still fehlschlagen — ein
-        Vote ohne Store-Text ist besser als kein Vote.
+        nicht (`NullStore`, #72), also darf das hier still fehlschlagen.
         """
         store = getattr(self.factory, "get_store", None)
-        if not conversation_id or store is None:
+        if store is None:
             return None
-        try:
-            loaded = store().load(conversation_id)
-            if not loaded:
-                return None
-            _ref, messages = loaded
-            return str(messages[index].get("content") or "")
-        except (AttributeError, IndexError, TypeError, KeyError):
-            logging.debug("Vote: kein Text aus der Ablage für %s", conversation_id)
+        loaded = store().load(conversation_id)
+        if not loaded:
             return None
+        _ref, messages = loaded
+        return str(messages[index].get("content") or "")
 
     def _on_chat_like(
         self,
@@ -1854,80 +1770,22 @@ class WebUI:
         conversation_id: str | None,
         evt: gr.LikeData,
     ) -> None:
-        # Votes must never break the UI: any failure is logged and swallowed.
-        try:
-            # Seit #61a ist `evt.index` ein **flacher** Index in die
-            # Anzeigeliste, kein `[row, col]` mehr. Ein nicht deutbarer Index
-            # wird verworfen statt geraten: der frühere `except`-Zweig ließ
-            # `row = -1` stehen, und der Zähler unten sah dann *alle* Bubbles
-            # und schrieb den Vote auf die **letzte** Antwort. Ein falsch
-            # zugeordneter Vote ist teurer als ein fehlender — für #7 ist eine
-            # verlorene Bewertung billiger als eine erfundene.
-            try:
-                row = int(evt.index)  # type: ignore[arg-type]
-            except (TypeError, ValueError):
-                logging.warning("Feedback vote with unexpected index %r", evt.index)
-                return
+        """Naht zwischen Gradios Event und der Aufzeichnung.
 
-            message = (
-                (chat_history or [])[row]
-                if 0 <= row < len(chat_history or [])
-                else None
-            )
-            if not isinstance(message, dict):
-                logging.warning("Feedback vote on index %s outside the history", row)
-                return
-
-            # Eine Bewertung der eigenen Frage ist kein Trainingssignal.
-            if message.get("role") != "assistant":
-                logging.debug("Ignoring feedback vote on a user message (row %s)", row)
-                return
-
-            answer = bubble_text(message) or str(evt.value)
-
-            # Bot-Bubble ist nicht gleich Modellantwort: Hinweise und Warnungen
-            # stehen in derselben Spalte. Sie als Trainingszeile aufzuzeichnen
-            # würde dem Modell beibringen, UI-Text zu produzieren. Derselbe
-            # Aufruf liefert die Stelle in der Ablage (#65).
-            message_index = self._store_index_of(answer, row, chat_history, llm_history)
-            if message_index is None:
-                logging.debug(
-                    "Ignoring feedback vote on a UI notice, not a model answer (row %s)",
-                    row,
-                )
-                return
-
-            conversation_id = str(conversation_id or "")
-            # Die Ablage hat das letzte Wort über den Wortlaut; die Anzeige ist
-            # nur ihre Darstellung.
-            answer = self._answer_from_store(conversation_id, message_index) or answer
-
-            meta = meta if isinstance(meta, dict) else {}
-            entry = {
-                "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
-                "app": meta.get("app", "web"),
-                "user": meta.get("user") or self._fallback_user(),
-                "persona": meta.get("persona") or session.bot or "",
-                "model": meta.get("model", ""),
-                "vote": "up" if evt.liked else "down",
-                "question": find_question_for_row(chat_history, row),
-                "answer": answer,
-                # Der Join-Schlüssel (#65): ohne ihn ist eine Vote-Zeile ein
-                # loses Textpaar. `conversation_id` ist leer, wenn ohne
-                # Anmeldung nichts aufgezeichnet wird (#72) — dann bleibt der
-                # Vote das, was er vorher immer war.
-                "conversation_id": conversation_id,
-                "message_index": message_index,
-                # Die UI-Koordinate bleibt zur Diagnose daneben stehen; seit
-                # #61a ist sie ein flacher Index statt [row, col].
-                "index": row,
-            }
-            path = self._resolve_feedback_log_path()
-            with _feedback_log_lock:
-                with open(path, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except (OSError, TypeError, ValueError, AttributeError):
-            logging.exception("Could not write feedback log %s", self.feedback_log_path)
+        Hier wird nur ausgepackt: `evt.index` ist seit #61a ein flacher Index,
+        `evt.liked` das Daumenzeichen. Alles Weitere entscheidet `FeedbackLog`
+        — dort steht es prüfbar ohne Oberfläche.
+        """
+        self._feedback.record(
+            row=getattr(evt, "index", None),
+            liked=bool(getattr(evt, "liked", False)),
+            value=getattr(evt, "value", ""),
+            chat_history=chat_history,
+            llm_history=llm_history,
+            meta=meta,
+            conversation_id=conversation_id,
+            persona=session.bot or "",
+        )
 
     def _bind_events(
         self,

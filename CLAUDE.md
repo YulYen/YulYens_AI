@@ -83,6 +83,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── webui_layout.py      # Gradio-Layout-Builder + Ausgabe-Key-Listen
 │   │   ├── webui_format.py      # Reine Formatierer (Statuszeile, Quellen, Markdown)
 │   │   ├── session.py           # SessionContext: Zustand *einer* Browser-Sitzung
+│   │   ├── feedback.py          # 👍/👎-Votes + Schlüssel in die Ablage (#40/#65)
 │   │   ├── conversation_io_terminal.py  # JSON-Im-/Export (Austausch, nicht Ablage)
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
