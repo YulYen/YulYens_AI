@@ -37,6 +37,7 @@ from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
 from ui.feedback import FeedbackLog
+from ui.history_access import ConversationHistory
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
 from ui.webui_events import bind_events
@@ -47,7 +48,6 @@ from ui.webui_format import (
     format_ask_all_results,
     format_status_line,
     format_wiki_sources,
-    history_label,
     messages_to_chat_history,
     user_bubble,
 )
@@ -1050,29 +1050,19 @@ class WebUI:
         return as_persona_outputs(updates)
 
     # ---------- Verlauf (#25) ----------
-    def _history_choices(self, user: str) -> list[tuple[str, str]]:
-        """Gespräche des angemeldeten Nutzers — Beschriftung und ID.
-
-        Die Filterung nach Nutzer ist der Grund, warum #53 vor diesem Ticket
-        kam: ohne sie zeigt eine Verlaufsliste jedem alles.
-        """
+    @property
+    def _history(self) -> ConversationHistory:
+        """Nutzergebundener Zugriff auf die Ablage — siehe ui/history_access."""
         storage_cfg = getattr(self.cfg, "storage", None) or {}
-        try:
-            limit = max(1, int(storage_cfg.get("history_limit", 50)))
-        except (TypeError, ValueError):
-            limit = 50
-        try:
-            refs = self.factory.get_store().list_conversations(
-                user=user or self._fallback_user(), limit=limit
-            )
-        except Exception:
-            logging.exception("Verlauf konnte nicht gelesen werden")
-            return []
-        return [(history_label(ref), ref.id) for ref in refs]
+        return ConversationHistory(
+            self.factory.get_store,
+            limit=storage_cfg.get("history_limit", 50),
+            fallback_user=self._fallback_user(),
+        )
 
     def _on_show_history(self, session: SessionContext, user: str) -> tuple:
         session.clear_persona()
-        choices = self._history_choices(user)
+        choices = self._history.choices(user)
         updates = self._reset_updates()
         updates.update(
             grid_group=gr.update(visible=False),
@@ -1087,34 +1077,11 @@ class WebUI:
 
     def _on_history_selected(self, conversation_id: str | None, user: str) -> Any:
         """Vorschau des gewählten Gesprächs."""
-        loaded = self._load_from_store(conversation_id, user)
+        loaded = self._history.load(conversation_id, user)
         if loaded is None:
             return gr.update(value="")
         ref, messages = loaded
         return gr.update(value=conversation_markdown(ref, messages, self._t))
-
-    def _load_from_store(self, conversation_id: str | None, user: str):
-        """Gespräch aus der Ablage — **nur** das des angemeldeten Nutzers.
-
-        Die Liste in ``_history_choices`` filtert nach Nutzer, die Handler
-        dahinter taten es nicht: die Gesprächs-ID kommt aus einem
-        ``gr.Dropdown``, und dessen ``preprocess`` reicht in Gradio 4.44 den
-        Wert des Clients ungeprüft durch (``type="value"`` → ``return payload``).
-        Wer eine fremde ID kannte, konnte das Gespräch lesen, exportieren,
-        fortsetzen und löschen — nachgestellt mit zwei angemeldeten Nutzern.
-
-        Deshalb liegt die Prüfung jetzt an der Stelle, an der alle vier
-        Handler zwangsläufig vorbeikommen, statt viermal beim Aufrufer.
-        """
-        if not conversation_id:
-            return None
-        try:
-            return self.factory.get_store().load(
-                str(conversation_id), user=user or self._fallback_user()
-            )
-        except Exception:
-            logging.exception("Gespräch %s nicht ladbar", conversation_id)
-            return None
 
     # Die Regel selbst steht in ui/continuation.py — sie gilt für alle drei
     # Wege in ein gespeichertes Gespräch, auch für den im Terminal.
@@ -1129,7 +1096,7 @@ class WebUI:
         input_placeholder: str = "",
     ) -> tuple:
         """Gespräch in den Chat holen — fortsetzbar, nicht nur ansehbar."""
-        loaded = self._load_from_store(conversation_id, user)
+        loaded = self._history.load(conversation_id, user)
         if loaded is None:
             updates = self._reset_updates()
             updates.update(
@@ -1186,7 +1153,7 @@ class WebUI:
     def _on_history_export(
         self, session: SessionContext, conversation_id: str | None, user: str
     ) -> Any:
-        loaded = self._load_from_store(conversation_id, user)
+        loaded = self._history.load(conversation_id, user)
         if loaded is None:
             return gr.update(value=None, visible=False)
         ref, messages = loaded
@@ -1207,17 +1174,10 @@ class WebUI:
                 gr.update(),
             )
 
-        deleted = False
-        if conversation_id:
-            try:
-                # Nur eigene Gespräche: das Löschen ist der einzige der vier
-                # Verlauf-Wege, der sich nicht rückgängig machen lässt.
-                deleted = self.factory.get_store().delete(
-                    str(conversation_id), user=user or self._fallback_user()
-                )
-            except Exception:
-                logging.exception("Gespräch %s nicht löschbar", conversation_id)
-        choices = self._history_choices(user)
+        # Nur eigene Gespräche: das Löschen ist der einzige der vier
+        # Verlauf-Wege, der sich nicht rückgängig machen lässt.
+        deleted = self._history.delete(conversation_id, user)
+        choices = self._history.choices(user)
         message = "history_deleted" if deleted else "history_not_found"
         return (
             gr.update(choices=choices, value=None),

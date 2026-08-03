@@ -2181,7 +2181,7 @@ def test_history_limit_comes_from_the_config(tmp_path):
     for i in range(4):
         _fill(store, question=f"Frage {i}")
 
-    assert len(web_ui._history_choices("local")) == 2
+    assert len(web_ui._history.choices("local")) == 2
 
 
 def test_history_limit_falls_back_on_nonsense(tmp_path):
@@ -2189,7 +2189,7 @@ def test_history_limit_falls_back_on_nonsense(tmp_path):
     web_ui.cfg.storage = {"history_limit": "viele"}
     _fill(store)
 
-    assert len(web_ui._history_choices("local")) == 1
+    assert len(web_ui._history.choices("local")) == 1
 
 
 # ---- Der Upload-Weg ist derselbe Weg (Review-Nachtrag) ----------------------
