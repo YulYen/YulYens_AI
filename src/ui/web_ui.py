@@ -19,14 +19,8 @@ from config.personas import _load_system_prompts, get_all_persona_names
 from core.context_injection import conversation_only
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.system_checks import fetch_model_names
-from core.utils import (
-    is_broadcast_enabled,
-    is_broadcast_parallel,
-    is_file_exchange_enabled,
-    module_available,
-)
 from rss.feeds import _rss_cache_of
-from stt.whisper_stt import is_stt_available, transcribe_wav
+from stt.whisper_stt import transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
@@ -36,6 +30,7 @@ from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
 from ui.webui_chat import STREAM_FLUSH_INTERVAL_S, ChatController
 from ui.webui_events import bind_events
+from ui.webui_features import WebFeatures
 from ui.webui_format import (
     ChatMessage,
     bot_bubble,
@@ -153,47 +148,21 @@ class WebUI:
         self._t = getattr(config, "t", getattr(self.texts, "format", None))
         # Wer bedient die UI (#53). Default DisabledAuth = kein Login.
         self.auth = factory.get_auth_provider()
-        # Verlauf nur anbieten, wenn wirklich aufgezeichnet wird (#72): ohne
-        # Ablage — abgeschaltet oder mangels Anmeldung — ist die Karte ein
-        # Versprechen, das sich nie einlösen kann.
-        self.history_enabled = bool(factory.get_store().records)
-        # Datei-Austausch (JSON rein/raus) ist abschaltbar (#54).
-        self.file_exchange_enabled = is_file_exchange_enabled(self.cfg)
-        self.broadcast_enabled = is_broadcast_enabled(self.cfg)
-        self.broadcast_parallel = is_broadcast_parallel(self.cfg)
+        # Welche optionalen Funktionen es überhaupt gibt — eine Frage, eine
+        # Stelle (`ui/webui_features.py`). Vorher standen sechs Bools mit sechs
+        # verschiedenen Herleitungen nebeneinander, und dass drei davon einen
+        # zweiten Schalter haben (installiertes Paket, schreibende Ablage), war
+        # nur an handgeschriebenen if-Blöcken zu erkennen.
+        self.features = WebFeatures.detect(self.cfg, factory.get_store())
         # Persona, Streamer, Kill-Switches und der Self-Talk-Runner gehören
         # *nicht* hierher: die WebUI ist ein Singleton und bedient alle Browser
         # gleichzeitig. Sie liegen in einem SessionContext pro Sitzung
         # (`ui/session.py`) und werden als gr.State durchgereicht.
         self.ask_all_placeholder = ""
         self.self_talk_prompt_placeholder = ""
-        # STT nur anbieten, wenn eingeschaltet UND faster-whisper installiert
-        # ist — sonst bleibt das Mikro unsichtbar und die App läuft normal.
         self.stt_cfg = getattr(config, "stt", {}) or {}
-        self.stt_available = bool(self.stt_cfg.get("enabled")) and is_stt_available()
         self.rss_cfg = getattr(config, "rss", {}) or {}
-        # Vorlesen (TTS): wie beim Mikro nur anbieten, wenn Piper installiert ist
         self.tts_cfg = getattr(config, "tts", {}) or {}
-        tts_features = self.tts_cfg.get("features", {}) or {}
-        self.tts_web_enabled = (
-            bool(self.tts_cfg.get("enabled"))
-            and bool(tts_features.get("web_read_aloud"))
-            and module_available("piper")
-        )
-        if (
-            self.tts_cfg.get("enabled")
-            and tts_features.get("web_read_aloud")
-            and not self.tts_web_enabled
-        ):
-            logging.info(
-                "TTS-Vorlesen aktiviert, aber piper ist nicht installiert — "
-                "Button bleibt ausgeblendet (pip install piper-tts)."
-            )
-        if self.stt_cfg.get("enabled") and not self.stt_available:
-            logging.info(
-                "STT aktiviert, aber faster-whisper ist nicht installiert — "
-                "Mikrofon bleibt ausgeblendet (pip install faster-whisper)."
-            )
         # Lazily resolved on first vote; tests may pre-set an explicit path.
         self.feedback_log_path: str | None = None
         if self._t is None:
@@ -417,9 +386,9 @@ class WebUI:
             ),
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
-            download_btn=gr.update(visible=self.file_exchange_enabled),
+            download_btn=gr.update(visible=self.features.file_exchange),
             briefing_btn=gr.update(visible=self.chat.briefing_enabled),
-            read_aloud_btn=gr.update(visible=self.tts_web_enabled),
+            read_aloud_btn=gr.update(visible=self.features.tts_read_aloud),
             meta_state=self._build_meta(persona["name"], user=user, app=app),
             conversation_state=conversation_id,
             ask_all_question=gr.update(
@@ -428,7 +397,7 @@ class WebUI:
                 interactive=True,
                 placeholder=self.ask_all_placeholder,
             ),
-            mic_audio=gr.update(value=None, visible=self.stt_available),
+            mic_audio=gr.update(value=None, visible=self.features.stt),
             # Regenerate ist ab Start sichtbar, aber erst nach einer Antwort
             # sinnvoll; ein Klick davor bringt nur einen Hinweis-Toast. Stop
             # erscheint ausschließlich während eines laufenden Streams.
@@ -981,7 +950,7 @@ class WebUI:
         question = (question or "").strip()
         existing = current_results or ""
 
-        if not self.broadcast_enabled:
+        if not self.features.broadcast:
             yield self._ask_all_state(
                 question,
                 existing,
@@ -1036,7 +1005,7 @@ class WebUI:
 
         # Parallel: alle Personas streamen gleichzeitig in ihre Sektionen;
         # sequenzieller Fallback per ui.experimental.broadcast_parallel: false.
-        if self.broadcast_parallel:
+        if self.features.broadcast_parallel:
             stop = threading.Event()
             session.ask_all_stop = stop
             events_iter = iter_broadcast_events_parallel(
@@ -1122,9 +1091,9 @@ class WebUI:
             ),
             send_btn=gr.update(visible=True, interactive=True),
             new_chat_btn=gr.update(visible=True),
-            download_btn=gr.update(visible=self.file_exchange_enabled),
+            download_btn=gr.update(visible=self.features.file_exchange),
             briefing_btn=gr.update(visible=self.chat.briefing_enabled),
-            read_aloud_btn=gr.update(visible=self.tts_web_enabled),
+            read_aloud_btn=gr.update(visible=self.features.tts_read_aloud),
             history_state=messages,
             meta_state=meta,
             ask_all_question=gr.update(
@@ -1403,7 +1372,7 @@ class WebUI:
         demo, components = build_ui(
             persona_thumbnail_path_fn=self._persona_thumbnail_path,
             persona_info=persona_info,
-            broadcast_enabled=self.broadcast_enabled,
+            broadcast_enabled=self.features.broadcast,
             project_title=project_title,
             choose_persona_txt=choose_persona_txt,
             persona_btn_suffix=persona_btn_suffix,
@@ -1452,8 +1421,8 @@ class WebUI:
             history_export_label=history_export_label,
             history_delete_label=history_delete_label,
             history_confirm_label=history_confirm_label,
-            file_exchange_enabled=self.file_exchange_enabled,
-            history_enabled=self.history_enabled,
+            file_exchange_enabled=self.features.file_exchange,
+            history_enabled=self.features.history,
         )
         # Gradio 4.x requires events to be bound within a Blocks context.
         # Reopening the demo as a context lets us keep the existing structure

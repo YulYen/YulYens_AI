@@ -5,6 +5,7 @@ import logging
 import sys
 import threading
 import types
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -620,7 +621,7 @@ def test_stt_unavailable_by_default_config():
 
     web_ui = _create_web_ui()
 
-    assert web_ui.stt_available is False
+    assert web_ui.features.stt is False
     assert web_ui.stt_cfg == {}
 
 
@@ -674,7 +675,7 @@ def test_persona_selected_updates_shows_mic_only_when_stt_available():
         web_ui = _create_web_ui()
         web_ui.cfg.core = {"model_name": "m:1"}
         web_ui.cfg.ensemble = "test"
-        web_ui.stt_available = available
+        web_ui.features = replace(web_ui.features, stt=available)
 
         updates = web_ui._persona_selected_updates(
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
@@ -685,7 +686,7 @@ def test_persona_selected_updates_shows_mic_only_when_stt_available():
 
 def test_reset_updates_hides_mic():
     web_ui = _create_web_ui()
-    web_ui.stt_available = True
+    web_ui.features = replace(web_ui.features, stt=True)
 
     updates = web_ui._reset_ui_updates()
 
@@ -838,7 +839,7 @@ def test_tts_web_disabled_by_default_config():
 
     web_ui = _create_web_ui()
 
-    assert web_ui.tts_web_enabled is False
+    assert web_ui.features.tts_read_aloud is False
 
 
 def test_on_read_aloud_without_reply_warns_and_stays_hidden():
@@ -905,7 +906,7 @@ def test_persona_selected_updates_toggles_read_aloud_button():
         web_ui = _create_web_ui()
         web_ui.cfg.core = {"model_name": "m:1"}
         web_ui.cfg.ensemble = "test"
-        web_ui.tts_web_enabled = enabled
+        web_ui.features = replace(web_ui.features, tts_read_aloud=enabled)
 
         updates = web_ui._persona_selected_updates(
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
@@ -916,7 +917,7 @@ def test_persona_selected_updates_toggles_read_aloud_button():
 
 def test_reset_updates_hides_read_aloud_button_and_player():
     web_ui = _create_web_ui()
-    web_ui.tts_web_enabled = True
+    web_ui.features = replace(web_ui.features, tts_read_aloud=True)
 
     updates = web_ui._reset_ui_updates()
 
@@ -1425,7 +1426,7 @@ ASK_ALL_RESULTS = ASK_ALL_OUTPUT_KEYS.index("ask_all_results")
 
 def _ask_all_web_ui():
     web_ui = _web_ui_with_texts()
-    web_ui.broadcast_parallel = False
+    web_ui.features = replace(web_ui.features, broadcast_parallel=False)
     return web_ui
 
 
@@ -1965,7 +1966,7 @@ def test_leaving_the_history_clears_the_delete_confirmation():
 def _exchange_web_ui(enabled):
     web_ui = _create_web_ui()
     web_ui.cfg.storage = {"file_exchange": enabled}
-    web_ui.file_exchange_enabled = enabled
+    web_ui.features = replace(web_ui.features, file_exchange=enabled)
     web_ui.cfg.core = {"model_name": "m"}
     web_ui.cfg.ensemble = "classic"
     return web_ui
