@@ -31,13 +31,13 @@ An ensemble bundles personas together with their system prompts, LLM options (te
 Two different user interfaces are available and can be selected via the configuration (`ui.type`):
 
 - **Terminal UI** – A console-based chat application with color-highlighted roles (user/AI). When launched, the desired persona is picked from a menu. User input is entered directly in the console, and the AI response is streamed token by token. Simple commands like `exit` end the session and `clear` starts a fresh chat history.
-- **Web UI** – A browser-based interface (Gradio). It offers a graphical persona selection (with avatar images) and a chat window for the conversation. The AI response is displayed live as it is generated. The web UI is accessible on the local network and enables a comfortable chat experience over HTTP.
+- **Web UI** – A browser-based interface (Gradio). It offers a graphical persona selection (with avatar images) and a chat window for the conversation. The AI response is displayed live as it is generated. By default it listens on `127.0.0.1` only, so it is reachable from your own machine alone; network access requires deliberately changing `ui.web.host` (and then please with a login, see below).
 
-An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcast_mode: true`). This sends a question to all personas—via the Ask-All option in the terminal start menu and through the Ask-All card in the web UI. The personas answer one after another; in the web UI the replies appear **streamed live token by token**, one markdown section per persona:
+An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcast_mode: true`). This sends a question to all personas—via the Ask-All option in the terminal start menu and through the Ask-All card in the web UI. In the terminal the personas answer one after another; in the web UI they run **concurrently** and appear **streamed live token by token**, one markdown section per persona. A real speed-up does require Ollama to serve requests in parallel (`OLLAMA_NUM_PARALLEL` ≥ number of personas) — otherwise it queues them up again. Fall back with `ui.experimental.broadcast_parallel: false`:
 
 ![Ask-All: all four personas answer the same question](../screenshot_ask_all.png)
 
-Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link using credentials from `ui.web.share_auth`.
+Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link (`ui.web.share: true`). Its credentials come from the `ui.web.auth` section — which applies **whether or not a share link is active** (see "Sign-in"). The former `ui.web.share_auth` is deprecated and only acts as a fallback when no `auth` section exists.
 
 ### Stream control: stop and retry
 
@@ -60,20 +60,25 @@ The project includes an **AI dialog mode** in which two personas talk to each ot
 - **Terminal UI:** Select “Self Talk” in the start menu, then choose Persona A, Persona B, and an initial prompt.
 - **Web UI:** A dedicated self-talk tile starts the same flow directly in the browser.
 - **Flow:** Both personas answer in turns; each generated reply is forwarded as the next input for the other persona.
-- **Automatic end:** The dialog stops once one persona emits the defined end token (`_endegelaende_`).
+- **Automatic end:** The dialog stops once one persona emits the defined end token (`_endegelaende_`). To be forgiving with small models, a reply ending in `_ende_` also counts.
 
 This mode is useful for brainstorming between two character styles or exploring multiple perspectives on the same question.
 
 ## Text-to-speech (TTS)
 
-For terminal interaction, integrated **Piper-based text-to-speech output** is available:
+Integrated **Piper-based text-to-speech output** is available in both interfaces:
 
 - Enable it via `tts.enabled: true`.
-- Create one WAV file per answer via `tts.features.terminal_auto_create_wav: true`.
+- **Terminal:** create and play one WAV file per answer via `tts.features.terminal_auto_create_wav: true`.
+- **Web UI:** the "Read aloud 🔊" button in the persona chat plays the latest reply with the persona's voice **in the browser** rather than through a system player. It only appears once `pip install piper-tts` is done and voices exist in the `voices/` folder; disable it via `tts.features.web_read_aloud: false`.
 - Configure voices in `config.yaml` via `tts.voices` (language defaults plus optional persona-specific voices).
 - **Platforms:** automatic WAV creation and playback in the terminal UI works on all three platforms. Windows uses `winsound` from the standard library; Linux and macOS dispatch to the usual command-line players (`paplay`, `aplay` or `ffplay` on Linux, `afplay` on macOS) — no extra dependency. If no player is found, playback is skipped silently and the WAV still lands in `out/`.
 
 This allows replies to be consumed not only as text but also immediately as audio.
+
+## Speech input (STT)
+
+The other direction works too: in the web UI you can **speak** instead of typing. With `stt.enabled: true` and `faster-whisper` installed (`pip install faster-whisper`), a microphone appears next to the input field. Record → stop → the transcript is appended to the input field and can still be edited before sending — recognition does not replace sending, it only fills the field. The first recording loads the Whisper model (once, including a download) and therefore takes noticeably longer than the ones after it. Size and language live under `stt.model` and `stt.language`; details in [src/stt/ReadMe.md](../../src/stt/ReadMe.md).
 
 ## One-shot API
 
@@ -147,7 +152,9 @@ The MVP handles plain-text emails; HTML is pragmatically reduced to text, attach
 
 ## Finding conversations again
 
-Conversations live in a local SQLite file (`storage.path`, `data/conversations.sqlite3` by default) — not in log files. The “Open history 🗂” card lists them for review, lets you **continue** one, export it as Markdown, or delete it. Only your own conversations are listed; without a login that is the `local` user.
+Conversations live in a local SQLite file (`storage.path`, `data/conversations.sqlite3` by default) — not in log files. The “Open history 🗂” card lists them for review, lets you **continue** one, export it as Markdown, or delete it. Only your own conversations are listed, and ownership is checked server-side.
+
+**In the web UI this requires a login.** Without one, every visitor is the same user `local` — "your own" history would be everybody's history, continuable and deletable by anyone who reaches the page. That is why the web UI records **nothing** without a login and hides the history card; the start-up names both ways out. If you deliberately want the shared pot on a single seat, set `storage.shared_without_login: true` and accept a loud warning at start-up. The terminal and the API are unaffected — there is no login there that could be missing.
 
 Continuing really means continuing: the reply is appended to the same conversation record rather than starting a second one. Conversations from a guest persona stay readable but cannot be continued — that persona's system prompt only existed in its session.
 
@@ -159,7 +166,7 @@ The former JSONL transcript under `logs/` is still available, but purely as a de
 
 By default the web UI asks for **no login** — on a single-seat machine that would be pure overhead. It is switched on via `ui.web.auth.provider`:
 
-- `disabled` (default): no login, every conversation is attributed to the user `local`.
+- `disabled` (default): no login, every visitor is the same user `local` — and that is exactly why the web UI records no conversations in this setting (see "Finding conversations again").
 - `local`: username and password from `ui.web.auth.users`. Passwords do not belong in the config in plain text — use `env:NAME`.
 - `header`: the identity comes from a reverse proxy in front (oauth2-proxy, Authelia, …). This is the route to putting a real identity provider such as Keycloak in front later — Gradio itself cannot do OpenID Connect.
 
@@ -196,7 +203,7 @@ The “Briefing 📰” button (and `/briefing` in the terminal) still exists; i
 To deliver well-grounded answers, the system can automatically **incorporate Wikipedia knowledge** for factual queries (configurable option). It relies on the following mechanisms:
 
 - **Automatic knowledge retrieval:** The relevant keyword is extracted from the user prompt using spaCy NLP. An internal wiki proxy then searches for a matching Wikipedia article—either **offline** via a local Kiwix database or **online** via the Wikipedia API, depending on the settings. In offline mode, the Kiwix server can be started automatically if configured.
-- **Context enrichment:** If the wiki proxy finds an article, a snippet is taken from it. This snippet is inserted into the chat context as an additional *system* message before the AI replies. The AI thus receives verified facts and can produce more precise responses. In the terminal UI a spyglass icon (🕵️) indicates when a Wikipedia snippet was used. If the search comes up empty, a short notice is displayed instead.
+- **Context enrichment:** If the wiki proxy finds an article, a snippet is taken from it. This snippet is inserted into the chat context before the AI replies, as an additional *user* message clearly marked as foreign text (`[FREMDTEXT ANFANG] … [FREMDTEXT ENDE]`) — deliberately not as a *system* message, because a downloaded article is material to talk about, not an instruction. It passes the security guard first, which discards attempts to instruct the model from within the article text. The AI thus receives verified facts and can produce more precise responses. The excerpt belongs to the prompt, not to the conversation: it never shows up in the store, the history or an export. In the terminal UI a spyglass icon (🕵️) indicates when a Wikipedia snippet was used. If the search comes up empty, a short notice is displayed instead.
 - **Sources on display (web UI):** A collapsed accordion labelled “Sources 📚” sits below the chat. Expanded, it shows each snippet's article title as a clickable link (pointing at the local kiwix-serve when offline), where it came from — and above all **the excerpt verbatim, exactly as it went into the prompt**, together with its character count. Since `wiki.snippet_limit` truncates long articles (1200 characters by default), it reads e.g. “1200 of 9800 characters injected (truncated)”, which is what makes it visible how much of the article the AI never saw. If everything fitted, it says “complete”. Without a wiki hit the accordion stays hidden. The ask-all view carries the same accordion below the answers, and in the terminal the `/sources` command prints the same information.
 - **Multiple hits usable:** If the keyword finder detects several relevant entities, multiple snippets can be injected into the prompt. The cap is configured via `wiki.max_wiki_snippets` (default: 2) to expand context deliberately without overloading it.
 
@@ -204,7 +211,7 @@ To deliver well-grounded answers, the system can automatically **incorporate Wik
 
 Robust usage is supported by extensive logging and automated tests:
 
-- **Chat logging:** Every conversation is recorded in a JSON file (stored in the `logs/` folder). It captures timestamps, the model in use, the persona, and all user and AI messages. The application also writes a rolling system log file (prefixed `yulyen_ai_...`) that contains internal processes and debug information (info/error).
+- **Conversations vs. logs:** The conversations themselves do **not** live in `logs/` but in the SQLite store (see "Finding conversations again"). `logs/` holds operational diagnostics: a rolling system log file (prefixed `yulyen_ai_...`) with internal processes and debug information. The raw JSONL transcript of the individual generation *attempts* (timestamps, model, persona, messages) can be switched on with `logging.conversation_jsonl: true` — it is a debugging tool and off by default.
 - **Wiki proxy logging:** The Wikipedia proxy service keeps its own log files for article requests and results. This makes it possible to trace wiki lookups and any errors separately from the main chat log.
 - **Answer feedback (👍/👎):** Every answer can be rated in the web UI. Each click appends a line to `logs/feedback_votes.jsonl` — with timestamp, persona, model, question, answer, the vote and a reference to the stored conversation. The file is append-only (changing your mind adds a line rather than replacing the old one), so the history stays auditable. Intended as a data basis for quality comparisons and later finetuning.
 - **Automated tests:** A collection of pytest tests (in the `tests/` directory) verifies core system functions. For example, the tests ensure that personas are initialized correctly, the security filter works, and repeatable responses (such as Doris telling the same jokes) remain consistent. These tests help prevent regressions and maintain reliable orchestration.
@@ -228,6 +235,7 @@ The architecture of *Yul Yen’s AI Orchestra* is designed to enable future enha
 - **LoRA fine-tuning (PoC):** Early experiments for model refinement exist as a proof of concept but are not included in the standard repository for size reasons. Internally, a small **LoRA fine-tuning** example (based on [PEFT/QLoRA](https://github.com/huggingface/peft)) demonstrates how a compact adapter for the persona Doris was trained with about 200 question–answer pairs. The training scripts and test runs are for demonstration only and are not integrated into production. Interested parties can reach out to the maintainers for details or access to the materials.
 - **Context compression ("Karl"):** For long conversations, the chat history is compressed automatically before the context window overflows. The default is a fast heuristic (trim old messages, keep the system prompt and the most recent messages); optionally, the LLM-based summarizer "Karl" condenses older chat parts (`context_management.strategy: "karl"`, with automatic fallback to the heuristic).
 - **Three-timestamp transparency:** The system prompt cleanly separates three easily confused dates: the current system date, the model's training cutoff (`core.knowledge_cutoffs`), and the data snapshot of the Wikipedia archive. This keeps personas from accidentally claiming to have "current" knowledge.
-- **Future features:** The project keeps a prioritized roadmap (see [backlog.md](../../backlog.md)). Planned additions include tool integrations (*tool use* such as web search or calculators), speech input (STT), and faster time-to-first-token. The current codebase provides a simple, extensible foundation on which these features can be built.
+- **Eval suite:** Whether a change actually made the model better is answered by a dedicated corpus of golden questions per persona plus guard attacks — as YAML, so new cases need no test code (`python scripts/run_evals.py -e classic`, details in [evals/ReadMe.md](../../evals/ReadMe.md)). The guard part runs without a model as part of the normal test suite.
+- **Future features:** The project keeps a prioritized roadmap (see [backlog.md](../../backlog.md)). Planned additions include tool integrations (*tool use* such as web search or calculators), long-term memory built on the conversation store, and full-text search across the history. The current codebase provides a simple, extensible foundation on which these features can be built.
 
 See also: [backlog.md](../../backlog.md)
