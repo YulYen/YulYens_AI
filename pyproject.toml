@@ -40,8 +40,11 @@ filterwarnings = [
 # kamen mit #54/#53 dazu und waren von Beginn an sauber.
 [tool.mypy]
 python_version = "3.10"
-files = ["src/core", "src/storage", "src/auth"]
+files = ["src"]
 mypy_path = "src"
+# Ohne das ist src/ui/webui_format.py auf zwei Wegen erreichbar
+# (webui_format und ui.webui_format) — mypy bricht dann ab.
+explicit_package_bases = true
 # Der Rest des Projekts wird mitgelesen (Signaturen!), aber nicht gemeldet —
 # sonst müsste man alles auf einmal aufräumen.
 follow_imports = "silent"
@@ -51,5 +54,15 @@ warn_redundant_casts = true
 # Bibliotheken ohne Typ-Stubs. Bewusst einzeln statt global, damit ein neuer
 # Import nicht stillschweigend ungeprüft durchrutscht.
 [[tool.mypy.overrides]]
-module = ["gradio.*", "colorama.*", "spacy.*", "piper.*", "ollama.*", "faster_whisper.*"]
+module = [
+    "gradio.*",
+    "colorama.*",
+    "spacy.*",
+    "piper.*",
+    "ollama.*",
+    "faster_whisper.*",
+    # Windows-stdlib. Auf dem Linux-Runner nicht vorhanden; unter
+    # `mypy --platform win32` kommt es aus typeshed und wird echt geprüft.
+    "winsound",
+]
 ignore_missing_imports = true

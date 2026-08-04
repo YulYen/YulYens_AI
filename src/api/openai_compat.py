@@ -30,6 +30,7 @@ from core.context_utils import approx_token_count
 from core.utils import resolve_secret
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -87,7 +88,11 @@ def _error(status: int, message: str, err_type: str, code: str | None = None):
     return OpenAIError(status, message, err_type, code)
 
 
-def openai_error_handler(_request: Request, exc: OpenAIError) -> JSONResponse:
+def openai_error_handler(_request: Request, exc: Exception) -> JSONResponse:
+    # Starlette reicht jedem Handler `Exception` — enger zu annotieren wäre
+    # eine Zusage, die der Aufrufer nicht einhalten muss. Deshalb hier
+    # verengen statt in der Signatur behaupten.
+    assert isinstance(exc, OpenAIError)
     return JSONResponse(status_code=exc.status, content=exc.payload)
 
 
@@ -97,6 +102,7 @@ def validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     A client that sends a malformed request should get an error it can parse;
     /ask keeps FastAPI's default so existing callers are unaffected.
     """
+    assert isinstance(exc, RequestValidationError)
     if not request.url.path.startswith("/v1/"):
         return JSONResponse(
             status_code=422, content={"detail": jsonable_encoder(exc.errors())}
