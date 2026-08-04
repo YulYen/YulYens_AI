@@ -309,10 +309,15 @@ Fast local run (dummy backend, without slow tests):
 pytest -q -m "not slow and not ollama and not browser"    # same as: make test
 ```
 
+Before pushing, **one** command is enough: `make check` — it runs the linters,
+the layer contracts, the type checks and the tests in turn, stopping at the
+first failure.
+
 More variants (see `Makefile`): `make test-all` (full suite), `make test-ci`
 (same scope as CI, with coverage), `make coverage`, `make lint` / `make format`
 (Ruff/Black), `make types` (mypy over all of `src`, twice — the second run
-assumes Windows), `make audit` (check the dependencies' known vulnerabilities against
+assumes Windows), `make lint-imports` (layer contracts, see below),
+`make audit` (check the dependencies' known vulnerabilities against
 `audit_allowlist.yaml` — needs network access) and `make evals` /
 `make evals-full` (eval suite, see `evals/ReadMe.md`; only the full variant
 needs a model).

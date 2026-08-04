@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint:
-    name: Format & lint
+    name: Format, lint & Schichten
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +23,13 @@ jobs:
         run: python -m black --check .
       - name: Ruff
         run: python -m ruff check .
+      # Schichten als Vertrag (`[tool.importlinter]` in pyproject.toml). Hier im
+      # lint-Job statt in einem eigenen: es ist eine statische Strukturprüfung,
+      # sie braucht weder Netz noch Modelle und läuft in Sekunden.
+      # PYTHONPATH=src, weil die Pakete top-level importiert werden — genau wie
+      # zur Laufzeit.
+      - name: Schichten (import-linter)
+        run: PYTHONPATH=src lint-imports
 
   audit:
     # Bekannte Schwachstellen in den gepinnten Abhängigkeiten (#61).

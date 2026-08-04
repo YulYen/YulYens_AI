@@ -100,6 +100,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
 | Formatting | Black (88), Ruff |
+| Schichten | import-linter (Verträge in `pyproject.toml`) |
 | Typen | mypy über das ganze `src` (Linux **und** `--platform win32`) |
 
 ## Verzeichnisstruktur
@@ -761,10 +762,56 @@ sinkt. Alle 55 Befunde sind behoben, nicht stummgeschaltet; wo ein `cast` steht
 ein `Any` ohne Grund ist ein Stummschalter, genau wie ein Allowlist-Eintrag
 ohne Grund.
 
+### Schichten sind ein Vertrag, keine Absichtserklärung (import-linter)
+
+CLAUDE.md sagt seit langem in Prosa, was wohin gehört. Ein Import, der das
+verletzt, fällt trotzdem niemandem auf — er funktioniert ja. `lint-imports`
+(Verträge in `pyproject.toml` unter `[tool.importlinter]`) macht daraus einen
+roten Job, der den konkreten Pfad nennt, inklusive der indirekten:
+`wiki.lookup -> security.tinyguard -> ui.session`.
+
+Fünf Verträge, jeder mit einem Grund:
+
+| Vertrag | Warum |
+|---|---|
+| Der Guard hängt an nichts außer der Config | Er wird von Wiki, RSS, Streamer und API gerufen. Eine Regel, die ihren Aufrufer kennt, ist keine Regel mehr |
+| Die Konfiguration kennt niemanden | Sonst wird jeder Start eine Frage der Import-Reihenfolge |
+| Oberflächen liegen oben | Drei benannte Ausnahmen: die AppFactory *baut* UI, WebUI und One-Shot-Provider |
+| Wiki weiß nichts von RSS (und umgekehrt) | Zwei Kontextquellen; sonst wandert die Guard-Regel der einen in die andere und gilt bald nur halb |
+
+**Bewusst `forbidden`-Verträge statt strenger Schichtung.** Die echten
+Aufwärts-Abhängigkeiten sind damit *benannte* Ausnahmen mit Begründung
+(`core.factory -> ui.web_ui` und zwei weitere), statt die Schichtung unmöglich
+zu machen. Der Wert liegt genau darin: eine **vierte** solche Abhängigkeit fällt
+auf, statt sich stillschweigend anzuschließen.
+
+Zwei Dinge, die beim Einbau aufgefallen sind:
+
+1. **Der Linter sieht, was `grep` nicht sieht.** Beim ersten Lauf fand er zwei
+   Importe, die in keiner Dateikopf-Suche auftauchen: **verzögerte Importe
+   innerhalb von Funktionen** (`security.tinyguard` holt sich lazy die
+   Config-Texte, `core.factory` den One-Shot-Provider). Beide sind legitim und
+   im Code begründet — aber ein Vertrag, der nur die Dateiköpfe kennt, hätte
+   sie nie gesehen.
+2. **Eine Mutationsprobe, die nicht greift, sieht aus wie ein blindes Gate.**
+   Mein erster Versuch, einen verbotenen Import einzuschleusen, blieb grün — ich
+   hätte fast auf „der Linter prüft gar nichts" geschlossen. Tatsächlich hatte
+   mein `replace` die Importzeile nicht getroffen, die Mutation war nie im
+   Code. **Vor dem Schluss „das Gate ist blind" also nachsehen, ob die Mutation
+   überhaupt drinsteht.** Richtig eingesetzt schlug der Vertrag sofort an.
+
+### `make check` — ein Kommando vor dem Push
+
+`make check` fährt `lint`, `lint-imports`, `types` und `test` nacheinander und
+stoppt beim ersten Fehler; die Reihenfolge ist nach Laufzeit sortiert, damit das
+Billige zuerst fehlschlägt. Bewusst **ohne** `audit` (braucht Netz) und ohne
+`test-browser` (braucht einen Browser-Build) — beides läuft getrennt, und ein
+Ziel, das ohne Netz fehlschlägt, würde bald umgangen.
+
 ### CI-Jobs (`.github/workflows/ci.yml`)
 | Job | Was er prüft |
 |---|---|
-| **Format & lint** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten) |
+| **Format, lint & Schichten** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten), dazu `lint-imports` — die Schichtenverträge (siehe unten). Statische Prüfungen, alle in Sekunden |
 | **Tests (ubuntu-latest / windows-latest)** | Volle Suite ohne `ollama`-Marker, mit `--cov`. Die Windows-Matrix ist der Punkt: das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf (#45) |
 | **Typen (mypy)** | `python -m mypy` — blockierend über das **ganze** `src` (Konfiguration in `pyproject.toml`). Dazu ein zweiter Lauf `--platform win32`: mypy wertet `sys.platform` statisch aus, der `winsound`-Zweig wäre auf dem Linux-Runner sonst ungeprüfter toter Code |
 | **Tests mit spaCy-Modell** | `de_core_news_lg` per `actions/cache` (versionierter Key), dann gezielt `test_spacy_keywords.py` + `test_wiki.py` — die liefen sonst nur als Skips |
@@ -839,6 +886,22 @@ im PATH** (z. B. `/root/.local/bin/black`), das das pip-installierte, gepinnte
 `python -m black --version` gegen den Pin in `requirements-dev.txt` prüfen
 (`black --version` zeigt ggf. das falsche PATH-Binary!). Das Makefile ruft
 bewusst `python -m black`/`python -m ruff` auf.
+
+**Dritte Fassung derselben Falle, gleiche Woche: `pytest`.** Der Makefile rief
+Black, Ruff und mypy längst als Modul auf — `pytest` aber nackt. Beim Bau von
+`make check` fiel es sofort auf: `ModuleNotFoundError: No module named
+'requests'`, während `python -c "import requests"` daneben anstandslos lief. Ein
+`pytest` im PATH kann auf einen **anderen Interpreter** zeigen als `python`;
+dann fehlen plötzlich Pakete, die installiert sind. Alle Testziele rufen
+deshalb jetzt `python -m pytest`.
+
+**Und eine vierte Fassung, die keine PATH-Falle ist, aber dieselbe Form hat:
+lokal installiert ≠ in der CI installiert.** Der mypy-Job installierte nur
+`requirements-dev.txt`; solange nur `src/core` geprüft wurde, genügte das. Mit
+dem erweiterten Prüfbereich meldete er 12-mal `import-not-found` statt zu
+prüfen — lokal war alles grün, weil hier alles installiert ist. Merksatz: **wer
+einen CI-Job ändert, stellt seine Installationsmenge nach, nicht nur sein
+Kommando** (ein `python -m venv` und zwei `pip install` reichen).
 
 ## Feature-Modi
 

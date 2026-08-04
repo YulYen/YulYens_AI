@@ -319,10 +319,14 @@ Schneller lokaler Durchlauf (Dummy-Backend, ohne langsame Tests):
 pytest -q -m "not slow and not ollama and not browser"    # entspricht: make test
 ```
 
+Vor dem Push genügt **ein** Kommando: `make check` — es fährt Linter,
+Schichtenprüfung, Typen und Tests nacheinander und stoppt beim ersten Fehler.
+
 Weitere Varianten (siehe `Makefile`): `make test-all` (komplette Suite),
 `make test-ci` (derselbe Umfang wie die CI, mit Coverage), `make coverage`,
 `make lint` / `make format` (Ruff/Black), `make types` (mypy über das ganze
-`src`, zweimal — der zweite Lauf nimmt Windows an), `make audit` (bekannte
+`src`, zweimal — der zweite Lauf nimmt Windows an), `make lint-imports`
+(Schichtenverträge, siehe unten), `make audit` (bekannte
 Schwachstellen der Abhängigkeiten gegen `audit_allowlist.yaml` halten — braucht Netz) und
 `make evals` / `make evals-full` (Eval-Suite, siehe `evals/ReadMe.md`; nur die
 volle Variante braucht ein Modell).

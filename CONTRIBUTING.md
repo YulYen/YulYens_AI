@@ -26,8 +26,24 @@
 
 Alternativ / shortcut: `make setup` führt die Schritte 2–4 aus.
 
+## Vor dem Push: ein Kommando
+
+```bash
+make check
+```
+
+Fährt `make lint`, `make lint-imports`, `make types` und `make test` in dieser
+Reihenfolge — was in Sekunden fehlschlägt, schlägt zuerst fehl. Bewusst **ohne**
+`make audit` (braucht Netz) und ohne `make test-browser` (braucht einen
+Browser-Build); beide laufen getrennt.
+
 ## Code Style
 - Use **Black** and **Ruff** for formatting and linting (`make format` / `make lint`).
+- **Schichten:** `make lint-imports` hält die Import-Struktur gegen die Verträge
+  in `pyproject.toml` (`[tool.importlinter]`). Beispiel: der Guard darf nichts
+  ausser der Config importieren, und nichts Unteres darf die Oberflächen kennen —
+  bis auf drei namentlich eingetragene Ausnahmen in der AppFactory. Ein Verstoss
+  nennt den konkreten Import-Pfad.
 - Typprüfung mit mypy: `make types` (blockierend über das ganze `src`;
   Konfiguration in `pyproject.toml`). Das Ziel fährt **zwei** Läufe — den
   zweiten mit `--platform win32`, weil mypy `sys.platform` statisch auswertet

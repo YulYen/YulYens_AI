@@ -66,3 +66,81 @@ module = [
     "winsound",
 ]
 ignore_missing_imports = true
+
+# --- Schichten als Vertrag (import-linter) -------------------------------------
+# CLAUDE.md sagt seit langem in Prosa, was wohin gehört. Ein Import, der das
+# verletzt, fällt aber niemandem auf — er funktioniert ja. Diese Verträge machen
+# daraus einen roten Job, der den konkreten Pfad nennt.
+#
+# Bewusst `forbidden`-Verträge statt einer strengen Schichtung: die echten
+# Aufwärts-Abhängigkeiten (die AppFactory *baut* die Oberflächen) sind damit
+# benannte Ausnahmen mit Begründung, statt die Schichtung unmöglich zu machen.
+#
+# Gleich beim ersten Lauf hat der Linter zwei Importe gefunden, die ein `grep`
+# über die Dateiköpfe nicht sieht: **verzögerte Importe innerhalb von
+# Funktionen**. Genau dafür ist er da.
+[tool.importlinter]
+root_packages = [
+    "core", "config", "security", "storage", "auth",
+    "wiki", "rss", "tts", "stt", "ui", "api", "email_adapter", "evals",
+]
+
+[[tool.importlinter.contracts]]
+name = "Der Guard haengt an nichts ausser der Config"
+type = "forbidden"
+source_modules = ["security"]
+# Der Guard wird von Wiki, RSS, Streamer und API gerufen — er darf nichts davon
+# kennen. Sonst entsteht ein Kreis, und schlimmer: eine Regel, die sich am
+# Aufrufer orientiert, ist keine Regel mehr.
+#
+# `config` fehlt in der Liste bewusst: `_load_texts` holt die Meldungstexte per
+# Lazy-Import, wenn der Aufrufer keine mitgibt. config ist selbst ein Blatt,
+# also keine Schichtverletzung — aber es ist die einzige erlaubte Abhängigkeit,
+# und deshalb steht sie hier statt in jemandes Kopf.
+forbidden_modules = [
+    "core", "storage", "auth", "wiki", "rss",
+    "tts", "stt", "ui", "api", "email_adapter", "evals",
+]
+
+[[tool.importlinter.contracts]]
+name = "Die Konfiguration kennt niemanden"
+type = "forbidden"
+source_modules = ["config"]
+# config wird von allem gelesen. Importierte sie zurück, wäre jeder Start eine
+# Frage der Import-Reihenfolge.
+forbidden_modules = [
+    "core", "security", "storage", "auth", "wiki", "rss",
+    "tts", "stt", "ui", "api", "email_adapter", "evals",
+]
+
+[[tool.importlinter.contracts]]
+name = "Oberflaechen liegen oben"
+type = "forbidden"
+source_modules = [
+    "core", "config", "security", "storage", "auth",
+    "wiki", "rss", "tts", "stt",
+]
+forbidden_modules = ["ui", "api", "email_adapter"]
+# Die drei bewussten Ausnahmen: die AppFactory baut die Oberflächen und den
+# One-Shot-Provider, das ist ihr Zweck. Sie stehen hier namentlich, damit eine
+# *vierte* solche Abhängigkeit auffällt, statt sich stillschweigend
+# anzuschließen.
+ignore_imports = [
+    "core.factory -> ui.terminal_ui",
+    "core.factory -> ui.web_ui",
+    "core.factory -> api.provider",
+]
+
+[[tool.importlinter.contracts]]
+name = "Wiki weiss nichts von RSS"
+type = "forbidden"
+source_modules = ["wiki"]
+# Zwei Kontextquellen, die sich nicht kennen sollen: sonst wandert die
+# Guard-Regel der einen in die andere und gilt bald nur noch halb.
+forbidden_modules = ["rss"]
+
+[[tool.importlinter.contracts]]
+name = "RSS weiss nichts vom Wiki"
+type = "forbidden"
+source_modules = ["rss"]
+forbidden_modules = ["wiki"]
