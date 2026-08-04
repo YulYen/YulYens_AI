@@ -47,12 +47,24 @@ Guard-Korpus.
 sagt kein `assert` — nur, ob ein Kommando noch existiert. Die englische Fassung
 ist außerdem eine Übersetzung: ändert sich die deutsche, ändert sich beide.
 
-**Datierte Berichte werden nicht nachgezogen.** `docs/framework_update_juni_2026.md`
-und `docs/modellwechsel_juni_2026.md` halten fest, was *damals* mit welcher
-Begründung entschieden wurde; ihren Inhalt anzupassen fälscht die Aufzeichnung.
-Wenn ihre Aussagen überholt sind, kommt ein datierter Hinweis davor — so
-geschehen, als Gradio 6 den dortigen `gradio==4.44.1`-Beschluss aufhob. Der Test
-lässt diese Dateien deshalb ausdrücklich aus (`LIVING_DOCS`).
+**Datierte Berichte werden nicht nachgezogen.**
+`docs/modellwechsel_juni_2026.md` hält fest, was *damals* mit welcher
+Begründung entschieden wurde — warum `ministral-3:8b` und nicht LeoLM 13B, was
+8 GB VRAM zulassen. Den Inhalt anzupassen fälscht die Aufzeichnung; ist eine
+Aussage überholt, kommt ein datierter Hinweis davor. Der Test lässt die Datei
+deshalb ausdrücklich aus (`LIVING_DOCS`).
+
+**Aber ein Bericht ist nicht automatisch erhaltenswert.** Nebenan lag
+`framework_update_juni_2026.md` und protokollierte einen Routine-Bump zweier
+Patch-Versionen. Das ist ein *Arbeitsprotokoll*, keine Entscheidung: die zwei
+Versionen waren überholt, alle vier dort festgehaltenen „bewusst nicht
+geändert"-Beschlüsse inzwischen umgekehrt, die einzige dauerhaft nützliche
+Zeile stand ohnehin hier — und **verlinkt hat ihn niemand**. Ein Dokument,
+dessen sämtliche Aussagen falsch sind und auf das nichts zeigt, ist keine
+Aufzeichnung, sondern Altlast; es ist gelöscht. Die Frage vor dem Hinweis
+lautet also: hält das hier eine *Entscheidung* fest, oder nur, dass jemand
+gearbeitet hat? `modellwechsel` besteht diese Probe (drei lebende Dokumente
+verlinken darauf), `framework_update` nicht.
 
 ### Ausnahme: eine einzelne Textdatei darf direkt auf `main`
 
