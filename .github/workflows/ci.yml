@@ -63,7 +63,12 @@ jobs:
           python-version: "3.10"
           cache: pip
       - name: Install tooling
-        run: pip install -r requirements-dev.txt
+        # **Beide** Dateien. Solange nur src/core geprüft wurde, genügten die
+        # Dev-Tools; seit der Prüfbereich `src/api`, `src/config`, `src/wiki`
+        # und `src/rss` einschliesst, braucht mypy die echten Pakete
+        # (pydantic, fastapi, uvicorn, bs4) — ohne sie meldet es
+        # `import-not-found` statt die Typen zu prüfen.
+        run: pip install -r requirements.txt -r requirements-dev.txt
       # 'python -m' wie bei Black/Ruff (PATH-Shadowing-Falle, siehe CLAUDE.md)
       - name: mypy
         run: python -m mypy
