@@ -29,13 +29,13 @@ Welche Ensembles verfügbar sind, listet `python src/launch.py --list-ensembles`
 Zwei verschiedene Benutzeroberflächen stehen zur Verfügung, auswählbar über die Konfiguration (`ui.type`):
 
 - **Terminal-UI** – Konsolenbasierte Chat-Anwendung mit farbig hervorgehobenen Rollen (Nutzer/KI). Bei Start wird die gewünschte Persona per Menü ausgewählt. Nutzereingaben werden direkt in der Konsole eingegeben, und die KI-Antwort erscheint tokenweise gestreamt. Es gibt einfache Befehle wie `exit` zum Beenden und `clear` für einen neuen Chatverlauf.
-- **Web-UI** – Webbasierte Oberfläche (Gradio), die im Browser verfügbar ist. Sie bietet eine grafische Persona-Auswahl (mit Avatar-Bildern) und ein Chat-Fenster für die Unterhaltung. Die KI-Antwort wird hier live im Verlauf angezeigt, während sie generiert wird. Die Web-UI ist im lokalen Netzwerk zugänglich und ermöglicht ein komfortables Chat-Erlebnis über HTTP.
+- **Web-UI** – Webbasierte Oberfläche (Gradio), die im Browser verfügbar ist. Sie bietet eine grafische Persona-Auswahl (mit Avatar-Bildern) und ein Chat-Fenster für die Unterhaltung. Die KI-Antwort wird hier live im Verlauf angezeigt, während sie generiert wird. Standardmäßig horcht sie nur auf `127.0.0.1`, ist also nur vom eigenen Rechner aus erreichbar; für den Zugriff aus dem Netz muss `ui.web.host` bewusst umgestellt werden (und dann bitte mit Anmeldung, siehe unten).
 
-Optional kann ein **Ask-All/Broadcast-Modus** aktiviert werden (`ui.experimental.broadcast_mode: true`). Dann lässt sich eine Frage an alle Personas richten – im Terminal über die Ask-All-Option im Startmenü, in der Web-UI über die Ask-All-Kachel. Die Personas antworten nacheinander; in der Web-UI erscheinen die Antworten **live tokenweise gestreamt** als Markdown-Abschnitt pro Persona:
+Optional kann ein **Ask-All/Broadcast-Modus** aktiviert werden (`ui.experimental.broadcast_mode: true`). Dann lässt sich eine Frage an alle Personas richten – im Terminal über die Ask-All-Option im Startmenü, in der Web-UI über die Ask-All-Kachel. Im Terminal antworten die Personas nacheinander; in der Web-UI laufen sie **parallel** und erscheinen **live tokenweise gestreamt** als Markdown-Abschnitt pro Persona. Ein echter Zeitgewinn setzt allerdings voraus, dass Ollama parallel bedient (`OLLAMA_NUM_PARALLEL` ≥ Zahl der Personas) — sonst reiht es die Anfragen doch wieder auf. Zurückschalten lässt sich das mit `ui.experimental.broadcast_parallel: false`:
 
 ![Ask-All: Alle vier Personas beantworten dieselbe Frage](../screenshot_ask_all.png)
 
-Zusätzlich kann `ui.type` auch auf `null` gesetzt werden, um ausschließlich die API zu betreiben; die Web-UI unterstützt außerdem einen optionalen Gradio-Share-Link mit Zugangsdaten aus `ui.web.share_auth`.
+Zusätzlich kann `ui.type` auch auf `null` gesetzt werden, um ausschließlich die API zu betreiben; die Web-UI unterstützt außerdem einen optionalen Gradio-Share-Link (`ui.web.share: true`). Die Zugangsdaten dafür kommen aus dem Abschnitt `ui.web.auth` — der gilt **unabhängig davon, ob ein Share-Link aktiv ist** (siehe „Anmeldung"). Das frühere `ui.web.share_auth` ist veraltet und wirkt nur noch als Fallback, wenn kein `auth`-Abschnitt vorhanden ist.
 
 ### Stream-Steuerung: Stop und Nochmal
 
@@ -59,20 +59,25 @@ Das Projekt unterstützt einen **AI-Dialog-Modus**, in dem zwei Personas automat
 - **Terminal-UI:** Über das Startmenü kann „Self Talk“ gewählt werden. Danach werden Persona A, Persona B und ein Start-Prompt abgefragt.
 - **Web-UI:** Eine eigene Self-Talk-Kachel startet denselben Ablauf direkt im Browser.
 - **Ablauf:** Beide Personas antworten abwechselnd; die jeweils erzeugte Antwort wird als nächste Eingabe für die andere Persona verwendet.
-- **Automatisches Ende:** Der Dialog endet, sobald eine Persona das definierte End-Token (`_endegelaende_`) ausgibt.
+- **Automatisches Ende:** Der Dialog endet, sobald eine Persona das definierte End-Token (`_endegelaende_`) ausgibt. Aus Nachsicht gegenüber kleinen Modellen zählt außerdem eine Antwort, die auf `_ende_` endet.
 
 Damit eignet sich der Modus z. B. für Brainstorming zwischen zwei Charakteren oder das Durchspielen mehrerer Sichtweisen auf dieselbe Fragestellung.
 
 ## Text-to-Speech (TTS)
 
-Für die Terminal-Interaktion ist eine integrierte **Text-to-Speech-Ausgabe mit Piper** verfügbar:
+Eine integrierte **Text-to-Speech-Ausgabe mit Piper** steht in beiden Oberflächen zur Verfügung:
 
 - Aktivierung über `tts.enabled: true`.
-- Automatische WAV-Erzeugung pro Antwort über `tts.features.terminal_auto_create_wav: true`.
+- **Terminal:** automatische WAV-Erzeugung pro Antwort über `tts.features.terminal_auto_create_wav: true`, inklusive Wiedergabe.
+- **Web-UI:** der Knopf „Vorlesen 🔊" im Persona-Chat spielt die letzte Antwort mit der Stimme der Persona **im Browser** ab, nicht über einen System-Player. Er erscheint nur, wenn `pip install piper-tts` erfolgt ist und Stimmen im `voices/`-Ordner liegen; abschalten über `tts.features.web_read_aloud: false`.
 - Sprachmodelle werden über `tts.voices` in der `config.yaml` konfiguriert (Default je Sprache plus optionale persona-spezifische Stimmen).
 - **Plattformen:** Die automatische WAV-Erzeugung und -Wiedergabe in der Terminal-UI läuft auf allen drei Plattformen. Windows nutzt `winsound` aus der Standardbibliothek, Linux und macOS greifen auf die üblichen Kommandozeilen-Player zurück (`paplay`, `aplay` oder `ffplay` unter Linux, `afplay` unter macOS) — ohne zusätzliche Abhängigkeit. Findet sich kein Player, wird die Wiedergabe still übersprungen und die WAV-Datei liegt trotzdem in `out/`.
 
 So kann die KI-Antwort nicht nur gelesen, sondern unmittelbar auch als Audio ausgegeben werden.
+
+## Spracheingabe (STT)
+
+Umgekehrt lässt sich in der Web-UI auch **sprechen** statt tippen: Mit `stt.enabled: true` und einem installierten `faster-whisper` (`pip install faster-whisper`) erscheint ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird an das Eingabefeld angehängt und lässt sich vor dem Absenden noch bearbeiten — die Erkennung ersetzt das Senden also nicht, sie füllt nur das Feld. Die erste Aufnahme lädt das Whisper-Modell (einmalig, inklusive Download) und dauert deshalb spürbar länger als die folgenden. Größe und Sprache stehen unter `stt.model` und `stt.language`; Details in [src/stt/ReadMe.md](../../src/stt/ReadMe.md).
 
 ## One-Shot API
 
@@ -147,7 +152,9 @@ Das MVP verarbeitet einfache Text-E-Mails; HTML wird pragmatisch zu Text reduzie
 
 ## Gespräche wiederfinden
 
-Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig `data/conversations.sqlite3`) — nicht in Logdateien. Über die Karte „Verlauf öffnen 🗂" lassen sie sich auflisten, ansehen, **fortsetzen**, als Markdown exportieren und löschen. Angezeigt werden nur die eigenen Gespräche; wer als `local` arbeitet, sieht die des lokalen Nutzers.
+Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig `data/conversations.sqlite3`) — nicht in Logdateien. Über die Karte „Verlauf öffnen 🗂" lassen sie sich auflisten, ansehen, **fortsetzen**, als Markdown exportieren und löschen. Angezeigt werden nur die eigenen Gespräche, geprüft wird der Eigentümer serverseitig.
+
+**In der Web-UI setzt das eine Anmeldung voraus.** Ohne sie sind alle Besucher derselbe Nutzer `local` — der „eigene" Verlauf wäre dann der Verlauf aller, fortsetzbar und löschbar von jedem, der die Seite erreicht. Deshalb zeichnet die Web-UI ohne Anmeldung **gar nichts** auf und blendet die Verlauf-Karte aus; der Start sagt beide Auswege dazu. Wer den gemeinsamen Topf am Einzelplatz ausdrücklich will, setzt `storage.shared_without_login: true` und bekommt dafür eine laute Warnung beim Start. Terminal und API sind davon nicht betroffen — dort gibt es keine Anmeldung, die fehlen könnte.
 
 Fortsetzen heißt wirklich fortsetzen: die Antwort landet im selben Gesprächseintrag, es entsteht kein zweiter. Gespräche einer Gast-Persona bleiben lesbar, lassen sich aber nicht fortsetzen — deren System-Prompt lebte nur in der damaligen Sitzung.
 
@@ -159,7 +166,7 @@ Der frühere JSONL-Mitschnitt in `logs/` ist weiterhin verfügbar, aber als rein
 
 Standardmäßig verlangt die Web-UI **keine Anmeldung** — für den Einzelplatz am eigenen Rechner wäre sie nur Aufwand. Über `ui.web.auth.provider` lässt sie sich einschalten:
 
-- `disabled` (Standard): kein Login, jedes Gespräch wird dem Nutzer `local` zugeordnet.
+- `disabled` (Standard): kein Login, alle Besucher sind derselbe Nutzer `local` — und genau deshalb zeichnet die Web-UI in dieser Einstellung keine Gespräche auf (siehe „Gespräche wiederfinden").
 - `local`: Benutzername und Passwort aus `ui.web.auth.users`. Passwörter gehören nicht im Klartext in die Config, sondern als `env:NAME`.
 - `header`: die Identität kommt von einem vorgeschalteten Reverse-Proxy (oauth2-proxy, Authelia, …). Das ist der Weg, um später einen echten Anmeldedienst wie Keycloak davorzusetzen — Gradio selbst kann kein OpenID Connect.
 
@@ -196,7 +203,7 @@ Der Button „Briefing 📰" (bzw. `/briefing` im Terminal) gibt es weiterhin; e
 Um fundierte Antworten zu ermöglichen, kann das System bei Wissensfragen automatisch **Wikipedia-Wissen einbinden** (optional konfigurierbar). Dabei kommen folgende Mechanismen zum Einsatz:
 
 - **Automatischer Wissensabruf:** Aus der Nutzerfrage wird mittels spaCy-NLP das relevanteste Schlagwort extrahiert. Anschließend sucht ein interner Wiki-Proxy nach einem passenden Wikipedia-Artikel – je nach Einstellung entweder **offline** über eine lokale Kiwix-Datenbank oder **online** über die Wikipedia-API. Bei Offline-Modus kann der Kiwix-Server automatisch gestartet werden, sofern konfiguriert.
-- **Kontext-Erweiterung:** Findet der Wiki-Proxy einen Artikel, wird ein Ausschnitt (Snippet) daraus entnommen. Dieser Ausschnitt wird als zusätzliche *System*-Nachricht in den Chat-Kontext eingefügt, bevor die KI antwortet. Die KI erhält so geprüfte Fakten als Kontext und kann präzisere Antworten geben. In der Terminal-UI wird außerdem ein Hinweis-Icon (🕵️) angezeigt, wenn ein Wikipedia-Snippet benutzt wurde. Bleibt die Suche ohne Treffer, wird dies durch eine kurze Hinweisnachricht vermerkt.
+- **Kontext-Erweiterung:** Findet der Wiki-Proxy einen Artikel, wird ein Ausschnitt (Snippet) daraus entnommen. Dieser Ausschnitt wird als zusätzliche, deutlich als Fremdtext markierte *user*-Nachricht in den Chat-Kontext eingefügt (`[FREMDTEXT ANFANG] … [FREMDTEXT ENDE]`), bevor die KI antwortet — bewusst nicht als *system*-Nachricht, denn ein heruntergeladener Artikel ist Material, über das geredet wird, und keine Anweisung. Vorher durchläuft er den Sicherheits-Guard, der Anweisungsversuche im Artikeltext verwirft. Die KI erhält so geprüfte Fakten als Kontext und kann präzisere Antworten geben. Der Ausschnitt gehört zum Prompt, nicht zum Gespräch: in Ablage, Verlauf und Export taucht er nicht auf. In der Terminal-UI wird außerdem ein Hinweis-Icon (🕵️) angezeigt, wenn ein Wikipedia-Snippet benutzt wurde. Bleibt die Suche ohne Treffer, wird dies durch eine kurze Hinweisnachricht vermerkt.
 - **Quellen einsehbar (Web-UI):** Unter dem Chat sitzt ein zugeklapptes Accordion „Quellen 📚". Aufgeklappt zeigt es pro Snippet den Artikeltitel als klickbaren Link (offline auf den lokalen kiwix-serve), die Herkunft — und vor allem **den Ausschnitt im Wortlaut, so wie er in den Prompt gegangen ist**, samt Zeichenzahl. Weil `wiki.snippet_limit` lange Artikel kürzt (Standard 1200 Zeichen), steht dort z. B. „1200 von 9800 Zeichen injiziert (gekürzt)" — daran ist erkennbar, wie viel des Artikels die KI gar nicht gesehen hat. Passte alles hinein, heißt es „vollständig". Ohne Wiki-Treffer bleibt das Accordion unsichtbar. In der Ask-All-Ansicht gibt es dasselbe Accordion unter den Antworten, im Terminal zeigt das Kommando `/quellen` denselben Inhalt.
 - **Mehrere Treffer nutzbar:** Erkennt der Keyword-Finder mehrere relevante Entitäten, können mehrere Snippets in den Prompt aufgenommen werden. Die Obergrenze steuert `wiki.max_wiki_snippets` (Standard: 2), sodass der Kontext gezielt erweitert werden kann, ohne zu überladen.
 
@@ -204,7 +211,7 @@ Um fundierte Antworten zu ermöglichen, kann das System bei Wissensfragen automa
 
 Stabile Nutzung wird durch umfangreiches Logging und automatische Tests unterstützt:
 
-- **Chat-Logging:** Jede Unterhaltung wird in einer JSON-Datei (im Ordner `logs/`) mitprotokolliert. Darin werden Zeitstempel, verwendetes Modell, Persona sowie alle Nutzer- und KI-Nachrichten festgehalten. Zusätzlich schreibt die Anwendung fortlaufend ein System-Logfile (mit Präfix `yulyen_ai_...`), das interne Abläufe und Debug-Informationen (Info/Fehler) enthält.
+- **Gespräche vs. Logs:** Die Gespräche selbst liegen **nicht** in `logs/`, sondern in der SQLite-Ablage (siehe „Gespräche wiederfinden"). In `logs/` steht Betriebs-Diagnostik: ein fortlaufendes System-Logfile (Präfix `yulyen_ai_...`) mit internen Abläufen und Debug-Informationen. Der rohe JSONL-Mitschnitt der einzelnen Generierungs*versuche* (Zeitstempel, Modell, Persona, Nachrichten) lässt sich mit `logging.conversation_jsonl: true` dazuschalten — er ist ein Debug-Werkzeug und standardmäßig aus.
 - **Wiki-Proxy Logging:** Der Wikipedia-Proxy-Dienst führt eigene Logdateien über die Artikelanfragen und Ergebnisse. Dadurch lassen sich Wiki-Zugriffe und etwaige Fehler nachvollziehen, getrennt vom Haupt-Chat-Log.
 - **Antwort-Feedback (👍/👎):** In der Web-UI lässt sich jede Antwort bewerten. Jeder Klick schreibt eine Zeile nach `logs/feedback_votes.jsonl` — mit Zeitstempel, Persona, Modell, Frage, Antwort, Bewertung und einem Verweis auf das gespeicherte Gespräch. Die Datei wächst nur an (eine Umbewertung ergänzt eine Zeile, statt die alte zu ersetzen), sodass sich der Verlauf auswerten lässt. Gedacht als Datenbasis für Qualitätsvergleiche und späteres Finetuning.
 - **Automatisierte Tests:** Eine Sammlung von Pytest-Tests (`tests/` Verzeichnis) prüft zentrale Funktionen des Systems. Beispielsweise wird getestet, ob die Personas korrekt initialisiert werden, ob der Sicherheits-Filter greift und ob wiederholbare Antworten (z. B. gleiche Witze von Doris) konsistent bleiben. Diese Tests helfen, Regressionen zu vermeiden und die Zuverlässigkeit der KI-Orchestrierung sicherzustellen.
@@ -228,6 +235,7 @@ Die Architektur von *Yul Yen’s AI Orchestra* ist darauf ausgelegt, zukünftige
 - **LoRA-Finetuning (PoC):** Erste Experimente zur Modellverfeinerung existieren als Proof-of-Concept, werden jedoch aus Platzgründen nicht im Standard-Repository mitgeliefert. Intern zeigt ein kleines **LoRA-Finetuning**-Beispiel (basierend auf [PEFT/QLoRA](https://github.com/huggingface/peft)), wie ein kompakter Adapter für die Persona Doris mit ca. 200 Frage-Antwort-Paaren trainiert wurde. Die zugehörigen Trainingsskripte und Testläufe dienen ausschließlich Demonstrationszwecken und sind nicht in den Hauptbetrieb integriert. Interessierte können sich bei den Maintainer:innen melden, um Details oder Zugang zu den Materialien zu erhalten.
 - **Kontext-Kompression („Karl“):** Bei langen Unterhaltungen wird die Chat-History automatisch komprimiert, bevor das Kontextfenster überläuft. Standard ist eine schnelle Heuristik (alte Nachrichten kürzen, System-Prompt und jüngste Nachrichten behalten); optional fasst der LLM-basierte Summarizer „Karl“ ältere Chat-Teile zusammen (`context_management.strategy: "karl"`, mit automatischem Fallback auf die Heuristik).
 - **Drei-Zeitstempel-Transparenz:** Der System-Prompt trennt drei leicht verwechselbare Zeitangaben sauber: das aktuelle Systemdatum, den Trainings-Cutoff des Modells (`core.knowledge_cutoffs`) und den Datenstand des Wikipedia-Archivs. So behaupten die Personas nicht versehentlich, „aktuelles“ Wissen zu haben.
-- **Zukünftige Features:** Das Projekt hat eine priorisierte Roadmap (siehe [backlog.md](../../backlog.md)). Geplant sind u. a. die Integration von Werkzeugen (*Tool Use* wie Websuche oder Rechner), Spracheingabe (STT) und schnellere First-Token-Zeiten. Die aktuelle Codebasis bildet eine einfache, erweiterbare Grundlage, auf der solche Features aufsetzen können.
+- **Eval-Suite:** Ob eine Änderung das Modell wirklich besser gemacht hat, beantwortet ein eigener Korpus aus goldenen Fragen pro Persona und Guard-Angriffen — als YAML, damit neue Fälle keinen Testcode brauchen (`python scripts/run_evals.py -e classic`, Details in [evals/ReadMe.md](../../evals/ReadMe.md)). Der Guard-Teil läuft ohne Modell in der normalen Testsuite mit.
+- **Zukünftige Features:** Das Projekt hat eine priorisierte Roadmap (siehe [backlog.md](../../backlog.md)). Geplant sind u. a. die Integration von Werkzeugen (*Tool Use* wie Websuche oder Rechner), ein Langzeit-Gedächtnis über die Gesprächs-Ablage und Volltextsuche im Verlauf. Die aktuelle Codebasis bildet eine einfache, erweiterbare Grundlage, auf der solche Features aufsetzen können.
 
 siehe auch: [backlog.md](../../backlog.md)

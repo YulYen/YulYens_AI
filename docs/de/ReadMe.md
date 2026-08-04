@@ -5,13 +5,16 @@ Sie alle basieren auf einem lokalen LLM (aktuell über [Ollama](https://ollama.c
 
 Das Projekt unterstützt:
 - **Terminal-UI** mit farbiger Konsolenausgabe & Streaming
-- **Web-UI** auf Basis von [Gradio](https://gradio.app) (im lokalen Netzwerk erreichbar)
+- **Web-UI** auf Basis von [Gradio](https://gradio.app) (Standard: nur vom eigenen Rechner erreichbar, siehe `ui.web.host`)
 - **Ask-All/Broadcast**: eine Frage an alle Personas, Antworten live und parallel gestreamt
 - **AI-Dialog (Self-Talk)** zwischen zwei Personas (Terminal + Web)
-- **Text-to-Speech (TTS)** mit automatischer WAV-Erstellung im Terminal-Modus
-- **API (FastAPI)** zur Integration in externe Anwendungen (inkl. `/healthz`-Deep-Check)
+- **Text-to-Speech (TTS)** mit Piper: automatische WAV-Erstellung im Terminal, „Vorlesen"-Knopf in der Web-UI
+- **Spracheingabe (STT)** in der Web-UI: Mikrofon neben dem Eingabefeld (opt-in via faster-whisper)
+- **API (FastAPI)** zur Integration in externe Anwendungen (inkl. `/healthz`-Deep-Check und OpenAI-kompatiblen `/v1`-Endpunkten)
 - **E-Mail-Adapter** (opt-in): Personas beantworten Mails per IMAP/SMTP
 - **Wikipedia-Integration** (online oder offline via Kiwix-Proxy)
+- **Nachrichten als Quelle (RSS)**: Feeds im Hintergrund, Meldungen kommen als Kontext dazu, wenn die Frage danach ist
+- **Gesprächs-Ablage** in SQLite mit Verlauf, Fortsetzen, Markdown-Export und optionaler Anmeldung
 - **Sicherheits-Filter** (Prompt-Injection-Schutz, PII-Erkennung, Wrongdoing-Guardrail)
 - **Setup-Doktor** (`--doctor`) für Preflight-Checks mit konkreten Fix-Hinweisen
 - **Logging & Tests** für stabile Nutzung
@@ -29,7 +32,7 @@ siehe auch: [Features.md](Features.md)
   - **Doris**: sarkastisch, humorvoll, frech
   - **Peter**: faktenorientiert, analytisch
   - **Popcorn**: verspielt, kindgerecht
-- **Erweiterbares Fundament** für zukünftige Features (z. B. LoRA-Finetuning, Tool-Use, RAG, STT)
+- **Erweiterbares Fundament** für zukünftige Features (z. B. LoRA-Finetuning, Tool-Use, RAG)
 - **KISS-Prinzip**: einfache, nachvollziehbare Architektur
 
 ---
@@ -40,7 +43,7 @@ siehe auch: [Features.md](Features.md)
 - **Core**:
   - Austauschbarer LLM-Core (`OllamaLLMCore`, `DummyLLMCore` für Tests) samt `YulYenStreamingProvider`
   - Wikipedia-Support inkl. spaCy-basiertem Keyword-Extractor
-- **Personas**: Systemprompts & Eigenheiten in `src/config/personas.py`
+- **Personas**: Systemprompts & LLM-Optionen als YAML unter `ensembles/<name>/`; `src/config/personas.py` lädt sie
 - **UI**:
   - `TerminalUI` für CLI
   - `WebUI` (Gradio) mit Persona-Auswahl & Avataren
@@ -48,8 +51,9 @@ siehe auch: [Features.md](Features.md)
 - **API**: FastAPI-Server (`/ask`-Endpoint für One-Shot-Fragen, `/health` als Liveness-Stub, `/healthz` als Deep-Check)
 - **Kontext-Management**: bei langen Chats wird die History automatisch komprimiert — heuristisch (Standard) oder per LLM-Zusammenfassung („Karl", `context_management.strategy: "karl"`)
 - **E-Mail-Adapter**: optionaler IMAP/SMTP-Dienst, der eingehende Mails einer Persona zuordnet und beantwortet (Details in [Features.md](Features.md))
+- **Gesprächs-Ablage**: die Gespräche liegen in SQLite (`storage.path`), nicht in Logdateien — der Verlauf in der Web-UI liest von dort
 - **Logging**:
-  - Chatverläufe und Systemlogs in `logs/`
+  - Systemlogs in `logs/`; der rohe JSONL-Mitschnitt eines Turns ist ein Debug-Artefakt und standardmäßig aus (`logging.conversation_jsonl`)
   - Wiki-Proxy schreibt separate Logdateien
 
 ---
@@ -121,6 +125,9 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Scha
 
 - `language`: steuert UI-Texte und Persona-Prompts (`"de"` oder `"en"`).
 - `ui.type`: wählt die Oberfläche (`"terminal"`, `"web"` oder `null` für nur API).
+- `ui.web.host`: **Standard `127.0.0.1`** — die Web-UI ist dann nur vom eigenen Rechner aus erreichbar. Auf `"0.0.0.0"` stellen, wenn andere im Netz sie benutzen sollen; dann aber `ui.web.auth` einschalten, sonst warnt der Start (zu Recht) laut.
+- `ui.web.auth.provider`: Anmeldung der Web-UI — `disabled` (Standard), `local` (Nutzer aus `ui.web.auth.users`, Passwörter als `env:NAME`) oder `header` (Identität von einem vorgeschalteten Proxy). Gilt **unabhängig** von `ui.web.share`. Das frühere `ui.web.share_auth` wirkt nur noch als Fallback und wird beim Start angemahnt.
+- `storage.enabled`: die Gesprächs-Ablage (SQLite unter `storage.path`), Grundlage für Verlauf, Fortsetzen und Markdown-Export. **Ohne Anmeldung zeichnet die Web-UI trotzdem nichts auf** — alle Besucher wären derselbe Nutzer `local` und sähen gegenseitig ihre Gespräche. Wer das für den Einzelplatz ausdrücklich will, setzt `storage.shared_without_login: true`; der Start warnt dann einmal laut. `storage.history_limit` steuert die Länge der Verlauf-Liste, `storage.file_exchange` den JSON-Down-/Upload.
 - `tts.enabled`: schaltet Text-to-Speech ein/aus.
 - `tts.features.terminal_auto_create_wav`: erzeugt im Terminal-Modus pro Antwort eine WAV-Datei und spielt sie ab — Windows über `winsound`, Linux/macOS über `paplay`/`aplay`/`ffplay` bzw. `afplay`. Ohne verfügbaren Player bleibt es bei der Datei in `out/`.
 - `api.openai_compatible`: schaltet die OpenAI-kompatiblen Endpunkte frei (`/v1/models`, `/v1/chat/completions`), mit denen fremde Clients wie Open WebUI mit den Personas sprechen. **Sobald `api.host` nicht mehr auf `127.0.0.1` steht, gehört hier ein `api_key` gesetzt** — am besten als `"env:YULYEN_API_KEY"` statt im Klartext. `rate_limit_per_minute` begrenzt Anfragen pro Client.
@@ -150,9 +157,11 @@ core:
 ui:
   type: "web"        # Alternativen: "terminal" oder null (nur API)
   web:
-    host: "0.0.0.0"
+    host: "127.0.0.1"  # Standard: nur lokal. "0.0.0.0" öffnet die UI ins Netz
     port: 7860
-    share: false       # Optional Gradio-Share (Benutzername/Passwort nötig)
+    share: false       # Optional: öffentlicher Gradio-Share-Link
+    auth:
+      provider: "disabled"   # disabled | local | header — gilt unabhängig von `share`
 
 wiki:
   mode: "offline"    # "offline", "online" oder false (deaktiviert)
@@ -264,12 +273,13 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
   - Bei `ui.type: "terminal"` im Terminal nutzen
   - Startmenü: neue Unterhaltung, Konversation laden (JSON), Self-Talk, Ask-All
   - Eingabe: Fragen einfach eintippen
-  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern), `/briefing` (Persona fasst die konfigurierten RSS-Feeds zusammen)
+  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern), `/briefing` (Persona fasst die konfigurierten RSS-Feeds zusammen), `/quellen` bzw. `/sources` (die zuletzt injizierten Wikipedia-Ausschnitte im Wortlaut, ungekürzt)
 
 - **Web-UI**
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
   - Im Browser öffnen: `http://<host>:<port>` entsprechend der Einstellungen unter `ui.web` (Standard: `http://127.0.0.1:7860`)
-  - Optional: Gradio-Share per `ui.web.share: true` aktivieren; Zugangsdaten kommen aus `ui.web.share_auth`
+  - Anmeldung (optional): `ui.web.auth.provider` auf `local` oder `header` setzen — sie gilt **unabhängig davon, ob ein Share-Link aktiv ist**. Ohne Anmeldung zeichnet die Web-UI keine Gespräche auf und blendet die Verlauf-Karte aus (`storage.shared_without_login: true` schaltet sie ausdrücklich wieder ein)
+  - Optional: öffentlicher Gradio-Share-Link per `ui.web.share: true`. Das alte `ui.web.share_auth` ist veraltet und wirkt nur noch als Fallback, wenn kein `auth`-Abschnitt existiert; der Start mahnt es an
   - Persona auswählen und loschatten
   - Profi-Option: Im zugeklappten „Erweitert"-Bereich unten am Startbildschirm lässt sich das Modell für die laufende Sitzung wechseln (Liste = installierte Ollama-Modelle). Gilt nur bis zum Neustart — danach greift wieder `core.model_name` aus der `config.yaml`
   - Spracheingabe (opt-in): Nach `pip install faster-whisper` erscheint im Persona-Chat ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird ans Eingabefeld angehängt und kann vor dem Senden editiert werden. Die erste Aufnahme lädt das Whisper-Modell (einmalig inkl. Download) und dauert daher etwas. Details und Modellwahl: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)

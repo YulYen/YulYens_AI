@@ -20,7 +20,10 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 - **AI-Dialog (Self-Talk)**: zwei Personas unterhalten sich automatisch
 - **Stop & Nochmal**: laufende Antworten abbrechen (die Teilantwort bleibt stehen) oder mit demselben Kontext neu erzeugen
 - **OpenAI-kompatible API**: `/v1/chat/completions` mit der Persona als `model` — damit sprechen Open WebUI, Handy-Apps und Editor-Plugins mit LEAH & Co., inklusive Guard und Wiki
-- **Text-to-Speech** mit Piper (persona-eigene Stimmen)
+- **Nachrichten als Quelle**: konfigurierte RSS-Feeds werden im Hintergrund geholt; passende Meldungen kommen als Kontext dazu, wenn die Frage danach ist — Small Talk löst nichts aus
+- **Gespräche bleiben**: Verlauf in einer lokalen SQLite-Ablage — wiederfinden, fortsetzen, als Markdown exportieren, löschen (in der Web-UI mit Anmeldung)
+- **Text-to-Speech** mit Piper (persona-eigene Stimmen; im Terminal automatisch, in der Web-UI per „Vorlesen"-Knopf)
+- **Spracheingabe** in der Web-UI: Mikrofon neben dem Eingabefeld, Transkript per faster-whisper (opt-in)
 - **E-Mail-Adapter** (opt-in): Personas per IMAP/SMTP anschreiben
 - **Security-Guard**: Prompt-Injection-Schutz, PII-Filter, Wrongdoing-Guardrail mit Session-Lock
 - **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python src/launch.py --list-ensembles`
@@ -40,7 +43,7 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
                                ▼                 optional:
                   ┌────────────────────────┐   ┌───────────────────────────────────────────┐
                   │     Python Backend     │   │  Lokales Wikipedia-Archiv (Kiwix + Proxy) │
-                  │ (Streaming, Security)  │-->│  → Snippets als Systemkontext ins Modell  │
+                  │ (Streaming, Security)  │-->│  → Snippets als Faktenkontext ins Modell  │
                   └──────────────┬─────────┘   └───────────────────────────────────────────┘
                                  │
                                  ▼
