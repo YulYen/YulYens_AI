@@ -321,9 +321,9 @@ pytest -q -m "not slow and not ollama and not browser"    # entspricht: make tes
 
 Weitere Varianten (siehe `Makefile`): `make test-all` (komplette Suite),
 `make test-ci` (derselbe Umfang wie die CI, mit Coverage), `make coverage`,
-`make lint` / `make format` (Ruff/Black), `make types` (mypy über `src/core`,
-`src/storage`, `src/auth`), `make audit` (bekannte Schwachstellen der
-Abhängigkeiten gegen `audit_allowlist.yaml` halten — braucht Netz) und
+`make lint` / `make format` (Ruff/Black), `make types` (mypy über das ganze
+`src`, zweimal — der zweite Lauf nimmt Windows an), `make audit` (bekannte
+Schwachstellen der Abhängigkeiten gegen `audit_allowlist.yaml` halten — braucht Netz) und
 `make evals` / `make evals-full` (Eval-Suite, siehe `evals/ReadMe.md`; nur die
 volle Variante braucht ein Modell).
 

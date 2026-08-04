@@ -5,17 +5,18 @@ import time
 
 from colorama import Fore, Style
 from config.personas import get_all_persona_names
+from config.texts import Texts
 from ui.persona_chooser import prompt_persona_choice
 
 
-def _choose_persona(texts: dict, prompt_key: str) -> str:
+def _choose_persona(texts: Texts, prompt_key: str) -> str:
     names = get_all_persona_names()
     persona_name = prompt_persona_choice(names, texts, prompt_key)
     print(texts["terminal_persona_selected"].format(persona_name=persona_name))
     return persona_name
 
 
-def _prompt_initial(texts: dict) -> str:
+def _prompt_initial(texts: Texts) -> str:
     while True:
         initial = input(texts["terminal_self_talk_initial_prompt"] + " ").strip()
         if initial:
@@ -26,7 +27,7 @@ def _prompt_initial(texts: dict) -> str:
 
 
 def _build_self_talk_guardrail(
-    texts: dict, persona_self: str, persona_other: str, task: str
+    texts: Texts, persona_self: str, persona_other: str, task: str
 ) -> str:
     return texts.format(
         "terminal_self_talk_guardrail",
@@ -45,7 +46,7 @@ class SelfTalkRunner:
     def __init__(
         self,
         factory,
-        texts: dict,
+        texts: Texts,
         persona_a: str,
         persona_b: str,
         initial_prompt: str,

@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
@@ -35,9 +36,12 @@ class TerminalUI:
         self.factory = factory
         self.config = config
         self.wiki = wiki
-        self.greeting = None  # set after selection
-        self.bot = None  # set after selection
-        self.streamer = None  # set after selection
+        # None heisst „noch keine Persona gewaehlt" — der Chat-Loop laeuft
+        # erst nach `_set_persona`. Ausdruecklich annotiert, weil mypy sonst
+        # den Typ `None` festschreibt und jeder spaetere String ein Fehler ist.
+        self.greeting: str | None = None
+        self.bot: str | None = None
+        self.streamer: Any = None
         self.texts = config.texts
         self._t = config.t
         self.broadcast_enabled = is_broadcast_enabled(config)
@@ -174,7 +178,7 @@ class TerminalUI:
         self.meta = {
             "created_at": datetime.now().isoformat(),
             "model": str(self.config.core.get("model_name")),
-            "persona": self.bot,
+            "persona": self.bot or "",
             "app": "terminal",
         }
 
@@ -356,7 +360,7 @@ class TerminalUI:
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
             if self.wiki.keyword_finder:
                 wiki_hints, contexts = self.wiki.snippets(
-                    user_input, self.bot, getattr(self.streamer, "guard", None)
+                    user_input, self.bot or "", getattr(self.streamer, "guard", None)
                 )
 
                 self.last_wiki_snippets = list(contexts)
@@ -382,7 +386,7 @@ class TerminalUI:
 
     def _stream_and_record_reply(self) -> None:
         """Streams the reply token by token, records it and finishes cleanly."""
-        self.print_bot_prefix(self.bot)
+        self.print_bot_prefix(self.bot or "")
         reply = ""
         for token in self.streamer.stream(messages=self.history):
             reply += token
@@ -505,7 +509,7 @@ class TerminalUI:
         if not context_near_limit(self.history, persona_options):
             return
 
-        drink = get_drink(self.bot)
+        drink = get_drink(self.bot or "")
         wait_msg = self._t("context_wait_message", persona_name=self.bot, drink=drink)
         print(wait_msg)
 

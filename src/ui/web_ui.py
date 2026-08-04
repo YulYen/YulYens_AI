@@ -8,7 +8,7 @@ import shutil
 import tempfile
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -144,8 +144,22 @@ class WebUI:
         self.wiki = wiki
         self.web_host = web_host
         self.web_port = int(web_port)
-        self.texts = getattr(config, "texts", {}) or {}
-        self._t = getattr(config, "t", getattr(self.texts, "format", None))
+        # Bewusst `Any`: im Betrieb ist das ein `Texts` (MutableMapping *plus*
+        # `format()`), in Tests oft ein schlichtes dict. Beides wird hier nur
+        # per `.get()` gelesen — nur `SelfTalkRunner` braucht `format()` und
+        # bekommt es im Betrieb auch. Eine engere Annotation wäre eine Zusage,
+        # die der Konstruktor nicht durchsetzt.
+        self.texts: Any = getattr(config, "texts", {}) or {}
+        # Einmal auflösen statt später nachbessern: vorher stand hier ein
+        # `_t`, das None sein *konnte*, und zwanzig Zeilen weiter ein
+        # `if self._t is None: self._t = …`. Für jeden Leser danach blieb der
+        # Typ `Callable | None` — jeder der 24 Aufrufe war formal ein Aufruf
+        # auf None. Der Fallback gehört an die Stelle, an der der Wert
+        # entsteht.
+        formatter = getattr(config, "t", None) or getattr(self.texts, "format", None)
+        self._t: Callable[..., str] = (
+            formatter if callable(formatter) else (lambda key, **kwargs: key)
+        )
         # Wer bedient die UI (#53). Default DisabledAuth = kein Login.
         self.auth = factory.get_auth_provider()
         # Welche optionalen Funktionen es überhaupt gibt — eine Frage, eine
@@ -165,8 +179,6 @@ class WebUI:
         self.tts_cfg = getattr(config, "tts", {}) or {}
         # Lazily resolved on first vote; tests may pre-set an explicit path.
         self.feedback_log_path: str | None = None
-        if self._t is None:
-            self._t = lambda key, **kwargs: key
         # Die streamenden Antwortwege (#56). Sie halten keinen Sitzungszustand —
         # der reist im SessionContext —, deshalb genügt ein Exemplar. Die
         # RSS-Schalter leitet der Controller aus dem Cache ab, statt sie hier
@@ -424,10 +436,13 @@ class WebUI:
             session.clear_persona()
             return self._reset_ui_updates()
 
-        session.bot = persona["name"]
-        session.streamer = self.factory.get_streamer_for_persona(session.bot)
+        # Den Namen einmal binden und dann *ihn* benutzen, statt ihn über den
+        # Sitzungszustand wieder auszulesen, den man gerade geschrieben hat.
+        persona_name = str(persona["name"])
+        session.bot = persona_name
+        session.streamer = self.factory.get_streamer_for_persona(persona_name)
         self._stamp_user(session, user)
-        conversation_id = self._open_conversation(session.bot, user)
+        conversation_id = self._open_conversation(persona_name, user)
         self._stamp_conversation(session, conversation_id)
         return self._persona_selected_updates(
             key,
@@ -645,8 +660,9 @@ class WebUI:
             )
             return as_persona_outputs(updates)
 
-        session.bot = persona["name"]
-        session.streamer = self.factory.get_streamer_for_persona(session.bot)
+        persona_name = str(persona["name"])
+        session.bot = persona_name
+        session.streamer = self.factory.get_streamer_for_persona(persona_name)
         self._stamp_user(session, ref.user)
         self._stamp_conversation(session, ref.id)
 
@@ -657,12 +673,12 @@ class WebUI:
             "app": ref.app,
             "user": ref.user,
         }
-        updates = self._conversation_loaded_updates(
+        loaded = self._conversation_loaded_updates(
             ref.persona.lower(), persona, meta, messages, input_placeholder
         )
         # _conversation_loaded_updates kennt die Ablage nicht — die ID muss
         # gesetzt werden, sonst schreibt das fortgesetzte Gespräch ins Leere.
-        as_dict = dict(zip(PERSONA_OUTPUT_KEYS, updates, strict=True))
+        as_dict = dict(zip(PERSONA_OUTPUT_KEYS, loaded, strict=True))
         as_dict["conversation_state"] = ref.id
         return as_persona_outputs(as_dict)
 
@@ -759,7 +775,7 @@ class WebUI:
         logging.info("Gast-Persona '%s' gestartet (nur Sitzung)", name)
 
         persona = {"name": name, "description": self._t("guest_description")}
-        updates = self._persona_selected_updates(
+        guest_updates = self._persona_selected_updates(
             name.lower(),
             persona,
             greeting_template,
@@ -771,7 +787,7 @@ class WebUI:
             # Markierung bis in die heruntergeladene JSON durchreichen.
             app=GUEST_APP,
         )
-        return updates
+        return guest_updates
 
     def _on_show_self_talk(self, session: SessionContext) -> tuple:
         session.clear_persona()
@@ -914,7 +930,7 @@ class WebUI:
         question: str,
         results_md: str,
         *,
-        editable: bool,
+        editable: bool = False,
         submit_visible: bool = True,
         submit_interactive: bool = True,
         status: str = "",
@@ -925,6 +941,12 @@ class WebUI:
         ``sources_md`` läuft wie ``status`` durch alle Yields mit: der
         Wiki-Lookup passiert einmal vorab, das Ergebnis muss danach in jedem
         Update wieder mitgeschickt werden (#32a).
+
+        Der Default ist der **laufende** Broadcast: Eingabe gesperrt, Senden
+        weg. Vorher stand dafür ein `running`-dict, das an drei Stellen mit
+        `**` hineingereicht wurde — eine Form, die weder mypy noch ein Leser
+        auf die Parameter abbilden kann. Die drei Werte gehören ohnehin
+        zusammen; sie einzeln setzen konnte niemand gebrauchen.
         """
         return (
             gr.update(
@@ -973,12 +995,10 @@ class WebUI:
         # hineinstreamen; gedrosselt, damit nicht jedes Token den kompletten
         # Markdown-Block über den Socket schickt.
         replies = {name: "…" for name in get_all_persona_names()}
-        running = {
-            "editable": False,
-            "submit_visible": False,
-            "submit_interactive": False,
-        }
-        yield self._ask_all_state(question, format_ask_all_results(replies), **running)
+        yield self._ask_all_state(
+            question,
+            format_ask_all_results(replies),
+        )
 
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
@@ -1000,7 +1020,6 @@ class WebUI:
                 format_ask_all_results(replies),
                 status=wiki_status,
                 sources_md=sources_md,
-                **running,
             )
 
         # Parallel: alle Personas streamen gleichzeitig in ihre Sektionen;
@@ -1044,7 +1063,6 @@ class WebUI:
                     format_ask_all_results(replies),
                     status=wiki_status,
                     sources_md=sources_md,
-                    **running,
                 )
 
         session.ask_all_stop = None
@@ -1140,15 +1158,16 @@ class WebUI:
             return self._load_failure_updates(msg)
 
         user = str(meta.get("user") or "")
-        session.bot = persona["name"]
-        session.streamer = self.factory.get_streamer_for_persona(session.bot)
+        loaded_persona = str(persona["name"])
+        session.bot = loaded_persona
+        session.streamer = self.factory.get_streamer_for_persona(loaded_persona)
         self._stamp_user(session, user)
         # Eine hochgeladene Datei wird ab hier fortgesetzt — also gehört sie in
         # die Ablage, sonst schriebe jeder weitere Turn ins Leere. Das Terminal
         # macht das nach dem Laden längst (`TerminalUI._set_persona`); die WebUI
         # war die Abweichlerin. Eigenes `app`, damit im Verlauf erkennbar
         # bleibt, dass dieses Gespräch von außen kam.
-        conversation_id = self._open_conversation(session.bot, user, app=IMPORT_APP)
+        conversation_id = self._open_conversation(loaded_persona, user, app=IMPORT_APP)
         self._stamp_conversation(session, conversation_id)
 
         normalized_meta = dict(meta)
@@ -1307,8 +1326,11 @@ class WebUI:
         choose_persona_txt = ui.get("choose_persona")
         new_chat_label = ui.get("new_chat")
         send_button_label = ui.get("send_button")
-        input_placeholder = ui.get("input_placeholder")
-        greeting_template = ui.get("greeting")
+        # Mit Fallback wie die Lookups darunter: ohne ihn liefert ein
+        # fehlender Locale-Schlüssel `None`, und das geht bis in
+        # `greeting_template.format(...)` durch.
+        input_placeholder = str(ui.get("input_placeholder", ""))
+        greeting_template = str(ui.get("greeting", ""))
         persona_btn_suffix = ui.get("persona_button_suffix")
         ask_all_button_label = ui.get("ask_all_button_label", "Frage an alle")
         ask_all_title = ui.get("ask_all_title", "Frage an alle Personas")

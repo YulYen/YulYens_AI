@@ -311,8 +311,8 @@ pytest -q -m "not slow and not ollama and not browser"    # same as: make test
 
 More variants (see `Makefile`): `make test-all` (full suite), `make test-ci`
 (same scope as CI, with coverage), `make coverage`, `make lint` / `make format`
-(Ruff/Black), `make types` (mypy over `src/core`, `src/storage`, `src/auth`),
-`make audit` (check the dependencies' known vulnerabilities against
+(Ruff/Black), `make types` (mypy over all of `src`, twice — the second run
+assumes Windows), `make audit` (check the dependencies' known vulnerabilities against
 `audit_allowlist.yaml` — needs network access) and `make evals` /
 `make evals-full` (eval suite, see `evals/ReadMe.md`; only the full variant
 needs a model).

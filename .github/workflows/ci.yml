@@ -51,9 +51,9 @@ jobs:
         run: python scripts/audit_deps.py
 
   types:
-    # Typprüfung nur für src/core (#52). Blockierend — ein Job, der auch gelb
-    # sein darf, wird ignoriert und ist damit wertlos. Konfiguration (Pfade,
-    # follow_imports, Stub-Ausnahmen) steht in pyproject.toml.
+    # Typprüfung über das ganze `src` (#52). Blockierend — ein Job, der auch
+    # gelb sein darf, wird ignoriert und ist damit wertlos. Konfiguration
+    # (Pfade, follow_imports, Stub-Ausnahmen) steht in pyproject.toml.
     name: Typen (mypy)
     runs-on: ubuntu-latest
     steps:
@@ -67,6 +67,14 @@ jobs:
       # 'python -m' wie bei Black/Ruff (PATH-Shadowing-Falle, siehe CLAUDE.md)
       - name: mypy
         run: python -m mypy
+      # Zweiter Lauf mit angenommener Windows-Plattform. mypy wertet
+      # `if sys.platform == "win32"` **statisch** aus: auf dem Linux-Runner ist
+      # der winsound-Zweig toter Code und wird nie geprüft — bei einem
+      # Windows-primären Projekt genau die falsche Richtung. Der Lauf läuft
+      # hier, nicht auf einem Windows-Runner: mypy braucht die Plattform nicht,
+      # nur die Annahme.
+      - name: mypy (als Windows)
+        run: python -m mypy --platform win32
 
   test:
     # OS-Matrix (#45): Das Projekt läuft Windows-primär, die CI lief bisher nur

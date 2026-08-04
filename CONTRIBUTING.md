@@ -28,8 +28,10 @@ Alternativ / shortcut: `make setup` führt die Schritte 2–4 aus.
 
 ## Code Style
 - Use **Black** and **Ruff** for formatting and linting (`make format` / `make lint`).
-- Typprüfung mit mypy: `make types` (blockierend über `src/core`, `src/storage`,
-  `src/auth`; Konfiguration in `pyproject.toml`).
+- Typprüfung mit mypy: `make types` (blockierend über das ganze `src`;
+  Konfiguration in `pyproject.toml`). Das Ziel fährt **zwei** Läufe — den
+  zweiten mit `--platform win32`, weil mypy `sys.platform` statisch auswertet
+  und der Windows-Zweig auf Linux sonst ungeprüft bliebe.
 - Maximum line length: **88 characters**.
 - **Wichtig:** Black/Ruff sind in `requirements-dev.txt` gepinnt (identisch zu
   `.pre-commit-config.yaml`). Eine abweichende lokale Black-Version formatiert

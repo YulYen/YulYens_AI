@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from config.personas import _load_system_prompts
 
 
-def prompt_persona_choice(names: list[str], texts: dict, prompt_key: str) -> str:
+def prompt_persona_choice(
+    names: list[str], texts: Mapping[str, str], prompt_key: str
+) -> str:
     """Print numbered persona list, prompt for a choice, and return the selected name."""
     print(texts["choose_persona"])
     for idx, name in enumerate(names, start=1):
