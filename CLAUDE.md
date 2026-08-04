@@ -126,10 +126,12 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── texts.py             # i18n (MutableMapping)
 │   │   └── logging_setup.py
 │   ├── ui/
-│   │   ├── web_ui.py            # Gradio-UI
+│   │   ├── web_ui.py            # Gradio-UI (Startseite, Ask-All, Verlauf, Gast)
 │   │   ├── terminal_ui.py       # Terminal-UI (farbig)
 │   │   ├── webui_layout.py      # Gradio-Layout-Builder + Ausgabe-Key-Listen
 │   │   ├── webui_format.py      # Reine Formatierer (Statuszeile, Quellen, Markdown)
+│   │   ├── webui_chat.py        # Stream-Lebenszyklus: Chat, Briefing, Nochmal (#56)
+│   │   ├── webui_features.py    # Welche Funktionen verfügbar sind — und warum nicht (#56)
 │   │   ├── session.py           # SessionContext: Zustand *einer* Browser-Sitzung
 │   │   ├── feedback.py          # 👍/👎-Votes + Schlüssel in die Ablage (#40/#65)
 │   │   ├── webui_events.py      # Verdrahtung der Gradio-Events (#56)
@@ -849,6 +851,45 @@ nicht treffen darf.
 `feed_aliases`): „Was sagt die Tagesschau?" zieht nur diese Quelle. Wer einen
 Feed ergänzt, bekommt seinen Auslöser geschenkt — keine zweite Wortliste.
 
+### Ein Modul bekommt eine Regel, nicht hundert Zeilen (#56)
+
+`web_ui.py` ist von 2440 auf 1438 Zeilen geschrumpft — die Zahl ist aber nicht
+das Kriterium, und wer sie zum Kriterium macht, baut den Schaden ein, den #56
+vermeiden wollte. **Gemessen** vor dem zweiten Durchgang: die sauberen Nähte
+waren die *kleinen* Blöcke (Gast: 69 Zeilen, 2 WebUI-Felder), die Masse lag in
+den Blöcken mit der stärksten Kopplung (Navigation: 264 Zeilen, **11** Felder).
+Ein mechanischer „fünf Controller"-Schnitt hätte fünf Module mit sechs bis elf
+Konstruktor-Argumenten ergeben, die weiter ins WebUI zurückrufen: mehr Dateien,
+dieselbe Kopplung, plus eine Indirektion.
+
+Der Test ist deshalb: **besitzt das Modul eine Regel?** `feedback.py` besitzt
+„ein nicht deutbarer Vote-Index wird verworfen, nicht geraten". `history_access.py`
+besitzt „jeder Zugriff trägt `user`". `webui_chat.py` besitzt den
+Stream-Lebenszyklus (Button-Updates im selben Yield, genau ein
+`record_conversation`, Kill-Switch über Identität). `webui_features.py` besitzt
+„welche Funktion ist verfügbar — und warum nicht". Gast, Self-Talk und die
+Ask-All-Handler besitzen keine und bleiben deshalb, wo sie sind; sie zu
+verschieben wäre Kosmetik, die sich als Fortschritt ausgibt.
+
+Zwei Dinge, die beim Schneiden wehtaten:
+
+1. **Keine delegierenden Wrapper.** Der bequeme Weg ist, `WebUI.respond_streaming`
+   als Einzeiler stehenzulassen, der auf `self.chat` zeigt — dann müssen die
+   Aufrufer nicht angefasst werden. Zwei Namen für eine Sache laufen aber
+   auseinander, genau wie `KNOWN_TOP_LEVEL_KEYS` neben den pydantic-Modellen
+   (#66). Die Aufrufer zeigen direkt auf `ui.chat.…`.
+2. **Ein weitergereichter Wert ist nicht mehr nachträglich zu drehen.** `_t` war
+   ein Feld am WebUI; ein Test tauschte es *nach* dem Bauen aus, und das ging
+   gut, solange alle Leser dasselbe Feld lasen. Sobald es an den Controller
+   weitergegeben wird, liest der still den alten Wert. Aufgefallen an einem
+   Test, hätte aber genauso eine Config-Option treffen können. **Was
+   weitergereicht wird, kommt beim Bauen herein** — bei Tests also über die
+   Config, wie im Betrieb auch.
+
+Und der Grund, warum der Browser-Rauchtest existiert: er hat in dieser Runde
+den einen echten Fund gemacht. In-process waren 1154 Tests grün, während der
+Patch-Zielpfad `ui.web_ui.module_available` ins Leere zeigte.
+
 ### Sitzungszustand gehört in den `gr.State`, nicht ans WebUI-Objekt
 Die `WebUI` ist ein **Singleton der AppFactory** und bedient alle Browser
 gleichzeitig. Persona, Streamer, die beiden Kill-Switches und der
@@ -1002,7 +1043,7 @@ Der naheliegende Weg für „Senden ⇄ Stop tauschen" ist ein kleines Event vor
 Stream-Handler (`btn.click(toggle).then(stream)`). **Kostet ~3,5 s bis zum ersten
 Token** — das gequeuete `.then()` startet erst nach einem vollen Roundtrip des
 ersten Events. Stattdessen die Button-Updates **in denselben Yields** des
-Stream-Generators mitschicken (`WebUI._with_stream_controls`, #35): Stop erscheint
+Stream-Generators mitschicken (`ChatController.with_controls`, #35): Stop erscheint
 dann nach 0,16 s. Achtung beim Schluss-Yield: für `gr.State` müssen die echten
 Werte erneut mitgeschickt werden, `gr.update()` würde den Update-Marker als
 Zustand speichern.

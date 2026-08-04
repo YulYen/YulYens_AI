@@ -261,11 +261,11 @@ def test_find_question_returns_empty_on_garbage():
 def test_status_line_ignores_a_streamer_without_real_stats():
     """Testdoubles setzen last_stream_stats nicht — das darf nichts rendern."""
     from ui.session import SessionContext
-    from ui.web_ui import WebUI
+    from ui.webui_chat import ChatController
 
     session = SessionContext(streamer=SimpleNamespace(last_stream_stats="kaputt"))
 
-    assert WebUI._last_stream_stats(session) is None
+    assert ChatController.last_stream_stats(session) is None
 
 
 # ---- Die Form, in der das Frontend zurueckliefert (#61a) -------------------

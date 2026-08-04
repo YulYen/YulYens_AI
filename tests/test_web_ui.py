@@ -5,6 +5,7 @@ import logging
 import sys
 import threading
 import types
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -60,13 +61,21 @@ def test_webui_start_server_uses_configured_host_and_port():
     )
 
 
-def _create_web_ui(ui_config=None):
+def _create_web_ui(ui_config=None, texts=None):
+    """Eine WebUI mit Doubles.
+
+    ``texts`` gehört in die **Config**, nicht nachträglich ans fertige Objekt:
+    die WebUI reicht den Formatierer beim Bauen an den ChatController weiter,
+    ein späteres ``web_ui._t = …`` erreicht ihn also nicht mehr. Genau das ist
+    beim Zerlegen aufgefallen — vorher war `_t` ein Feld, das jeder Aufrufer
+    noch drehen konnte, und die Statuszeile las still den alten Wert.
+    """
     if ui_config is None:
         ui_config = {"experimental": {"broadcast_mode": True}}
 
     dummy_config = SimpleNamespace(
-        texts={},
-        t=lambda key, **kwargs: key,
+        texts=texts if texts is not None else {},
+        t=texts.format if texts is not None else (lambda key, **kwargs: key),
         ui=ui_config,
         context_management={
             "strategy": "heuristic",
@@ -107,8 +116,8 @@ def test_stream_reply_throttles_updates():
 
     # 10 ms per token → with the 0.1 s throttle only every ~10th token flushes.
     clock = iter(1000.0 + i * 0.01 for i in range(len(tokens) + 5))
-    with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
-        outputs = list(web_ui._stream_reply(session, [], []))
+    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+        outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     assert len(outputs) < len(tokens) / 2
     final_chat = outputs[-1][1]
@@ -126,8 +135,8 @@ def test_stream_reply_always_flushes_final_state():
     session.streamer = streamer
 
     # Frozen clock: after the first flush no throttle window ever elapses.
-    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._stream_reply(session, [], []))
+    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     final_chat = outputs[-1][1]
     assert final_chat[-1] == {"role": "assistant", "content": "Hallo Welt!"}
@@ -148,15 +157,17 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.inject_wiki_context"),
-        patch("ui.web_ui.context_near_limit", return_value=True),
-        patch("ui.web_ui.get_drink", return_value="☕"),
+        patch("ui.webui_chat.inject_wiki_context"),
+        patch("ui.webui_chat.context_near_limit", return_value=True),
+        patch("ui.webui_chat.get_drink", return_value="☕"),
         patch(
             "core.context_utils.karl_prepare_quick_and_dirty",
             side_effect=lambda history, limit: history,
         ) as mock_prepare,
     ):
-        list(web_ui.respond_streaming(session, "Hallo", chat_history, history_state))
+        list(
+            web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
+        )
 
     mock_prepare.assert_called_once()
     assert mock_prepare.call_args[0][1] == 4096
@@ -174,15 +185,15 @@ def test_webui_heuristic_strategy_never_instantiates_karl():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.context_near_limit", return_value=True),
-        patch("ui.web_ui.get_drink", return_value="☕"),
+        patch("ui.webui_chat.context_near_limit", return_value=True),
+        patch("ui.webui_chat.get_drink", return_value="☕"),
         patch(
             "core.context_utils.karl_prepare_quick_and_dirty",
             side_effect=lambda h, c: h,
         ),
         patch("core.context_utils.KarlSummarizer") as mock_karl,
     ):
-        list(web_ui.respond_streaming(session, "Hallo", [], []))
+        list(web_ui.chat.respond_streaming(session, "Hallo", [], []))
 
     mock_karl.assert_not_called()
 
@@ -201,14 +212,14 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.context_near_limit", return_value=True),
-        patch("ui.web_ui.get_drink", return_value="☕"),
+        patch("ui.webui_chat.context_near_limit", return_value=True),
+        patch("ui.webui_chat.get_drink", return_value="☕"),
         patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
         patch("core.context_utils.KarlSummarizer") as mock_karl,
     ):
         instance = mock_karl.return_value
         instance.summarize.return_value = [{"role": "system", "content": "S"}]
-        outputs = list(web_ui.respond_streaming(session, "Hallo", [], []))
+        outputs = list(web_ui.chat.respond_streaming(session, "Hallo", [], []))
 
     mock_prepare.assert_not_called()
     mock_karl.assert_called_once()
@@ -231,12 +242,14 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.inject_wiki_context"),
-        patch("ui.web_ui.context_near_limit", return_value=True),
-        patch("ui.web_ui.get_drink", return_value="☕"),
+        patch("ui.webui_chat.inject_wiki_context"),
+        patch("ui.webui_chat.context_near_limit", return_value=True),
+        patch("ui.webui_chat.get_drink", return_value="☕"),
         patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
     ):
-        list(web_ui.respond_streaming(session, "Hallo", chat_history, history_state))
+        list(
+            web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
+        )
 
     mock_prepare.assert_not_called()
     assert "Skipping 'karl_prepare_quick_and_dirty'" in caplog.text
@@ -264,13 +277,13 @@ def test_respond_streaming_keeps_session_histories_isolated():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.webui_chat.context_near_limit", return_value=False),
     ):
         session_one_outputs = list(
-            web_ui.respond_streaming(session, "Frage 1", [], session_one_state)
+            web_ui.chat.respond_streaming(session, "Frage 1", [], session_one_state)
         )
         session_two_outputs = list(
-            web_ui.respond_streaming(session, "Frage 2", [], session_two_state)
+            web_ui.chat.respond_streaming(session, "Frage 2", [], session_two_state)
         )
 
     final_history_one = session_one_outputs[-1][2]
@@ -306,10 +319,10 @@ def test_respond_streaming_returns_chat_and_state_updates():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.webui_chat.context_near_limit", return_value=False),
     ):
         outputs = list(
-            web_ui.respond_streaming(session, "Hallo", chat_history, history_state)
+            web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
         )
 
     assert outputs
@@ -331,10 +344,10 @@ def test_respond_streaming_appends_final_history_entries():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.webui_chat.context_near_limit", return_value=False),
     ):
         outputs = list(
-            web_ui.respond_streaming(session, "Hallo", chat_history, history_state)
+            web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
         )
 
     final_state = outputs[-1][2]
@@ -608,7 +621,7 @@ def test_stt_unavailable_by_default_config():
 
     web_ui = _create_web_ui()
 
-    assert web_ui.stt_available is False
+    assert web_ui.features.stt is False
     assert web_ui.stt_cfg == {}
 
 
@@ -662,7 +675,7 @@ def test_persona_selected_updates_shows_mic_only_when_stt_available():
         web_ui = _create_web_ui()
         web_ui.cfg.core = {"model_name": "m:1"}
         web_ui.cfg.ensemble = "test"
-        web_ui.stt_available = available
+        web_ui.features = replace(web_ui.features, stt=available)
 
         updates = web_ui._persona_selected_updates(
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
@@ -673,7 +686,7 @@ def test_persona_selected_updates_shows_mic_only_when_stt_available():
 
 def test_reset_updates_hides_mic():
     web_ui = _create_web_ui()
-    web_ui.stt_available = True
+    web_ui.features = replace(web_ui.features, stt=True)
 
     updates = web_ui._reset_ui_updates()
 
@@ -689,26 +702,55 @@ def _briefing_web_ui():
     web_ui = _create_web_ui()
     session = SessionContext()
     session.bot = "Karl"
-    web_ui.briefing_enabled = True
-    web_ui.rss_enabled = True
-    # Ein gefüllter Cache — der Knopf holt seit #73 nichts mehr selbst.
+    # Ein gefüllter Cache — der Knopf holt seit #73 nichts mehr selbst. Er ist
+    # zugleich die einzige Eingabe: `rss_enabled` und `briefing_enabled` leitet
+    # der ChatController daraus ab, statt sie als zweites Feld zu führen.
     cache = RssCache(feeds=[{"name": "quelle", "url": "https://example.org/rss"}])
     cache._items = {"quelle": [RssItem("quelle", "Titel", "Text")]}
     cache._filled_at = datetime(2026, 7, 30, 10, 30).timestamp()
-    web_ui.rss_cache = cache
+    web_ui.chat.rss_cache = cache
     streamer = streamer_double()
     streamer.stream.return_value = iter(["Ant", "wort"])
     session.streamer = streamer
     return web_ui, session
 
 
+def test_the_rss_switches_follow_the_cache_instead_of_being_carried_along():
+    """Der Cache ist die einzige Eingabe — die beiden Schalter sind abgeleitet.
+
+    Vorher standen `rss_cache`, `rss_enabled` und `briefing_enabled` als drei
+    Felder nebeneinander und mussten von Hand konsistent gehalten werden. Ein
+    `rss_enabled = True` neben einem Cache ohne Feeds war ein Zustand, den der
+    Code widerspruchslos annahm — und ein Aufrufer, der nur den Cache tauschte,
+    ließ die Schalter still auf dem alten Stand stehen. Genau das prüft dieser
+    Test: **nur** der Cache wird gesetzt, beide Schalter müssen folgen.
+    """
+    web_ui = _create_web_ui()
+    assert web_ui.chat.rss_enabled is False, "leerer Cache, also keine Quelle"
+
+    web_ui.chat.rss_cache = RssCache(feeds=[{"name": "q", "url": "u"}])
+
+    assert web_ui.chat.rss_enabled is True
+    assert web_ui.chat.briefing_enabled is True, "Knopf folgt ohne zweites Feld"
+
+
+def test_the_button_can_be_off_while_the_source_stays_on():
+    """`show_button: false` trennt Knopf von Quelle (#73) — beides abgeleitet."""
+    web_ui = _create_web_ui()
+    web_ui.chat.rss_cache = RssCache(feeds=[{"name": "q", "url": "u"}])
+    web_ui.chat.rss_cfg = {"show_button": False}
+
+    assert web_ui.chat.rss_enabled is True, "die Quelle hängt nicht am Knopf"
+    assert web_ui.chat.briefing_enabled is False
+
+
 def test_briefing_disabled_by_default_config():
     web_ui = _create_web_ui()
     session = SessionContext()
 
-    assert web_ui.briefing_enabled is False
+    assert web_ui.chat.briefing_enabled is False
 
-    outputs = list(web_ui.respond_briefing(session, [], []))
+    outputs = list(web_ui.chat.respond_briefing(session, [], []))
     assert len(outputs) == 1
     web_ui.factory.get_streamer_for_persona.assert_not_called()
 
@@ -717,8 +759,8 @@ def test_respond_briefing_streams_summary_with_injected_context():
     web_ui, session = _briefing_web_ui()
     history_state = [{"role": "user", "content": "früher"}]
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
-        outputs = list(web_ui.respond_briefing(session, [], history_state))
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
+        outputs = list(web_ui.chat.respond_briefing(session, [], history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
     # Guardrail (system) + genau ein Meldungs-Block (zitierter user-Fremdtext),
@@ -740,8 +782,8 @@ def test_respond_briefing_streams_summary_with_injected_context():
 def test_respond_briefing_without_items_shows_empty_note_and_skips_stream():
     web_ui, session = _briefing_web_ui()
 
-    web_ui.rss_cache._items = {}  # Feeds waren nicht erreichbar
-    outputs = list(web_ui.respond_briefing(session, [], []))
+    web_ui.chat.rss_cache._items = {}  # Feeds waren nicht erreichbar
+    outputs = list(web_ui.chat.respond_briefing(session, [], []))
 
     final_chat = outputs[-1][1]
     assert final_chat[-1] == {"role": "assistant", "content": "briefing_empty"}
@@ -755,7 +797,9 @@ def test_persona_selected_updates_toggles_briefing_button():
         web_ui = _create_web_ui()
         web_ui.cfg.core = {"model_name": "m:1"}
         web_ui.cfg.ensemble = "test"
-        web_ui.briefing_enabled = enabled
+        # Der Knopf hängt an `show_button`, die Quelle am Cache (#73).
+        web_ui.chat.rss_cache = RssCache(feeds=[{"name": "q", "url": "u"}])
+        web_ui.chat.rss_cfg = {"show_button": enabled}
 
         updates = web_ui._persona_selected_updates(
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
@@ -766,7 +810,7 @@ def test_persona_selected_updates_toggles_briefing_button():
 
 def test_reset_updates_hides_briefing_button():
     web_ui = _create_web_ui()
-    web_ui.briefing_enabled = True
+    web_ui.chat.rss_cache = RssCache(feeds=[{"name": "q", "url": "u"}])
 
     updates = web_ui._reset_ui_updates()
 
@@ -795,7 +839,7 @@ def test_tts_web_disabled_by_default_config():
 
     web_ui = _create_web_ui()
 
-    assert web_ui.tts_web_enabled is False
+    assert web_ui.features.tts_read_aloud is False
 
 
 def test_on_read_aloud_without_reply_warns_and_stays_hidden():
@@ -862,7 +906,7 @@ def test_persona_selected_updates_toggles_read_aloud_button():
         web_ui = _create_web_ui()
         web_ui.cfg.core = {"model_name": "m:1"}
         web_ui.cfg.ensemble = "test"
-        web_ui.tts_web_enabled = enabled
+        web_ui.features = replace(web_ui.features, tts_read_aloud=enabled)
 
         updates = web_ui._persona_selected_updates(
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
@@ -873,7 +917,7 @@ def test_persona_selected_updates_toggles_read_aloud_button():
 
 def test_reset_updates_hides_read_aloud_button_and_player():
     web_ui = _create_web_ui()
-    web_ui.tts_web_enabled = True
+    web_ui.features = replace(web_ui.features, tts_read_aloud=True)
 
     updates = web_ui._reset_ui_updates()
 
@@ -992,13 +1036,13 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     session.streamer = streamer
 
     outputs = []
-    generator = web_ui._stream_reply(session, [], [])
+    generator = web_ui.chat.stream_reply(session, [], [])
     # Uhr läuft in 1-s-Schritten, damit jeder Token die 0.1-s-Drossel passiert.
     clock = iter(1000.0 + i for i in range(100))
-    with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
+    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
         outputs.append(next(generator))
         # Stoppen wie der Button es tut, während der Stream noch läuft.
-        web_ui._on_stop_stream(session)
+        web_ui.chat.on_stop_stream(session)
         outputs.extend(generator)
 
     final_chat = outputs[-1][1]
@@ -1018,15 +1062,15 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
 def test_stop_clears_the_switch_so_the_next_stream_runs():
     web_ui = _create_web_ui()
     session = SessionContext()
-    web_ui._on_stop_stream(
+    web_ui.chat.on_stop_stream(
         session
     )  # Stop ohne laufenden Stream: darf nichts kaputt machen
 
     streamer = streamer_double()
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
     session.streamer = streamer
-    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._stream_reply(session, [], []))
+    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     assert outputs[-1][1][-1] == {"role": "assistant", "content": "Hallo Welt"}
     assert session.stream_stop is None
@@ -1036,24 +1080,24 @@ def test_stale_generator_ignores_a_newer_streams_stop_switch():
     """Ein alter Generator darf nicht auf den Kill-Switch des neuen reagieren."""
     web_ui = _create_web_ui()
     session = SessionContext()
-    old_stop = web_ui._arm_stream_stop(session)
-    new_stop = web_ui._arm_stream_stop(session)
+    old_stop = web_ui.chat._arm_stream_stop(session)
+    new_stop = web_ui.chat._arm_stream_stop(session)
 
     old_stop.set()
-    assert web_ui._stop_requested(session, old_stop) is False
+    assert web_ui.chat._stop_requested(session, old_stop) is False
     new_stop.set()
-    assert web_ui._stop_requested(session, new_stop) is True
+    assert web_ui.chat._stop_requested(session, new_stop) is True
 
 
 def test_streaming_button_updates_swap_send_and_stop():
     web_ui = _create_web_ui()
 
-    send, stop, regenerate = web_ui._streaming_button_updates(streaming=True)
+    send, stop, regenerate = web_ui.chat.streaming_button_updates(streaming=True)
     assert send["visible"] is False
     assert stop["visible"] is True
     assert regenerate["interactive"] is False
 
-    send, stop, regenerate = web_ui._streaming_button_updates(streaming=False)
+    send, stop, regenerate = web_ui.chat.streaming_button_updates(streaming=False)
     assert send["visible"] is True
     assert stop["visible"] is False
     assert regenerate["interactive"] is True
@@ -1078,7 +1122,7 @@ def test_stream_controls_flip_buttons_on_the_first_yield():
             [],
         )
 
-    outputs = list(web_ui._with_stream_controls(_fake_stream()))
+    outputs = list(web_ui.chat.with_controls(_fake_stream()))
 
     # Erster Yield: Stop sichtbar, Send weg — ohne zusätzliche Runde.
     assert outputs[0][4]["visible"] is True
@@ -1105,7 +1149,7 @@ def test_stream_controls_repeat_real_values_in_the_final_yield():
             final_state,
         )
 
-    outputs = list(web_ui._with_stream_controls(_fake_stream()))
+    outputs = list(web_ui.chat.with_controls(_fake_stream()))
 
     assert outputs[-1][1] == [
         {"role": "user", "content": "Frage"},
@@ -1117,7 +1161,7 @@ def test_stream_controls_repeat_real_values_in_the_final_yield():
 def test_stream_controls_pass_through_an_empty_stream():
     web_ui = _create_web_ui()
 
-    assert list(web_ui._with_stream_controls(iter(()))) == []
+    assert list(web_ui.chat.with_controls(iter(()))) == []
 
 
 def test_regenerate_drops_last_answer_and_streams_again():
@@ -1145,8 +1189,8 @@ def test_regenerate_drops_last_answer_and_streams_again():
         {"role": "assistant", "content": "Alte Antwort"},
     ]
 
-    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
+    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui.chat.regenerate(session, chat_history, history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
     assert final_chat[-1] == {"role": "assistant", "content": "Neue Antwort"}
@@ -1179,8 +1223,8 @@ def test_regenerate_keeps_wiki_hint_rows():
         {"role": "assistant", "content": "Alte Antwort"},
     ]
 
-    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
-        outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
+    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+        outputs = list(web_ui.chat.regenerate(session, chat_history, history_state))
 
     rows = [row.get("content") for row in outputs[-1][1]]
     assert "🕵️ Hinweis" in rows
@@ -1197,7 +1241,7 @@ def test_regenerate_without_an_answer_warns_and_changes_nothing():
     history_state = [{"role": "user", "content": "Frage"}]
 
     with patch("ui.web_ui.gr.Warning") as warning:
-        outputs = list(web_ui._on_regenerate(session, chat_history, history_state))
+        outputs = list(web_ui.chat.regenerate(session, chat_history, history_state))
 
     warning.assert_called_once()
     session.streamer.stream.assert_not_called()
@@ -1210,7 +1254,7 @@ def test_regenerate_without_persona_is_a_no_op():
     session = SessionContext()
     session.bot = None
 
-    outputs = list(web_ui._on_regenerate(session, [], []))
+    outputs = list(web_ui.chat.regenerate(session, [], []))
 
     assert len(outputs) == 1
 
@@ -1219,7 +1263,7 @@ def test_reset_sets_the_stream_kill_switch():
     """cancels allein reicht nicht — der Reset muss die Backend-Arbeit stoppen."""
     web_ui = _create_web_ui()
     session = SessionContext()
-    stop = web_ui._arm_stream_stop(session)
+    stop = web_ui.chat._arm_stream_stop(session)
 
     web_ui._on_reset_to_start(session)
 
@@ -1261,9 +1305,9 @@ def test_self_talk_stream_stops_between_turns():
     session.self_talk_runner = runner
 
     generator = web_ui._run_self_talk_stream(session, [], [])
-    with patch("ui.web_ui.time.monotonic", return_value=1000.0):
+    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
         next(generator)  # erster Turn läuft
-        web_ui._on_stop_stream(session)
+        web_ui.chat.on_stop_stream(session)
         list(generator)
 
     # Der laufende Turn wird fertig, ein weiterer startet nicht mehr.
@@ -1276,15 +1320,11 @@ def test_self_talk_stream_stops_between_turns():
 
 
 def _web_ui_with_texts():
-    web_ui = _create_web_ui()
-    catalog = Texts("de")
-    web_ui.texts = catalog
-    web_ui._t = catalog.format
-    return web_ui
+    return _create_web_ui(texts=Texts("de"))
 
 
 def test_wiki_source_updates_hide_the_accordion_without_hits():
-    accordion, markdown = _web_ui_with_texts()._wiki_source_updates([])
+    accordion, markdown = _web_ui_with_texts().chat.wiki_source_updates([])
 
     assert accordion["visible"] is False
     assert markdown["value"] == ""
@@ -1318,10 +1358,10 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
             "wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [snippet]),
         ),
-        patch("ui.web_ui.inject_wiki_context"),
-        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.webui_chat.inject_wiki_context"),
+        patch("ui.webui_chat.context_near_limit", return_value=False),
     ):
-        for item in web_ui.respond_streaming(session, "Frage", [], []):
+        for item in web_ui.chat.respond_streaming(session, "Frage", [], []):
             snapshots.append((item[md_index], item[accordion_index], list(item[1])))
 
     published = [
@@ -1360,9 +1400,9 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
 
     with (
         patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.web_ui.context_near_limit", return_value=False),
+        patch("ui.webui_chat.context_near_limit", return_value=False),
     ):
-        outputs = list(web_ui.respond_streaming(session, "Frage", [], []))
+        outputs = list(web_ui.chat.respond_streaming(session, "Frage", [], []))
 
     accordion_index = STREAM_OUTPUT_KEYS.index("sources_accordion")
     assert outputs[0][accordion_index]["visible"] is False
@@ -1386,7 +1426,7 @@ ASK_ALL_RESULTS = ASK_ALL_OUTPUT_KEYS.index("ask_all_results")
 
 def _ask_all_web_ui():
     web_ui = _web_ui_with_texts()
-    web_ui.broadcast_parallel = False
+    web_ui.features = replace(web_ui.features, broadcast_parallel=False)
     return web_ui
 
 
@@ -1493,7 +1533,7 @@ def test_status_line_ignores_a_streamer_without_real_stats():
     session.streamer = Mock()
     session.streamer.persona_options = {"num_ctx": 8192}
 
-    assert web_ui._last_stream_stats(session) is None
+    assert web_ui.chat.last_stream_stats(session) is None
 
 
 def test_stream_reply_publishes_the_status_only_at_the_end():
@@ -1506,8 +1546,8 @@ def test_stream_reply_publishes_the_status_only_at_the_end():
     session.streamer = streamer
 
     clock = iter(1000.0 + i for i in range(10))
-    with patch("ui.web_ui.time.monotonic", side_effect=lambda: next(clock)):
-        outputs = list(web_ui._stream_reply(session, [], []))
+    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+        outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     # Zwischendurch nur der No-op-Marker, am Ende der echte Wert.
     assert all("value" not in item[STATUS_INDEX] for item in outputs[:-1])
@@ -1926,7 +1966,7 @@ def test_leaving_the_history_clears_the_delete_confirmation():
 def _exchange_web_ui(enabled):
     web_ui = _create_web_ui()
     web_ui.cfg.storage = {"file_exchange": enabled}
-    web_ui.file_exchange_enabled = enabled
+    web_ui.features = replace(web_ui.features, file_exchange=enabled)
     web_ui.cfg.core = {"model_name": "m"}
     web_ui.cfg.ensemble = "classic"
     return web_ui
@@ -2004,13 +2044,13 @@ def test_a_stop_in_one_session_leaves_the_other_stream_running():
     """Der Kill-Switch ist sitzungsweit — sonst stoppt ein Klick alle Browser."""
     web_ui = _create_web_ui()
     a, b = SessionContext(), SessionContext()
-    stop_a = web_ui._arm_stream_stop(a)
-    stop_b = web_ui._arm_stream_stop(b)
+    stop_a = web_ui.chat._arm_stream_stop(a)
+    stop_b = web_ui.chat._arm_stream_stop(b)
 
-    web_ui._on_stop_stream(a)
+    web_ui.chat.on_stop_stream(a)
 
-    assert web_ui._stop_requested(a, stop_a) is True
-    assert web_ui._stop_requested(b, stop_b) is False
+    assert web_ui.chat._stop_requested(a, stop_a) is True
+    assert web_ui.chat._stop_requested(b, stop_b) is False
 
 
 def test_reset_in_one_session_does_not_clear_the_other():
@@ -2441,8 +2481,7 @@ def _rss_web_ui(filled=True):
             "heise online": [RssItem("heise online", "Linux 7", "Neuer Kernel.")],
         }
         cache._filled_at = datetime(2026, 7, 30, 14, 20).timestamp()
-    web_ui.rss_cache = cache
-    web_ui.rss_enabled = True
+    web_ui.chat.rss_cache = cache
     streamer = streamer_double()
     streamer.stream.return_value = iter(["Ant", "wort"])
     session.streamer = streamer
@@ -2453,8 +2492,10 @@ def test_a_news_question_pulls_the_feeds_into_the_context():
     """Der Punkt des Tickets: RSS meldet sich, wenn die Frage danach ist."""
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
-        outputs = list(web_ui.respond_streaming(session, "Was gibt's Neues?", [], []))
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
+        outputs = list(
+            web_ui.chat.respond_streaming(session, "Was gibt's Neues?", [], [])
+        )
 
     final_state = outputs[-1][2]
     guardrails = [m for m in final_state if m["role"] == "system"]
@@ -2469,9 +2510,9 @@ def test_a_news_question_pulls_the_feeds_into_the_context():
 def test_a_named_source_pulls_only_that_feed():
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(
-            web_ui.respond_streaming(session, "Was sagt die Tagesschau?", [], [])
+            web_ui.chat.respond_streaming(session, "Was sagt die Tagesschau?", [], [])
         )
 
     block = [m for m in outputs[-1][2] if is_injected(m)][-1]["content"]
@@ -2483,9 +2524,9 @@ def test_small_talk_does_not_pull_the_news():
     """Der teure Fehlalarm: die Persona finge an, Schlagzeilen aufzusagen."""
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(
-            web_ui.respond_streaming(session, "Was gibt's Neues bei dir?", [], [])
+            web_ui.chat.respond_streaming(session, "Was gibt's Neues bei dir?", [], [])
         )
 
     assert [m for m in outputs[-1][2] if m["role"] == "system"] == []
@@ -2495,8 +2536,8 @@ def test_the_hint_names_the_feeds_and_the_cache_age():
     """Der Cache ist bis zu einer Stunde alt — das muss man sehen können."""
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
-        outputs = list(web_ui.respond_streaming(session, "Neuigkeiten?", [], []))
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
+        outputs = list(web_ui.chat.respond_streaming(session, "Neuigkeiten?", [], []))
 
     hints = [
         row.get("content")
@@ -2510,8 +2551,10 @@ def test_an_empty_cache_injects_nothing():
     """Feeds nicht erreichbar → die Frage läuft normal weiter, ohne Kontext."""
     web_ui, session = _rss_web_ui(filled=False)
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
-        outputs = list(web_ui.respond_streaming(session, "Was gibt's Neues?", [], []))
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
+        outputs = list(
+            web_ui.chat.respond_streaming(session, "Was gibt's Neues?", [], [])
+        )
 
     assert [m for m in outputs[-1][2] if m["role"] == "system"] == []
     assert outputs[-1][1][-1] == {
@@ -2523,10 +2566,10 @@ def test_an_empty_cache_injects_nothing():
 def test_the_source_stays_active_when_only_the_button_is_off():
     """`show_button: false` schaltet den Knopf ab, nicht die Quelle (#73)."""
     web_ui, session = _rss_web_ui()
-    web_ui.briefing_enabled = False  # Knopf aus
+    web_ui.chat.rss_cfg = {"show_button": False}  # Knopf aus, Quelle bleibt
 
-    with patch("ui.web_ui.context_near_limit", return_value=False):
-        outputs = list(web_ui.respond_streaming(session, "Neuigkeiten?", [], []))
+    with patch("ui.webui_chat.context_near_limit", return_value=False):
+        outputs = list(web_ui.chat.respond_streaming(session, "Neuigkeiten?", [], []))
 
     assert [
         m for m in outputs[-1][2] if m["role"] == "system"

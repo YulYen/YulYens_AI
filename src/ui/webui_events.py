@@ -132,7 +132,7 @@ def bind_events(
     )
 
     # Stream-Steuerung (#35): die Button-Updates reisen in denselben Yields
-    # mit (siehe _with_stream_controls) — ein vorgeschaltetes Event hätte den
+    # mit (siehe ChatController.with_controls) — ein vorgeschaltetes Event hätte den
     # ersten Token um Sekunden verzögert. Aus demselben Grund hängen auch die
     # Quellen (#32) an denselben Yields.
     stream_buttons = [components[key] for key in STREAM_CONTROL_KEYS]
@@ -142,14 +142,14 @@ def bind_events(
     ]
 
     input_submit_evt = input_box.submit(
-        fn=ui.respond_streaming_with_controls,
+        fn=ui.chat.respond_streaming_with_controls,
         inputs=[session_state, input_box, chatbot, history_state],
         outputs=stream_outputs,
         queue=True,
     )
 
     send_click_evt = send_btn.click(
-        fn=ui.respond_streaming_with_controls,
+        fn=ui.chat.respond_streaming_with_controls,
         inputs=[session_state, input_box, chatbot, history_state],
         outputs=stream_outputs,
         queue=True,
@@ -158,14 +158,14 @@ def bind_events(
     # Kein `cancels`: der Kill-Switch beendet den Generator geordnet, damit
     # die Teilantwort im Verlauf bleibt.
     stop_btn.click(
-        fn=ui._on_stop_stream,
+        fn=ui.chat.on_stop_stream,
         inputs=[session_state],
         outputs=stream_buttons,
         queue=False,
     )
 
     regenerate_evt = regenerate_btn.click(
-        fn=ui.regenerate_with_controls,
+        fn=ui.chat.regenerate_with_controls,
         inputs=[session_state, chatbot, history_state],
         outputs=stream_outputs,
         queue=True,
@@ -179,7 +179,7 @@ def bind_events(
     )
 
     briefing_evt = briefing_btn.click(
-        fn=ui.respond_briefing_with_controls,
+        fn=ui.chat.respond_briefing_with_controls,
         inputs=[session_state, chatbot, history_state],
         outputs=stream_outputs,
         queue=True,

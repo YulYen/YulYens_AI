@@ -121,7 +121,11 @@ def live_app(tmp_path_factory):
 
     captured: dict = {}
 
-    with patch("ui.web_ui.module_available", lambda name: name != "faster_whisper"):
+    # Die Verfügbarkeitsfragen beantwortet seit #56 `ui/webui_features.py` —
+    # dort hängt auch die Prüfung auf installierte Pakete.
+    with patch(
+        "ui.webui_features.module_available", lambda name: name != "faster_whisper"
+    ):
         ui = AppFactory().get_ui()
     sys.modules["tts.piper_tts"] = _fake_piper_module()
 
