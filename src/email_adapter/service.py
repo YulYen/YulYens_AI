@@ -13,7 +13,7 @@ from email.header import decode_header, make_header
 from email.message import EmailMessage, Message
 from email.policy import default
 from email.utils import getaddresses, make_msgid, parseaddr
-from typing import Protocol
+from typing import Protocol, cast
 
 from api.provider import AiApiProvider
 from core.utils import resolve_secret
@@ -343,7 +343,13 @@ class EmailAdapterService:
             logging.warning("IMAP fetch for uid=%s did not contain message bytes.", uid)
             return None
 
-        msg = message_from_bytes(raw, policy=default)
+        # typeshed gibt `message_from_bytes(..., policy=default)` als
+        # `Message` an. Zur Laufzeit baut die Policy über ihre
+        # `message_factory` aber eine `EmailMessage` — und nur die hat
+        # `get_content()`, auf dem `_extract_text` weiter unten steht. Der
+        # cast hält genau diese Zusage fest, an der Stelle, an der sie
+        # entsteht: `policy=default` ist tragend, nicht Geschmackssache.
+        msg = cast(EmailMessage, message_from_bytes(raw, policy=default))
         return IncomingEmail(
             uid=uid,
             # **`From`, nicht `Reply-To`** (#14d). Über `Reply-To` liess sich
@@ -573,7 +579,7 @@ def _decode_header(value: str) -> str:
     return str(make_header(decode_header(value)))
 
 
-def _extract_text(msg: Message) -> str:
+def _extract_text(msg: EmailMessage) -> str:
     if msg.is_multipart():
         plain_parts = []
         html_parts = []
@@ -595,13 +601,27 @@ def _extract_text(msg: Message) -> str:
     return _part_content(msg).strip()
 
 
-def _part_content(part: Message) -> str:
+def _part_content(part: EmailMessage) -> str:
+    """Den Text eines Teils holen — `EmailMessage`, nicht `Message`.
+
+    Die Annotation ist keine Kosmetik: `get_content()` gibt es **nur** auf
+    `EmailMessage`, und die entsteht allein daraus, dass oben mit
+    `policy=default` geparst wird. Nimmt jemand die Policy weg, liefert der
+    Parser die Basisklasse, `get_content()` wirft `AttributeError` — und der
+    Fallback unten fängt nur `LookupError`/`UnicodeDecodeError`, greift also
+    gerade **nicht**. `policy=default` ist damit tragend, und diese Signatur
+    ist die Stelle, an der das steht.
+    """
     try:
         content = part.get_content()
     except (LookupError, UnicodeDecodeError):
-        payload = part.get_payload(decode=True) or b""
+        # `get_payload(decode=True)` ist in typeshed breit typisiert
+        # (Message | bytes | Any) — hier interessiert nur der Byte-Fall, alles
+        # andere hat in diesem Zweig nichts zu suchen.
+        payload = part.get_payload(decode=True)
         charset = part.get_content_charset() or "utf-8"
-        content = payload.decode(charset, errors="replace")
+        raw = payload if isinstance(payload, bytes) else b""
+        content = raw.decode(charset, errors="replace")
     if isinstance(content, bytes):
         return content.decode("utf-8", errors="replace")
     return str(content)

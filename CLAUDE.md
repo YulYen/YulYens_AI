@@ -100,7 +100,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | Security | BasicGuard (tinyguard.py) |
 | Tests | pytest |
 | Formatting | Black (88), Ruff |
-| Typen | mypy (`src/core`, `src/storage`, `src/auth`) |
+| Typen | mypy über das ganze `src` (Linux **und** `--platform win32`) |
 
 ## Verzeichnisstruktur
 
@@ -726,17 +726,52 @@ in der CI (z. B. würde `api.enabled: false` sonst API-Tests brechen).
 - `make lint` → Ruff check only
 - Keine Docstrings für einfache Methoden, kurze Inline-Kommentare nur wenn nötig
 
+### ⚠️ Ein Prüfer, der abbricht, meldet *weniger* Fehler — nicht keine
+
+mypy lief lange über drei Module. Ein Lauf über `src/ui` meldete genau **einen**
+Fehler, und zwar diesen: „Source file found twice under different module names",
+mit dem Zusatz `errors prevented further checking`. Die Zahl 1 war kein
+Qualitätsurteil, sondern ein **Abbruch** — nach der ersten Meldung hat mypy
+aufgehört zu schauen. Tatsächlich waren es 46.
+
+Ursache ist `mypy_path = "src"` in Kombination mit den Importen des Projekts
+(`from ui.session import …`): `src/ui/webui_format.py` ist damit auf zwei Wegen
+erreichbar, als `webui_format` und als `ui.webui_format`. mypy weigert sich
+dann weiterzuarbeiten. `explicit_package_bases = true` sagt ihm, wo die
+Paketwurzel liegt.
+
+**Die Lehre ist allgemeiner als mypy:** eine niedrige Fehlerzahl kann bedeuten,
+dass wenig kaputt ist — oder dass wenig geprüft wurde. Dieselbe Klasse wie der
+immer-rote Audit-Job (#61), nur andersherum: dort war die Farbe wertlos, weil
+sie sich nie änderte, hier war die Zahl wertlos, weil sie nicht zu Ende gezählt
+wurde. Wer ein Prüfwerkzeug einhängt, sieht **einmal** nach, wie viele Dateien
+es tatsächlich angefasst hat (`checked N source files`).
+
+**`--platform win32` ist kein Luxus.** mypy wertet `if sys.platform == "win32"`
+statisch aus: auf dem Linux-Runner ist der `winsound`-Zweig toter Code und wird
+nie geprüft. Bei einem Windows-primären Projekt ist das die falsche Richtung —
+die Tests haben seit #45 eine Windows-Matrix, die Typprüfung hatte keine. Der
+zweite Lauf braucht keinen Windows-Runner, nur die Annahme, und hat sofort einen
+Befund geliefert, den der Linux-Lauf nie sehen konnte (typeshed gibt
+`SND_FILENAME` als `Literal[131072]`, das folgende `|=` macht ein `int` daraus).
+
+Was dabei **nicht** passieren darf: eine Prüfung abschalten, damit die Zahl
+sinkt. Alle 55 Befunde sind behoben, nicht stummgeschaltet; wo ein `cast` steht
+(Mail-Adapter) oder ein `Any` (`WebUI.texts`), steht die Begründung daneben —
+ein `Any` ohne Grund ist ein Stummschalter, genau wie ein Allowlist-Eintrag
+ohne Grund.
+
 ### CI-Jobs (`.github/workflows/ci.yml`)
 | Job | Was er prüft |
 |---|---|
 | **Format & lint** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten) |
 | **Tests (ubuntu-latest / windows-latest)** | Volle Suite ohne `ollama`-Marker, mit `--cov`. Die Windows-Matrix ist der Punkt: das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf (#45) |
-| **Typen (mypy)** | `python -m mypy` — blockierend über `src/core`, `src/storage` und `src/auth` (Konfiguration in `pyproject.toml`). `follow_imports = silent` liest den Rest fürs Signatur-Wissen mit, meldet dort aber nichts; Erweiterung Modul für Modul |
+| **Typen (mypy)** | `python -m mypy` — blockierend über das **ganze** `src` (Konfiguration in `pyproject.toml`). Dazu ein zweiter Lauf `--platform win32`: mypy wertet `sys.platform` statisch aus, der `winsound`-Zweig wäre auf dem Linux-Runner sonst ungeprüfter toter Code |
 | **Tests mit spaCy-Modell** | `de_core_news_lg` per `actions/cache` (versionierter Key), dann gezielt `test_spacy_keywords.py` + `test_wiki.py` — die liefen sonst nur als Skips |
 
 Coverage steht als Zahl in der Job-Summary (kein externer Badge-Dienst, der
-Account + Token bräuchte). mypy läuft seit #52 blockierend, inzwischen über `src/core`, `src/storage` und
-`src/auth`; `make types` ist die lokale Kurzform.
+Account + Token bräuchte). mypy läuft seit #52 blockierend, seit dieser Runde über das
+gesamte `src`; `make types` ist die lokale Kurzform und fährt beide Läufe.
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
@@ -1096,7 +1131,7 @@ Highlights:
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
-  #42 Perf-Benchmark (mypy läuft seit #52 über `src/core`; nächste Module bewusst einzeln)
+  #42 Perf-Benchmark (mypy deckt inzwischen das ganze `src` ab)
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
   (Archiv), #14 bis auf den Server-Teil (#14a). #61 (Gradio 5.x) ist gehoben, die
   Fortsetzung auf 6.x läuft als #61a weiter

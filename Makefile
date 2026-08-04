@@ -14,9 +14,12 @@ format:
 lint:
 	python -m ruff check .
 
-# Typprüfung nur für src/core (#52); Pfade stehen in pyproject.toml.
+# Typprüfung über das ganze src (#52); Pfade stehen in pyproject.toml.
+# Der zweite Lauf nimmt Windows an: mypy wertet `sys.platform` statisch aus,
+# der winsound-Zweig ist auf Linux sonst ungeprüfter toter Code.
 types:
 	python -m mypy
+	python -m mypy --platform win32
 
 fix:
 	python -m ruff check --fix .

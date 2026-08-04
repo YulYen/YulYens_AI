@@ -17,9 +17,18 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 if sys.platform == "win32":  # pragma: no cover - platform specific
     import winsound
+else:
+    # Der Name muss auf *jeder* Plattform existieren: `play_wav` entscheidet
+    # über eine Laufzeit-Variable (`platform`, damit die Verteilung testbar
+    # ist), und die Tests stellen den Windows-Zweig auf Linux nach, indem sie
+    # dieses Attribut ersetzen. Für mypy ist der Zweig hier der einzige, den es
+    # auf Linux sieht — unter `mypy --platform win32` nimmt es den echten
+    # Import oben und prüft die winsound-Aufrufe wirklich.
+    winsound: Any = None
 
 # First match wins. paplay covers PulseAudio/PipeWire, aplay plain ALSA;
 # ffplay is the fallback for boxes that have ffmpeg but no sound tooling.
@@ -57,7 +66,9 @@ def play_wav(path: Path, block: bool = False, platform: str | None = None) -> bo
     wav = Path(path)
 
     if current == "win32":  # pragma: no cover - platform specific
-        flags = winsound.SND_FILENAME
+        # Ausdrücklich `int`: typeshed gibt SND_FILENAME als Literal[131072],
+        # und das nächste `|=` macht daraus wieder ein gewöhnliches int.
+        flags: int = winsound.SND_FILENAME
         if not block:
             flags |= winsound.SND_ASYNC
         try:

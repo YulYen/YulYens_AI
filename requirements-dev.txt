@@ -7,7 +7,9 @@ black==24.4.2
 # Version über den Pin. Genau die Falle, die CLAUDE.md fürs PATH-Shadowing
 # beschreibt, nur über die Abhängigkeiten statt über den PATH.
 ruff==0.16.1
-# Typprüfung nur für src/core (#52) — Konfiguration in pyproject.toml.
+# Typprüfung über das ganze src (#52) — Konfiguration in pyproject.toml.
+# Achtung: mypy braucht dafür auch die *Laufzeit*-Abhängigkeiten aus
+# requirements.txt, sonst meldet es import-not-found statt zu prüfen.
 mypy==1.10.1
 types-requests
 types-PyYAML

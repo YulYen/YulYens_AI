@@ -125,7 +125,7 @@ class ChatController:
         if not context_near_limit(llm_history, session.streamer.persona_options):
             return False
 
-        drink = get_drink(session.bot)
+        drink = get_drink(session.bot or "")
         warn = self._t("context_wait_message", persona_name=session.bot, drink=drink)
 
         chat_history.append(bot_bubble(warn))
@@ -370,7 +370,9 @@ class ChatController:
         inject_rss_context(llm_history, block)
         return self._rss_hint(session.bot, list(names), dropped)
 
-    def _rss_hint(self, persona: str, names: list[str], dropped: int) -> str | None:
+    def _rss_hint(
+        self, persona: str | None, names: list[str], dropped: int
+    ) -> str | None:
         """„📰 LEAH hat dazu tagesschau gelesen (Stand 14:20)."
 
         Der Stand gehört sichtbar dazu: der Cache ist bis zu einer Stunde alt,

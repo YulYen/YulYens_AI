@@ -207,7 +207,7 @@ def render_markdown(run: EvalRun) -> str:
             lines.append("")
             for verdict in result.verdict.verdicts if result.verdict else ():
                 mark = "✅" if verdict.passed else "❌"
-                score = verdict.score if verdict.score is not None else "—"
+                score = "—" if verdict.score is None else f"{verdict.score}"
                 lines.append(f"- {mark} {score}/5 — {verdict.trait} ({verdict.reason})")
             lines.append("")
 
