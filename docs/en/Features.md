@@ -158,6 +158,8 @@ Conversations live in a local SQLite file (`storage.path`, `data/conversations.s
 
 Continuing really means continuing: the reply is appended to the same conversation record rather than starting a second one. Conversations from a guest persona stay readable but cannot be continued — that persona's system prompt only existed in its session.
 
+**Ask-All and the AI dialog do not appear in the history** — deliberately, not by oversight. "Ask all" produces four parallel answers to *one* question and does not fit the shape "one conversation with one persona"; the AI dialog produces an artefact the user only supplied the opening prompt for. To keep either, use the file export.
+
 File exchange (JSON download/upload in the web UI, `/save` and “load conversation” in the terminal) remains alongside it — it is meant for backups and moving between machines. If you do not need it, switch it off with `storage.file_exchange: false`; the history's Markdown export is unaffected.
 
 The former JSONL transcript under `logs/` is still available, but purely as a debugging tool and off by default (`logging.conversation_jsonl`).

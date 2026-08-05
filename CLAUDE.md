@@ -549,8 +549,9 @@ in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 und damit protokollierte die Ablage Generierungs*versuche* statt des Gesprächs:
 „Nochmal 🔄" hängte Frage und verworfene Antwort erneut an (dreimal gedrückt →
 drei Fragen und drei Antworten im Store, während die Oberfläche eine zeigte),
-„Stop ⏹" ließ die Antwort ganz weg, und Ask-All wie Self-Talk zeichneten gar
-nichts auf, weil dort nie eine Gesprächs-ID gesetzt wurde.
+„Stop ⏹" ließ die Antwort ganz weg. Ask-All und Self-Talk zeichneten gar nichts
+auf, weil dort nie eine Gesprächs-ID gesetzt wurde — das ist bis heute so und
+**seit 2026-08-05 eine bewusste Entscheidung**, siehe unten.
 
 Jetzt gilt: **die Oberfläche besitzt den Gesprächsstand, die Ablage spiegelt
 ihn.** `stream()` schreibt nur noch den JSONL-Mitschnitt (der *soll* Versuche
@@ -561,7 +562,28 @@ auseinanderlaufen, und injizierter System-Kontext (Wiki, Briefing) bleibt
 draußen, weil er zum Prompt gehört und nicht zum Gespräch.
 
 Wer einen **neuen Antwortweg** baut, muss `record_conversation` aufrufen —
-sonst ist er wieder spurlos wie Ask-All davor.
+sonst bleibt er spurlos. Aufgezeichnet wird heute aus Einzelchat, Briefing,
+„Nochmal", Terminal, API und Mail-Adapter.
+
+**Zwei Wege zeichnen bewusst nicht auf: Ask-All und Self-Talk (#75, verworfen
+am 2026-08-05).** Das ist keine Lücke, sondern eine Entscheidung — und sie steht
+hier, weil der Satz davor sonst wie ein unerledigter Fehler aussieht:
+
+- **Ask-All** sind vier parallele Antworten auf *eine* Frage. Das Datenmodell
+  der Ablage ist „eine Persona, ein Faden"; Ask-All hineinzuzwingen hieße, eine
+  Form zu erfinden, die niemand braucht. Die Ansicht ist ohnehin ein
+  `gr.Markdown` ohne Daumen — es hängt also auch kein Feedback daran.
+- **Self-Talk** erzeugt ein Artefakt, kein Nutzergespräch: zwei Personas reden
+  miteinander, der Nutzer gibt nur den Startprompt.
+
+**Die Fußnote zu Self-Talk, damit sie niemand neu entdecken muss:** anders als
+Ask-All schreibt er in **dasselbe** `chatbot` wie der Einzelchat — an dem die
+👍/👎 hängen. Ein Daumen dort wird also geschrieben, aber mit **leerer
+`conversation_id`**, weil es kein Gespräch gibt. Derselbe Zustand wie ohne
+Anmeldung (#72), nur auf einem zweiten Weg erreichbar. Der Preis ist bekannt und
+klein: genau diese Vote-Zeilen lassen sich später nicht gegen Persona, Modell
+und Verlauf joinen — wofür #65 gebaut wurde. Wer die Entscheidung umdreht, fängt
+bei Self-Talk an, nicht bei Ask-All.
 
 **Der Datei-Im-/Export bleibt, ist aber abschaltbar** (`storage.file_exchange`, Default an) — er ist etwas anderes als die Ablage. `conversation_io_terminal.py`
 (JSON hoch-/runterladen im WebUI, `/save` und Laden im Terminal) ist der
