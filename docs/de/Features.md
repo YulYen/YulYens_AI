@@ -158,6 +158,8 @@ Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig
 
 Fortsetzen heißt wirklich fortsetzen: die Antwort landet im selben Gesprächseintrag, es entsteht kein zweiter. Gespräche einer Gast-Persona bleiben lesbar, lassen sich aber nicht fortsetzen — deren System-Prompt lebte nur in der damaligen Sitzung.
 
+**Nicht im Verlauf stehen Ask-All und der AI-Dialog** — und das ist Absicht, kein Fehler. „Frage an alle" sind vier parallele Antworten auf *eine* Frage und passen nicht in die Form „ein Gespräch mit einer Persona"; der AI-Dialog erzeugt ein Artefakt, zu dem der Nutzer nur den Startprompt beigesteuert hat. Wer beides behalten will, nimmt den Datei-Export.
+
 Der Austausch per Datei (JSON herunterladen/hochladen im WebUI, `/save` und „Gespräch laden" im Terminal) bleibt daneben bestehen — er ist für Backups und den Wechsel zwischen Rechnern gedacht. Wer ihn nicht braucht, schaltet ihn mit `storage.file_exchange: false` ab; der Markdown-Export im Verlauf bleibt davon unberührt.
 
 Der frühere JSONL-Mitschnitt in `logs/` ist weiterhin verfügbar, aber als reines Debug-Werkzeug und standardmäßig aus (`logging.conversation_jsonl`).
