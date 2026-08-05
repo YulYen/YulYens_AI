@@ -60,7 +60,7 @@ siehe auch: [Features.md](Features.md)
 
 ## Voraussetzungen
 
-- **Python 3.10+**
+- **Python 3.10+** — geprüft wird in der CI gegen 3.10 und 3.13
 - **Ollama** (oder anderes kompatibles Backend) mit installiertem Modell, z. B.:
   ```bash
   ollama pull ministral-3:8b

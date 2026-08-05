@@ -1,7 +1,10 @@
 # CONTRIBUTING
 
 ## Voraussetzungen / Requirements
-- Python 3.10 oder neuer (Python 3.10 or newer)
+- Python 3.10 oder neuer (Python 3.10 or newer). Die CI prüft die **Enden**:
+  3.10 auf Linux und Windows, 3.13 auf Linux. 3.11 und 3.12 sind gegen die
+  volle Suite gefahren worden, laufen aber nicht bei jedem Push mit — jede
+  Matrix-Zeile kostet CI-Minuten.
 
 ## Setup
 1. Create a virtual environment:

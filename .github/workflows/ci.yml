@@ -89,21 +89,42 @@ jobs:
         run: python -m mypy --platform win32
 
   test:
-    # OS-Matrix (#45): Das Projekt läuft Windows-primär, die CI lief bisher nur
-    # auf Linux — winsound- und Pfadprobleme wären hier nie aufgefallen.
+    # Zwei Achsen, aber **kein** Kreuzprodukt (#45, #64e).
+    #
+    # OS: das Projekt läuft Windows-primär, die CI lief bisher nur auf Linux —
+    # winsound- und Pfadprobleme wären hier nie aufgefallen (#45).
+    #
+    # Python: die Doku verspricht „3.10+", geprüft wurde nur 3.10. Getestet
+    # werden jetzt die **Enden** — die versprochene Untergrenze und die neueste
+    # Fassung. 3.11 und 3.12 bleiben bewusst draußen: alle vier Versionen sind
+    # vor dem Einbau lokal gegen die volle Suite gefahren worden (je 1154 Tests
+    # grün), und wenn beide Enden halten, ist die Mitte selten die Ausreißerin.
+    # Jede Zeile kostet CI-Minuten bei *jedem* Push — deshalb `include` statt
+    # einer Kreuzmatrix: drei Jobs, nicht vier.
+    #
     # fail-fast: false, damit ein Windows-Fehler das Linux-Ergebnis nicht
     # verschluckt (und umgekehrt).
-    name: Tests (${{ matrix.os }})
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          # Die versprochene Untergrenze, auf beiden Betriebssystemen.
+          - os: ubuntu-latest
+            python: "3.10"
+            coverage: true
+          - os: windows-latest
+            python: "3.10"
+          # Die neueste Fassung. Linux genügt: was hier bricht, sind
+          # Sprach-/Bibliotheksänderungen, keine Plattformfragen.
+          - os: ubuntu-latest
+            python: "3.13"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: "${{ matrix.python }}"
           cache: pip
       - name: Install dependencies
         run: |
@@ -113,11 +134,11 @@ jobs:
         # Deliberately includes the 'slow' marker (locally 'make test' skips it).
         # spaCy- and Ollama-dependent tests skip themselves when the
         # model or server is unavailable (see tests/conftest.py).
-        run: pytest -q -m "not ollama and not browser" --cov=src --cov-report=term-missing --cov-report=json
+        run: python -m pytest -q -m "not ollama and not browser" --cov=src --cov-report=term-missing --cov-report=json
       - name: Coverage in die Job-Summary schreiben
         # Statt eines externen Badge-Dienstes (bräuchte Account und Token): die
         # Zahl steht direkt im Run. Siehe Backlog #45.
-        if: always() && matrix.os == 'ubuntu-latest'
+        if: always() && matrix.coverage
         shell: bash
         run: |
           if [ -f coverage.json ]; then
@@ -183,4 +204,4 @@ jobs:
       - name: Keyword- und Wiki-Tests
         # Gezielt die Tests, die das Modell brauchen — der Rest läuft im
         # test-Job und muss hier nicht doppelt laufen.
-        run: pytest -q -m "not ollama and not browser" tests/test_spacy_keywords.py tests/test_wiki.py
+        run: python -m pytest -q -m "not ollama and not browser" tests/test_spacy_keywords.py tests/test_wiki.py
