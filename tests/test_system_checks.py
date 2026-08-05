@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import core.system_checks as sc
 import pytest
 import requests
+from version import __version__
 
 
 class FakeResp:
@@ -263,7 +264,16 @@ def test_healthz_returns_503_on_critical(client, monkeypatch):
 
 
 def test_health_liveness_still_cheap(client):
-    assert client.get("/health").json() == {"status": "ok"}
+    # Der Gleichheitsvergleich ist Absicht: /health soll billig bleiben und
+    # nichts prüfen. Die Version ist eine Konstante, kein Check (#74).
+    assert client.get("/health").json() == {"status": "ok", "version": __version__}
+
+
+def test_both_health_endpoints_name_the_running_version(client):
+    # Ohne Paket und ohne Tag ist "welcher Stand läuft dort?" von außen sonst
+    # nicht zu beantworten — /health trägt sie schlüsselfrei.
+    assert client.get("/health").json()["version"] == __version__
+    assert client.get("/healthz").json()["version"] == __version__
 
 
 # ---- Passt das Modell in den freien VRAM? (#43) -----------------------------

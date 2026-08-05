@@ -32,7 +32,7 @@ Die Durchsicht dauert eine Minute und geht immer gleich:
 |---|---|
 | Makefile-Ziel, Testkommando, Marker | `docs/{de,en}/ReadMe.md`, `CONTRIBUTING.md` |
 | Config-Schalter | beide ReadMes (Schalterliste) + `config.yaml`-Kommentar |
-| Nutzerseitiges Verhalten | `docs/{de,en}/Features.md` |
+| Nutzerseitiges Verhalten | `docs/{de,en}/Features.md` **und** `CHANGELOG.md` unter `## [Unreleased]` |
 | Entwurfsentscheidung, Stolperfalle | diese Datei |
 | Ticketstand | `backlog.md` |
 | Abhängigkeits-Pin | `requirements*.txt`-Kommentar; bei Bedarf `.pre-commit-config.yaml` |
@@ -77,6 +77,93 @@ Alles andere bleibt beim PR: sobald **Code** betroffen ist oder **mehrere
 Dateien**, ist der PR die Stelle, an der man die Änderung als Ganzes sieht.
 Im Zweifel Branch — die Ausnahme ist für den offensichtlichen Fall gedacht,
 nicht für den grenzwertigen.
+
+## Versionierung und Changelog (#74)
+
+Die Version steht in **`src/version.py`** und sonst nirgends; `CHANGELOG.md`
+trägt sie als oberste Überschrift, `tests/test_version_consistency.py` hält
+beide zusammen. Angezeigt wird sie von `--version`, in der Kopfzeile von
+`--doctor` und als Feld in `/health` und `/healthz` — ohne Paket und ohne Tag
+ist „welcher Stand läuft?" sonst nicht zu beantworten, und das ist die erste
+Frage bei jeder Fehlermeldung.
+
+**Baseline ist 1.0.0 (2026-08-05).** Die fünf Wochen davor stehen bewusst
+*nicht* im Changelog: das Backlog-Archiv erzählt sie ausführlicher, als ein
+Changelog es könnte, und eine zweite Fassung derselben Texte läuft beim dritten
+Eintrag auseinander. `0.x` wäre die falsche Bescheidenheit gewesen — dort darf
+laut SemVer jede MINOR brechen, die MAJOR-Stelle trüge also keine Information,
+und genau die ist der einzige Grund für SemVer hier.
+
+### Was hinein gehört — und was nicht
+
+**Nur, was jemand beim Betreiben merkt:** ein neuer Schalter in `config.yaml`,
+ein geänderter Default, ein neues Bedienelement, eine entfernte Option, ein
+Pflichtfeld. Interner Umbau gehört nicht hinein — #58 (Moderator umgeschrieben)
+und #64d (Broadcast-Events) ändern für den Startenden nichts.
+
+Diese Abgrenzung ist der Grund, warum die **Ein-Datei-Ausnahme oben überlebt**:
+eine korrigierte Doku-Zeile merkt niemand, braucht also keinen
+Changelog-Eintrag und bleibt eine Datei. Bräuchte *jede* Änderung eine Zeile,
+wäre jede Korrektur zwei Dateien und damit PR-pflichtig.
+
+### Welche Stelle springt
+
+Der öffentliche Vertrag ist: die Keys in `config.yaml`, die Kommandozeile von
+`src/launch.py`, die HTTP-Endpunkte und das Ensemble-YAML-Format. Das
+Store-Schema gehört **nicht** dazu (dafür gibt es Migrationen), Locale-Keys
+auch nicht.
+
+| Stelle | wann |
+|---|---|
+| MAJOR | der Vertrag bricht — Pflichtfeld, geänderter Default, entfernter Schalter |
+| MINOR | Neues, ohne dass Bestehendes bricht |
+| PATCH | nur Behobenes |
+
+**Eine stille Verhaltensänderung ist auch ein Bruch.** #72 ist der Beleg: die
+Config blieb gültig, aber eine WebUI ohne Anmeldung zeichnete plötzlich nichts
+mehr auf. Das ist die teuerste Sorte, weil den Verlust nichts anzeigt — wer sie
+unter „Changed" einsortiert, versteckt sie. Eine Deprecation dagegen ist *kein*
+Bruch: `briefing:` → `rss:` wird weitergelesen und warnt, das gehört unter
+„Changed".
+
+Die Stelle wird **beim Taggen** entschieden, nicht vorher: man liest den
+`Unreleased`-Abschnitt und sieht es. Steht dort etwas unter „Breaking", ist es
+MAJOR.
+
+### Wer schreibt wann
+
+**Die Zeile kommt im selben PR mit**, unter `## [Unreleased]`. Der Grund ist
+nicht Vollständigkeit, sondern Perspektive: später aus den eigenen
+Commit-Titeln rekonstruiert, entsteht sie aus der Sicht dessen, der es gebaut
+hat — nicht dessen, der es benutzt. Dass die Commits deutsch sind und das
+Changelog englisch, ist dabei ein Vorteil: eine Zeile lässt sich nicht
+kopieren, ohne zu bemerken, dass `refactor(ui): …` dort nichts verloren hat.
+
+**Getaggt wird, wenn Yul „runder Stand" sagt** — höchstens einmal die Woche,
+nicht pro Merge. Der Tag (`v1.2.3`) entsteht, *nachdem* beide Dateien
+übereinstimmen; er ist nicht Teil der Testprüfung, weil die CI flach auscheckt.
+
+**Der Konflikt-Trap von oben gilt hier auch:** zwei Branches hängen beide oben
+in dieselbe Datei. Er ist kleiner, weil `Unreleased` in `Breaking`/`Added`/
+`Changed`/`Fixed` zerfällt und zwei Branches selten in denselben Abschnitt
+schreiben — die Gegenmaßnahme bleibt „jeder Branch frisch von `main`". Ein
+Werkzeug dagegen (towncrier mit einer Schnipsel-Datei je Änderung) wäre
+Zeremonie für einen Konflikt, den es bei einem Entwickler kaum gibt.
+
+### Zwei Dinge, die man leicht umdreht
+
+**Das Changelog ist englisch, obwohl alles andere hier deutsch ist.** Die
+deutsche Ebene richtet sich an den Entwickler (Code-Kommentare, diese Datei,
+`backlog.md`), die englische an den Betreiber — und der ist im Zweifel jemand
+anderes. `docs/en/` und der englische README-Teil sind dieselbe Ebene. Wer das
+zweisprachig macht, schreibt jeden Eintrag doppelt, für immer, ohne dass ein
+Test die Fassungen zusammenhält.
+
+**Veröffentlichte Einträge werden nicht nachgezogen** — dieselbe Regel wie bei
+`docs/modellwechsel_juni_2026.md`. Ein Eintrag hält fest, was in *dieser*
+Version galt; ihn anzupassen fälscht die Aufzeichnung. Ist eine Aussage
+überholt, steht das im nächsten Eintrag. Deshalb steht `CHANGELOG.md` auch
+nicht in `LIVING_DOCS` von `tests/test_docs_consistency.py`.
 
 ## Was ist dieses Projekt?
 
@@ -165,7 +252,8 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── rss/
 │   │   ├── feeds.py             # RSS/Atom als Kontextquelle: Cache + Block (#73)
 │   │   └── trigger.py           # Heuristik „ist das eine Nachrichtenfrage?"
-│   └── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
+│   ├── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
+│   └── version.py               # __version__ — die einzige Quelle der Version (#74)
 ├── evals/                       # Eval-Korpora als YAML (siehe evals/ReadMe.md)
 │   ├── personas/*.yaml          # Goldene Fragen pro Persona
 │   ├── behaviour/*.yaml         # Verhaltensbeweise (drei Zeitstempel)
@@ -179,14 +267,15 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 41 Testmodule (inkl. test_web_ui_wiring.py,
+│   └── test_*.py                # 53 Testmodule (inkl. test_web_ui_wiring.py,
 │                                #   test_continuation.py, test_imports.py)
 ├── locales/
-│   ├── de.yaml                  # 150 UI-Texte Deutsch (Parität mit en.yaml)
+│   ├── de.yaml                  # 156 UI-Texte Deutsch (Parität mit en.yaml)
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
 ├── Makefile                     # make setup / format / lint / types / test / test-ci / evals / clean / run
+├── CHANGELOG.md                 # nutzersichtbare Änderungen, englisch (#74)
 └── backlog.md                   # Feature-Backlog mit Effort/Benefit
 ```
 

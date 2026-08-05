@@ -267,6 +267,11 @@ python src/launch.py --doctor
 
 Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
 
+Die Kopfzeile nennt die laufende Version. Sie allein bekommt man auch mit
+`python src/launch.py --version`, und über HTTP als Feld `version` in `/health`
+— nützlich, bevor man einen Fehler meldet. Was sich zwischen zwei Versionen
+geändert hat, steht in [`CHANGELOG.md`](../../CHANGELOG.md) (englisch).
+
 Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf **jeder** Ebene gemeldet, also auch `security.pii_protecton` statt `pii_protection` oder `storage.enable` statt `enabled` — ein Tippfehler, der sonst still dazu führt, dass die Einstellung gar nicht greift. Beim normalen Start ist das nur eine Warnung im Log (ein laufendes Setup soll nicht an einem Schema scheitern), im Doktor ein harter Befund.
 
 - **Terminal-UI**

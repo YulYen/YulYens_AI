@@ -5,6 +5,7 @@ import core.system_checks as system_checks
 from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
+from version import __version__
 
 from .openai_compat import (
     OpenAIError,
@@ -40,7 +41,11 @@ class AskResponse(BaseModel):
     answer: str
 
 
-app = FastAPI(title="Leah One‑Shot API", version="1.0.0")
+# Die OpenAPI-Version ist bewusst dieselbe wie die des Projekts (#74). Sie
+# meint streng genommen die API-Fläche, nicht die App — aber ein fest
+# eingetragener Literal daneben wäre eine Zahl, die nie mitwandert und trotzdem
+# wie eine Aussage aussieht.
+app = FastAPI(title="Leah One‑Shot API", version=__version__)
 
 # Der /v1-Router wird immer gemountet; ob er antwortet, entscheidet
 # api.openai_compatible.enabled pro Request (#37). Eine Weiche an dieser Stelle
@@ -55,8 +60,10 @@ app.add_exception_handler(RequestValidationError, validation_error_handler)
 
 @app.get("/health")
 def health():
-    # Cheap liveness probe: the process answers.
-    return {"status": "ok"}
+    # Cheap liveness probe: the process answers. Carries the version because
+    # this endpoint needs no API key — without an artifact and without a tag,
+    # "which build is running?" is otherwise unanswerable from the outside.
+    return {"status": "ok", "version": __version__}
 
 
 @app.get("/healthz")
@@ -68,7 +75,11 @@ def healthz(response: Response):
     status = system_checks.overall_status(results)
     if status == "error":
         response.status_code = 503
-    return {"status": status, "checks": [r.as_dict() for r in results]}
+    return {
+        "status": status,
+        "version": __version__,
+        "checks": [r.as_dict() for r in results],
+    }
 
 
 # Derselbe Schlüssel und dasselbe Rate-Limit wie unter /v1: /ask bietet
