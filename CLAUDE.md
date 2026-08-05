@@ -87,12 +87,33 @@ beide zusammen. Angezeigt wird sie von `--version`, in der Kopfzeile von
 ist „welcher Stand läuft?" sonst nicht zu beantworten, und das ist die erste
 Frage bei jeder Fehlermeldung.
 
-**Baseline ist 1.0.0 (2026-08-05).** Die fünf Wochen davor stehen bewusst
-*nicht* im Changelog: das Backlog-Archiv erzählt sie ausführlicher, als ein
-Changelog es könnte, und eine zweite Fassung derselben Texte läuft beim dritten
-Eintrag auseinander. `0.x` wäre die falsche Bescheidenheit gewesen — dort darf
-laut SemVer jede MINOR brechen, die MAJOR-Stelle trüge also keine Information,
-und genau die ist der einzige Grund für SemVer hier.
+**Baseline ist 2.0.0 (2026-08-05).** Das Changelog beginnt hier; was davor
+liegt, steht *nicht* darin — das Backlog-Archiv erzählt es ausführlicher, als
+ein Changelog es könnte, und eine zweite Fassung derselben Texte läuft beim
+dritten Eintrag auseinander. Warum die Hauptnummer trotzdem springt: der
+letzte Tag `v1.1.0` ist vom 2026-01-04, und seither ist der Vertrag mehrfach
+gebrochen — `ui.web.host` stand auf `0.0.0.0`, `email_adapter.allowed_senders`
+kam als Pflichtfeld dazu, und #72 hat die Aufzeichnung ohne Anmeldung still
+abgeschaltet.
+
+### ⚠️ Der Clone in der Sandbox ist flach — `git tag` lügt dort
+
+Der erste Anlauf zu #74 stand auf der Feststellung „es gibt keinerlei
+Versionierung: kein Tag, kein `__version__`, 162 Commits". Zwei Drittel davon
+waren falsch, und zwar **messbar falsch, nicht strittig**: der Arbeits-Clone ist
+`shallow`. `git tag` gab deshalb nichts aus, und `git log --reverse` behauptete,
+das Projekt beginne am 2026-07-02. Tatsächlich: **843 Commits seit dem
+2025-07-09 und drei Tags** — `v0.9.7-stable-webui`, `v1.0.0` („Erste
+öffentliche Veröffentlichung", 2025-11-24) und `v1.1.0`.
+
+Die Folge wäre teuer gewesen: `v1.0.0` ist seit November vergeben, ein Tag mit
+diesem Namen hätte die erste öffentliche Veröffentlichung überschrieben.
+
+**Merksatz:** vor jeder Aussage über die Historie — Tags, Alter, Commit-Zahl,
+„gab es das schon mal?" — erst `git rev-parse --is-shallow-repository` fragen
+und bei `true` `git fetch --unshallow origin`. Das ist dieselbe Klasse wie der
+abbrechende mypy-Lauf weiter unten: die Zahl war nicht falsch berechnet, sie
+war auf einem Ausschnitt berechnet, der wie das Ganze aussah.
 
 ### Was hinein gehört — und was nicht
 

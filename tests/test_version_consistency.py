@@ -15,6 +15,13 @@ hochziehen, den Changelog-Eintrag vergessen (oder umgekehrt). Danach meldet
 Veröffentlichen, und die CI checkt flach aus — ein Test gegen `git describe`
 wäre auf dem Runner entweder rot oder übersprungen, also wertlos. Die
 Reihenfolge ist: beide Dateien stimmen überein, dann wird getaggt.
+
+**Genau diese Lücke hat schon einmal zugeschlagen**, und der Test hier hätte
+sie nicht schließen können: geplant war `v1.0.0` — den Tag gab es seit November
+2025 bereits. Gesehen wurde er nicht, weil der Arbeits-Clone flach war und
+`git tag` deshalb schwieg. Wer die Zahl anhebt, prüft **von Hand**, ob sie
+frei ist (`git fetch --unshallow origin && git tag -l`); dieselbe Flachheit,
+die den Test hier unmöglich macht, ist die Ursache des Fehlers.
 """
 
 from __future__ import annotations

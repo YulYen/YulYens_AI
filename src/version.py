@@ -18,4 +18,4 @@ Lehre aus `KNOWN_TOP_LEVEL_KEYS` (#66).
 
 from __future__ import annotations
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

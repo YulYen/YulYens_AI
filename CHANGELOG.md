@@ -30,14 +30,21 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 Nothing yet.
 
-## [1.0.0] - 2026-08-05
+## [2.0.0] - 2026-08-05
 
-Baseline. Changelog-keeping starts here — this entry deliberately does not
-summarise the five weeks of development that came before it. For that history,
-see the archive in [`backlog.md`](backlog.md).
+Baseline. Changelog-keeping starts here; this entry deliberately does not
+summarise the development that came before it. For that history, see the
+archive in [`backlog.md`](backlog.md).
+
+**Why 2.0.0 and not 1.2.0.** The previous tag, `v1.1.0`, is from January 2026.
+The public contract changed several times since — among them a changed default
+for `ui.web.host`, a new required `email_adapter.allowed_senders`, and a web UI
+without login no longer recording conversations. Those changes are real and
+they are the reason the major digit moves; they are not itemised here, because
+this file starts recording from this release onwards.
 
 For what the project is and does, see the [README](README.md); for the
 features in detail, [`docs/en/Features.md`](docs/en/Features.md).
 
-[Unreleased]: https://github.com/YulYen/YulYens_AI/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/YulYen/YulYens_AI/releases/tag/v1.0.0
+[Unreleased]: https://github.com/YulYen/YulYens_AI/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/YulYen/YulYens_AI/compare/v1.1.0...v2.0.0
