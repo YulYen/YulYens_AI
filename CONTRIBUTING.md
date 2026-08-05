@@ -73,6 +73,24 @@ Browser-Build); beide laufen getrennt.
   Er ist aus allen anderen Zielen und aus der CI ausgenommen, weil er Playwright
   **und** einen Browser-Build braucht; ohne Playwright wird sauber übersprungen.
 
+## Changelog & Versionierung
+- **Ändert dein PR etwas, das ein Betreiber merkt** — ein Schalter in
+  `config.yaml`, ein geänderter Default, ein neues Bedienelement, ein
+  Pflichtfeld, eine entfernte Option — dann kommt eine Zeile unter
+  `## [Unreleased]` in `CHANGELOG.md` **mit in denselben PR**. Auf Englisch;
+  die Begründung dafür steht in `CLAUDE.md`.
+- **Interner Umbau gehört nicht hinein.** Umbenannte Module, umgeschriebene
+  Interna, neue Tests ändern für den Startenden nichts. Die Entwicklersicht
+  steht im Archiv von `backlog.md`.
+- Die Version selbst liegt in `src/version.py` und **sonst nirgends**;
+  `tests/test_version_consistency.py` hält sie gegen die oberste Überschrift
+  in `CHANGELOG.md`. Getaggt wird (`v1.2.3`) erst, wenn beide übereinstimmen.
+- Welche SemVer-Stelle springt, entscheidet der `Unreleased`-Abschnitt beim
+  Taggen. Der öffentliche Vertrag ist `config.yaml`, die Kommandozeile von
+  `src/launch.py`, die HTTP-Endpunkte und das Ensemble-Format.
+- Welche Version gerade läuft, sagen `python src/launch.py --version`,
+  die Kopfzeile von `--doctor` und das Feld `version` in `/health`.
+
 ## PR Flow
 - Submit small, focused pull requests.
 - Reference the relevant issue in the PR description.

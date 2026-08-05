@@ -18,6 +18,7 @@ from config.config_singleton import Config
 # Logging setup
 from config.logging_setup import init_logging
 from core.utils import _wiki_mode_enabled, ensure_dir_exists
+from version import __version__
 from wiki.kiwix_autostart import ensure_kiwix_running_if_offlinemode_and_autostart
 from yaml import YAMLError
 
@@ -54,6 +55,13 @@ def main():
         action="store_true",
         dest="list_ensembles",
         help="List the bundled persona ensembles (name for -e, personas, locales) and exit.",
+    )
+    # Ohne Paket und ohne Artefakt ist der laufende Stand sonst nicht
+    # feststellbar — und das ist die erste Frage bei jeder Fehlermeldung (#74).
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"Yul Yen's AI Orchestra {__version__}",
     )
     args = parser.parse_args()
 
@@ -232,7 +240,9 @@ def _run_doctor(config_path: str | None) -> int:
     }
     ok_symbol = (f"{Fore.GREEN}✓{Style.RESET_ALL}", "OK")
 
-    print(f"\n{Style.BRIGHT}Yul Yen — Setup-Doktor{Style.RESET_ALL}")
+    # Die Version gehört in die Kopfzeile, weil der Doktor das ist, was jemand
+    # laufen lässt, bevor er einen Fehler meldet (#74).
+    print(f"\n{Style.BRIGHT}Yul Yen — Setup-Doktor{Style.RESET_ALL}  v{__version__}")
     print("-" * 48)
     for r in results:
         mark, label = ok_symbol if r.ok else symbols[(r.severity, False)]
