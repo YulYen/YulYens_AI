@@ -812,7 +812,7 @@ Ziel, das ohne Netz fehlschlägt, würde bald umgangen.
 | Job | Was er prüft |
 |---|---|
 | **Format, lint & Schichten** | `black --check` + `ruff check`, beide als Modul (PATH-Falle unten), dazu `lint-imports` — die Schichtenverträge (siehe unten). Statische Prüfungen, alle in Sekunden |
-| **Tests (ubuntu-latest / windows-latest)** | Volle Suite ohne `ollama`-Marker, mit `--cov`. Die Windows-Matrix ist der Punkt: das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf (#45) |
+| **Tests (3 Jobs)** | Volle Suite ohne `ollama`-Marker. Zwei Achsen, **kein** Kreuzprodukt: Ubuntu+Windows auf 3.10 (die versprochene Untergrenze — das Projekt läuft Windows-primär, Pfad-/`winsound`-Probleme fielen auf reinem Linux nie auf, #45) plus Ubuntu auf 3.13 (die neueste Fassung, #64e). Coverage nur im ersten Job |
 | **Typen (mypy)** | `python -m mypy` — blockierend über das **ganze** `src` (Konfiguration in `pyproject.toml`). Dazu ein zweiter Lauf `--platform win32`: mypy wertet `sys.platform` statisch aus, der `winsound`-Zweig wäre auf dem Linux-Runner sonst ungeprüfter toter Code |
 | **Tests mit spaCy-Modell** | `de_core_news_lg` per `actions/cache` (versionierter Key), dann gezielt `test_spacy_keywords.py` + `test_wiki.py` — die liefen sonst nur als Skips |
 

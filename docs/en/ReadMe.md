@@ -62,7 +62,7 @@ See also: [Features.md](Features.md)
 
 ## Prerequisites
 
-- **Python 3.10+**
+- **Python 3.10+** — CI checks 3.10 and 3.13
 - **Ollama** (or another compatible backend) with an installed model, for example:
   ```bash
   ollama pull ministral-3:8b
