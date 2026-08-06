@@ -50,7 +50,13 @@ voices/
 out/
 
 # Claude Code / MCP local config
-.claude/
+# `.claude/*` statt `.claude/`: aus einem ausgeschlossenen *Verzeichnis* lassen
+# sich einzelne Dateien nicht zurückholen — git steigt gar nicht erst hinein.
+# Der Sitzungs-Hook gehört ins Repo (er richtet jede Sandbox ein), die
+# persönliche settings.local.json und alles Übrige bleiben draußen.
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .mcp.json
 
 # Playwright MCP artifacts
