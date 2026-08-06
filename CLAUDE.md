@@ -164,6 +164,27 @@ kopieren, ohne zu bemerken, dass `refactor(ui): …` dort nichts verloren hat.
 nicht pro Merge. Der Tag (`v1.2.3`) entsteht, *nachdem* beide Dateien
 übereinstimmen; er ist nicht Teil der Testprüfung, weil die CI flach auscheckt.
 
+**Beim Taggen über die Releases-Oberfläche (geht vom Handy) zwei Handgriffe,
+die man beide leicht vergisst:**
+
+1. **Den Pre-Release-Haken wegnehmen.** GitHub überspringt Pre-Releases bei
+   „latest" — `/releases/latest` antwortet dann **404**, und auf der
+   Repo-Startseite steht gar kein Release, obwohl eines da ist. Bei 2.0.0
+   genau so passiert: der Release hieß zuerst `v2.0.0-beta` und war markiert.
+   Der Name ist der zweite Teil desselben Fehlers — `-beta` ist in SemVer
+   keine Verzierung, sondern eine Vorabkennzeichnung, die *vor* `2.0.0`
+   sortiert.
+2. **„Generate release notes" ersetzen.** Die erzeugte PR-Liste ist die
+   Entwicklersicht (bei 2.0.0 siebzig Zeilen, darunter „Codex-generated pull
+   request") — also genau das, was laut den Regeln oben *nicht* an den
+   Betreiber geht. Der Text ist der Changelog-Eintrag; die Zeile
+   `**Full Changelog**: …compare/…` darf unten stehen bleiben, dann ist die
+   Liste einen Klick entfernt statt im Weg.
+
+Die Oberfläche legt einen **lightweight** Tag an, die älteren drei sind
+annotated. Kein Handlungsbedarf — der Text lebt dann im Release-Objekt statt
+im Tag-Objekt; es steht hier nur, damit die Ungleichheit niemanden beunruhigt.
+
 **Der Konflikt-Trap von oben gilt hier auch:** zwei Branches hängen beide oben
 in dieselbe Datei. Er ist kleiner, weil `Unreleased` in `Breaking`/`Added`/
 `Changed`/`Fixed` zerfällt und zwei Branches selten in denselben Abschnitt
