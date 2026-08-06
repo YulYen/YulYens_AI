@@ -12,9 +12,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 in `config.yaml`, a changed default, a new button, a removed option, a required
 field. Internal work does not — a rewritten moderator or a split-up module
 changes nothing for the person starting the app. The development history,
-including the reasoning behind each decision, lives in the archive section of
-[`backlog.md`](backlog.md); that is the developer-facing record and it is not
-duplicated here.
+including the reasoning behind each decision, lives in
+[`backlog_archiv.md`](backlog_archiv.md); that is the developer-facing record
+and it is not duplicated here. (It sat in the archive section of
+[`backlog.md`](backlog.md) until 2026-08-06 — older entries below still point
+there, and that link keeps working: the backlog links on to the archive.)
 
 **What a MAJOR bump means.** The public contract of this project is: the keys
 in `config.yaml`, the command line of `src/launch.py`, the HTTP endpoints

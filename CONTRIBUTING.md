@@ -81,7 +81,7 @@ Browser-Build); beide laufen getrennt.
   die Begründung dafür steht in `CLAUDE.md`.
 - **Interner Umbau gehört nicht hinein.** Umbenannte Module, umgeschriebene
   Interna, neue Tests ändern für den Startenden nichts. Die Entwicklersicht
-  steht im Archiv von `backlog.md`.
+  steht in `backlog_archiv.md`.
 - Die Version selbst liegt in `src/version.py` und **sonst nirgends**;
   `tests/test_version_consistency.py` hält sie gegen die oberste Überschrift
   in `CHANGELOG.md`. Getaggt wird (`v1.2.3`) erst, wenn beide übereinstimmen.
