@@ -207,6 +207,49 @@ Version galt; ihn anzupassen fälscht die Aufzeichnung. Ist eine Aussage
 überholt, steht das im nächsten Eintrag. Deshalb steht `CHANGELOG.md` auch
 nicht in `LIVING_DOCS` von `tests/test_docs_consistency.py`.
 
+## Wo diese Sitzung läuft — und was dort fehlt
+
+Claude läuft mal in einer **Sandbox** (Claude Code im Web), mal auf **Yuls
+Rechner**. Der Unterschied ist keine Randnotiz: in der Sandbox fehlt fast alles,
+was das Projekt zur Laufzeit braucht.
+
+| | Sandbox | Yuls Kiste |
+|---|---|---|
+| Abhängigkeiten | kommen **leer** an | eingerichtetes venv |
+| Clone | **flach** — `git tag` schweigt, `git log --reverse` lügt | vollständig |
+| Ollama, Modell | nicht da → `@pytest.mark.ollama` wird übersprungen | da |
+| spaCy `de_core_news_lg` | nicht da → Keyword-/Wiki-Tests übersprungen | da |
+| Playwright | Paket fehlt, **Chromium liegt aber** unter `/opt/pw-browsers` | nach Bedarf |
+| Kiwix/ZIM, Piper, faster-whisper, echter Mailserver, Windows | nichts davon | teils |
+| `git push` | Branches und `main` ja, **Tag-Refs nein** (403 vom Gateway) | alles |
+
+Die letzte Zeile ist die überraschendste: ein Tag lässt sich aus der Sandbox
+nicht setzen. Das geht über die Releases-Oberfläche (siehe oben) oder von Hand.
+
+**Die ersten beiden Zeilen erledigt ein Hook**
+(`.claude/hooks/session-start.sh`, registriert in `.claude/settings.json`): er
+installiert die Abhängigkeiten und macht den Clone tief. Drei Entwurfspunkte,
+die man beim Anfassen leicht umdreht:
+
+1. **Er läuft nur remote** (`CLAUDE_CODE_REMOTE`). Auf Yuls Rechner wäre ein
+   `pip install` bei jedem Sitzungsstart Lärm und im schlimmsten Fall der
+   falsche Interpreter — und flach ist der Clone dort nicht. *Weil* er
+   remote-only ist, darf er bash sein und Linux annehmen, obwohl das Projekt
+   sonst Windows-primär ist.
+2. **Er endet immer mit 0.** Ein Werkzeug, das die Sitzung am Start scheitern
+   lässt, ist schlimmer als die Handarbeit, die es ersetzt.
+3. **Das spaCy-Modell holt er nicht** (~575 MB). Es schaltet nur Tests frei,
+   die sonst sauber übersprungen werden; der Download bei jedem Start wäre der
+   schlechtere Tausch.
+
+**`.gitignore` hatte `.claude/`** — der Hook wäre also stumm nicht mitgekommen.
+Jetzt steht dort `.claude/*` mit zwei Ausnahmen: aus einem ausgeschlossenen
+*Verzeichnis* lassen sich einzelne Dateien nicht zurückholen, git steigt gar
+nicht erst hinein. `settings.local.json` bleibt draußen.
+
+Was hier steht, gehört auch in den Abschnitt „Nicht geprüft" der
+PR-Vorlage — dort wird danach gefragt, hier steht, was die Antwort ist.
+
 ## Was ist dieses Projekt?
 
 **Yul Yen's AI Orchestra** ist ein lokal laufendes Multi-Persona-KI-Chatsystem.
@@ -236,6 +279,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 
 ```
 <repo-root>/
+├── .claude/
+│   ├── settings.json          # registriert den Sitzungs-Hook
+│   └── hooks/session-start.sh # richtet die Sandbox ein (nur remote, siehe oben)
 ├── src/
 │   ├── launch.py              # Haupteinstiegspunkt (inkl. --doctor Systemcheck, --list-ensembles)
 │   ├── core/
@@ -309,10 +355,10 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
 ├── tests/
 │   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
-│   └── test_*.py                # 53 Testmodule (inkl. test_web_ui_wiring.py,
+│   └── test_*.py                # ein Modul je Bereich (inkl. test_web_ui_wiring.py,
 │                                #   test_continuation.py, test_imports.py)
 ├── locales/
-│   ├── de.yaml                  # 156 UI-Texte Deutsch (Parität mit en.yaml)
+│   ├── de.yaml                  # UI-Texte Deutsch (Parität mit en.yaml, per Test)
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
