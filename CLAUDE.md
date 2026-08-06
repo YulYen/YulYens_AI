@@ -7,8 +7,10 @@ Dieses Dokument ist der Einstiegspunkt für Claude Code in diesem Projekt.
 **Immer `git fetch origin main` und den neuen Branch von dort abzweigen** — nie
 vom Stand des vorherigen Tickets, auch nicht, wenn dessen PR „gleich gemergt
 wird". Zwei Zweige, die nacheinander entstehen, hängen sonst beide eine Zeile an
-dieselbe Stelle in `backlog.md` (oben ins Archiv), und der zweite bekommt einen
-Konflikt, sobald der erste drin ist. Genau so passiert, deshalb steht es hier:
+dieselbe Stelle in `backlog_archiv.md` (oben ins Archiv), und der zweite bekommt
+einen Konflikt, sobald der erste drin ist. Genau so passiert, deshalb steht es
+hier — der Split von Backlog und Archiv (2026-08-06) nimmt dem Fall nichts,
+zwei erledigte Tickets hängen weiterhin beide oben in dieselbe Datei:
 
 ```bash
 git fetch origin main
@@ -34,7 +36,7 @@ Die Durchsicht dauert eine Minute und geht immer gleich:
 | Config-Schalter | beide ReadMes (Schalterliste) + `config.yaml`-Kommentar |
 | Nutzerseitiges Verhalten | `docs/{de,en}/Features.md` **und** `CHANGELOG.md` unter `## [Unreleased]` |
 | Entwurfsentscheidung, Stolperfalle | diese Datei |
-| Ticketstand | `backlog.md` |
+| Ticketstand | `backlog.md`; Erledigtes wandert nach `backlog_archiv.md` |
 | Abhängigkeits-Pin | `requirements*.txt`-Kommentar; bei Bedarf `.pre-commit-config.yaml` |
 
 **`tests/test_docs_consistency.py` nimmt davon den mechanischen Teil ab:** jedes
@@ -364,7 +366,8 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
 ├── Makefile                     # make setup / format / lint / types / test / test-ci / evals / clean / run
 ├── CHANGELOG.md                 # nutzersichtbare Änderungen, englisch (#74)
-└── backlog.md                   # Feature-Backlog mit Effort/Benefit
+├── backlog.md                   # offene Tickets mit Effort/Benefit
+└── backlog_archiv.md            # erledigte Tickets — die Projektgeschichte
 ```
 
 ## Die 4 Personas (Ensemble "classic")
@@ -1386,20 +1389,24 @@ Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` baue
 
 ## Backlog (wichtigste offene Punkte)
 
-Siehe [backlog.md](backlog.md) für vollständige Liste mit Effort/Benefit-Matrix
-(Generalüberholung 2026-07-30: neue Tickets #24–#48, Erledigtes in Archiv-Sektion).
-Highlights:
+Zwei Dateien seit dem 2026-08-06: [backlog.md](backlog.md) sind die **offenen**
+Tickets mit Effort/Benefit-Matrix, [backlog_archiv.md](backlog_archiv.md) das
+Erledigte samt Begründung. Der Schnitt trennt zwei Schreibmuster — die Tiers
+werden ständig umgeschrieben, ein Archiveintrag nie wieder. Highlights:
 
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
-  (in Arbeit, LeoLM13B; nicht mehr blockiert). Offen: #41a Baseline-Lauf, #40b Blind-Ranking
+  (in Arbeit, LeoLM13B; nicht mehr blockiert). #41a (Baseline-Lauf) ist gefahren —
+  Baseline und Adapter über den **Ø-Judge-Score** vergleichen, nicht über die
+  Bestehensquote. Offen: #40b Blind-Ranking
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
   #42 Perf-Benchmark (mypy deckt inzwischen das ganze `src` ab)
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
-  (Archiv), #14 bis auf den Server-Teil (#14a). #61 (Gradio 5.x) ist gehoben, die
-  Fortsetzung auf 6.x läuft als #61a weiter
+  (Archiv), #14 bis auf den Server-Teil (#14a). Die Gradio-Strecke ist durch —
+  #61 auf 5.50, #61a auf 6.22 mit null pip-audit-Befunden. Aus #64 offen: die
+  Coverage-Schwelle (#64e), eine Richtlinienentscheidung
 - **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
 
-Bereits erledigt (Details im Backlog-Archiv): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
+Bereits erledigt (Details in `backlog_archiv.md`): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
 #2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update, #23 Paralleler Broadcast,
 #17 Faster first token, #6 Modell-Auswahl (WebUI, session-only), #13 STT MVP (WebUI-Mikro
