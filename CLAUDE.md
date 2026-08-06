@@ -552,6 +552,21 @@ Zwei Dinge, die beim Bauen wehtaten und beim nächsten Mal Zeit sparen:
   zwischen 4.44 und 5.x von `like-button`/„like" auf `icon-button`/„Like"
   umbenannt. `get_by_role("button", name=re.compile(r"^like$", re.I))` überlebt
   beides; `exact=True` wäre case-sensitiv und genau hier zerbrechlich.
+- **Die Locale des Browser-Kontexts festnageln** (`new_context(locale="en-US")`).
+  Seit Gradio 6 ist das eigene Bedienchrom **übersetzt**: derselbe Daumen heißt
+  auf einem deutschen System „Gefällt mir", auf einem englischen „Like" — ein
+  Rollen-Selektor allein reicht also nicht mehr. Ohne die Zeile hängt das
+  Testergebnis an der Spracheinstellung des Rechners, und zwar in der
+  unangenehmen Richtung: auf dem Linux-Runner grün, auf Yuls Windows rot.
+  Unsere eigenen Texte folgen weiter `language:` aus der Config, bleiben also
+  deutsch. Nebenbei der Grund, warum der Anker im Regex zählt — „Gefällt mir"
+  ist ein Präfix von „Gefällt mir nicht".
+
+**Und warum das erst hier auffiel:** der Marker ist aus CI und `make check`
+ausgenommen, der Test läuft also nur, wenn ihn jemand von Hand startet. Nach
+dem Sprung auf Gradio 6.22 war er auf einer deutschen Windows-Kiste rot, ohne
+dass irgendein Job das gemeldet hätte. Wer die Gradio-Version hebt, fährt
+`pytest -m browser` einmal von Hand nach — kein anderes Gate schaut dorthin.
 
 **Der Test ist zuerst gegen die alte Version grün zu bekommen.** Bei #61 war er
 auf 4.44 grün, bevor migriert wurde — sonst ist später nicht zu unterscheiden,
