@@ -1398,6 +1398,23 @@ werden ständig umgeschrieben, ein Archiveintrag nie wieder. Highlights:
   (in Arbeit, LeoLM13B; nicht mehr blockiert). #41a (Baseline-Lauf) ist gefahren —
   Baseline und Adapter über den **Ø-Judge-Score** vergleichen, nicht über die
   Bestehensquote. Offen: #40b Blind-Ranking
+
+### Das Training läuft nicht in diesem Repo (#7)
+
+`transformers` ist im venv dieses Projekts **nicht importierbar**, und das ist
+Absicht, kein Defekt: Gradio 6 verlangt `huggingface_hub>=1.0`, `transformers`
+4.43 verlangt `<1.0`. Wer den ImportError „repariert", zieht `hf_hub` unter
+Gradio weg und legt damit die Anwendung lahm.
+
+Die LoRA-Strecke lebt in einem **eigenen Repository** (`YY_AI_Trainingground`,
+privat) mit eigenem venv und eigenen Pins. Hier gehört nur her, was den
+*Vergleich* betrifft: die Eval-Suite (#41) und der Baseline-Wert oben.
+
+Der Satz steht hier, weil er sich zweimal aufdrängt — einmal als scheinbar
+kaputte Abhängigkeit, einmal als Versuchung, „schnell ein Trainings-venv
+daneben" anzulegen. Beim zweiten Mal ist es tatsächlich passiert; die
+Umgebung existierte im Schwesterprojekt längst, funktionsfähig und mit
+denselben Pins.
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
   #42 Perf-Benchmark (mypy deckt inzwischen das ganze `src` ab)
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
