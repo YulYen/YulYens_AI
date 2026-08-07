@@ -24,7 +24,7 @@ from stt.whisper_stt import transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
 from ui.conversation_io_terminal import load_conversation
-from ui.feedback import FeedbackLog
+from ui.feedback import DEFAULT_VOTES_DIR, FeedbackLog
 from ui.history_access import ConversationHistory
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
@@ -1226,16 +1226,28 @@ class WebUI:
 
         Lazy, weil `feedback_log_path` von Tests nach dem Bau gesetzt wird.
         """
-        log_cfg = getattr(self.cfg, "logging", None)
-        log_dir = log_cfg.get("dir", "logs") if isinstance(log_cfg, dict) else "logs"
         recorder = FeedbackLog(
             self.feedback_log_path,
-            log_dir=log_dir,
+            data_dir=self._votes_dir(),
             store_loader=self._store_text,
             fallback_user=self._fallback_user,
         )
         self.feedback_log_path = recorder.path
         return recorder
+
+    def _votes_dir(self) -> str:
+        """Das Verzeichnis der Ablage — dort liegen auch die Votes.
+
+        Abgeleitet statt fest verdrahtet: die Vote-Zeilen verweisen über
+        `conversation_id` auf genau diese Datenbank, also folgen sie ihr, wenn
+        jemand `storage.path` verlegt. Ein zweiter Schalter für dasselbe wären
+        zwei Quellen für eine Wahrheit — derselbe Fehler wie
+        `KNOWN_TOP_LEVEL_KEYS` neben den pydantic-Modellen (#66).
+        """
+        store_cfg = getattr(self.cfg, "storage", None)
+        path = store_cfg.get("path") if isinstance(store_cfg, dict) else None
+        directory = os.path.dirname(str(path or "")) if path else ""
+        return directory or DEFAULT_VOTES_DIR
 
     def _store_text(self, conversation_id: str, index: int) -> str | None:
         """Den aufgezeichneten Wortlaut holen — best effort (#65).

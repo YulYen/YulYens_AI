@@ -9,8 +9,16 @@ weiter `_on_chat_like`) — sie prüft jetzt die *Naht*, nicht mehr die Regeln.
 """
 
 import json
+import logging
+import os
 
-from ui.feedback import FeedbackLog, store_index_of
+from ui.feedback import (
+    DEFAULT_VOTES_DIR,
+    LEGACY_VOTES_DIR,
+    FeedbackLog,
+    adopt_legacy_votes,
+    store_index_of,
+)
 
 
 def _bubble(role, text):
@@ -327,3 +335,79 @@ def test_the_meta_user_wins_over_the_fallback(tmp_path):
         conversation_id="c",
     )
     assert _lines(tmp_path / "votes.jsonl")[0]["user"] == "yulyen"
+
+
+# ---- Umzug aus dem Logverzeichnis ----------------------------------------
+#
+# Der Vote-Log liegt seit dieser Runde neben der Ablage statt in `logs/`
+# (Begründung im Modulkopf von `ui/feedback.py`). Ein Pfadwechsel ohne Umzug
+# verliert stillschweigend Daten — und genau diese Sorte Verlust meldet sich
+# nie von selbst, sondern erst, wenn jemand die Trainingsdaten für #7
+# zusammenstellt und die Hälfte fehlt.
+
+
+def _write(path, *rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+
+
+def test_an_existing_log_is_moved_out_of_the_log_directory(tmp_path):
+    legacy = tmp_path / "logs" / "feedback_votes.jsonl"
+    _write(legacy, {"vote": "up"})
+    target = tmp_path / "data" / "feedback_votes.jsonl"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    result = adopt_legacy_votes(str(target), legacy_dir=str(tmp_path / "logs"))
+
+    assert result == str(target)
+    assert not legacy.exists(), "die alte Datei muss weg sein, sonst zwei Wahrheiten"
+    assert _lines(target) == [{"vote": "up"}]
+
+
+def test_nothing_happens_without_an_old_file(tmp_path):
+    target = tmp_path / "data" / "feedback_votes.jsonl"
+
+    assert adopt_legacy_votes(str(target), legacy_dir=str(tmp_path / "logs")) == str(
+        target
+    )
+    assert not target.exists(), "es wird nichts angelegt, was noch niemand braucht"
+
+
+def test_two_existing_files_are_left_alone(tmp_path, caplog):
+    """Zusammenführen wäre geraten, nicht gewusst — also Finger weg und laut sein."""
+    legacy = tmp_path / "logs" / "feedback_votes.jsonl"
+    _write(legacy, {"vote": "up"})
+    target = tmp_path / "data" / "feedback_votes.jsonl"
+    _write(target, {"vote": "down"})
+
+    with caplog.at_level(logging.WARNING):
+        result = adopt_legacy_votes(str(target), legacy_dir=str(tmp_path / "logs"))
+
+    assert result == str(target)
+    assert legacy.exists(), "nichts darf verschwinden"
+    assert _lines(legacy) == [{"vote": "up"}]
+    assert any("existieren beide" in r.getMessage() for r in caplog.records)
+
+
+def test_a_failed_move_keeps_writing_to_the_old_place(tmp_path, monkeypatch, caplog):
+    """Eine verlorene Bewertung ist teurer als ein unaufgeräumtes Verzeichnis."""
+    legacy = tmp_path / "logs" / "feedback_votes.jsonl"
+    _write(legacy, {"vote": "up"})
+    target = tmp_path / "data" / "feedback_votes.jsonl"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    def _boom(*_args, **_kwargs):
+        raise OSError("Datei in Benutzung")
+
+    monkeypatch.setattr(os, "replace", _boom)
+    with caplog.at_level(logging.WARNING):
+        result = adopt_legacy_votes(str(target), legacy_dir=str(tmp_path / "logs"))
+
+    assert result == str(legacy)
+    assert _lines(legacy) == [{"vote": "up"}]
+
+
+def test_the_default_directory_is_not_the_log_directory():
+    """Der eigentliche Punkt dieser Runde, als Zusicherung."""
+    assert DEFAULT_VOTES_DIR == "data"
+    assert LEGACY_VOTES_DIR == "logs"

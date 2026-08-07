@@ -30,7 +30,16 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- The feedback vote log moved from `logs/feedback_votes.jsonl` to
+  `data/feedback_votes.jsonl`, next to the conversation store it refers to.
+  `logs/` holds diagnostics you may delete at any time; these votes are
+  collected human judgement and cannot be reproduced. An existing file is
+  **moved automatically** on first use. If both locations somehow hold a file,
+  neither is touched and a warning names both — merging them would be guesswork.
+  The location follows the directory of `storage.path`, so moving the store
+  moves the votes with it.
 
 ## [2.0.0] - 2026-08-05
 
