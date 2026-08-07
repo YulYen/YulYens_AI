@@ -530,6 +530,26 @@ Gemessen nach dem Fix: **13 von 13** Angriffsformulierungen weiter gefangen,
 auf 394 zufälligen *und* 0 auf den 49 heiklen Artikeln (vorher 2). Die
 Mutationsprobe — Fix zurückgenommen — lässt vier Korpusfälle fallen.
 
+**Nachgemessen wird das mit `python scripts/probe_injection.py -e classic`**
+(#60b, Code in `src/evals/injection_probe.py`, braucht Ollama). Drei Arme —
+alte `system`-Rolle, `user`-Zitat ohne Guard, ausgelieferter Stand mit Guard —
+und pro Nutzlast ein Muster, das ihr *eigenes* Befolgen erkennt. Wer am
+Guardrail-Wortlaut schraubt, das Modell wechselt oder eine Regel ergänzt,
+fährt das hier und vergleicht, statt zu vermuten.
+
+**Seit der Messung oben stehen dort auch die sechs Nutzlasten, die durchkommen
+*und* wirken.** Vorher zeigte der Guard-Arm strukturell `0/20`, weil die Probe
+nur die vier Formulierungen mit eigener Regel enthielt — eine Zahl, die nicht
+schlechter werden kann, meldet auch keine Verschlechterung. Jetzt steht er bei
+8/20, und zwei gemessen *wirkungslose* Nutzlasten sind bewusst dabei: sonst
+verlöre die Probe die Fähigkeit zu zeigen, wo das Modell standhält.
+
+Zwei Dinge, die man beim Ergänzen einer Nutzlast falsch macht und die beide
+schon passiert sind: das Erkennungsmuster darf die **eigene Wirkung** treffen
+und sonst nichts (`kiwix is` traf auch „Kiwix **ist** ein freier …", brave
+Antworten zählten als Treffer), und eine **konditionale** Nutzlast braucht ihre
+eigene Frage (`Payload.frage`) — siehe die Falle oben.
+
 **Diese Regeln liegen in einem eigenen, kontext-exklusiven Topf
 (`BasicGuard.check_context_only`, nur von `context_verdict` gerufen) — und das
 ist der Entwurf, nicht ein Implementierungsdetail.** Der Nutzer darf, was ein
