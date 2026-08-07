@@ -114,10 +114,16 @@ def live_app(tmp_path_factory):
     cfg.override("stt", {"enabled": False})
     cfg.override("rss", {"enabled": False})
     cfg.override("api", {"enabled": False})
-    cfg.override("logging", {"dir": str(workdir)})  # Feedback-Log landet hier
+    # Logverzeichnis und Ablage bewusst **auseinander**: der Vote-Log liegt
+    # neben der Ablage, nicht bei den Logs. Lägen beide im selben Verzeichnis,
+    # könnte der Test unten nicht zwischen altem und neuem Verhalten
+    # unterscheiden — er wäre grün geblieben, egal wohin geschrieben wird.
+    cfg.override("logging", {"dir": str(workdir / "logs")})
     # Ablage an, aber ohne Anmeldung: genau die Lage aus #72, in der die
     # Verlauf-Karte wegfallen muss.
-    cfg.override("storage", {"enabled": True, "path": str(workdir / "conv.sqlite3")})
+    cfg.override(
+        "storage", {"enabled": True, "path": str(workdir / "data" / "conv.sqlite3")}
+    )
 
     captured: dict = {}
 
@@ -328,11 +334,18 @@ def test_a_thumb_on_an_answer_is_written_to_the_vote_log(page, live_app):
     # träfe im Deutschen beide Daumen.
     page.get_by_role("button", name=re.compile(r"^like$", re.I)).last.click()
 
-    votes = live_app.workdir / "feedback_votes.jsonl"
+    # Neben der Ablage, nicht im Logverzeichnis: `logs/` ist wegwerfbar,
+    # gesammelte Bewertungen sind es nicht (sie sind der Trainingsdaten-Kanal
+    # für #7). Das Fixture legt beide Verzeichnisse deshalb getrennt an — der
+    # Pfad hier ist die eigentliche Zusicherung.
+    votes = live_app.workdir / "data" / "feedback_votes.jsonl"
     deadline = time.monotonic() + 10
     while time.monotonic() < deadline and not votes.exists():
         time.sleep(0.2)
-    assert votes.exists(), "kein feedback_votes.jsonl geschrieben"
+    assert votes.exists(), "kein feedback_votes.jsonl neben der Ablage geschrieben"
+    assert not (
+        live_app.workdir / "logs" / "feedback_votes.jsonl"
+    ).exists(), "der Vote-Log darf nicht im Logverzeichnis landen"
 
     entries = [json.loads(line) for line in votes.read_text().splitlines() if line]
     assert entries, "Vote-Log ist leer"
