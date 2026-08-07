@@ -2574,3 +2574,61 @@ def test_the_source_stays_active_when_only_the_button_is_off():
     assert [
         m for m in outputs[-1][2] if m["role"] == "system"
     ], "die automatische Injektion hängt nicht am Knopf"
+
+
+# ---- Wo die Vote-Datei landet (#40/#7) -----------------------------------
+#
+# Sie liegt neben der Ablage, weil ihre Zeilen ueber `conversation_id` genau
+# dorthin verweisen — und weil `logs/` ein Verzeichnis ist, das man beim
+# Aufraeumen leert. Gesammelte Bewertungen sind nicht reproduzierbar.
+
+
+_UNSET = object()
+
+
+def _ui_with_storage(path=_UNSET, *, storage=_UNSET):
+    """WebUI mit einer bestimmten `storage`-Sektion.
+
+    Entweder `path` (dann wird die Sektion drumherum gebaut) oder `storage`
+    direkt, für die Fälle ohne Pfad.
+    """
+    if storage is _UNSET:
+        storage = {"enabled": True, "path": path}
+    cfg = SimpleNamespace(texts={}, t=lambda key, **kwargs: key, storage=storage)
+    return WebUI(
+        factory=factory_double(),
+        config=cfg,
+        wiki=WikiLookup(),
+        web_host="127.0.0.1",
+        web_port="7860",
+    )
+
+
+def test_the_vote_log_follows_the_store_directory():
+    """Verlegt jemand `storage.path`, ziehen die Votes mit."""
+    ui = _ui_with_storage("/srv/yulyen/ablage/conversations.sqlite3")
+
+    assert ui._votes_dir() == "/srv/yulyen/ablage"
+
+
+@pytest.mark.parametrize("storage", [None, {}, {"enabled": False}, {"path": None}])
+def test_the_vote_log_never_lands_in_the_log_directory(storage):
+    """Der eigentliche Punkt — auch wenn gar keine Ablage konfiguriert ist.
+
+    Ohne Anmeldung zeichnet die WebUI nichts auf (#72), Votes schreibt sie
+    trotzdem. Genau dann darf der Pfad nicht nach `logs/` zurückfallen.
+    """
+    ui = _ui_with_storage(storage=storage)
+
+    assert ui._votes_dir() == "data"
+
+
+def test_a_bare_filename_does_not_produce_an_empty_directory():
+    """`storage.path: "conv.sqlite3"` hat kein Verzeichnis — dann greift der Default.
+
+    Ohne diesen Zweig waere das Ergebnis der leere String, und die Datei laege
+    im aktuellen Arbeitsverzeichnis statt in `data/`.
+    """
+    ui = _ui_with_storage("conv.sqlite3")
+
+    assert ui._votes_dir() == "data"

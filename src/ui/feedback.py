@@ -21,6 +21,12 @@ Sache statt zwischen zweitausend Zeilen Oberfläche:
    wird verworfen: eine verlorene Bewertung ist billiger als eine erfundene.
 4. **Die Ablage hat das letzte Wort über den Wortlaut**, nicht die Anzeige —
    gegen sie wird später gejoint.
+5. **Die Datei liegt neben der Ablage, nicht im Logverzeichnis.** Sie ist
+   gesammelte menschliche Bewertung: nicht reproduzierbar, nicht nachträglich
+   erzeugbar, und über `conversation_id` an genau die Datei gebunden, neben der
+   sie steht. `logs/` ist Betriebs-Diagnostik und darf jederzeit geleert
+   werden — dieselbe Grenze, die #54 zwischen Store und Logfile gezogen hat.
+   Die Votes standen bis dahin auf der falschen Seite davon.
 
 Der Gradio-Teil (das `LikeData`-Event) bleibt bewusst in `web_ui.py`: hier
 kommen nur einfache Werte an, damit das Ganze ohne Oberfläche prüfbar bleibt.
@@ -43,6 +49,56 @@ Message = dict[str, str]
 
 # Eine Datei, mehrere Browser-Sitzungen: der Anhang wird serialisiert.
 _log_lock = threading.Lock()
+
+VOTES_FILENAME = "feedback_votes.jsonl"
+# Neben der Ablage, nicht im Logverzeichnis — Begründung im Modulkopf, Punkt 5.
+DEFAULT_VOTES_DIR = "data"
+# Wo die Datei bis dahin lag. Nur noch für den Umzug relevant.
+LEGACY_VOTES_DIR = "logs"
+
+
+def adopt_legacy_votes(target: str, legacy_dir: str = LEGACY_VOTES_DIR) -> str:
+    """Holt eine Vote-Datei aus dem alten Logverzeichnis herüber.
+
+    Der Pfad hat sich geändert, und **ein Pfadwechsel ohne Umzug verliert
+    stillschweigend Daten**: die alten Zeilen lägen weiter in `logs/`, neue
+    kämen in `data/` dazu, und niemandem fiele es auf, bis jemand die
+    Trainingsdaten für #7 zusammenstellt und die Hälfte fehlt.
+
+    Verschoben wird nur im **eindeutigen** Fall — alt da, neu nicht. Liegen
+    beide, wird nichts angefasst und laut gewarnt: welche der beiden Dateien
+    dann die richtige ist, kann hier niemand entscheiden, und ein automatisches
+    Zusammenführen wäre geraten statt gewusst.
+    """
+    legacy = os.path.join(legacy_dir, VOTES_FILENAME)
+    if not os.path.exists(legacy):
+        return target
+
+    if os.path.exists(target):
+        logging.warning(
+            "[FEEDBACK] %s und %s existieren beide. Es wird nur %s beschrieben — "
+            "die alte Datei bitte von Hand anhängen und entfernen.",
+            legacy,
+            target,
+            target,
+        )
+        return target
+
+    try:
+        os.replace(legacy, target)
+        logging.info("[FEEDBACK] Vote-Log von %s nach %s verschoben.", legacy, target)
+    except OSError as err:
+        # Lieber am alten Ort weiterschreiben als gar nicht: eine verlorene
+        # Bewertung ist teurer als ein unaufgeräumtes Verzeichnis.
+        logging.warning(
+            "[FEEDBACK] Umzug von %s nach %s fehlgeschlagen (%s) — "
+            "es wird weiter am alten Ort geschrieben.",
+            legacy,
+            target,
+            err,
+        )
+        return legacy
+    return target
 
 
 def store_index_of(
@@ -112,20 +168,21 @@ class FeedbackLog:
         self,
         path: str | None = None,
         *,
-        log_dir: str = "logs",
+        data_dir: str = DEFAULT_VOTES_DIR,
         store_loader: Callable[[str, int], str | None] | None = None,
         fallback_user: Callable[[], str] = lambda: "local",
     ) -> None:
         self._path = path
-        self._log_dir = log_dir
+        self._data_dir = data_dir
         self._store_loader = store_loader
         self._fallback_user = fallback_user
 
     @property
     def path(self) -> str:
         if not self._path:
-            ensure_dir_exists(self._log_dir)
-            self._path = os.path.join(self._log_dir, "feedback_votes.jsonl")
+            ensure_dir_exists(self._data_dir)
+            target = os.path.join(self._data_dir, VOTES_FILENAME)
+            self._path = adopt_legacy_votes(target)
         return self._path
 
     @path.setter
