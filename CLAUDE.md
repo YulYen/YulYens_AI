@@ -1297,6 +1297,48 @@ eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
 | Projekt, `holdback: 32` (Default) | **1,91 s** |
 | Projekt, `holdback: 0` | 0,39 s |
 
+**Auf Gradio 6.22 nachgemessen (2026-08-07) — die Tabelle gilt weiter.** Die
+Zahlen oben stammen aus der 4.44-Zeit; seither sind Gradio, Starlette und das
+ganze Frontend gewechselt, und eine Tabelle, die niemand nachprüft, ist
+irgendwann Behauptung statt Messung. Gleicher Aufbau (im Browser, Klick bis
+erstes sichtbares Zeichen, 24 Zeichen/s), 5 Läufe je Variante:
+
+| `holdback` | 4.44 (#51) | **6.22** | rechnerisch (`holdback` ÷ 24) |
+|---|---|---|---|
+| 0 | 0,39 s | **0,66 s** | 0 s |
+| 32 (Default) | 1,91 s | **2,02 s** | 1,33 s |
+| 96 | 4,13 s | **4,78 s** | 4,00 s |
+
+Die belastbare Aussage steht in der letzten Spalte: der **Aufschlag über die
+Grundlatenz** ist 1,36 s bzw. 4,12 s — also fast exakt `holdback ÷ Tempo`, wie
+es sein muss. Der Holdback kostet, was er rechnerisch kostet; daran hat der
+Versionssprung nichts geändert, und der Default 32 bleibt richtig gewählt.
+
+**Fremdlast auf der GPU stört diese Messung nicht** — nachgeprüft, weil der
+erste Durchgang zufällig neben einem laufenden Spiel entstand (87 % VRAM
+belegt) und der zweite auf freier Maschine (13 %). Die Mediane unterscheiden
+sich um 0,02 s. Das ist keine Überraschung, sondern eine Eigenschaft des
+Aufbaus: gemessen wird gegen das **Dummy-Backend** mit fest getakteten
+24 Zeichen/s, es läuft also kein Modell mit. Wer denselben Aufbau je auf echtes
+Ollama umstellt, verliert genau diese Robustheit — dann misst er die
+Auslastung mit.
+
+Die Grundlatenz selbst liegt 0,24 s höher als 2026 gemessen. Ob das an Gradio 6
+liegt oder an der Maschine, ist **nicht** entschieden — die 4.44-Zahlen sind
+nicht auf derselben Kiste entstanden. Wer daraus eine Regression ableiten will,
+misst beide Versionen nebeneinander; als Größenordnung taugt es, als Befund
+nicht.
+
+Zwei Fallen im Messaufbau, beide zuerst als Latenzbefund missverstanden:
+
+1. **Der Chat behält die vorherige Antwort.** Ein Selektor auf „Antwortblase
+   mit Text" findet sie sofort und meldet 0,04 s — bei 24 Zeichen/s
+   physikalisch unmöglich, und nur daran aufgefallen. Jede Antwort braucht
+   eine laufende Nummer als Marker.
+2. **Während des Streams heißt der Knopf „Stop".** Ein Klick auf „Senden"
+   wartet dann bis zum Streamende, und alle Varianten landen bei ~8,5 s. Sah
+   wie ein Latenzbefund aus, war einer des Messaufbaus.
+
 Der Default 32 ist kein runder Wert: das längste Blocklist-Muster (AWS-Secret)
 schlägt erst nach Label + 30 Zeichen an, deshalb bleibt Schlüsselmaterial erst
 ab einem Holdback von 30 vollständig verdeckt. Darunter rutscht es mit durch —
