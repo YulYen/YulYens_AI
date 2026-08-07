@@ -607,6 +607,16 @@ make evals                                           # Kurzform für --guard-onl
   stabiler. Ursache ist die Schwelle: 5–7 der 17 Fälle liegen im Band 3,0–3,9,
   also direkt unter „4 besteht", und entscheiden sich an einem Zehntelpunkt. Wer
   Baseline gegen Adapter (#7) über die Quote vergleicht, misst Münzwürfe
+- **Die Baseline für #7 steht bei Ø 3,73** (2026-08-07, drei Läufe: 3,70 / 3,68 /
+  3,80; Quote 5–6 von 17). Modell und Judge `ministral-3:8b`, Wiki offline über
+  kiwix-serve, ausgelieferte `config.yaml`. Gemessen **nach** dem Sprung auf
+  Gradio 6.22 / pydantic 2.12 / FastAPI 0.141 — die Zahl liegt mitten in der
+  #41a-Spanne, der Stack-Wechsel hat die Antwortqualität also nicht bewegt.
+  Damit ist sie der Vergleichspunkt für den LoRA-Adapter; `leo-hessianai-13b-chat`
+  liegt auf Yuls Kiste bereits neben `ministral-3:8b` in Ollama.
+  Die Läufe selbst liegen in `logs/evals/` und sind **gitignored** — wer die
+  Referenz braucht, findet hier die Zahl und fährt sonst neu. Nebenbei
+  bestätigte der Dreierlauf #41a: Ø streute 3,2 %, die Quote 20 %
 - **Judge-Bias: die Annahme hat sich nicht bestätigt.** Erwartet wurde, dass ein
   sich selbst bewertendes Modell zu nachsichtig ist. Ein fremder Judge
   (`qwen2.5:7b` statt `ministral-3:8b`) liefert Ø 3,71 — mitten in der Spanne der
