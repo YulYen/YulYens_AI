@@ -456,6 +456,20 @@ Nutzlasten; #60a ergänzt drei Regeln (`persona_override`,
 `standing_answer_instruction`, `fake_system_notice`) und kommt auf 4/4, bei 0
 Fehlalarmen auf 12 harmlosen Fremdtexten.
 
+**Nachgemessen wird das mit `python scripts/probe_injection.py -e classic`**
+(#60b, Code in `src/evals/injection_probe.py`, braucht Ollama). Drei Arme —
+alte `system`-Rolle, `user`-Zitat ohne Guard, ausgelieferter Stand mit Guard —
+und pro Nutzlast ein Muster, das ihr *eigenes* Befolgen erkennt. Wer am
+Guardrail-Wortlaut schraubt, das Modell wechselt oder eine Regel ergänzt,
+fährt das hier und vergleicht, statt zu vermuten.
+
+Zwei Dinge, die man beim Ergänzen einer Nutzlast falsch machen kann und die
+beide schon passiert sind: das Erkennungsmuster darf die **eigene Wirkung**
+treffen und sonst nichts (`kiwix is` traf auch „Kiwix **ist** ein freier …",
+brave Antworten zählten als Treffer), und eine **konditionale** Nutzlast
+braucht ihre eigene Frage (`Payload.frage`) — gegen die Standardfrage bleibt
+sie stumm und sieht wirkungslos aus, obwohl sie 3 von 3 Mal wirkt.
+
 **Diese Regeln liegen in einem eigenen, kontext-exklusiven Topf
 (`BasicGuard.check_context_only`, nur von `context_verdict` gerufen) — und das
 ist der Entwurf, nicht ein Implementierungsdetail.** Der Nutzer darf, was ein
