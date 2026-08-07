@@ -503,13 +503,32 @@ Zwei methodische Fallen, beide beim ersten Anlauf hineingetappt:
 **Zufällige Artikel sind dabei ein leichter Gegner** — die Mehrheit sind
 Jahreszahlen und Ortschaften, in denen keine Regel etwas zu suchen hat. Die
 zwei Fehlalarme kamen erst auf 49 gezielt heiklen Artikeln (Sprengstoff,
-Schadprogramm, Betäubungsmittel), und beide gehen auf dieselbe Ursache zurück:
-`amoklauf_de` und `mass_shooting` sind die einzigen zwei Wrongdoing-Regeln
-**ohne Verb-Objekt-Brücke**, also nackte Themenwörter — genau die Bauart, die
-#62 aus den Injection-Regeln entfernt und in der Wrongdoing-Liste stehen
-gelassen hat. Folge: „Was ist ein Amoklauf?" wird geblockt, „Wie viele
-Amokläufe gab es 2024?" nicht — und diese Trennschärfe ist kein Entwurf,
-sondern Zufall, weil der Plural mit Umlaut nicht auf `\bamoklauf\b` passt.
+Schadprogramm, Betäubungsmittel), und beide gingen auf dieselbe Ursache
+zurück: `amoklauf_de` und `mass_shooting` waren die einzigen zwei
+Wrongdoing-Regeln **ohne Verb-Objekt-Brücke**, also nackte Themenwörter —
+genau die Bauart, die #62 aus den Injection-Regeln entfernt und in der
+Wrongdoing-Liste stehen gelassen hatte. Folge: „Was ist ein Amoklauf?" wurde
+geblockt, „Wie viele Amokläufe gab es 2024?" nicht — und diese Trennschärfe
+war kein Entwurf, sondern Zufall, weil der Plural mit Umlaut nicht auf
+`\bamoklauf\b` passte.
+
+**Behoben: beide Regeln verlangen jetzt einen Absichtsmarker.** Die Brücke ist
+dieselbe Bauart wie bei `weapon_construction_de` und greift in beide
+Richtungen, weil die Absicht vor („wie plane ich einen …") wie hinter dem Wort
+stehen kann. Der Marker zerfällt in zwei Sorten — die Tat planen/begehen, oder
+um Hilfe dabei bitten („Tipps für …", der Fall aus `wd_amoklauf_de`).
+
+**Vergangenheitsformen stehen bewusst nicht drin, und das ist der ganze
+Trick.** „Der Täter *plante* den Amoklauf über Monate" ist der Normalsatz
+jedes Artikels über eine solche Tat; mit `plante` in der Wortliste fiel der
+Artikel „Amoklauf" sofort wieder heraus — die Regel hätte zurückgeholt, was
+sie loswerden sollte. `ok_article_reports_a_planned_rampage` hält genau das
+fest.
+
+Gemessen nach dem Fix: **13 von 13** Angriffsformulierungen weiter gefangen,
+**15 von 15** Wissensfragen und Artikelsätze durchgelassen, **0** Fehlalarme
+auf 394 zufälligen *und* 0 auf den 49 heiklen Artikeln (vorher 2). Die
+Mutationsprobe — Fix zurückgenommen — lässt vier Korpusfälle fallen.
 
 **Diese Regeln liegen in einem eigenen, kontext-exklusiven Topf
 (`BasicGuard.check_context_only`, nur von `context_verdict` gerufen) — und das
