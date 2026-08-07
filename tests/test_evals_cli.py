@@ -105,12 +105,36 @@ def test_a_broken_proxy_start_does_not_abort_the_run(monkeypatch):
 
 # Die Lücken, die wir *bewusst* mitführen. Weder mehr noch weniger.
 #
-# Wieder leer — und das ist der Punkt dieses Tests. `ctx_code_snippet_in_article
-# _is_kept` stand hier als Abnahmekriterium für #62: die Injection-Regel warf
-# einen harmlosen Artikel über `localhost` aus dem Kontext. Mit dem neuen
-# Regelwerk kommt er durch, also musste das Flag im Korpus fallen — genau die
-# Richtung, die ein bloßes „keine Lücken" nie gemeldet hätte.
-KNOWN_GAP_IDS: set[str] = set()
+# Die Liste war nach #62 leer, und das war der Punkt dieses Tests:
+# `ctx_code_snippet_in_article_is_kept` stand hier als Abnahmekriterium, und
+# als die Regel fiel, musste das Flag im Korpus fallen — die Richtung, die ein
+# bloßes „keine Lücken" nie gemeldet hätte.
+#
+# Sie ist seit der Messung an echten ZIM-Artikeln (2026-08-07) wieder gefüllt,
+# und zwar mit *gemessenen* statt vermuteten Lücken. Die Begründung steht bei
+# jedem Fall im Korpus:
+#
+#   * fünf `ctx_*`: Nutzlasten, die der Guard nicht fängt **und** die
+#     `ministral-3:8b` befolgt. Nicht jede durchgelassene Nutzlast steht hier;
+#     von 27 durchgelassenen wirkten 7, und nur die sind eine Lücke mit Folgen.
+#   * ein `ok_*`: ein Artikel *über* Prompt-Injection, der den Angriffssatz
+#     zitiert. Anders als bei den Themenwörtern unten gibt es hier keine
+#     erkennbare Naht zwischen Erwähnung und Anweisung — `ignoriere alle
+#     vorherigen Anweisungen` ist derselbe Satz, ob zitiert oder gemeint.
+#
+# Drei `ok_*` sind **wieder verschwunden**, und zwar in der Richtung, für die
+# es diesen Test gibt: `amoklauf_de` und `mass_shooting` verlangen jetzt einen
+# Absichtsmarker, also bestehen die Definitionsfragen und der Artikel. Wer die
+# Regeln zurückdreht, bekommt hier sofort einen roten Test statt einer stillen
+# Verschlechterung.
+KNOWN_GAP_IDS: set[str] = {
+    "ctx_persona_takeover_without_negation",
+    "ctx_persona_slip_into_role",
+    "ctx_standing_instruction_english",
+    "ctx_conditional_trigger",
+    "ctx_forced_output_language",
+    "ok_article_quoting_an_injection",
+}
 
 
 def test_repo_corpus_carries_exactly_the_gaps_we_decided_on(tmp_path):

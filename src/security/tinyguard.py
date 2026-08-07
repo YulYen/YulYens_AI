@@ -338,6 +338,23 @@ class BasicGuard:
             r"|assembl(?:e|es|ing)|synthesi[sz](?:e|es|ing)"
             r"|manufactur(?:e|es|ing)|creat(?:e|es|ing)|detonat(?:e|es|ing))"
         )
+        # Amoklauf/Schulmassaker sind **Ereignisse**, über die eine
+        # Enzyklopädie berichtet — anders als „Bombenbau", wo das Wort selbst
+        # die Handlung benennt. Deshalb brauchen sie einen Absichtsmarker, und
+        # der zerfällt in zwei Sorten: die Tat selbst planen/begehen, oder um
+        # Hilfe dabei bitten („Tipps für …", der Fall aus `wd_amoklauf_de`).
+        #
+        # Bewusst **ohne** Vergangenheitsformen: „der Täter plante den Amoklauf
+        # monatelang" ist der Normalsatz jedes Artikels darüber. Gemessen an
+        # 443 echten ZIM-Artikeln kostet diese Auslassung nichts — mit
+        # Vergangenheit fiel der Artikel „Amoklauf" wieder heraus.
+        _rampage_en = r"(?:mass|school)\s+shooting"
+        _intent_en = (
+            r"(?:how\s+to|best\s+way|plan(?:ning)?|carry\s+out|carrying\s+out"
+            r"|commit(?:ting)?|prepar(?:e|ing)|stag(?:e|ing)|execut(?:e|ing)"
+            r"|tips?|guide|help\s+me)"
+        )
+
         # `[^,.!?\n]` statt `.` in den Brücken: eine Bauanleitung steht in einem
         # Teilsatz. Über ein Komma hinweg entstehen dagegen Treffer wie
         # „Wir bauen ein Modellflugzeug, keine Bombe" — Verneinung inklusive.
@@ -357,7 +374,24 @@ class BasicGuard:
                     r"[^,.!?\n]{0,30}\b(?:someone|a\s+person|people|him|her|them)\b"
                 ),
             ),
-            Rule("mass_shooting", re.compile(r"(?i)\b(?:mass|school)\s+shooting\b")),
+            # Ein Themenwort ist kein Angriff — es braucht die Absicht dazu.
+            # Vorher stand hier `\b(?:mass|school)\s+shooting\b` nackt, und
+            # damit war "What is a school shooting?" geblockt: eine
+            # Wissensfrage, die eine Enzyklopädie-Persona beantworten können
+            # muss. Dieselbe Bauart hatte #62 aus den Injection-Regeln entfernt
+            # und hier stehen lassen.
+            #
+            # Die Brücke greift beide Richtungen, weil der Absichtsmarker vorn
+            # ("how to carry out a …") wie hinten ("… shooting, how do I plan
+            # it") stehen kann. `[^,.!?\n]` wie überall: eine Absicht steht in
+            # einem Teilsatz.
+            Rule(
+                "mass_shooting",
+                re.compile(
+                    rf"(?i)\b{_intent_en}\b[^,.!?\n]{{0,40}}\b{_rampage_en}\b"
+                    rf"|\b{_rampage_en}\b[^,.!?\n]{{0,40}}\b{_intent_en}\b"
+                ),
+            ),
             Rule(
                 "maximize_casualties",
                 re.compile(
@@ -380,6 +414,16 @@ class BasicGuard:
             r"(?:bau(?:e|en|st|t)?|herstell(?:e|en|ung|t)"
             r"|bastel[nst]?|bastle|misch(?:e|en|st|t)?|z(?:ü|ue)nde[nst]?)"
         )
+        _rampage_de = r"(?:amokl(?:auf|äufe|aufs|äufen)|schulamoklauf|schulmassaker)"
+        # „hilf mir" ohne Objekt wäre zu breit; „tipps/anleitung/wie" sind die
+        # Formen, in denen die Bitte tatsächlich auftritt (`wd_amoklauf_de`).
+        _intent_de = (
+            r"(?:plan(?:e|en|st|t)?|beg(?:ehe|ehen|ehst|eht)"
+            r"|ver(?:ü|ue)b(?:e|en|st|t)?|durchf(?:ü|ue)hr(?:e|en|st|t)?"
+            r"|organisier(?:e|en|st|t)?|vorbereit(?:e|en|est|et)?"
+            r"|tipps?|anleitung|hilf\s+mir|ratschl(?:a|ä)g\w*|wie\s+(?:ich|man))"
+        )
+
         de_wrong = [
             Rule(
                 "weapon_construction_de",
@@ -410,7 +454,18 @@ class BasicGuard:
                     r"\b(?:jemanden|eine\s+person|menschen|ihn|sie)\b"
                 ),
             ),
-            Rule("amoklauf_de", re.compile(r"(?i)\b(?:amoklauf|schulamoklauf)\b")),
+            # Siehe die Begründung bei `mass_shooting`: „Was ist ein Amoklauf?"
+            # war geblockt, „Wie viele Amokläufe gab es 2024?" nicht — und
+            # dieser Unterschied war kein Entwurf, sondern Zufall, weil der
+            # Plural mit Umlaut nicht auf `\bamoklauf\b` passte. Jetzt
+            # entscheidet die Absicht, und der Plural ist ausdrücklich dabei.
+            Rule(
+                "amoklauf_de",
+                re.compile(
+                    rf"(?i)\b{_intent_de}\b[^,.!?\n]{{0,40}}\b{_rampage_de}\b"
+                    rf"|\b{_rampage_de}\b[^,.!?\n]{{0,40}}\b{_intent_de}\b"
+                ),
+            ),
         ]
         wrong += de_wrong
 

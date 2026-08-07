@@ -186,7 +186,15 @@ def browser():
 
 @pytest.fixture
 def page(browser, live_app):
-    context = browser.new_context()
+    # `locale` festnageln: Gradio 6 übersetzt sein *eigenes* Bedienchrom nach
+    # der Browsersprache — der Daumen heißt auf einem deutschen System
+    # „Gefällt mir", auf einem englischen „Like". Ohne diese Zeile hängt der
+    # Selektor unten an der Spracheinstellung des Rechners, auf dem der Test
+    # gerade läuft; er war genau deshalb auf einem deutschen Windows rot und
+    # auf dem Linux-Runner grün. Unsere eigenen Texte bleiben davon unberührt,
+    # sie kommen aus `locales/de.yaml` und folgen `language:` in der Config —
+    # deshalb wird hier weiter auf „Senden" und „Verlauf" gewartet.
+    context = browser.new_context(locale="en-US")
     page = context.new_page()
     # Nicht `networkidle`: Gradio hält eine Verbindung offen, der Zustand tritt
     # nie ein. Stattdessen auf ein Element warten, das die App gebaut hat.
@@ -312,6 +320,12 @@ def test_a_thumb_on_an_answer_is_written_to_the_vote_log(page, live_app):
     # `icon-button` und „Like"). Der verankerte Regex trennt Like von Dislike
     # und ist gegen die Schreibweise unempfindlich — `exact=True` wäre
     # case-sensitiv und damit genau an dieser Stelle zerbrechlich.
+    #
+    # Dass hier ein *englisches* Wort steht, ist keine Nachlässigkeit: seit
+    # Gradio 6 ist der Name übersetzt, und die Sprache legt das `page`-Fixture
+    # fest (`locale="en-US"`). Der Anker ist dabei die halbe Miete — „Gefällt
+    # mir" ist ein Präfix von „Gefällt mir nicht", ein ungeankertes Muster
+    # träfe im Deutschen beide Daumen.
     page.get_by_role("button", name=re.compile(r"^like$", re.I)).last.click()
 
     votes = live_app.workdir / "feedback_votes.jsonl"
