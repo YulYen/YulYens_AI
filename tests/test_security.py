@@ -309,21 +309,20 @@ def test_context_with_pii_is_kept():
     assert any("vorstand@verein.example" in m["content"] for m in history)
 
 
-def _rss_block(items):
-    from rss.feeds import RssCache, build_context_block
+def _inject_rss(history, items):
+    from rss.feeds import RssCache, inject_rss_context
 
-    return build_context_block(items, RssCache(feeds=[]), _guard_for_context())
+    return inject_rss_context(history, items, RssCache(feeds=[]), _guard_for_context())
 
 
 def test_a_poisoned_rss_item_never_reaches_the_prompt():
     """Dieselbe Regel für den zweiten Kontext-Kanal — RSS-Feeds."""
-    from rss.feeds import RssItem, inject_rss_context
+    from rss.feeds import RssItem
 
-    block, dropped = _rss_block([RssItem("boesartiger-feed", "Schlagzeile", POISON)])
     history: list = []
-    inject_rss_context(history, block)
+    result = _inject_rss(history, [RssItem("boesartiger-feed", "Schlagzeile", POISON)])
 
-    assert dropped == 1
+    assert result.dropped == 1
     assert history == []
 
 
@@ -332,21 +331,23 @@ def test_only_one_poisoned_item_is_dropped():
 
     Seit #73 landen alle Meldungen in **einer** System-Nachricht — genau
     deshalb muss der Guard *vor* dem Zusammenfügen filtern. Täte er es danach,
-    risse ein einziger vergifteter Eintrag den ganzen Block mit.
+    risse ein einziger vergifteter Eintrag den ganzen Block mit. Seit #75 kann
+    die Reihenfolge nicht mehr umgedreht werden: der Block entsteht in
+    ``bodies_of``, und das sieht nur Angenommenes.
     """
-    from rss.feeds import RssItem, inject_rss_context
+    from rss.feeds import RssItem
 
-    block, dropped = _rss_block(
+    history: list = []
+    result = _inject_rss(
+        history,
         [
             RssItem("feed", "gut", "Heute war das Wetter schön."),
             RssItem("feed", "boese", POISON),
-        ]
+        ],
     )
-    history: list = []
-    inject_rss_context(history, block)
 
     joined = " ".join(m["content"] for m in history)
-    assert dropped == 1
+    assert result.dropped == 1
     assert "Wetter" in joined
     assert "Entwickler-Modus" not in joined
 

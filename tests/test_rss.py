@@ -15,7 +15,6 @@ from rss.feeds import (
     RssCache,
     RssItem,
     _parse_feed,
-    build_context_block,
     build_rss_cache,
     inject_rss_context,
 )
@@ -236,12 +235,12 @@ def test_everything_becomes_one_block():
     """
     cache = _cache()
     cache._filled_at = datetime(2026, 7, 30, 10, 30).timestamp()
-    block, dropped = build_context_block(_items(), cache, guard=None)
 
     history: list = []
-    inject_rss_context(history, block)
+    result = inject_rss_context(history, _items(), cache)
 
-    assert dropped == 0
+    assert result.dropped == 0
+    assert result.injected == 1
     assert len(history) == 2  # Guardrail + genau ein Block
     # Die Anweisung bleibt `system`, die Meldungen werden zitierter
     # `user`-Fremdtext (#60) — eine Schlagzeile ist Material, kein Befehl.
@@ -256,6 +255,10 @@ def test_the_guard_filters_per_item_before_merging():
 
     Derselbe Fehler wie damals bei `WikiLookup.snippets()`, nur andersherum:
     dort wurde zu spät gefiltert, hier wäre zu grob gefiltert worden.
+
+    Seit #75 erzwingt das die Tür (`core.context_channels.inject_context`):
+    `build_context_block` bekommt nur noch, was der Guard durchgelassen hat,
+    und *kann* damit nicht mehr vor dem Filtern zusammenfügen.
     """
 
     guard = permissive_guard_double()
@@ -265,10 +268,11 @@ def test_the_guard_filters_per_item_before_merging():
         else {"ok": False, "reason": "prompt_injection", "detail": ""}
     )
 
-    cache = _cache()
-    block, dropped = build_context_block(_items(), cache, guard=guard)
+    history: list = []
+    result = inject_rss_context(history, _items(), _cache(), guard)
 
-    assert dropped == 1
+    assert result.dropped == 1
+    block = history[-1]["content"]
     assert "Erste" in block
     assert "Zweite" not in block
 
@@ -281,24 +285,22 @@ def test_nothing_left_after_the_guard_means_no_block():
         "detail": "",
     }
 
-    block, dropped = build_context_block(_items(), _cache(), guard=guard)
     history: list = []
-    inject_rss_context(history, block)
+    result = inject_rss_context(history, _items(), _cache(), guard)
 
-    assert block is None
-    assert dropped == 2
+    assert not result
+    assert result.dropped == 2
     assert history == []
 
 
-def test_an_empty_block_injects_nothing():
+def test_without_items_nothing_is_injected():
     history: list = []
-    inject_rss_context(history, None)
-    assert history == []
+    result = inject_rss_context(history, [], _cache())
+    assert not result and history == []
 
 
 def test_a_permissive_guard_lets_everything_through():
     """Gegenrichtung: ohne Befund darf nichts verloren gehen."""
-    block, dropped = build_context_block(
-        _items(), _cache(), guard=permissive_guard_double()
-    )
-    assert block and dropped == 0
+    history: list = []
+    result = inject_rss_context(history, _items(), _cache(), permissive_guard_double())
+    assert result.injected == 1 and result.dropped == 0

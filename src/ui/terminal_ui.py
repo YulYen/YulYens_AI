@@ -11,7 +11,7 @@ from config.personas import get_all_persona_names, get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
-from rss.feeds import _rss_cache_of, build_context_block, inject_rss_context
+from rss.feeds import _rss_cache_of, inject_rss_context
 from ui import self_talk
 from ui.continuation import continuable_persona, persona_info_from_names
 from ui.conversation_io_terminal import load_conversation, save_conversation
@@ -437,10 +437,14 @@ class TerminalUI:
         # Derselbe Cache wie die automatische Injektion — der Knopf holt
         # nichts mehr selbst (#73).
         items = self.rss_cache.items_for(self.rss_cache.feed_names)
-        block, _dropped = build_context_block(
-            items, self.rss_cache, getattr(self.streamer, "guard", None)
+        # Same ordering as the wiki context: system messages first, then user turn
+        result = inject_rss_context(
+            self.history,
+            items,
+            self.rss_cache,
+            getattr(self.streamer, "guard", None),
         )
-        if not block:
+        if not result:
             print(f"{Fore.YELLOW}{self._t('briefing_empty')}{Style.RESET_ALL}\n")
             return
 
@@ -456,8 +460,6 @@ class TerminalUI:
             + f"{Style.RESET_ALL}\n"
         )
 
-        # Same ordering as the wiki context: system messages first, then user turn
-        inject_rss_context(self.history, block)
         self.history.append(
             {"role": "user", "content": self._t("briefing_user_prompt")}
         )
