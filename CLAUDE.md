@@ -414,9 +414,32 @@ als die Frage des Nutzers. Derselbe Satz, den der Guard beim Tippen blockt, kam
 
 Seit dem Fix prüft `security.tinyguard.accepted_context` den Inhalt (nur
 `prompt_injection` und `wrongdoing` verwerfen — ein Artikel darf E-Mail-Adressen
-enthalten). Wer einen **dritten** Kontext-Kanal baut, muss ihn dort mit
-anschließen; ein Kanal ohne diese Prüfung ist eine Injection-Lücke mit
-System-Autorität.
+enthalten).
+
+**Seit #75 ist das keine Bitte an den Aufrufer mehr, sondern der einzige Weg.**
+Beide Kanäle gehen durch `core/context_channels.py` — `inject_context()`
+filtert, klammert, markiert und hängt an, in einem Aufruf ohne Schalter zum
+Weglassen. Wer einen **dritten** Kanal baut, trägt ihn in `CHANNELS` ein und
+ruft diese Tür; ein ad hoc gebautes `ContextChannel` wird abgewiesen. Vorher
+riefen beide Kanäle den Filter brav auf, *weil es so dokumentiert war* — ein
+dritter, der `injected_message` direkt benutzt, hätte in keinem Test ein
+Geräusch gemacht und wäre eine Injection-Lücke mit System-Autorität gewesen.
+`tests/test_context_channels.py` sucht solche Aufrufe deshalb per AST über
+`src/`: außer der Tür darf sie niemand rufen.
+
+**Die eine Zusicherung, die dabei die Arbeit macht, ist die Reihenfolge:
+erst filtern, dann zusammenfügen.** `bodies_of` bekommt ausschließlich, was der
+Guard durchgelassen hat — RSS *kann* seinen Block also gar nicht mehr vor dem
+Filtern bauen. Der erste Entwurf ließ RSS zusammenfügen wie bisher und schickte
+nur den fertigen Block durch die Tür, mit der Begründung, ein zweiter Durchgang
+könne nichts verschlimmern, weil die Guard-Brücken seit #62 keine Zeilengrenze
+überspringen. **Die Begründung war falsch, und der Test hat sie widerlegt:**
+`[^,.!?\n]` steht nur in einem *Teil* der Regeln, andere verbinden mit `\s+` —
+und das schließt `\n` ein. Zwei einzeln harmlose Schlagzeilen ergeben
+zusammengefügt einen Treffer, und der hätte den ganzen Nachrichtenblock
+gerissen, still. Der Fall steht als
+`test_the_guard_bridges_can_span_a_line_break` im Korpus, damit die Annahme
+nicht ein zweites Mal plausibel wirkt.
 
 **Gefiltert wird in `WikiLookup.snippets()`, nicht erst beim Injizieren.** Der
 erste Anlauf hängte die Prüfung nur an `inject_wiki_context` — dann bekam die
@@ -435,9 +458,10 @@ als letzte Schranke vor dem Prompt.
 Abgerufener Fremdtext steht seit #60 als zitierter **`user`**-Block im Prompt
 (`[FREMDTEXT ANFANG] … [FREMDTEXT ENDE]`), die Guardrails bleiben `system`, weil
 sie unsere eigene Anweisung sind. Jede injizierte Nachricht trägt einen Marker
-(`core/context_injection.py`); **wer einen dritten Kontext-Kanal baut, benutzt
-`injected_message`** — sonst landet der Fremdtext in der Ablage, im Verlauf, im
-Markdown-Export und im JSON-Download, weil `system` bis dahin nebenbei das
+(`core/context_injection.py`); **wer einen dritten Kontext-Kanal baut, ruft
+`inject_context` aus `core/context_channels.py`** und bekommt den Marker
+dadurch — seit #75 ist das der einzige Weg, vorher war es eine Bitte. Ohne ihn
+landet der Fremdtext in der Ablage, im Verlauf, im
 Trennmerkmal war.
 
 **Die Erwartung hinter dem Ticket hat sich aber nicht bestätigt, und das ist die

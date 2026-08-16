@@ -26,7 +26,7 @@ from core.context_injection import (
     injected_message,
     is_injected,
 )
-from rss.feeds import inject_rss_context
+from rss.feeds import RssCache, RssItem, inject_rss_context
 from security.tinyguard import BasicGuard
 from storage import SqliteStore
 from ui.conversation_io_terminal import load_conversation, save_conversation
@@ -84,7 +84,11 @@ def test_the_quoted_block_is_delimited_on_both_sides():
 
 def test_the_rss_block_is_quoted_user_text_too():
     history: list = []
-    inject_rss_context(history, "Meldung: Bahnstreik")
+    item = RssItem(
+        source="tagesschau", title="Bahnstreik", body="Verhandlungen laufen."
+    )
+
+    inject_rss_context(history, [item], RssCache(feeds=[]))
 
     assert history[0]["role"] == "system"
     assert history[1]["role"] == "user" and history[1][INJECTED_KEY] == "rss"

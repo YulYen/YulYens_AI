@@ -48,7 +48,7 @@ import gradio as gr
 from config.personas import get_drink
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.streaming_provider import StreamStats
-from rss.feeds import RssCache, build_context_block, inject_rss_context
+from rss.feeds import RssCache, inject_rss_context
 from rss.trigger import feeds_for_question
 from ui.session import SessionContext
 from ui.webui_format import (
@@ -362,13 +362,15 @@ class ChatController:
         if not names:
             return None
         items = self.rss_cache.items_for(list(names))
-        block, dropped = build_context_block(
-            items, self.rss_cache, getattr(session.streamer, "guard", None)
+        result = inject_rss_context(
+            llm_history,
+            items,
+            self.rss_cache,
+            getattr(session.streamer, "guard", None),
         )
-        if not block:
+        if not result:
             return None
-        inject_rss_context(llm_history, block)
-        return self._rss_hint(session.bot, list(names), dropped)
+        return self._rss_hint(session.bot, list(names), result.dropped)
 
     def _rss_hint(
         self, persona: str | None, names: list[str], dropped: int
@@ -534,21 +536,25 @@ class ChatController:
         # automatische Injektion (#73). Damit ist er eine Abkürzung, kein
         # zweiter Code-Pfad, und er wartet nie auf das Netz.
         items = self.rss_cache.items_for(self.rss_cache.feed_names)
-        block, dropped = build_context_block(
-            items, self.rss_cache, getattr(session.streamer, "guard", None)
+        # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn.
+        # Injiziert wird vor dem Hinweis, weil erst die Tür sagt, wie viel sie
+        # verworfen hat; `llm_history` wird bis zum Stream von niemandem gelesen.
+        result = inject_rss_context(
+            llm_history,
+            items,
+            self.rss_cache,
+            getattr(session.streamer, "guard", None),
         )
-        hint = self._rss_hint(session.bot, self.rss_cache.feed_names, dropped)
+        hint = self._rss_hint(session.bot, self.rss_cache.feed_names, result.dropped)
         if hint:
             chat_history.append(bot_bubble(hint))
             yield None, chat_history, llm_history, *keep, gr.update()
 
-        if not block:
+        if not result:
             chat_history.append(bot_bubble(self._t("briefing_empty")))
             yield None, chat_history, llm_history, *keep, gr.update()
             return
 
-        # Reihenfolge wie beim Wiki-Kontext: erst System-Messages, dann User-Turn
-        inject_rss_context(llm_history, block)
         llm_history.append({"role": "user", "content": briefing_prompt})
 
         if self.handle_context_warning(session, llm_history, chat_history):

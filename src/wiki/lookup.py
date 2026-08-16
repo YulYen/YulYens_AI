@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 import requests
 from config.config_singleton import Config
-from core.context_injection import injected_message
+from core.context_channels import WIKI, inject_context
 from security.tinyguard import accepted_context
 
 
@@ -240,24 +240,36 @@ def inject_wiki_context(
     ``guard`` ist optional, damit Aufrufer ohne Guard (und die Bestandstests)
     unverändert bleiben. Ist einer da, fliegt ein Snippet raus, dessen Text die
     Injection- oder Wrongdoing-Regeln auslöst.
+
+    Läuft seit #75 durch ``core.context_channels.inject_context``, die
+    gemeinsame Tür beider Kontext-Kanäle. Hier ist sie die **letzte** Schranke:
+    gefiltert wird schon in :meth:`WikiLookup.snippets`, weil sonst die
+    Quellen-Karte (#32) Ausschnitte auflistet, die das Modell nie gesehen hat.
+    Der zweite Durchgang ist gefahrlos, weil er dieselben Einheiten prüft —
+    anders als bei RSS, wo über einen zusammengefügten Block geprüft würde.
     """
     if not contexts:
         return
     cfg = Config()
-    safe = accepted_context(
-        guard, contexts, text_of=lambda ctx: ctx.snippet, label_of=lambda ctx: ctx.topic
-    )
-    if not safe:
-        return
-    guardrail = cfg.t("wiki_context_guardrail")
-    history.append({"role": "system", "content": guardrail})
 
-    for idx, ctx in enumerate(safe, start=1):
-        topic_clean = ctx.topic.replace("_", " ")
-        context_message = cfg.t(
-            "wiki_context_message", topic=topic_clean, snippet=ctx.snippet
-        )
-        body = f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
-        history.append(
-            injected_message(cfg.t("context_quote_wrapper", body=body), "wiki")
-        )
+    def _bodies(safe: list[WikiSnippet]) -> list[str]:
+        bodies = []
+        for idx, ctx in enumerate(safe, start=1):
+            topic_clean = ctx.topic.replace("_", " ")
+            context_message = cfg.t(
+                "wiki_context_message", topic=topic_clean, snippet=ctx.snippet
+            )
+            bodies.append(
+                f"=== WIKI SNIPPET {idx}: {topic_clean} ===\n{context_message}"
+            )
+        return bodies
+
+    inject_context(
+        history,
+        WIKI,
+        contexts,
+        guard=guard,
+        text_of=lambda ctx: ctx.snippet,
+        label_of=lambda ctx: ctx.topic,
+        bodies_of=_bodies,
+    )

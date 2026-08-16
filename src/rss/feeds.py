@@ -28,8 +28,7 @@ from typing import Any
 import requests
 from bs4 import BeautifulSoup
 from config.config_singleton import Config
-from core.context_injection import injected_message
-from security.tinyguard import accepted_context
+from core.context_channels import RSS, Injection, inject_context
 
 
 def _local(tag: str) -> str:
@@ -217,42 +216,47 @@ class RssCache:
         self._stop.set()
 
 
-def build_context_block(items: list[RssItem], cache: RssCache, guard: Any = None):
-    """Alle Meldungen als **ein** Textblock — oder ``None``.
+def build_context_block(items: list[RssItem], cache: RssCache) -> str:
+    """Die angenommenen Meldungen als **ein** Textblock.
 
-    Der Guard filtert **pro Meldung, bevor zusammengefügt wird**. Andersherum
-    wäre die Zusammenfassung eine stille Abschwächung: eine einzige schräge
-    Schlagzeile risse entweder den ganzen Block mit oder rutschte in ihm durch.
-    Genau derselbe Fehler wie damals bei ``WikiLookup.snippets()``, nur
-    andersherum.
+    Nimmt bewusst **keinen** Guard mehr: gefiltert wird in
+    :func:`inject_rss_context` über die Tür, und die reicht hierher nur durch,
+    was sie durchgelassen hat. Vorher lag beides in dieser Funktion — richtig
+    gebaut, aber freiwillig; ein Aufrufer, der selbst zusammenfügte, hätte die
+    Reihenfolge lautlos umdrehen können (#75).
     """
-    accepted = accepted_context(
-        guard,
-        items,
-        text_of=lambda item: f"{item.title} {item.body}",
-        label_of=lambda item: item.source,
-    )
-    if not accepted:
-        return None, len(items)
     cfg = Config()
     stamp = cache.filled_at.strftime("%H:%M") if cache.filled_at else "?"
-    lines = "\n".join(item.as_line(cache.max_chars_per_item) for item in accepted)
-    block = cfg.t("rss_context_block", stand=stamp, meldungen=lines)
-    return block, len(items) - len(accepted)
+    lines = "\n".join(item.as_line(cache.max_chars_per_item) for item in items)
+    return str(cfg.t("rss_context_block", stand=stamp, meldungen=lines))
 
 
-def inject_rss_context(history: list, block: str | None) -> None:
+def inject_rss_context(
+    history: list, items: list[RssItem], cache: RssCache, guard: Any = None
+) -> Injection:
     """Hängt Guardrail + **einen** zitierten Meldungsblock an die History.
 
     Wie beim Wiki (#60): die Anweisung bleibt ``system``, die Meldungen werden
     zitierter ``user``-Fremdtext. Eine Schlagzeile ist Material, kein Befehl —
     und ein Feed ist genau der Kanal, den man am leichtesten fremdbefüllt.
+
+    **Der Guard sieht die einzelnen Meldungen, nicht den Block** — die Regel
+    aus #73, seit #75 von der Tür erzwungen statt von dieser Funktion
+    eingehalten: ``bodies_of`` fügt erst zusammen, wenn gefiltert ist. Über den
+    fertigen Block geprüft, risse eine einzige schräge Schlagzeile alle
+    anderen mit.
     """
-    if not block:
-        return
-    cfg = Config()
-    history.append({"role": "system", "content": cfg.t("rss_context_guardrail")})
-    history.append(injected_message(cfg.t("context_quote_wrapper", body=block), "rss"))
+    if not items:
+        return Injection(injected=0, dropped=0)
+    return inject_context(
+        history,
+        RSS,
+        items,
+        guard=guard,
+        text_of=lambda item: f"{item.title} {item.body}",
+        label_of=lambda item: item.source,
+        bodies_of=lambda accepted: [build_context_block(accepted, cache)],
+    )
 
 
 def build_rss_cache(rss_cfg: dict | None) -> RssCache:
