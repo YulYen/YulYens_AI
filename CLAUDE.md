@@ -68,15 +68,35 @@ lautet also: hält das hier eine *Entscheidung* fest, oder nur, dass jemand
 gearbeitet hat? `modellwechsel` besteht diese Probe (drei lebende Dokumente
 verlinken darauf), `framework_update` nicht.
 
-### Ausnahme: eine einzelne Textdatei darf direkt auf `main`
+### Ausnahme: Prosa ohne Code darf direkt auf `main`
 
-Eine übersichtliche Änderung an **genau einer** Textdatei — ein Backlog-Ticket,
-eine Zeile Doku, ein korrigierter Tippfehler — geht ohne Branch und ohne PR
-direkt auf `main`. Ein Review-Prozess für eine Zeile Prosa kostet mehr
-Aufmerksamkeit, als er einbringt.
+Eine übersichtliche Änderung, die **keinen Code anfasst** — ein Backlog-Ticket,
+eine Zeile Doku, ein korrigierter Tippfehler, derselbe falsche Pfad in vier
+Dateien — geht ohne Branch und ohne PR direkt auf `main`. Ein Review-Prozess
+für eine Zeile Prosa kostet mehr Aufmerksamkeit, als er einbringt.
 
-Alles andere bleibt beim PR: sobald **Code** betroffen ist oder **mehrere
-Dateien**, ist der PR die Stelle, an der man die Änderung als Ganzes sieht.
+**Bis zum 2026-08-25 stand hier „genau eine Datei", und die Zahl war der
+falsche Maßstab.** Der Anlass: `feedback_votes.jsonl` war von `logs/` nach
+`data/` gezogen, vier beschreibende Dokumente nannten weiter den alten Ort.
+Vier Dateien, je eine Zeile, viermal dieselbe Ersetzung — ein Branch, ein PR
+und eine Beschreibung für etwas, das ein `grep` in einer Sekunde abnimmt.
+Umgekehrt wäre eine **einzelne** Datei, in der ein ganzer Abschnitt neu
+geschrieben wird, einen PR wert gewesen. Die Dateizahl war ein Stellvertreter
+für „klein", und ein schlechter.
+
+Der Maßstab sind stattdessen zwei Fragen, beide mit Nein zu beantworten:
+
+1. **Ist Code betroffen?** Dann PR — dort sieht man die Änderung als Ganzes,
+   und dort laufen Linter, Typen und Tests, bevor sie auf `main` liegt.
+   `config.yaml`, Ensemble-YAML und Locale-Dateien zählen als Code: sie ändern
+   das Verhalten der laufenden App.
+2. **Braucht es einen `CHANGELOG.md`-Eintrag?** Dann merkt es jemand beim
+   Betreiben — und was der Betreiber merkt, verdient den Blick von außen.
+
+Sonst gilt: lässt sich die Änderung in *einem* Satz sagen und nachprüfen, geht
+sie direkt. Ein Übersetzungspaar (`docs/{de,en}/…`) ist dabei **eine**
+Änderung, keine zwei; die beiden Fassungen gehören ohnehin zusammen.
+
 Im Zweifel Branch — die Ausnahme ist für den offensichtlichen Fall gedacht,
 nicht für den grenzwertigen.
 
@@ -124,10 +144,12 @@ ein geänderter Default, ein neues Bedienelement, eine entfernte Option, ein
 Pflichtfeld. Interner Umbau gehört nicht hinein — #58 (Moderator umgeschrieben)
 und #64d (Broadcast-Events) ändern für den Startenden nichts.
 
-Diese Abgrenzung ist der Grund, warum die **Ein-Datei-Ausnahme oben überlebt**:
-eine korrigierte Doku-Zeile merkt niemand, braucht also keinen
-Changelog-Eintrag und bleibt eine Datei. Bräuchte *jede* Änderung eine Zeile,
-wäre jede Korrektur zwei Dateien und damit PR-pflichtig.
+Diese Abgrenzung trägt die **Ausnahme oben** — seit die Dateizahl dort nicht
+mehr entscheidet, ist sie sogar direkt eine der beiden Fragen: „braucht es
+einen Changelog-Eintrag?" heißt „merkt es jemand beim Betreiben?" und damit
+„gehört ein Blick von außen dazu?". Bräuchte *jede* Änderung eine Zeile, wäre
+jede korrigierte Doku-Zeile PR-pflichtig. Die Abgrenzung hält also nicht nur
+das Changelog lesbar, sondern auch den kurzen Weg offen.
 
 ### Welche Stelle springt
 
