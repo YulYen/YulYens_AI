@@ -10,7 +10,7 @@ Erledigtes stand noch in den Tiers und ist ins Archiv gewandert.)
 ## Tier A — Fokus: die LoRA-Strecke
 
 #7 ist in Arbeit. #40 und #41 gehörten logisch davor — **beide sind jetzt
-erledigt** (siehe Archiv): Votes sammeln sich in `logs/feedback_votes.jsonl`,
+erledigt** (siehe Archiv): Votes sammeln sich in `data/feedback_votes.jsonl`,
 die Eval-Suite liegt unter `evals/` und liefert mit `report.csv` das
 Vergleichsartefakt für Baseline vs. Adapter. Damit ist #7 nicht mehr blockiert.
 Offen bleibt nur die Ausbaustufe #40b (Blind-Ranking). Der Baseline-Lauf

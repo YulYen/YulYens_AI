@@ -27,7 +27,7 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 - **E-Mail-Adapter** (opt-in): Personas per IMAP/SMTP anschreiben
 - **Security-Guard**: Prompt-Injection-Schutz, PII-Filter, Wrongdoing-Guardrail mit Session-Lock
 - **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python src/launch.py --list-ensembles`
-- **Antwort-Feedback**: 👍/👎 pro Antwort, gesammelt in `logs/feedback_votes.jsonl` als Datenbasis für Auswertung und Finetuning
+- **Antwort-Feedback**: 👍/👎 pro Antwort, gesammelt in `data/feedback_votes.jsonl` (neben der Ablage, nicht in `logs/`) als Datenbasis für Auswertung und Finetuning
 - **Eval-Suite**: goldene Fragen pro Persona und ein Guard-Red-Team-Korpus als YAML — beantwortet messbar, ob eine Änderung das Modell besser gemacht hat (`python scripts/run_evals.py -e classic`)
 - **Setup-Doktor**: `python src/launch.py --doctor` prüft Ollama, Modell, spaCy, Kiwix und VRAM mit konkreten Fix-Hinweisen
 
