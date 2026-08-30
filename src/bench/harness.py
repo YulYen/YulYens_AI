@@ -177,7 +177,12 @@ def run_bench(
 
     Die Aufwärmrunden bleiben in der Liste und werden nicht stillschweigend
     weggeworfen: der Kaltstart (Modell in den VRAM laden) ist eine eigene,
-    interessante Zahl — sie darf nur nicht in den Median rutschen.
+    interessante Zahl — sie darf nur nicht in den Median rutschen. Ob sie
+    *wirklich* einen Kaltstart zeigt, weiß der Harness allerdings nicht: hielt
+    `keep_alive` das Modell von einem Lauf davor noch im Speicher, ist die
+    Aufwärmrunde eine gewöhnliche Messung. Gemessen am selben Nachmittag:
+    30,7 s kalt gegen 0,9 s bei geladenem Modell. Der Report sagt das dazu,
+    statt die Zahl als Kaltstart auszugeben.
     """
     if not personas or not questions:
         return []

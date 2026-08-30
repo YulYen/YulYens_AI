@@ -130,8 +130,11 @@ def render_markdown(run: BenchRun) -> str:
     cold = run.cold_start
     if cold.runs and cold.t_first_ms is not None:
         lines.append(
-            f"- Kaltstart (Aufwärmrunde, nicht in den Zahlen oben): erstes "
-            f"Zeichen nach {_seconds(cold.t_first_ms)}"
+            f"- Aufwärmrunde (nicht in den Zahlen oben): erstes Zeichen nach "
+            f"{_seconds(cold.t_first_ms)}. Das ist der **Kaltstart nur dann**, "
+            f"wenn das Modell vorher nicht schon im VRAM lag — nach einem Lauf "
+            f"kurz davor hält `keep_alive` es dort, und die Zahl ist eine "
+            f"gewöhnliche Messung"
         )
     lines.append("")
 

@@ -882,6 +882,64 @@ sichtbar macht; der Wirtstext ist echter Fließtext und keine Wiederholung
 desselben Satzes, weil wiederholter Text billiger zu verarbeiten ist und den
 Prefill schneller aussehen ließe, als er ist.
 
+### Was der erste Lauf ergeben hat (2026-08-30, #42a)
+
+Gemessen auf Yuls Kiste, ausgelieferte `config.yaml`, PETER, 5 Fragen × 3
+Runden, GPU sonst frei.
+
+| | `ministral-3:8b` (Q4) | `leo-hessianai-13b-chat.Q5` |
+|---|---|---|
+| erstes Zeichen (Median) | **0,46 s** | 2,18 s |
+| Durchsatz (Median) | **107 Zeichen/s** | 29,3 Zeichen/s |
+| davon Guard-Holdback | 299 ms (**65 %**) | 1.221 ms (56 %) |
+| Kaltstart (Modell in den VRAM) | 30,7 s | 30,5 s |
+
+**Das ist die Baseline für jeden künftigen Modellwechsel** — und zugleich die
+Latenz-Verifikation, die #17 offen ließ. Ihr Ergebnis ist unbequem: das
+Backend ist gar nicht das Problem. Das erste Token des Modells liegt nach rund
+150 ms vor, ausgeliefert wird es nach 460 ms. **Zwei Drittel der
+wahrgenommenen Antwortzeit entstehen nach dem Modell, nicht in ihm.** Wer die
+gefühlte Geschwindigkeit verbessern will, dreht am Holdback, nicht am
+Warm-up — jede weitere Backend-Optimierung verschwindet hinter diesen 300 ms.
+
+#### Die Holdback-Tabelle, diesmal am echten Modell
+
+Die Tabelle aus #51 entstand gegen das getaktete Dummy-Backend. Das war
+methodisch richtig (lastunabhängig), ließ aber offen, ob die Rechnung neben
+echter Generierung noch gilt. Sie gilt:
+
+| `holdback` | erstes Zeichen | Aufschlag | rechnerisch (`holdback` ÷ 107 Z/s) |
+|---|---|---|---|
+| 0 | 0,15 s | — | — |
+| **32 (Default)** | **0,46 s** | +0,31 s | +0,30 s |
+| 96 | 1,12 s | +0,97 s | +0,90 s |
+
+Der Holdback kostet also auch am echten Modell genau das, was er rechnerisch
+kostet — der Default 32 bleibt richtig gewählt.
+
+**Ein Nebenbefund, der bei der Dummy-Messung nicht auffallen konnte:** bei
+`holdback: 96` war für `q1_kurz` (85 Zeichen Antwort) `t_first` **gleich**
+`t_total`. Die Antwort ist kürzer als der Holdback, also wird sie erst beim
+`flush()` freigegeben — es streamt **gar nichts**, die Antwort erscheint am
+Stück. Wer den Holdback hochdreht, schaltet für kurze Antworten das Streaming
+ab, ohne dass irgendetwas davon berichtet.
+
+#### Was das für #7 heißt
+
+`leo-hessianai-13b-chat.Q5` ist **3,7-mal langsamer im Durchsatz und 4,7-mal
+langsamer bis zum ersten Zeichen**. Das ist kein Randdetail für die
+LoRA-Strecke, sondern ein Preisschild: ein Adapter auf LeoLM 13B muss die
+Antwort*qualität* deutlich heben, um eine Vervierfachung der Wartezeit
+aufzuwiegen. Nebenbei kostet der Holdback dort 1,22 s statt 0,30 s — er zählt
+*Zeichen*, und ein langsamer schreibendes Modell braucht für dieselben 32
+Zeichen viermal so lange. Wer auf 13B wechselt, senkt also sinnvollerweise
+`security.stream_holdback_chars` mit.
+
+**Der Kaltstart ist bei beiden Modellen rund 30 s** und hängt damit
+offensichtlich nicht an der Modellgröße — bei 8 GB VRAM und 5–6 GB
+Modellgewicht dominiert das Laden von der Platte. Er ist der Grund, warum
+`core.warm_up` existiert.
+
 **Der Skriptname ist `run_bench.py`, nicht `bench.py`** — wie `run_evals.py`
 neben dem Paket `evals`. Ein `scripts/bench.py` heißt beim Import schlicht
 `bench` und verdeckt das gleichnamige Paket unter `src/`; aufgefallen, weil
@@ -1534,6 +1592,13 @@ eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
 | Projekt, `holdback: 32` (Default) | **1,91 s** |
 | Projekt, `holdback: 0` | 0,39 s |
 
+**Am echten Modell nachgemessen (2026-08-30, #42a) — die Rechnung gilt auch
+dort.** Die Tabellen hier entstanden gegen das getaktete Dummy-Backend; die
+Zahlen mit `ministral-3:8b` stehen im Abschnitt „Die Stoppuhr". Kurz: 0,15 /
+0,46 / 1,12 s für Holdback 0 / 32 / 96, also der rechnerische Aufschlag. Neu
+dort und hier nicht sichtbar: ist die Antwort **kürzer** als der Holdback,
+streamt sie gar nicht mehr, sondern erscheint am Stück.
+
 **Auf Gradio 6.22 nachgemessen (2026-08-07) — die Tabelle gilt weiter.** Die
 Zahlen oben stammen aus der 4.44-Zeit; seither sind Gradio, Starlette und das
 ganze Frontend gewechselt, und eine Tabelle, die niemand nachprüft, ist
@@ -1712,8 +1777,8 @@ daneben" anzulegen. Beim zweiten Mal ist es tatsächlich passiert; die
 Umgebung existierte im Schwesterprojekt längst, funktionsfähig und mit
 denselben Pins.
 - **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator.
-  #42 (Perf-Benchmark) ist gebaut — offen ist nur noch #42a, der erste Lauf am
-  echten Modell, der die Zahlen liefert
+  #42 (Perf-Benchmark) und #42a (erster Messlauf) sind erledigt — die Baseline
+  steht bei 0,46 s bis zum ersten Zeichen und 107 Zeichen/s
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
   (Archiv), #14 bis auf den Server-Teil (#14a). Die Gradio-Strecke ist durch —
   #61 auf 5.50, #61a auf 6.22 mit null pip-audit-Befunden. Aus #64 offen: die
