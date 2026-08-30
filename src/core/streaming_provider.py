@@ -66,6 +66,13 @@ def _render_prompt_trace(
     return "\n".join(lines)
 
 
+# Was der Aufrufer statt der Antwort bekommt, wenn das Backend nicht liefert.
+# Als Konstante, weil `stream()` den Fehler *fängt* und als Text ausliefert:
+# ein Verbraucher sieht also einen erfolgreichen, sehr kurzen Stream. Wer misst
+# (#42) oder auswertet, muss diesen Fall erkennen können, ohne das Literal zu
+# kopieren.
+LLM_ERROR_MESSAGE = "[ERROR] LLM is not responding correctly."
+
 # Number of trailing characters held back while streaming so that a PII or
 # secret pattern split across token boundaries is still detected before any
 # part of it reaches the user. Best-effort: patterns longer than this window
@@ -586,7 +593,7 @@ class YulYenStreamingProvider:
             logging.exception(
                 "stream() failed persona=%s model=%s", self.persona, self.model_name
             )
-            err = "[ERROR] LLM is not responding correctly."
+            err = LLM_ERROR_MESSAGE
             self._append_jsonl("assistant", err)
             yield err
 
