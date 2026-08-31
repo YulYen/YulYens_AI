@@ -325,7 +325,7 @@ assumes Windows), `make lint-imports` (layer contracts, see below),
 `make audit` (check the dependencies' known vulnerabilities against
 `audit_allowlist.yaml` — needs network access) and `make evals` /
 `make evals-full` (eval suite, see `evals/ReadMe.md`; only the full variant
-needs a model).
+needs a model) and `make bench` (response times, see below).
 
 **The browser smoke test sits beside these, not among them:**
 ```bash
@@ -338,6 +338,33 @@ whether a file actually reaches the browser. That needs Playwright **and** a
 browser build (`pip install playwright && playwright install chromium`), which
 is exactly why it is excluded from `make test` and from CI. Without Playwright
 it skips cleanly.
+
+### Measuring response times: `make bench`
+
+```bash
+make bench                                    # same as: python scripts/run_bench.py -e classic
+python scripts/run_bench.py -e classic --model leo-hessianai-13b-chat.Q5
+python scripts/run_bench.py -e classic --holdback 0
+```
+
+The project's stopwatch (`scripts/run_bench.py`). It asks a fixed set of questions
+several times over and writes `logs/bench/report.md` plus `report.csv` — the
+CSV is the artefact that matters, because two runs can be compared there row by
+row. Needs Ollama; `--backend dummy` only proves the harness runs, and the
+report says so.
+
+**What is timed is the first character actually delivered**, not the model's
+first token. Between the two sits the guard holdback, the single largest
+contributor to perceived response time; the report shows it as its own figure.
+Two numbers lead: **time to first character** and **characters per second**.
+The total duration of a run is explicitly *not* a comparison metric — it mostly
+depends on how much the model chose to write.
+
+The default path measures in-process (persona prompt, guard, holdback, model)
+and deliberately leaves wiki and RSS out, because their lookup varies by
+seconds from question to question. For the full path, measure against the
+running server with `--api-url http://127.0.0.1:8013/v1`; in exchange you lose
+the model-side timings, which only exist in-process.
 
 ---
 

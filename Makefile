@@ -1,4 +1,4 @@
-.PHONY: setup format lint lint-imports types fix test test-ci test-all test-browser coverage clean run audit check evals evals-full
+.PHONY: setup format lint lint-imports types fix test test-ci test-all test-browser coverage clean run audit check evals evals-full bench
 
 setup:
 	pip install -r requirements.txt -r requirements-dev.txt
@@ -69,6 +69,11 @@ evals:
 
 evals-full:
 	python scripts/run_evals.py -e classic
+
+# Stoppuhr (#42): Zeit bis zum ersten *ausgelieferten* Zeichen und Durchsatz.
+# Braucht Ollama. `--backend dummy` prueft nur, dass der Harness laeuft.
+bench:
+	python scripts/run_bench.py -e classic
 
 # Python statt find: das Projekt läuft Windows-primär, dort gibt es kein find.
 clean:

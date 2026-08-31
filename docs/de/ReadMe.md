@@ -334,7 +334,8 @@ Weitere Varianten (siehe `Makefile`): `make test-all` (komplette Suite),
 (Schichtenverträge, siehe unten), `make audit` (bekannte
 Schwachstellen der Abhängigkeiten gegen `audit_allowlist.yaml` halten — braucht Netz) und
 `make evals` / `make evals-full` (Eval-Suite, siehe `evals/ReadMe.md`; nur die
-volle Variante braucht ein Modell).
+volle Variante braucht ein Modell) und `make bench` (Antwortzeiten, siehe
+unten).
 
 **Der Browser-Rauchtest steht bewusst daneben**, nicht dabei:
 ```bash
@@ -347,6 +348,33 @@ Datei beim Browser ankommt. Dafür braucht er Playwright **und** einen
 Browser-Build (`pip install playwright && playwright install chromium`), und
 genau deshalb ist er aus `make test` und aus der CI ausgenommen. Fehlt
 Playwright, wird sauber übersprungen.
+
+### Antwortzeiten messen: `make bench`
+
+```bash
+make bench                                    # entspricht: python scripts/run_bench.py -e classic
+python scripts/run_bench.py -e classic --model leo-hessianai-13b-chat.Q5
+python scripts/run_bench.py -e classic --holdback 0
+```
+
+Die Stoppuhr des Projekts (`scripts/run_bench.py`). Sie stellt einen festen
+Fragensatz mehrfach und schreibt `logs/bench/report.md` samt `report.csv` —
+Letzteres ist das eigentliche Artefakt, weil sich zwei Läufe dort zeilenweise
+gegeneinanderhalten lassen. Braucht Ollama; `--backend dummy` prüft nur, dass
+der Harness läuft, und sagt das im Report auch.
+
+**Gemessen wird die Zeit bis zum ersten *ausgelieferten* Zeichen**, nicht bis
+zum ersten Token des Modells. Zwischen beiden liegt der Guard-Holdback, und der
+ist der größte Einzelposten der wahrgenommenen Antwortzeit; der Report weist
+ihn als eigene Zahl aus. Zwei Leitkennzahlen zählen: **erstes Zeichen** und
+**Zeichen/s**. Die Gesamtdauer eines Laufs ist ausdrücklich *keine*
+Vergleichszahl — sie hängt vor allem daran, wie viel das Modell schreibt.
+
+Der Standardweg misst in-process (Persona-Prompt, Guard, Holdback, Modell) und
+lässt Wiki und RSS bewusst außen vor, weil deren Abruf je Frage um Sekunden
+schwankt. Wer den vollen Pfad will, misst mit `--api-url
+http://127.0.0.1:8013/v1` gegen den laufenden Server; dann fehlen dafür die
+Modellzeiten, die es nur in-process gibt.
 
 ---
 

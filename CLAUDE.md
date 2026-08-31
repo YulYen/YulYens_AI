@@ -365,6 +365,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── feeds.py             # RSS/Atom als Kontextquelle: Cache + Block (#73)
 │   │   └── trigger.py           # Heuristik „ist das eine Nachrichtenfrage?"
 │   ├── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
+│   ├── bench/                   # Stoppuhr (#42): Harness, Treiber, Fragensatz, Report
 │   └── version.py               # __version__ — die einzige Quelle der Version (#74)
 ├── evals/                       # Eval-Korpora als YAML (siehe evals/ReadMe.md)
 │   ├── personas/*.yaml          # Goldene Fragen pro Persona
@@ -372,7 +373,8 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   ├── karl_summary.yaml        # Qualität der Karl-Zusammenfassungen
 │   └── guard_redteam.yaml       # Angriff → erwartetes Guard-Verhalten
 ├── scripts/
-│   └── run_evals.py             # Einstieg der Eval-Suite
+│   ├── run_evals.py             # Einstieg der Eval-Suite
+│   └── run_bench.py             # Einstieg der Stoppuhr (#42)
 ├── ensembles/
 │   └── classic/
 │       ├── personas_base.yaml   # LLM-Optionen pro Persona
@@ -386,7 +388,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
 ├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
-├── Makefile                     # make setup / format / lint / types / test / test-ci / evals / clean / run
+├── Makefile                     # make setup / format / lint / types / test / test-ci / evals / bench / clean / run
 ├── CHANGELOG.md                 # nutzersichtbare Änderungen, englisch (#74)
 ├── backlog.md                   # offene Tickets mit Effort/Benefit
 └── backlog_archiv.md            # erledigte Tickets — die Projektgeschichte
@@ -800,6 +802,149 @@ make evals                                           # Kurzform für --guard-onl
 - `expect.rule` nennt die Regel, die einen Guard-Fall fangen *soll* (#62). Nur
   `reason` zu prüfen reicht nicht: ein Fall, der von der falschen Regel gefangen
   wird, sieht sonst aus wie ein Erfolg
+
+## Die Stoppuhr (#42)
+
+Die messbare Antwort auf „ist es schneller geworden?" — und das Gegenstück zur
+Eval-Suite: dort Qualität, hier Zeit.
+
+```bash
+python scripts/run_bench.py -e classic                    # braucht Ollama
+python scripts/run_bench.py -e classic --model <anderes>  # Modellwechsel vergleichen
+python scripts/run_bench.py -e classic --holdback 0       # die Tabelle aus #51 nachfahren
+python scripts/run_bench.py -e classic --backend dummy    # nur: läuft der Harness?
+make bench                                                # Kurzform der ersten Zeile
+```
+
+Der Lauf schreibt `logs/bench/report.md` und `report.csv`; das CSV ist das
+Artefakt, weil sich zwei Läufe dort zeilenweise gegenüberstellen lassen.
+
+**Gemessen wird das erste *ausgelieferte* Zeichen, nicht das erste Token des
+Modells.** Das ist der ganze Grund, warum das Werkzeug existiert und nicht
+einfach `StreamStats` ausgelesen wird: dazwischen liegt der Guard-Holdback, und
+der ist im Projekt der größte Einzelposten der wahrgenommenen Antwortzeit. Wo
+beide Zahlen zu haben sind, steht die Differenz als eigene Spalte —
+`t_model_first_ms` kommt aus `StreamStats`, das der Provider seit #36 ohnehin
+ablegt.
+
+**Zwei Leitkennzahlen, und die dritte Zahl ist ausdrücklich keine:** erstes
+Zeichen und Zeichen/s vergleichen zwei Läufe, die **Gesamtdauer nicht** — sie
+hängt vor allem daran, wie viel das Modell zu schreiben beschließt. Dieselbe
+Lehre wie bei #41a, nur an anderer Stelle: wer die instabile Zahl oben
+hinschreibt, vergleicht später Münzwürfe.
+
+Sechs Entwurfsentscheidungen, die man beim Anfassen leicht umdreht:
+
+1. **Rundenweise messen, nicht fragenweise.** Runde 1 stellt alle Fragen, dann
+   Runde 2 — nicht dreimal Frage 1, dann dreimal Frage 2. Zwei unabhängige
+   Gründe: eine Maschine, die im Lauf warm wird, benachteiligt sonst genau die
+   Frage, die hinten steht; und dieselbe Frage direkt hintereinander trifft den
+   **Prompt-Cache** des Backends, was die zweite Runde grundlos schneller macht.
+   Bei nur *einer* Frage greift der zweite Schutz nicht — dann warnt der Lauf.
+2. **Aufwärmrunden werden ausgewiesen, nicht weggeworfen.** Der erste Aufruf
+   lädt das Modell in den VRAM und ist um Größenordnungen langsamer. Das ist
+   eine eigene, interessante Zahl — sie darf nur nicht in den Median rutschen.
+3. **Median, nicht Mittelwert.** Bei einer Handvoll Läufe kippt ein einzelner
+   Ausreißer den Mittelwert: 100/110/5000 ms ergibt Ø 1736 und Median 110.
+4. **Eine Fehlermeldung ist keine Bestzeit.** `stream()` *fängt* Backend-Fehler
+   ab und liefert sie als Text aus — ein nicht erreichbares Ollama wäre sonst
+   die schnellste Messung des Laufs. Der Harness hält den Antwortanfang gegen
+   `LLM_ERROR_MESSAGE` (dafür ist die Konstante da) und bricht ab, wenn schon
+   die *erste* Messung fehlschlägt: das ist ein Aufbaufehler, kein Ergebnis.
+   Ein Aussetzer mittendrin wird dagegen aufgezeichnet und der Lauf läuft
+   weiter.
+5. **Die Kopfzeile trägt alles, was zwei Läufe unvergleichbar macht** — Modell,
+   Backend, Messpfad, `num_ctx`, `keep_alive`, Version und vor allem der
+   Holdback samt der Frage, ob er überhaupt **wirkt**: ohne aktive
+   Ausgangsprüfung setzt der Moderator ihn selbst auf 0, und zwei Läufe mit
+   derselben Zahl in der Config unterscheiden sich dann drastisch, ohne dass
+   die Zahl es verriete.
+6. **Der Default-Persona wird abgeleitet, nicht verdrahtet:** die mit der
+   niedrigsten Temperatur (in `classic` also PETER). Sie liefert über mehrere
+   Runden die ähnlichsten Antworten, und die Antwortlänge ist der größte
+   Einzeleinfluss auf die Gesamtdauer. Abgeleitet, damit der Default auch für
+   ein fremdes Ensemble stimmt.
+
+**Zwei Messpfade, die nicht dasselbe messen.** In-process (Default) misst
+Persona-Prompt, Guard, Holdback und Modell — Wiki und RSS bleiben bewusst
+draußen, weil ihr Abruf je Frage um Sekunden schwankt und die Zahl dominieren
+würde. `--api-url` misst den vollen Pfad über den laufenden Server, inklusive
+FastAPI/SSE und allem, was dort konfiguriert ist; dafür fehlen die
+Modellzeiten, die es nur in-process gibt. Der Modus steht deshalb in jeder
+Kopfzeile.
+
+**Der Fragensatz liegt in `src/bench/questions.py`, nicht in der Config.** Er
+ist ein Maßstab: eine Frage zu ändern gibt die Vergleichbarkeit mit allen
+früheren Läufen auf, und das soll ein Commit sein, keine Config-Zeile. Eigene
+Sätze gehen über `--questions datei.txt`. Die letzte Frage ist absichtlich ein
+langer Prompt mit kurzer Antwort — sie ist die einzige, die die *Prefill*-Zeit
+sichtbar macht; der Wirtstext ist echter Fließtext und keine Wiederholung
+desselben Satzes, weil wiederholter Text billiger zu verarbeiten ist und den
+Prefill schneller aussehen ließe, als er ist.
+
+### Was der erste Lauf ergeben hat (2026-08-30, #42a)
+
+Gemessen auf Yuls Kiste, ausgelieferte `config.yaml`, PETER, 5 Fragen × 3
+Runden, GPU sonst frei.
+
+| | `ministral-3:8b` (Q4) | `leo-hessianai-13b-chat.Q5` |
+|---|---|---|
+| erstes Zeichen (Median) | **0,46 s** | 2,18 s |
+| Durchsatz (Median) | **107 Zeichen/s** | 29,3 Zeichen/s |
+| davon Guard-Holdback | 299 ms (**65 %**) | 1.221 ms (56 %) |
+| Kaltstart (Modell in den VRAM) | 30,7 s | 30,5 s |
+
+**Das ist die Baseline für jeden künftigen Modellwechsel** — und zugleich die
+Latenz-Verifikation, die #17 offen ließ. Ihr Ergebnis ist unbequem: das
+Backend ist gar nicht das Problem. Das erste Token des Modells liegt nach rund
+150 ms vor, ausgeliefert wird es nach 460 ms. **Zwei Drittel der
+wahrgenommenen Antwortzeit entstehen nach dem Modell, nicht in ihm.** Wer die
+gefühlte Geschwindigkeit verbessern will, dreht am Holdback, nicht am
+Warm-up — jede weitere Backend-Optimierung verschwindet hinter diesen 300 ms.
+
+#### Die Holdback-Tabelle, diesmal am echten Modell
+
+Die Tabelle aus #51 entstand gegen das getaktete Dummy-Backend. Das war
+methodisch richtig (lastunabhängig), ließ aber offen, ob die Rechnung neben
+echter Generierung noch gilt. Sie gilt:
+
+| `holdback` | erstes Zeichen | Aufschlag | rechnerisch (`holdback` ÷ 107 Z/s) |
+|---|---|---|---|
+| 0 | 0,15 s | — | — |
+| **32 (Default)** | **0,46 s** | +0,31 s | +0,30 s |
+| 96 | 1,12 s | +0,97 s | +0,90 s |
+
+Der Holdback kostet also auch am echten Modell genau das, was er rechnerisch
+kostet — der Default 32 bleibt richtig gewählt.
+
+**Ein Nebenbefund, der bei der Dummy-Messung nicht auffallen konnte:** bei
+`holdback: 96` war für `q1_kurz` (85 Zeichen Antwort) `t_first` **gleich**
+`t_total`. Die Antwort ist kürzer als der Holdback, also wird sie erst beim
+`flush()` freigegeben — es streamt **gar nichts**, die Antwort erscheint am
+Stück. Wer den Holdback hochdreht, schaltet für kurze Antworten das Streaming
+ab, ohne dass irgendetwas davon berichtet.
+
+#### Was das für #7 heißt
+
+`leo-hessianai-13b-chat.Q5` ist **3,7-mal langsamer im Durchsatz und 4,7-mal
+langsamer bis zum ersten Zeichen**. Das ist kein Randdetail für die
+LoRA-Strecke, sondern ein Preisschild: ein Adapter auf LeoLM 13B muss die
+Antwort*qualität* deutlich heben, um eine Vervierfachung der Wartezeit
+aufzuwiegen. Nebenbei kostet der Holdback dort 1,22 s statt 0,30 s — er zählt
+*Zeichen*, und ein langsamer schreibendes Modell braucht für dieselben 32
+Zeichen viermal so lange. Wer auf 13B wechselt, senkt also sinnvollerweise
+`security.stream_holdback_chars` mit.
+
+**Der Kaltstart ist bei beiden Modellen rund 30 s** und hängt damit
+offensichtlich nicht an der Modellgröße — bei 8 GB VRAM und 5–6 GB
+Modellgewicht dominiert das Laden von der Platte. Er ist der Grund, warum
+`core.warm_up` existiert.
+
+**Der Skriptname ist `run_bench.py`, nicht `bench.py`** — wie `run_evals.py`
+neben dem Paket `evals`. Ein `scripts/bench.py` heißt beim Import schlicht
+`bench` und verdeckt das gleichnamige Paket unter `src/`; aufgefallen, weil
+`tests/test_audit_deps.py` `scripts/` in den `sys.path` hängt und die
+Testsammlung danach im Skript statt im Paket landete.
 
 ## Konfiguration (config.yaml)
 
@@ -1447,6 +1592,13 @@ eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
 | Projekt, `holdback: 32` (Default) | **1,91 s** |
 | Projekt, `holdback: 0` | 0,39 s |
 
+**Am echten Modell nachgemessen (2026-08-30, #42a) — die Rechnung gilt auch
+dort.** Die Tabellen hier entstanden gegen das getaktete Dummy-Backend; die
+Zahlen mit `ministral-3:8b` stehen im Abschnitt „Die Stoppuhr". Kurz: 0,15 /
+0,46 / 1,12 s für Holdback 0 / 32 / 96, also der rechnerische Aufschlag. Neu
+dort und hier nicht sichtbar: ist die Antwort **kürzer** als der Holdback,
+streamt sie gar nicht mehr, sondern erscheint am Stück.
+
 **Auf Gradio 6.22 nachgemessen (2026-08-07) — die Tabelle gilt weiter.** Die
 Zahlen oben stammen aus der 4.44-Zeit; seither sind Gradio, Starlette und das
 ganze Frontend gewechselt, und eine Tabelle, die niemand nachprüft, ist
@@ -1502,6 +1654,8 @@ entfällt der Holdback automatisch, weil es dann nichts zu prüfen gibt.
 
 Wichtig für #17/#42: eine backendseitige Messung von „Zeit bis zum ersten Token"
 sieht diesen Anteil **nicht** — das Modell liefert längst, die Anzeige wartet.
+Genau deshalb misst die Stoppuhr (siehe unten) das erste *ausgelieferte*
+Zeichen und stellt die Modellzeit daneben; die Differenz ist diese Tabelle.
 
 **Der Holdback ist nur die eine Hälfte.** #51 hat die Zeit bis zum *ersten*
 Token gemessen und daraus den Default abgeleitet — korrekt, aber unvollständig.
@@ -1622,8 +1776,9 @@ kaputte Abhängigkeit, einmal als Versuchung, „schnell ein Trainings-venv
 daneben" anzulegen. Beim zweiten Mal ist es tatsächlich passiert; die
 Umgebung existierte im Schwesterprojekt längst, funktionsfähig und mit
 denselben Pins.
-- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator,
-  #42 Perf-Benchmark (mypy deckt inzwischen das ganze `src` ab)
+- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator.
+  #42 (Perf-Benchmark) und #42a (erster Messlauf) sind erledigt — die Baseline
+  steht bei 0,46 s bis zum ersten Zeichen und 107 Zeichen/s
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
   (Archiv), #14 bis auf den Server-Teil (#14a). Die Gradio-Strecke ist durch —
   #61 auf 5.50, #61a auf 6.22 mit null pip-audit-Befunden. Aus #64 offen: die
