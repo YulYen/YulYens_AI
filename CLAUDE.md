@@ -790,7 +790,10 @@ make evals                                           # Kurzform für --guard-onl
   Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist. Genau
   so ist #62 abgenommen worden: `ctx_code_snippet_in_article_is_kept` fing an zu
   bestehen, also musste das Flag fallen. `KNOWN_GAP_IDS` in
-  `tests/test_evals_cli.py` ist damit wieder leer
+  `tests/test_evals_cli.py` war danach leer und trägt seit der ZIM-Messung
+  (2026-08-07) wieder **sechs** Einträge — die Lücken aus dem Abschnitt „Die
+  Rollenverschiebung wirkt nicht"; der Test hält Korpus und Liste deckungsgleich
+  und schlägt in beide Richtungen an
 - **Der Judge-Parser liest Markdown mit, aber nicht mehr (#71):** ein reales 8B-Modell
   antwortet `1: **5** | …` statt `1: 5 | …` — formattreu, nur fett. Vorher wurde daraus
   `score=None`, also ein Durchfaller trotz sauberer Bewertung; ein Baseline-Lauf hätte
@@ -1055,6 +1058,18 @@ draußen, weil er zum Prompt gehört und nicht zum Gespräch.
 Wer einen **neuen Antwortweg** baut, muss `record_conversation` aufrufen —
 sonst bleibt er spurlos. Aufgezeichnet wird heute aus Einzelchat, Briefing,
 „Nochmal", Terminal, API und Mail-Adapter.
+
+> **⚠️ Datierter Hinweis (2026-09-05): die nächsten zwei Absätze widersprechen
+> dem Code — nachgemessen, nicht strittig.** `iter_broadcast_events`/`_parallel`
+> eröffnen seit #59 (Commit `6f5e16a`, 2026-08-01 — also *vor* der Entscheidung
+> vom 2026-08-05) je Persona ein Gespräch (`app: ask-all`) und rufen
+> `record_conversation`; `SelfTalkRunner` ebenso (`app: self-talk`). Tests
+> nageln das als Absicht fest. Auf einer Default-Installation fällt der
+> Widerspruch nicht auf, weil ohne Anmeldung ein `NullStore` läuft (#72) — mit
+> Anmeldung wird aufgezeichnet, unter dem Eigentümer `local`, für niemanden im
+> Verlauf sichtbar. Welche Seite gilt, entscheidet **#77** (backlog.md); bis
+> dahin ist weder auf diese Absätze noch auf die Docstrings in
+> `ask_all_moderator.py` Verlass.
 
 **Zwei Wege zeichnen bewusst nicht auf: Ask-All und Self-Talk (#75, verworfen
 am 2026-08-05).** Das ist keine Lücke, sondern eine Entscheidung — und sie steht

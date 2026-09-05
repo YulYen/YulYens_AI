@@ -39,8 +39,8 @@ in them turns out to be wrong, it gets corrected in a later entry.
   question — a checkbox under the input field in the web UI, a single yes/no
   question in the terminal (empty answer means no). Very long answers are
   trimmed for this run so a verbose round cannot exhaust the context window.
-  There is no config switch: the checkbox is the decision. Like the rest of
-  Ask-All, the verdict is not written to the conversation store.
+  There is no config switch: the checkbox is the decision. The verdict itself is
+  not written to the conversation store.
 
 ### Changed
 
