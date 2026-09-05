@@ -1506,11 +1506,39 @@ Gesprächs-ID. Das ist dieselbe Entscheidung wie bei Ask-All selbst (siehe
 „Ablage der Gespräche"): ein Fazit über vier Fäden passt in ein Datenmodell
 „eine Persona, ein Faden" noch weniger als die vier Fäden selbst.
 
-**Wer moderiert, ist abgeleitet, nicht verdrahtet:** die Persona mit der
-niedrigsten Temperatur, weil Zusammenfassen keine kreative Aufgabe ist. Die
-Regel liegt seit dieser Runde in `config.personas.quietest_persona_name` — die
-Stoppuhr (#42) traf dieselbe Wahl aus einem anderen Grund und hatte ihre eigene
-Fassung davon; zwei Fassungen derselben Regel laufen auseinander.
+**Von der ruhigsten Persona kommen die Sampling-Optionen, nicht die Stimme.**
+Moderiert wird mit einem eigenen, neutralen Systemprompt
+(`ask_all_moderator_system` in den Locales): Zusammenfassen und Bewerten ist
+eine *Aufgabe*, keine Rolle. Eine der vier Personas moderieren zu lassen wäre
+naheliegend gewesen — das Projekt hat schließlich eine Besetzung — und kostet
+an zwei Stellen, die man erst beim Lesen ihres Prompts sieht:
+
+* **Sie müsste die stärkste Antwort küren, und eine davon ist ihre eigene.**
+  Der Prompt sagt „Du bist PETER", der Stoff trägt eine Sektion `### PETER`.
+* **PETERs Prompt enthält bereits eine Rangfolge**, nämlich die
+  Zuständigkeitsliste des Ensembles („für Wärme und Empathie an LEAH, für
+  verspielte Katzenenergie an POPCORN, für trockenen Sarkasmus an DORIS").
+  Das ist eine Bewertung *vor* der Runde, unabhängig davon, was diesmal
+  tatsächlich dastand. Dazu käme über `_system_prompt_with_date` der
+  Zeitstempel- und Guardrail-Block, der fürs Beantworten von Nutzerfragen
+  geschrieben ist — und die Zeile „vermeide Meta-Erklärungen über dein
+  Vorgehen", während Moderieren genau das ist.
+
+Übernommen wird deshalb nur `llm_options` der Persona mit der niedrigsten
+Temperatur. In `classic` sind `repeat_penalty` und `num_ctx` bei allen vieren
+gleich — es läuft also auf „Ensemble-Optionen plus niedrigste Temperatur"
+hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
+verdrahtet, damit es auch für ein fremdes Ensemble stimmt; die Regel liegt in
+`config.personas.quietest_persona_name`, weil die Stoppuhr (#42) dieselbe Wahl
+aus einem anderen Grund trifft und zwei Fassungen derselben Regel
+auseinanderlaufen.
+
+**Der Preis steht auf der anderen Seite und ist bekannt:** das Fazit ist eine
+fünfte Stimme ohne Gesicht in einer Oberfläche, in der jede andere Stimme ein
+Porträt hat. Wer das ändern will, macht den Moderator zu einer **eigenen**
+Persona im Ensemble-YAML — mit Namen und Prompt, die ein fremdes Ensemble
+überschreiben kann, aber nicht auf der Startseite — und nicht zu einer der
+vier, die gerade bewertet werden.
 
 ### Ein Modul bekommt eine Regel, nicht hundert Zeilen (#56)
 
