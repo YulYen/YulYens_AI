@@ -35,6 +35,17 @@ Optional kann ein **Ask-All/Broadcast-Modus** aktiviert werden (`ui.experimental
 
 ![Ask-All: Alle vier Personas beantworten dieselbe Frage](../screenshot_ask_all.png)
 
+**Fazit 🎭 — auf Wunsch, nicht automatisch.** Unter dem Eingabefeld sitzt ein
+Häkchen „Fazit 🎭 dazu"; im Terminal fragt Ask-All nach der Frage einmal nach.
+Ist es gesetzt, läuft nach der Runde ein weiterer Durchgang, der die Antworten
+zusammenfasst, Übereinstimmungen und Unterschiede benennt und die stärkste
+Antwort begründet — als eigener Abschnitt unter den Personas. Der Haken steht
+im Namen: **das kostet einen kompletten zusätzlichen Modelllauf**, deshalb ist
+es ausgeschaltet, bis man es anhakt. Sehr lange Antworten werden für das Fazit
+gekürzt (sichtbar am Zusatz „[…gekürzt]" im Prompt), damit vier ausführliche
+Personas nicht das Kontextfenster sprengen. Wer die Runde mit „Neues Gespräch"
+abbricht, bricht auch das Fazit ab.
+
 Zusätzlich kann `ui.type` auch auf `null` gesetzt werden, um ausschließlich die API zu betreiben; die Web-UI unterstützt außerdem einen optionalen Gradio-Share-Link (`ui.web.share: true`). Die Zugangsdaten dafür kommen aus dem Abschnitt `ui.web.auth` — der gilt **unabhängig davon, ob ein Share-Link aktiv ist** (siehe „Anmeldung"). Das frühere `ui.web.share_auth` ist veraltet und wirkt nur noch als Fallback, wenn kein `auth`-Abschnitt vorhanden ist.
 
 ### Stream-Steuerung: Stop und Nochmal

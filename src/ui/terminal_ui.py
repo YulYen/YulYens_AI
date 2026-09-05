@@ -8,6 +8,7 @@ from typing import Any
 
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
+from core.ask_all_moderator import iter_verdict
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
@@ -22,6 +23,16 @@ from wiki.lookup import (
     format_snippet_meta,
     inject_wiki_context,
 )
+
+
+def _is_yes(answer: str) -> bool:
+    """Ja/Nein am Terminal, sprachunabhängig — leere Eingabe heißt Nein.
+
+    Beide Sprachbuchstaben zählen: der Prompt kommt aus den Locales („[j/N]"
+    bzw. „[y/N]"), die Eingabe des Nutzers folgt aber seiner Tastatur, nicht
+    der Config.
+    """
+    return answer.strip().lower() in {"j", "ja", "y", "yes"}
 
 
 class TerminalUI:
@@ -269,6 +280,14 @@ class TerminalUI:
             print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
             return
 
+        # Opt-in wie das Häkchen in der WebUI (#27) — gefragt wird *vor* der
+        # Runde, weil danach vier Antworten auf dem Schirm stehen und eine
+        # Rückfrage dort untergeht.
+        want_verdict = _is_yes(
+            input(self.texts["terminal_askall_moderator_prompt"] + " ")
+        )
+        print()
+
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
         context_messages: list[dict[str, str]] = []
@@ -301,7 +320,7 @@ class TerminalUI:
                 last_persona = persona
             print(token, end="", flush=True)
 
-        broadcast_to_ensemble(
+        results = broadcast_to_ensemble(
             self.factory,
             question,
             on_token=_on_token,
@@ -310,9 +329,31 @@ class TerminalUI:
 
         if last_persona is not None:
             print("\n")
+
+        if want_verdict:
+            self._print_ask_all_verdict(
+                question, {r["persona"]: r["reply"] for r in results}
+            )
+
         print(
             f"{Fore.MAGENTA}{self.texts['terminal_askall_block_end']}{Style.RESET_ALL}\n"
         )
+
+    def _print_ask_all_verdict(self, question: str, replies: dict[str, str]) -> None:
+        """Das Fazit über die Runde, tokenweise wie die Antworten davor."""
+        heading = self.texts["ask_all_moderator_heading"]
+        printed = False
+        for event in iter_verdict(self.factory, question, replies):
+            if event["type"] != "token":
+                continue
+            if not printed:
+                print(
+                    f"{Fore.MAGENTA}[{heading}]{Style.RESET_ALL} ", end="", flush=True
+                )
+                printed = True
+            print(event["token"], end="", flush=True)
+        if printed:
+            print("\n")
 
     # ---------- Main loop ----------
     def launch(self) -> None:

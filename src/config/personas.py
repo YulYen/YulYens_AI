@@ -120,3 +120,32 @@ def get_drink(name: str) -> str:
         if persona["name"].lower() == name.lower():
             return persona.get("drink", "Coffee")
     raise ValueError(f"Persona '{name}' not found.")
+
+
+def quietest_persona_name(names: list[str] | None = None) -> str:
+    """Die Persona mit der niedrigsten Temperatur.
+
+    Zwei Stellen wählen dieselbe Persona als Default und aus demselben Grund:
+    die Stoppuhr (#42), weil die Antwortlänge dort der größte Einzeleinfluss
+    ist, und der Ask-All-Moderator (#27), weil Zusammenfassen keine kreative
+    Aufgabe ist. Abgeleitet statt verdrahtet, damit der Default auch für ein
+    fremdes Ensemble stimmt — und an *einer* Stelle, weil zwei Fassungen
+    derselben Regel auseinanderlaufen.
+
+    Bei Gleichstand gewinnt die zuerst genannte Persona; ohne ``temperature``
+    zählt 1.0, also verliert eine Persona ohne Angabe gegen jede mit.
+    """
+    candidates = list(names) if names is not None else get_all_persona_names()
+    if not candidates:
+        raise ValueError("Das Ensemble enthält keine Persona.")
+
+    def _temperature(name: str) -> float:
+        options = get_options(name) or {}
+        try:
+            return float(options.get("temperature", 1.0))
+        except (TypeError, ValueError):
+            return 1.0
+
+    return min(
+        candidates, key=lambda name: (_temperature(name), candidates.index(name))
+    )

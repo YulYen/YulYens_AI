@@ -108,7 +108,10 @@ def iter_broadcast_events_parallel(
     Args:
         stop_event: Optional external kill switch. Needed for Gradio cancels:
             das bricht nur den asyncio-Task ab und schließt den Generator
-            nicht — der Aufrufer muss das Event selbst setzen können.
+            nicht — der Aufrufer muss das Event selbst setzen können. Es wird
+            hier **nur gelesen**: nach einem durchgelaufenen Broadcast ist es
+            unverändert, ein gesetztes Event heißt also immer „der Aufrufer
+            hat abgebrochen".
         join_timeout_s: Grace period per worker thread on shutdown; a worker
             stuck in a blocking backend read is logged and abandoned (daemon).
     """
@@ -123,7 +126,22 @@ def iter_broadcast_events_parallel(
     streamers = {name: factory.get_streamer_for_persona(name) for name in personas}
 
     events: queue.Queue[dict[str, str]] = queue.Queue()
-    stop = stop_event if stop_event is not None else threading.Event()
+
+    # Zwei Signale, und die Trennung ist der Punkt: ``shutdown`` gehört diesem
+    # Generator und wird auch beim **normalen** Ende gesetzt, ``stop_event``
+    # gehört dem Aufrufer und wird hier nur gelesen.
+    #
+    # Vorher war es dasselbe Objekt. Ein sauber durchgelaufener Broadcast
+    # hinterließ dem Aufrufer damit einen *gesetzten* Kill-Switch — nicht
+    # unterscheidbar von „der Nutzer hat abgebrochen". Genau daran ist das
+    # Ask-All-Fazit (#27) gescheitert: es lief hinter
+    # ``if not stop.is_set()`` und wurde deshalb in der ausgelieferten
+    # Konfiguration **nie** erreicht, still. Ein Aufgerufener fasst den
+    # Kill-Switch seines Aufrufers nicht an.
+    shutdown = threading.Event()
+
+    def _stopped() -> bool:
+        return shutdown.is_set() or (stop_event is not None and stop_event.is_set())
 
     def _worker(persona: str, streamer: YulYenStreamingProvider) -> None:
         parts: list[str] = []
@@ -132,7 +150,7 @@ def iter_broadcast_events_parallel(
         token_stream = streamer.stream(messages=messages)
         try:
             for token in token_stream:
-                if stop.is_set():
+                if _stopped():
                     break
                 parts.append(token)
                 events.put({"type": "token", "persona": persona, "token": token})
@@ -167,7 +185,7 @@ def iter_broadcast_events_parallel(
                 pending -= 1
             yield event
     finally:
-        stop.set()
+        shutdown.set()
         for thread in threads:
             thread.join(timeout=join_timeout_s)
             if thread.is_alive():

@@ -314,6 +314,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── dummy_llm_core.py  # Mock-LLM für Tests
 │   │   ├── streaming_provider.py  # Kern-Streamer (Logging, Security, Wiki)
 │   │   ├── orchestrator.py    # Broadcast an alle Personas
+│   │   ├── ask_all_moderator.py  # Fazit über eine Ask-All-Runde (#27)
 │   │   ├── factory.py         # AppFactory (Lazy Singletons)
 │   │   ├── context_utils.py   # Token-Zählung
 │   │   ├── context_summarizer.py  # "Karl": LLM-basierte Kontext-Zusammenfassung
@@ -1421,7 +1422,7 @@ Kommando** (ein `python -m venv` und zwei `pip install` reichen).
 |---|---|
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
-| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token) |
+| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token). Ein Häkchen unter dem Eingabefeld hängt ein **Fazit 🎭** an die Runde (#27, Default aus, kostet einen vollen Modelllauf) |
 | **RSS als Quelle (#73)** | Nachrichten verhalten sich wie das Wiki: eine Quelle, die sich meldet, wenn die Frage danach ist (`rss/trigger.py`), statt eines Knopfes, der alles abkippt. Geholt wird **im Hintergrund** (`RssCache`, Start + alle `rss.refresh_minutes`) — ein Turn nimmt, was da ist, notfalls nichts. Alle Meldungen zusammen als **eine** System-Nachricht, je Meldung `max_chars_per_item` und ein Datum. Der Knopf „Briefing 📰" bzw. `/briefing` nutzt denselben Cache und ist über `rss.show_button` abschaltbar, ohne die Quelle abzuschalten |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
@@ -1460,6 +1461,84 @@ nicht treffen darf.
 **Die Feed-Namen sind Auslöser und kommen aus der Config** (`rss/trigger.py`,
 `feed_aliases`): „Was sagt die Tagesschau?" zieht nur diese Quelle. Wer einen
 Feed ergänzt, bekommt seinen Auslöser geschenkt — keine zweite Wortliste.
+
+### Das Ask-All-Fazit: opt-in, und ausdrücklich kein Kontext-Kanal (#27)
+
+`core/ask_all_moderator.py` hängt an eine fertige Ask-All-Runde einen weiteren
+Modelllauf, der die vier Antworten zusammenfasst und die stärkste benennt.
+Vier Entscheidungen, die man beim Anfassen leicht umdreht:
+
+1. **Das Häkchen ist die Entscheidung — es gibt keinen Config-Schalter
+   daneben.** Ein Fazit kostet einen *vollen* zusätzlichen Lauf; das ist nichts,
+   was man einmal einstellt und dann vergisst, sondern etwas, das man pro Frage
+   will oder nicht. Ein zweiter Schalter in `config.yaml` könnte das Häkchen nur
+   verbergen und wäre damit eine Einstellung, die eine Einstellung versteckt.
+   Im Terminal ist es dieselbe Entscheidung als eine Rückfrage vor der Runde —
+   *vor* ihr, weil danach vier Antworten auf dem Schirm stehen und eine
+   Rückfrage dort untergeht.
+2. **Kein dritter Kontext-Kanal (#75), und das ist kein Schlupfloch.** Die
+   Regel aus #75 gilt für abgerufenen **Fremdtext**. Die vier Antworten sind
+   die eigene Modellausgabe desselben Turns und auf dem Weg nach draußen
+   bereits durch `_StreamModerator` gelaufen — PII maskiert, Blocklist
+   angewandt. Sie durch `inject_context` zu schicken prüfte die Maskierung,
+   nicht das Modell; genau das Argument, mit dem `respond_one_shot` keine
+   zweite `check_output` fährt. Das Vorbild steht daneben: Karl
+   (`context_summarizer`) gibt den Gesprächsverlauf ebenso direkt in einen
+   Prompt. Wer hier einmal Fremdtext hineingibt, der *nicht* durch unseren
+   Stream kam, dreht diese Begründung um und braucht dann den Kanal.
+3. **Genau eine `user`-Nachricht.** `stream()` prüft die *letzte*
+   user-Nachricht — zwei daraus zu machen führte die Antworten still am
+   Eingangs-Guard vorbei. Der bekannte Preis: vier zusammengefügte Antworten
+   können eine Guard-Brücke über eine Zeilengrenze schlagen (dieselbe Klasse
+   wie `test_the_guard_bridges_can_span_a_line_break`), dann fällt das Fazit
+   mit einer sichtbaren Absage aus. Sichtbar und behebbar ist der bessere
+   Tausch als eine Ausnahme, die als einzige Stelle im Projekt ungeprüft in
+   ein Modell geht.
+4. **Gekürzt wird vor dem Prompt, mit Marker.** Das Budget je Antwort kommt
+   aus dem `num_ctx` des Ensembles (halbes Fenster, geteilt durch die Zahl der
+   Antworten), nicht aus einer runden Zahl — vier ausführliche Personas
+   sprengen sonst genau dann, wenn es interessant wird. Der Marker
+   („[…gekürzt]") ist nicht Kosmetik: ohne ihn liest der Moderator einen mitten
+   im Satz endenden Absatz als vollständige Antwort und zieht daraus Schlüsse.
+
+**Aufgezeichnet wird nichts** — der Moderator-Streamer bekommt nie eine
+Gesprächs-ID. Das ist dieselbe Entscheidung wie bei Ask-All selbst (siehe
+„Ablage der Gespräche"): ein Fazit über vier Fäden passt in ein Datenmodell
+„eine Persona, ein Faden" noch weniger als die vier Fäden selbst.
+
+**Von der ruhigsten Persona kommen die Sampling-Optionen, nicht die Stimme.**
+Moderiert wird mit einem eigenen, neutralen Systemprompt
+(`ask_all_moderator_system` in den Locales): Zusammenfassen und Bewerten ist
+eine *Aufgabe*, keine Rolle. Eine der vier Personas moderieren zu lassen wäre
+naheliegend gewesen — das Projekt hat schließlich eine Besetzung — und kostet
+an zwei Stellen, die man erst beim Lesen ihres Prompts sieht:
+
+* **Sie müsste die stärkste Antwort küren, und eine davon ist ihre eigene.**
+  Der Prompt sagt „Du bist PETER", der Stoff trägt eine Sektion `### PETER`.
+* **PETERs Prompt enthält bereits eine Rangfolge**, nämlich die
+  Zuständigkeitsliste des Ensembles („für Wärme und Empathie an LEAH, für
+  verspielte Katzenenergie an POPCORN, für trockenen Sarkasmus an DORIS").
+  Das ist eine Bewertung *vor* der Runde, unabhängig davon, was diesmal
+  tatsächlich dastand. Dazu käme über `_system_prompt_with_date` der
+  Zeitstempel- und Guardrail-Block, der fürs Beantworten von Nutzerfragen
+  geschrieben ist — und die Zeile „vermeide Meta-Erklärungen über dein
+  Vorgehen", während Moderieren genau das ist.
+
+Übernommen wird deshalb nur `llm_options` der Persona mit der niedrigsten
+Temperatur. In `classic` sind `repeat_penalty` und `num_ctx` bei allen vieren
+gleich — es läuft also auf „Ensemble-Optionen plus niedrigste Temperatur"
+hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
+verdrahtet, damit es auch für ein fremdes Ensemble stimmt; die Regel liegt in
+`config.personas.quietest_persona_name`, weil die Stoppuhr (#42) dieselbe Wahl
+aus einem anderen Grund trifft und zwei Fassungen derselben Regel
+auseinanderlaufen.
+
+**Der Preis steht auf der anderen Seite und ist bekannt:** das Fazit ist eine
+fünfte Stimme ohne Gesicht in einer Oberfläche, in der jede andere Stimme ein
+Porträt hat. Wer das ändern will, macht den Moderator zu einer **eigenen**
+Persona im Ensemble-YAML — mit Namen und Prompt, die ein fremdes Ensemble
+überschreiben kann, aber nicht auf der Startseite — und nicht zu einer der
+vier, die gerade bewertet werden.
 
 ### Ein Modul bekommt eine Regel, nicht hundert Zeilen (#56)
 
@@ -1748,6 +1827,38 @@ Kill-Switch — `SessionContext.ask_all_stop` (`threading.Event`) wird vom Reset
 Broadcast-Worker direkt (`stop_event`-Parameter von `iter_broadcast_events_parallel`).
 Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` bauen.
 
+### ⚠️ Ein Aufgerufener fasst den Kill-Switch seines Aufrufers nicht an (#27)
+
+`iter_broadcast_events_parallel` nimmt ein `stop_event` entgegen und benutzte
+**genau dieses Objekt** als sein eigenes Abschaltsignal — inklusive `stop.set()`
+im `finally`, das auch beim **normalen** Ende läuft. Für den Aufrufer war
+„fertig" damit nicht mehr von „abgebrochen" zu unterscheiden.
+
+Der Schaden lag nicht im Broadcast, sondern beim nächsten, der das Event lesen
+wollte: das Ask-All-Fazit (#27) läuft hinter `if not stop.is_set()` und wurde in
+der ausgelieferten Konfiguration (`broadcast_parallel: true`) deshalb **nie**
+erreicht. Das Häkchen tat nichts, ohne Fehler, ohne Logzeile — nur der
+sequenzielle Fallback funktionierte. Seit dieser Runde hat der Generator ein
+eigenes `shutdown`-Event; `stop_event` wird nur noch **gelesen**, und
+`test_a_finished_broadcast_leaves_the_callers_kill_switch_alone` nagelt das
+fest.
+
+**Die teurere Hälfte ist, warum kein Test das gesehen hat.** Es gab einen, der
+genau diese Funktion prüfte — er stellte den Broadcast aber als Generator-Attrappe
+nach, und die fasste das Event nicht an. Der Test war grün gegen ein Verhalten,
+das es nicht gibt. Dieselbe Klasse wie die stille Richtung bei den Doubles (#67),
+nur eine Ebene höher: **wo eine Attrappe die Nebenwirkung wegnimmt, um die es
+geht, prüft der Test seine eigene Attrappe.** Für einen Zusammenbau, dessen
+Korrektheit an einer Nebenwirkung hängt, gehört mindestens ein Test gegen das
+**echte** Gegenstück — hier
+`test_the_verdict_runs_after_the_real_parallel_broadcast`, der den wirklichen
+Parallel-Broadcast fährt und nur das Fazit selbst mockt.
+
+Und ein Nachspann darf den Hauptgang nicht mitnehmen: die Fazit-Phase liegt in
+einem `try`, weil sonst eine Ausnahme darin den Schluss-Yield überspringt — die
+Eingabe bliebe gesperrt und die vier Antworten wären für einen Fehler in der
+Zugabe verloren.
+
 ## Backlog (wichtigste offene Punkte)
 
 Zwei Dateien seit dem 2026-08-06: [backlog.md](backlog.md) sind die **offenen**
@@ -1776,7 +1887,8 @@ kaputte Abhängigkeit, einmal als Versuchung, „schnell ein Trainings-venv
 daneben" anzulegen. Beim zweiten Mal ist es tatsächlich passiert; die
 Umgebung existierte im Schwesterprojekt längst, funktionsfähig und mit
 denselben Pins.
-- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator.
+- **Quick Wins:** #53a Identität für API/Mail. #27 (Ask-All-Moderator) ist
+  erledigt — das Fazit hängt hinter einem Häkchen, Default aus.
   #42 (Perf-Benchmark) und #42a (erster Messlauf) sind erledigt — die Baseline
   steht bei 0,46 s bis zum ersten Zeichen und 107 Zeichen/s
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt

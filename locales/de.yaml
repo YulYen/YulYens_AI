@@ -20,6 +20,22 @@ ask_all_button_label: "Frage an alle"
 ask_all_title: "Frage an alle Personas"
 ask_all_input_placeholder: "Stelle eine Frage an alle Personas …"
 ask_all_disabled: "Ask-All ist in der config.yaml deaktiviert."
+ask_all_moderator_label: "Fazit 🎭 dazu (ein zusätzlicher Modelllauf)"
+ask_all_moderator_heading: "🎭 Fazit"
+ask_all_moderator_truncated: " […gekürzt]"
+ask_all_moderator_system: >-
+  Du moderierst eine Runde mehrerer KI-Personas. Du bekommst eine Frage und die
+  Antworten der Personas darauf. Fasse in höchstens fünf Sätzen zusammen, worin
+  sie übereinstimmen und worin sie sich unterscheiden. Nenne danach in einem
+  Satz die stärkste Antwort und begründe die Wahl. Stütze dich ausschließlich
+  auf die vorliegenden Antworten und erfinde nichts hinzu. Antworte auf Deutsch
+  und ohne Anrede.
+ask_all_moderator_task: |-
+  Frage: {question}
+
+  Antworten:
+
+  {answers}
 self_talk_button_label: "AI Dialog"
 self_talk_title: "AI Dialog"
 self_talk_description: "Zwei Personas sprechen automatisch miteinander."
@@ -131,6 +147,7 @@ terminal_self_talk_guardrail: |-
   Du schreibst jeweils nur einen Beitrag für dich {persona_self} (deinen eigenen Namen musst du nicht unnötig erwähnen, da das Framework ihm dem Nutzer anzeigt). Die Antworten von {persona_other} werdem dir wechselweise vom Framework geliefert.
   Erst wenn der Nutzerauftrag erfüllt und Dialog somit fertig ist: gib am Ende genau das Token _endegelaende_ aus.
 terminal_askall_prompt: "Frage an alle:"
+terminal_askall_moderator_prompt: "Fazit dazu? [j/N]:"
 terminal_askall_block_start: "=== Ask-All (Orchestra) ==="
 terminal_askall_block_end: "=== Zurück zum Startmenü ==="
 terminal_load_path_prompt: "Pfad zur JSON-Verlaufsdatei:"

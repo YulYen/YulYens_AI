@@ -112,19 +112,12 @@ def _quietest_persona(names: list[str]) -> str:
 
     Als Default gewählt, weil sie über mehrere Runden die ähnlichsten Antworten
     liefert — und die Antwortlänge ist der größte Einzeleinfluss auf die
-    Gesamtdauer. Abgeleitet statt fest verdrahtet, damit der Default auch für
-    ein fremdes Ensemble gilt.
+    Gesamtdauer. Die Regel selbst liegt in ``config.personas``, weil der
+    Ask-All-Moderator (#27) sie aus demselben Grund braucht.
     """
-    from config import personas
+    from config.personas import quietest_persona_name
 
-    def _temperature(name: str) -> float:
-        options = personas.get_options(name) or {}
-        try:
-            return float(options.get("temperature", 1.0))
-        except (TypeError, ValueError):
-            return 1.0
-
-    return min(names, key=lambda name: (_temperature(name), names.index(name)))
+    return quietest_persona_name(names)
 
 
 def _resolve_personas(parser: argparse.ArgumentParser, raw: str | None) -> list[str]:

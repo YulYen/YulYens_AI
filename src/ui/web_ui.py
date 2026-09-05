@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 import gradio as gr
 import requests
 from config.personas import _load_system_prompts, get_all_persona_names
+from core.ask_all_moderator import iter_verdict
 from core.context_injection import conversation_only
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.system_checks import fetch_model_names
@@ -968,6 +969,7 @@ class WebUI:
         session: SessionContext,
         question: str | None,
         current_results: str | None = None,
+        with_verdict: bool = False,
     ) -> Iterator[tuple]:
         question = (question or "").strip()
         existing = current_results or ""
@@ -1022,11 +1024,15 @@ class WebUI:
                 sources_md=sources_md,
             )
 
+        # Der Kill-Switch gilt in beiden Zweigen: der sequenzielle Broadcast
+        # kennt ihn zwar nicht, das Fazit danach (#27) aber schon — sonst liefe
+        # ein zusätzlicher Modelllauf weiter, nachdem der Nutzer abgebrochen hat.
+        stop = threading.Event()
+        session.ask_all_stop = stop
+
         # Parallel: alle Personas streamen gleichzeitig in ihre Sektionen;
         # sequenzieller Fallback per ui.experimental.broadcast_parallel: false.
         if self.features.broadcast_parallel:
-            stop = threading.Event()
-            session.ask_all_stop = stop
             events_iter = iter_broadcast_events_parallel(
                 self.factory,
                 question,
@@ -1065,11 +1071,57 @@ class WebUI:
                     sources_md=sources_md,
                 )
 
+        # Das Fazit läuft *nach* der Runde und nur auf Wunsch (#27): es kostet
+        # einen vollen Modelllauf. Bricht der Nutzer ab, bleibt der Text stehen,
+        # den es bis dahin geschrieben hat — wie „Stop" im Einzelchat.
+        verdict = ""
+        verdict_heading = self._t("ask_all_moderator_heading")
+        # `stop` ist hier ein verlässliches „der Nutzer hat abgebrochen": der
+        # Broadcast setzt es seit dieser Runde nicht mehr selbst (siehe
+        # `iter_broadcast_events_parallel`).
+        if with_verdict and not stop.is_set():
+            verdict_parts: list[str] = []
+            last_flush = 0.0
+            try:
+                for event in iter_verdict(
+                    self.factory, question, replies, stop_event=stop
+                ):
+                    if event["type"] == "done":
+                        verdict = event["reply"]
+                    else:
+                        verdict_parts.append(event["token"])
+
+                    now = time.monotonic()
+                    if (
+                        event["type"] == "done"
+                        or now - last_flush >= STREAM_FLUSH_INTERVAL_S
+                    ):
+                        last_flush = now
+                        yield self._ask_all_state(
+                            question,
+                            format_ask_all_results(
+                                replies,
+                                verdict=verdict or "".join(verdict_parts),
+                                verdict_heading=verdict_heading,
+                            ),
+                            status=wiki_status,
+                            sources_md=sources_md,
+                        )
+            except Exception:
+                # Das Fazit ist Zugabe — es darf die Runde nicht mitnehmen.
+                # Ohne diesen Riegel bliebe die Eingabe gesperrt und
+                # `session.ask_all_stop` stehen: der Schluss-Yield unten wird
+                # nie erreicht, und der Nutzer verlöre Bedienbarkeit und
+                # Antworten für einen Fehler im Nachspann.
+                logging.exception("Ask-All: das Fazit ist fehlgeschlagen")
+
         session.ask_all_stop = None
         # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
         yield self._ask_all_state(
             question,
-            format_ask_all_results(replies),
+            format_ask_all_results(
+                replies, verdict=verdict, verdict_heading=verdict_heading
+            ),
             status=wiki_status,
             sources_md=sources_md,
             editable=True,
@@ -1349,6 +1401,9 @@ class WebUI:
         ask_all_input_placeholder = ui.get(
             "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
         )
+        ask_all_moderator_label = ui.get(
+            "ask_all_moderator_label", "Fazit 🎭 dazu (ein zusätzlicher Modelllauf)"
+        )
         load_label = ui.get("web_load_label", "Gespräch laden (JSON)")
         self_talk_button_label = ui.get("self_talk_button_label", "AI Dialog")
         self_talk_title = ui.get("self_talk_title", "AI Dialog")
@@ -1416,6 +1471,7 @@ class WebUI:
             ask_all_button_label=ask_all_button_label,
             ask_all_title=ask_all_title,
             ask_all_input_placeholder=ask_all_input_placeholder,
+            ask_all_moderator_label=ask_all_moderator_label,
             self_talk_button_label=self_talk_button_label,
             self_talk_title=self_talk_title,
             self_talk_description=self_talk_description,
