@@ -516,6 +516,74 @@ def test_the_checkbox_appends_the_verdict_as_its_own_section():
     assert outputs[-1][0]["interactive"] is True
 
 
+def test_the_verdict_runs_after_the_real_parallel_broadcast():
+    """Mit dem *echten* Broadcast, nicht mit einer Attrappe davor.
+
+    Genau hier lag der Fehler: `iter_broadcast_events_parallel` benutzte das
+    Event des Aufrufers als sein eigenes Abschaltsignal und setzte es im
+    `finally` — auch beim normalen Ende. Das Fazit lief hinter
+    `not stop.is_set()` und wurde in der ausgelieferten Konfiguration
+    (`broadcast_parallel: true`) deshalb **nie** erreicht, ohne ein Geräusch.
+    Der Test daneben hat das nicht gesehen, weil seine Attrappe das Event nicht
+    anfasste: er prüfte den Handler gegen einen Broadcast, den es nicht gibt.
+    """
+    web_ui = _create_web_ui()
+
+    def _tokens(*_args, **_kwargs):
+        yield "Antwort"
+
+    def _streamer_for(_persona):
+        double = streamer_double()
+        double.stream.side_effect = _tokens
+        return double
+
+    web_ui.factory.get_streamer_for_persona.side_effect = _streamer_for
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH", "DORIS"]),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "ui.web_ui.iter_verdict",
+            return_value=iter([{"type": "done", "reply": "Einigkeit."}]),
+        ) as mock_verdict,
+    ):
+        outputs = list(
+            web_ui._on_submit_ask_all(
+                session_ctx := SessionContext(), "Frage", None, True
+            )
+        )
+
+    mock_verdict.assert_called_once()
+    assert "Einigkeit." in outputs[-1][2]["value"]
+    assert session_ctx.ask_all_stop is None
+
+
+def test_a_broken_verdict_does_not_take_the_round_with_it():
+    """Das Fazit ist Zugabe — ein Fehler darf die Eingabe nicht gesperrt lassen."""
+    web_ui = _create_web_ui()
+
+    def fake_broadcast(factory, question, *, context_messages=None, stop_event=None):
+        yield {"type": "done", "persona": "LEAH", "reply": "A"}
+        yield {"type": "done", "persona": "DORIS", "reply": "B"}
+
+    session = SessionContext()
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH", "DORIS"]),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.iter_broadcast_events_parallel", side_effect=fake_broadcast),
+        patch(
+            "ui.web_ui.iter_verdict", side_effect=KeyError("ask_all_moderator_system")
+        ),
+    ):
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage", None, True))
+
+    results = outputs[-1][2]["value"]
+    assert "A" in results and "B" in results
+    assert web_ui._t("ask_all_moderator_heading") not in results
+    assert outputs[-1][0]["interactive"] is True
+    assert session.ask_all_stop is None
+
+
 def test_on_start_self_talk_validates_distinct_personas():
     web_ui = _create_web_ui()
     session = SessionContext()

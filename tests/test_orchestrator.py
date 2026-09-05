@@ -226,6 +226,28 @@ def test_parallel_broadcast_close_stops_all_workers():
     assert not _broadcast_worker_threads()
 
 
+def test_a_finished_broadcast_leaves_the_callers_kill_switch_alone():
+    """Ein normal beendeter Broadcast darf das Event des Aufrufers nicht setzen.
+
+    Vorher benutzte der Generator genau dieses Objekt als sein eigenes
+    Abschaltsignal und setzte es im `finally` — auch beim sauberen Ende. Für
+    den Aufrufer war „fertig" damit nicht mehr von „abgebrochen" zu
+    unterscheiden, und das Ask-All-Fazit (#27) lief hinter dieser Unterscheidung
+    still nie an. Ein Aufgerufener fasst den Kill-Switch seines Aufrufers nicht
+    an.
+    """
+    stop = threading.Event()
+
+    events = list(
+        iter_broadcast_events_parallel(
+            _DummyFactory(), "Ping", persona_names=["Alpha", "Beta"], stop_event=stop
+        )
+    )
+
+    assert [e for e in events if e["type"] == "done"]
+    assert not stop.is_set()
+
+
 def test_parallel_broadcast_external_stop_event_stops_workers():
     """Kill-Switch von außen (Gradio schließt den Generator beim Cancel nicht)."""
     stop = threading.Event()

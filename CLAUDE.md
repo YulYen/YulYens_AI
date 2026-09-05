@@ -1827,6 +1827,38 @@ Kill-Switch — `SessionContext.ask_all_stop` (`threading.Event`) wird vom Reset
 Broadcast-Worker direkt (`stop_event`-Parameter von `iter_broadcast_events_parallel`).
 Für neue streamende Handler dasselbe Muster verwenden, nicht auf `cancels` bauen.
 
+### ⚠️ Ein Aufgerufener fasst den Kill-Switch seines Aufrufers nicht an (#27)
+
+`iter_broadcast_events_parallel` nimmt ein `stop_event` entgegen und benutzte
+**genau dieses Objekt** als sein eigenes Abschaltsignal — inklusive `stop.set()`
+im `finally`, das auch beim **normalen** Ende läuft. Für den Aufrufer war
+„fertig" damit nicht mehr von „abgebrochen" zu unterscheiden.
+
+Der Schaden lag nicht im Broadcast, sondern beim nächsten, der das Event lesen
+wollte: das Ask-All-Fazit (#27) läuft hinter `if not stop.is_set()` und wurde in
+der ausgelieferten Konfiguration (`broadcast_parallel: true`) deshalb **nie**
+erreicht. Das Häkchen tat nichts, ohne Fehler, ohne Logzeile — nur der
+sequenzielle Fallback funktionierte. Seit dieser Runde hat der Generator ein
+eigenes `shutdown`-Event; `stop_event` wird nur noch **gelesen**, und
+`test_a_finished_broadcast_leaves_the_callers_kill_switch_alone` nagelt das
+fest.
+
+**Die teurere Hälfte ist, warum kein Test das gesehen hat.** Es gab einen, der
+genau diese Funktion prüfte — er stellte den Broadcast aber als Generator-Attrappe
+nach, und die fasste das Event nicht an. Der Test war grün gegen ein Verhalten,
+das es nicht gibt. Dieselbe Klasse wie die stille Richtung bei den Doubles (#67),
+nur eine Ebene höher: **wo eine Attrappe die Nebenwirkung wegnimmt, um die es
+geht, prüft der Test seine eigene Attrappe.** Für einen Zusammenbau, dessen
+Korrektheit an einer Nebenwirkung hängt, gehört mindestens ein Test gegen das
+**echte** Gegenstück — hier
+`test_the_verdict_runs_after_the_real_parallel_broadcast`, der den wirklichen
+Parallel-Broadcast fährt und nur das Fazit selbst mockt.
+
+Und ein Nachspann darf den Hauptgang nicht mitnehmen: die Fazit-Phase liegt in
+einem `try`, weil sonst eine Ausnahme darin den Schluss-Yield überspringt — die
+Eingabe bliebe gesperrt und die vier Antworten wären für einen Fehler in der
+Zugabe verloren.
+
 ## Backlog (wichtigste offene Punkte)
 
 Zwei Dateien seit dem 2026-08-06: [backlog.md](backlog.md) sind die **offenen**

@@ -1076,31 +1076,44 @@ class WebUI:
         # den es bis dahin geschrieben hat — wie „Stop" im Einzelchat.
         verdict = ""
         verdict_heading = self._t("ask_all_moderator_heading")
+        # `stop` ist hier ein verlässliches „der Nutzer hat abgebrochen": der
+        # Broadcast setzt es seit dieser Runde nicht mehr selbst (siehe
+        # `iter_broadcast_events_parallel`).
         if with_verdict and not stop.is_set():
             verdict_parts: list[str] = []
             last_flush = 0.0
-            for event in iter_verdict(self.factory, question, replies, stop_event=stop):
-                if event["type"] == "done":
-                    verdict = event["reply"]
-                else:
-                    verdict_parts.append(event["token"])
-
-                now = time.monotonic()
-                if (
-                    event["type"] == "done"
-                    or now - last_flush >= STREAM_FLUSH_INTERVAL_S
+            try:
+                for event in iter_verdict(
+                    self.factory, question, replies, stop_event=stop
                 ):
-                    last_flush = now
-                    yield self._ask_all_state(
-                        question,
-                        format_ask_all_results(
-                            replies,
-                            verdict=verdict or "".join(verdict_parts),
-                            verdict_heading=verdict_heading,
-                        ),
-                        status=wiki_status,
-                        sources_md=sources_md,
-                    )
+                    if event["type"] == "done":
+                        verdict = event["reply"]
+                    else:
+                        verdict_parts.append(event["token"])
+
+                    now = time.monotonic()
+                    if (
+                        event["type"] == "done"
+                        or now - last_flush >= STREAM_FLUSH_INTERVAL_S
+                    ):
+                        last_flush = now
+                        yield self._ask_all_state(
+                            question,
+                            format_ask_all_results(
+                                replies,
+                                verdict=verdict or "".join(verdict_parts),
+                                verdict_heading=verdict_heading,
+                            ),
+                            status=wiki_status,
+                            sources_md=sources_md,
+                        )
+            except Exception:
+                # Das Fazit ist Zugabe — es darf die Runde nicht mitnehmen.
+                # Ohne diesen Riegel bliebe die Eingabe gesperrt und
+                # `session.ask_all_stop` stehen: der Schluss-Yield unten wird
+                # nie erreicht, und der Nutzer verlöre Bedienbarkeit und
+                # Antworten für einen Fehler im Nachspann.
+                logging.exception("Ask-All: das Fazit ist fehlgeschlagen")
 
         session.ask_all_stop = None
         # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
