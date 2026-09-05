@@ -20,6 +20,21 @@ ask_all_button_label: "Ask all personas"
 ask_all_title: "Ask all personas"
 ask_all_input_placeholder: "Ask a question to all personas …"
 ask_all_disabled: "Ask-all is disabled in config.yaml."
+ask_all_moderator_label: "Add a verdict 🎭 (one extra model run)"
+ask_all_moderator_heading: "🎭 Verdict"
+ask_all_moderator_truncated: " […truncated]"
+ask_all_moderator_system: >-
+  You are moderating a round of several AI personas. You receive a question and
+  the personas' answers to it. Summarise in at most five sentences where they
+  agree and where they differ. Then name the strongest answer in one sentence
+  and justify the choice. Rely only on the answers given and do not invent
+  anything. Answer in English and without a salutation.
+ask_all_moderator_task: |-
+  Question: {question}
+
+  Answers:
+
+  {answers}
 self_talk_button_label: "AI Dialog"
 self_talk_title: "AI Dialog"
 self_talk_description: "Two personas talk to each other automatically."
@@ -131,6 +146,7 @@ terminal_self_talk_guardrail: |-
   You only write one message for yourself {persona_self} at a time (no need to mention your own name unnecessarily, because the framework shows it to the user). The responses from {persona_other} are provided to you alternately by the framework.
   Only once the user request is fulfilled and the dialog is therefore finished: output exactly the token _endegelaende_ at the end.
 terminal_askall_prompt: "Ask-All question"
+terminal_askall_moderator_prompt: "Add a verdict? [y/N]:"
 terminal_askall_block_start: "=== Ask-All (Orchestra) ==="
 terminal_askall_block_end: "=== Back to start menu ==="
 terminal_load_path_prompt: "Path to the JSON history file:"

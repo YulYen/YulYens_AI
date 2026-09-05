@@ -263,6 +263,7 @@ def build_ui(
     ask_all_button_label,
     ask_all_title,
     ask_all_input_placeholder,
+    ask_all_moderator_label,
     self_talk_button_label,
     self_talk_title,
     self_talk_description,
@@ -724,6 +725,13 @@ def build_ui(
                 placeholder=ask_all_input_placeholder,
                 interactive=True,
             )
+            # Opt-in, Default aus: das Fazit (#27) kostet einen vollen
+            # Modelllauf am Ende der Runde. Bewusst kein Config-Schalter
+            # daneben — ein Häkchen, das man pro Frage setzt, *ist* die
+            # Entscheidung; ein zweiter Schalter könnte sie nur verbergen.
+            ask_all_moderator_check = gr.Checkbox(
+                label=ask_all_moderator_label, value=False
+            )
             with gr.Row(elem_classes="chat-input-row"):
                 ask_all_submit = gr.Button(
                     send_button_label,
@@ -805,6 +813,7 @@ def build_ui(
         "ask_all_submit": ask_all_submit,
         "ask_all_new_chat": ask_all_new_chat,
         "ask_all_status": ask_all_status,
+        "ask_all_moderator_check": ask_all_moderator_check,
         "ask_all_card_btn": ask_all_card_btn,
         "self_talk_card_btn": self_talk_card_btn,
         "self_talk_group": self_talk_group,

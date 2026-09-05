@@ -314,6 +314,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 │   │   ├── dummy_llm_core.py  # Mock-LLM für Tests
 │   │   ├── streaming_provider.py  # Kern-Streamer (Logging, Security, Wiki)
 │   │   ├── orchestrator.py    # Broadcast an alle Personas
+│   │   ├── ask_all_moderator.py  # Fazit über eine Ask-All-Runde (#27)
 │   │   ├── factory.py         # AppFactory (Lazy Singletons)
 │   │   ├── context_utils.py   # Token-Zählung
 │   │   ├── context_summarizer.py  # "Karl": LLM-basierte Kontext-Zusammenfassung
@@ -1421,7 +1422,7 @@ Kommando** (ein `python -m venv` und zwei `pip install` reichen).
 |---|---|
 | **Chat** | Einzelne Persona, Streaming |
 | **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
-| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token) |
+| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token). Ein Häkchen unter dem Eingabefeld hängt ein **Fazit 🎭** an die Runde (#27, Default aus, kostet einen vollen Modelllauf) |
 | **RSS als Quelle (#73)** | Nachrichten verhalten sich wie das Wiki: eine Quelle, die sich meldet, wenn die Frage danach ist (`rss/trigger.py`), statt eines Knopfes, der alles abkippt. Geholt wird **im Hintergrund** (`RssCache`, Start + alle `rss.refresh_minutes`) — ein Turn nimmt, was da ist, notfalls nichts. Alle Meldungen zusammen als **eine** System-Nachricht, je Meldung `max_chars_per_item` und ein Datum. Der Knopf „Briefing 📰" bzw. `/briefing` nutzt denselben Cache und ist über `rss.show_button` abschaltbar, ohne die Quelle abzuschalten |
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
@@ -1460,6 +1461,56 @@ nicht treffen darf.
 **Die Feed-Namen sind Auslöser und kommen aus der Config** (`rss/trigger.py`,
 `feed_aliases`): „Was sagt die Tagesschau?" zieht nur diese Quelle. Wer einen
 Feed ergänzt, bekommt seinen Auslöser geschenkt — keine zweite Wortliste.
+
+### Das Ask-All-Fazit: opt-in, und ausdrücklich kein Kontext-Kanal (#27)
+
+`core/ask_all_moderator.py` hängt an eine fertige Ask-All-Runde einen weiteren
+Modelllauf, der die vier Antworten zusammenfasst und die stärkste benennt.
+Vier Entscheidungen, die man beim Anfassen leicht umdreht:
+
+1. **Das Häkchen ist die Entscheidung — es gibt keinen Config-Schalter
+   daneben.** Ein Fazit kostet einen *vollen* zusätzlichen Lauf; das ist nichts,
+   was man einmal einstellt und dann vergisst, sondern etwas, das man pro Frage
+   will oder nicht. Ein zweiter Schalter in `config.yaml` könnte das Häkchen nur
+   verbergen und wäre damit eine Einstellung, die eine Einstellung versteckt.
+   Im Terminal ist es dieselbe Entscheidung als eine Rückfrage vor der Runde —
+   *vor* ihr, weil danach vier Antworten auf dem Schirm stehen und eine
+   Rückfrage dort untergeht.
+2. **Kein dritter Kontext-Kanal (#75), und das ist kein Schlupfloch.** Die
+   Regel aus #75 gilt für abgerufenen **Fremdtext**. Die vier Antworten sind
+   die eigene Modellausgabe desselben Turns und auf dem Weg nach draußen
+   bereits durch `_StreamModerator` gelaufen — PII maskiert, Blocklist
+   angewandt. Sie durch `inject_context` zu schicken prüfte die Maskierung,
+   nicht das Modell; genau das Argument, mit dem `respond_one_shot` keine
+   zweite `check_output` fährt. Das Vorbild steht daneben: Karl
+   (`context_summarizer`) gibt den Gesprächsverlauf ebenso direkt in einen
+   Prompt. Wer hier einmal Fremdtext hineingibt, der *nicht* durch unseren
+   Stream kam, dreht diese Begründung um und braucht dann den Kanal.
+3. **Genau eine `user`-Nachricht.** `stream()` prüft die *letzte*
+   user-Nachricht — zwei daraus zu machen führte die Antworten still am
+   Eingangs-Guard vorbei. Der bekannte Preis: vier zusammengefügte Antworten
+   können eine Guard-Brücke über eine Zeilengrenze schlagen (dieselbe Klasse
+   wie `test_the_guard_bridges_can_span_a_line_break`), dann fällt das Fazit
+   mit einer sichtbaren Absage aus. Sichtbar und behebbar ist der bessere
+   Tausch als eine Ausnahme, die als einzige Stelle im Projekt ungeprüft in
+   ein Modell geht.
+4. **Gekürzt wird vor dem Prompt, mit Marker.** Das Budget je Antwort kommt
+   aus dem `num_ctx` des Ensembles (halbes Fenster, geteilt durch die Zahl der
+   Antworten), nicht aus einer runden Zahl — vier ausführliche Personas
+   sprengen sonst genau dann, wenn es interessant wird. Der Marker
+   („[…gekürzt]") ist nicht Kosmetik: ohne ihn liest der Moderator einen mitten
+   im Satz endenden Absatz als vollständige Antwort und zieht daraus Schlüsse.
+
+**Aufgezeichnet wird nichts** — der Moderator-Streamer bekommt nie eine
+Gesprächs-ID. Das ist dieselbe Entscheidung wie bei Ask-All selbst (siehe
+„Ablage der Gespräche"): ein Fazit über vier Fäden passt in ein Datenmodell
+„eine Persona, ein Faden" noch weniger als die vier Fäden selbst.
+
+**Wer moderiert, ist abgeleitet, nicht verdrahtet:** die Persona mit der
+niedrigsten Temperatur, weil Zusammenfassen keine kreative Aufgabe ist. Die
+Regel liegt seit dieser Runde in `config.personas.quietest_persona_name` — die
+Stoppuhr (#42) traf dieselbe Wahl aus einem anderen Grund und hatte ihre eigene
+Fassung davon; zwei Fassungen derselben Regel laufen auseinander.
 
 ### Ein Modul bekommt eine Regel, nicht hundert Zeilen (#56)
 
@@ -1776,7 +1827,8 @@ kaputte Abhängigkeit, einmal als Versuchung, „schnell ein Trainings-venv
 daneben" anzulegen. Beim zweiten Mal ist es tatsächlich passiert; die
 Umgebung existierte im Schwesterprojekt längst, funktionsfähig und mit
 denselben Pins.
-- **Quick Wins:** #53a Identität für API/Mail, #27 Ask-All-Moderator.
+- **Quick Wins:** #53a Identität für API/Mail. #27 (Ask-All-Moderator) ist
+  erledigt — das Fazit hängt hinter einem Häkchen, Default aus.
   #42 (Perf-Benchmark) und #42a (erster Messlauf) sind erledigt — die Baseline
   steht bei 0,46 s bis zum ersten Zeichen und 107 Zeichen/s
 - **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt

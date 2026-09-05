@@ -37,6 +37,16 @@ An optional **Ask-All/Broadcast mode** can be enabled (`ui.experimental.broadcas
 
 ![Ask-All: all four personas answer the same question](../screenshot_ask_all.png)
 
+**A verdict 🎭 — on request, not automatically.** Below the input field sits a
+checkbox "Add a verdict 🎭"; in the terminal Ask-All asks once after the
+question. When it is ticked, one more run follows the round: it summarises the
+answers, names where they agree and differ, and justifies which one is
+strongest — as its own section below the personas. The catch is in the label:
+**this costs one complete extra model run**, which is why it stays off until
+you tick it. Very long answers are trimmed for the verdict (visible as
+"[…truncated]" in the prompt) so four verbose personas cannot blow the context
+window. Cancelling the round with "New conversation" cancels the verdict too.
+
 Additionally, `ui.type` can be set to `null` to operate the API exclusively. The web UI also supports an optional Gradio share link (`ui.web.share: true`). Its credentials come from the `ui.web.auth` section — which applies **whether or not a share link is active** (see "Sign-in"). The former `ui.web.share_auth` is deprecated and only acts as a fallback when no `auth` section exists.
 
 ### Stream control: stop and retry

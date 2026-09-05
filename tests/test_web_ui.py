@@ -460,6 +460,62 @@ def test_on_submit_ask_all_sequential_fallback_via_config():
     assert "Antwort" in outputs[-1][2]["value"]
 
 
+# ---- Das Fazit ist opt-in (#27) --------------------------------------------
+
+
+def _run_ask_all(web_ui, session, *, with_verdict, verdict_events=()):
+    """Eine Ask-All-Runde mit zwei Antworten, Wiki aus, Fazit nach Wunsch."""
+
+    def fake_broadcast(factory, question, *, context_messages=None, stop_event=None):
+        yield {"type": "done", "persona": "LEAH", "reply": "A"}
+        yield {"type": "done", "persona": "DORIS", "reply": "B"}
+
+    with (
+        patch("ui.web_ui.get_all_persona_names", return_value=["LEAH", "DORIS"]),
+        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("ui.web_ui.iter_broadcast_events_parallel", side_effect=fake_broadcast),
+        patch(
+            "ui.web_ui.iter_verdict", return_value=iter(verdict_events)
+        ) as mock_verdict,
+    ):
+        outputs = list(web_ui._on_submit_ask_all(session, "Frage", None, with_verdict))
+    return outputs, mock_verdict
+
+
+def test_ask_all_costs_no_extra_model_run_without_the_checkbox():
+    """Der Default ist aus — ein Fazit kostet einen vollen Lauf."""
+    web_ui = _create_web_ui()
+
+    outputs, mock_verdict = _run_ask_all(web_ui, SessionContext(), with_verdict=False)
+
+    mock_verdict.assert_not_called()
+    results = outputs[-1][2]["value"]
+    assert "A" in results and "B" in results
+    assert web_ui._t("ask_all_moderator_heading") not in results
+
+
+def test_the_checkbox_appends_the_verdict_as_its_own_section():
+    web_ui = _create_web_ui()
+
+    outputs, mock_verdict = _run_ask_all(
+        web_ui,
+        SessionContext(),
+        with_verdict=True,
+        verdict_events=[
+            {"type": "token", "token": "Einig"},
+            {"type": "done", "reply": "Einigkeit."},
+        ],
+    )
+
+    mock_verdict.assert_called_once()
+    results = outputs[-1][2]["value"]
+    assert f"### {web_ui._t('ask_all_moderator_heading')}" in results
+    assert results.endswith("Einigkeit.")
+    # Erst nach dem Fazit wird die Eingabe wieder freigegeben — sonst schickt
+    # ein schneller Nutzer die nächste Frage in einen laufenden Modelllauf.
+    assert outputs[-1][0]["interactive"] is True
+
+
 def test_on_start_self_talk_validates_distinct_personas():
     web_ui = _create_web_ui()
     session = SessionContext()

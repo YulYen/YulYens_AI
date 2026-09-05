@@ -53,6 +53,7 @@ def bind_events(
     ask_all_submit = components["ask_all_submit"]
     ask_all_new_chat = components["ask_all_new_chat"]
     ask_all_card_btn = components["ask_all_card_btn"]
+    ask_all_moderator_check = components["ask_all_moderator_check"]
     ask_all_outputs = [components[key] for key in ASK_ALL_OUTPUT_KEYS]
     self_talk_card_btn = components["self_talk_card_btn"]
     self_talk_status = components["self_talk_status"]
@@ -329,14 +330,24 @@ def bind_events(
 
     ask_all_submit_evt = ask_all_submit.click(
         fn=ui._on_submit_ask_all,
-        inputs=[session_state, ask_all_question, ask_all_results],
+        inputs=[
+            session_state,
+            ask_all_question,
+            ask_all_results,
+            ask_all_moderator_check,
+        ],
         outputs=ask_all_outputs,
         queue=True,
     )
 
     ask_all_question_evt = ask_all_question.submit(
         fn=ui._on_submit_ask_all,
-        inputs=[session_state, ask_all_question, ask_all_results],
+        inputs=[
+            session_state,
+            ask_all_question,
+            ask_all_results,
+            ask_all_moderator_check,
+        ],
         outputs=ask_all_outputs,
         queue=True,
     )

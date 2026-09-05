@@ -30,6 +30,18 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ## [Unreleased]
 
+### Added
+
+- Ask-All can now close a round with a **verdict**: one more model run that
+  summarises the personas' answers, says where they agree and differ, and
+  names the strongest one. It appears as its own section below the personas.
+  It is **off by default** and costs a full extra model run, so you opt in per
+  question — a checkbox under the input field in the web UI, a single yes/no
+  question in the terminal (empty answer means no). Very long answers are
+  trimmed for this run so a verbose round cannot exhaust the context window.
+  There is no config switch: the checkbox is the decision. Like the rest of
+  Ask-All, the verdict is not written to the conversation store.
+
 ### Changed
 
 - The feedback vote log moved from `logs/feedback_votes.jsonl` to

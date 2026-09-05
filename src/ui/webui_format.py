@@ -160,11 +160,19 @@ def format_wiki_sources(snippets: list[WikiSnippet] | None, t: Any) -> str:
     return "\n\n---\n\n".join(sections)
 
 
-def format_ask_all_results(replies: dict[str, str]) -> str:
-    """One markdown section per persona, separated by horizontal rules."""
-    return "\n\n---\n\n".join(
-        f"### {persona}\n\n{reply}" for persona, reply in replies.items()
-    )
+def format_ask_all_results(
+    replies: dict[str, str], verdict: str = "", verdict_heading: str = ""
+) -> str:
+    """One markdown section per persona, separated by horizontal rules.
+
+    Das Fazit (#27) ist eine weitere Sektion in derselben Form und hängt hinten
+    an — leer bleibt es weg, damit eine Runde ohne Fazit keine leere
+    Überschrift trägt.
+    """
+    sections = [f"### {persona}\n\n{reply}" for persona, reply in replies.items()]
+    if verdict:
+        sections.append(f"### {verdict_heading}\n\n{verdict}")
+    return "\n\n---\n\n".join(sections)
 
 
 def history_label(ref: ConversationRef) -> str:

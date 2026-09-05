@@ -172,6 +172,59 @@ def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -
     assert captured["context_messages"] == [{"role": "system", "content": "WIKI"}]
 
 
+def _answers(monkeypatch, *replies: str) -> None:
+    """`input()` der Reihe nach beantworten — Frage, dann das Fazit-Häkchen."""
+    it = iter(replies)
+    monkeypatch.setattr("builtins.input", lambda _: next(it))
+
+
+def _broadcast_returning(monkeypatch, *pairs: tuple[str, str]) -> None:
+    def fake_broadcast(factory, question, on_token=None, *, context_messages=None):
+        return [{"persona": p, "reply": r} for p, r in pairs]
+
+    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", fake_broadcast)
+
+
+def test_terminal_ask_all_asks_no_verdict_by_default(monkeypatch, capsys) -> None:
+    """Leere Eingabe heißt Nein — das Fazit kostet einen vollen Modelllauf."""
+    ui = _create_terminal_ui()
+    ui.factory = factory_double()
+    _answers(monkeypatch, "Frage", "")
+    _broadcast_returning(monkeypatch, ("LEAH", "A"), ("DORIS", "B"))
+    mock_verdict = Mock()
+    monkeypatch.setattr("ui.terminal_ui.iter_verdict", mock_verdict)
+
+    ui._run_ask_all_flow()
+
+    mock_verdict.assert_not_called()
+    assert ui.texts["ask_all_moderator_heading"] not in capsys.readouterr().out
+
+
+def test_terminal_ask_all_prints_the_verdict_when_asked_for(
+    monkeypatch, capsys
+) -> None:
+    ui = _create_terminal_ui()
+    ui.factory = factory_double()
+    _answers(monkeypatch, "Frage", "j")
+    _broadcast_returning(monkeypatch, ("LEAH", "A"), ("DORIS", "B"))
+
+    captured: dict = {}
+
+    def fake_verdict(factory, question, replies, **kwargs):
+        captured["replies"] = replies
+        yield {"type": "token", "token": "Einigkeit."}
+        yield {"type": "done", "reply": "Einigkeit."}
+
+    monkeypatch.setattr("ui.terminal_ui.iter_verdict", fake_verdict)
+
+    ui._run_ask_all_flow()
+
+    out = capsys.readouterr().out
+    assert ui.texts["ask_all_moderator_heading"] in out
+    assert "Einigkeit." in out
+    assert captured["replies"] == {"LEAH": "A", "DORIS": "B"}
+
+
 def test_terminal_ui_run_ask_all_flow_requires_question(monkeypatch, capsys) -> None:
     ui = _create_terminal_ui()
     monkeypatch.setattr("builtins.input", lambda _: "")
