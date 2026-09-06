@@ -172,6 +172,31 @@ def test_the_kill_switch_stops_the_verdict_mid_stream():
     assert seen == ["a"]
 
 
+def test_only_sampling_is_inherited_from_the_persona(monkeypatch):
+    """Ein fremdes Ensemble darf die *Form* des Fazits nicht bestimmen.
+
+    `format` machte daraus JSON, `stop` schnitte es ab, `num_predict` beendete
+    es nach n Tokens, `system` überschriebe den Moderator-Prompt — und keiner
+    der vier Fälle sähe nach einem Fehler aus, weil niemand weiß, wie ein Fazit
+    aussehen sollte.
+    """
+    monkeypatch.setattr(
+        "config.personas.get_options",
+        lambda name: {
+            "temperature": 0.1,
+            "num_ctx": 4096,
+            "format": "json",
+            "stop": ["\n"],
+            "num_predict": 20,
+            "system": "Du bist wer anders.",
+        },
+    )
+
+    options = moderator_options()
+
+    assert options == {"temperature": 0.1, "num_ctx": 4096}
+
+
 def test_a_persona_without_a_temperature_loses_against_one_with(monkeypatch):
     """Ohne Angabe zählt 1.0 — sonst gewänne die Persona, über die nichts bekannt ist."""
     monkeypatch.setattr(

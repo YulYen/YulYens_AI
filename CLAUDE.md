@@ -1540,9 +1540,15 @@ an zwei Stellen, die man erst beim Lesen ihres Prompts sieht:
   Vorgehen", während Moderieren genau das ist.
 
 Übernommen wird deshalb nur `llm_options` der Persona mit der niedrigsten
-Temperatur. In `classic` sind `repeat_penalty` und `num_ctx` bei allen vieren
-gleich — es läuft also auf „Ensemble-Optionen plus niedrigste Temperatur"
-hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
+Temperatur — und davon nur, was in `INHERITED_OPTIONS` steht: die Persona leiht
+ihr **Sampling**, nicht die *Form* der Antwort. `format`, `stop`, `num_predict`,
+`system` und `template` bleiben draußen, weil ein fremdes Ensemble sie sonst
+still gegen den Moderator drehen könnte (JSON statt Fazit, nach zwanzig Tokens
+abgeschnitten, eigener Systemprompt) — und an einem Fazit sieht niemand, wie es
+hätte aussehen sollen. In `classic` ändert der Filter nichts: dort stehen nur
+`temperature`, `repeat_penalty` und `num_ctx`, bei den letzten beiden für alle
+vier gleich. Es läuft also weiter auf „Ensemble-Optionen plus niedrigste
+Temperatur" hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
 verdrahtet, damit es auch für ein fremdes Ensemble stimmt; die Regel liegt in
 `config.personas.quietest_persona_name`, weil die Stoppuhr (#42) dieselbe Wahl
 aus einem anderen Grund trifft und zwei Fassungen derselben Regel
