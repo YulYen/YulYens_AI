@@ -101,6 +101,11 @@ class TerminalUI:
         if self.wiki.keyword_finder:
             sources_hint = self.texts.get("terminal_sources_hint", "/quellen")
             print(f"{Fore.MAGENTA}{sources_hint}{Style.RESET_ALL}")
+        # Nur anbieten, wenn die Ablage wirklich schreibt — ein Kommando über
+        # einem NullStore verspricht etwas, das sich nie füllen kann (#72).
+        if getattr(self.factory.get_store(), "records", False):
+            search_hint = self.texts.get("terminal_search_hint", "/suche <begriff>")
+            print(f"{Fore.MAGENTA}{search_hint}{Style.RESET_ALL}")
 
     def prompt_user(self) -> str:
         return input(
@@ -339,6 +344,31 @@ class TerminalUI:
             f"{Fore.MAGENTA}{self.texts['terminal_askall_block_end']}{Style.RESET_ALL}\n"
         )
 
+    def _handle_search_command(self, term: str) -> None:
+        """`/suche <begriff>` über die eigenen Gespräche (#49).
+
+        Ohne `user` gerufen, wie `load` und `delete` im Terminal auch: hier gibt
+        es keine Anmeldung, die fehlen könnte.
+        """
+        term = term.strip()
+        if not term:
+            usage = self.texts.get("terminal_search_usage", "/suche <begriff>")
+            print(f"{Fore.YELLOW}{usage}{Style.RESET_ALL}\n")
+            return
+
+        hits = self.factory.get_store().search(term)
+        if not hits:
+            miss = self.texts.get("terminal_search_empty", "Nichts gefunden.")
+            print(f"{Fore.YELLOW}{miss}{Style.RESET_ALL}\n")
+            return
+
+        for hit in hits:
+            stamp = hit.updated_at[:16].replace("T", " ")
+            print(
+                f"{Fore.CYAN}[{hit.persona} · {stamp}]{Style.RESET_ALL} {hit.snippet}"
+            )
+        print()
+
     def _print_ask_all_verdict(self, question: str, replies: dict[str, str]) -> None:
         """Das Fazit über die Runde, tokenweise wie die Antworten davor."""
         heading = self.texts["ask_all_moderator_heading"]
@@ -396,6 +426,14 @@ class TerminalUI:
             # Locale greift — die Kommandos selbst sind nicht übersetzt.
             if user_input.lower() in ("/quellen", "/sources"):
                 self._handle_sources_command()
+                continue
+
+            # Volltextsuche über die eigenen Gespräche (#49). Beide
+            # Schreibweisen wie bei /quellen — Kommandos sind nicht übersetzt.
+            if user_input.lower().startswith(("/suche", "/search")):
+                self._handle_search_command(
+                    user_input.split(maxsplit=1)[1] if " " in user_input else ""
+                )
                 continue
 
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---

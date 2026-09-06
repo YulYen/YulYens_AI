@@ -228,6 +228,16 @@ def bind_events(
 
     # user_state gehört in *jeden* Verlauf-Handler: die Gesprächs-ID kommt
     # vom Client und wird von Gradio nicht gegen die Auswahlliste geprüft.
+    components["history_search"].change(
+        fn=ui._on_history_search,
+        inputs=[components["history_search"], user_state],
+        outputs=[
+            components["history_pick"],
+            components["history_preview"],
+            components["history_status"],
+        ],
+    )
+
     components["history_pick"].change(
         fn=ui._on_history_selected,
         inputs=[components["history_pick"], user_state],

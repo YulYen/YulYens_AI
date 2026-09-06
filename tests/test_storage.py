@@ -159,16 +159,19 @@ def test_migration_starts_from_an_empty_file(tmp_path):
 # Ein Schritt, wie ihn #49 bringen wird: mehrere Anweisungen, ein Trigger mit
 # eigenen Semikolons im Rumpf — und als letzte eine Anweisung, die auf manchen
 # SQLite-Builds scheitert (FTS5 fehlt dort).
+# Bewusst eigene Namen (`probe_…`): der Schritt ist eine Attrappe und darf sich
+# nicht mit echten Schemaobjekten stoßen. Er hieß einmal `messages_fts` und
+# kollidierte prompt, als es die Tabelle mit Schritt 2 wirklich gab.
 _STEP_THAT_FAILS_AT_THE_END = """
-    CREATE TABLE search_meta (k TEXT PRIMARY KEY);
-    CREATE TRIGGER messages_ai AFTER INSERT ON messages BEGIN
-        INSERT INTO search_meta(k) VALUES (new.role);
+    CREATE TABLE probe_meta (k TEXT PRIMARY KEY);
+    CREATE TRIGGER probe_ai AFTER INSERT ON messages BEGIN
+        INSERT INTO probe_meta(k) VALUES (new.role);
     END;
-    CREATE VIRTUAL TABLE messages_fts USING fts_gibt_es_nicht(content);
+    CREATE VIRTUAL TABLE probe_index USING fts_gibt_es_nicht(content);
 """
 _STEP_THAT_WORKS = _STEP_THAT_FAILS_AT_THE_END.replace(
-    "CREATE VIRTUAL TABLE messages_fts USING fts_gibt_es_nicht(content);",
-    "CREATE TABLE messages_fts (content TEXT);",
+    "CREATE VIRTUAL TABLE probe_index USING fts_gibt_es_nicht(content);",
+    "CREATE TABLE probe_index (content TEXT);",
 )
 
 
@@ -422,3 +425,141 @@ def test_sync_without_a_conversation_is_ignored(store):
     store.sync("", [{"role": "user", "content": "ins Leere"}])
 
     assert store.list_conversations() == []
+
+
+# ---- Volltextsuche (#49) ----------------------------------------------------
+
+
+def _conversation_with(store, *, user="yulyen", persona="LEAH", texts=()):
+    cid = store.start(user=user, persona=persona, model="m1", app="web")
+    for role, text in texts:
+        store.append(cid, role, text)
+    return cid
+
+
+def test_search_finds_a_word_from_an_earlier_answer(store):
+    _conversation_with(
+        store,
+        texts=[
+            ("user", "Was ist Kiwix?"),
+            ("assistant", "Kiwix serviert Wikipedia offline aus einer ZIM-Datei."),
+        ],
+    )
+
+    hits = store.search("ZIM")
+
+    assert [h.role for h in hits] == ["assistant"]
+    assert hits[0].persona == "LEAH"
+    assert "ZIM" in hits[0].snippet
+
+
+def test_search_is_bound_to_the_user_like_load_and_delete(store):
+    _conversation_with(store, user="yulyen", texts=[("user", "Kiwix und ZIM")])
+    _conversation_with(store, user="fremd", texts=[("user", "Kiwix und ZIM")])
+
+    assert len(store.search("Kiwix")) == 2
+    assert len(store.search("Kiwix", user="yulyen")) == 1
+    assert store.search("Kiwix", user="niemand") == []
+
+
+def test_several_words_are_an_and_not_a_phrase(store):
+    _conversation_with(store, texts=[("assistant", "Kiwix serviert eine ZIM-Datei")])
+
+    assert store.search("Kiwix ZIM"), "beide Wörter kommen vor"
+    assert store.search("Kiwix Piper") == [], "Piper kommt nicht vor"
+
+
+def test_a_query_with_fts_syntax_finds_nothing_instead_of_throwing(store):
+    """Die Eingabe ist Text, nicht Syntax.
+
+    Roh durchgereicht wirft FTS5 bei `"`, `*` oder einem nackten `AND` einen
+    OperationalError — der Nutzer bekäme einen Fehler statt „nichts gefunden".
+    """
+    _conversation_with(store, texts=[("user", "Kiwix")])
+
+    for query in ['"', "*", "AND", "NEAR(", "Kiwix OR", "^"]:
+        assert store.search(query) == [], query
+    assert store.search("Kiwix"), "die normale Suche funktioniert weiterhin"
+
+
+def test_an_empty_query_returns_nothing(store):
+    _conversation_with(store, texts=[("user", "Kiwix")])
+
+    assert store.search("") == []
+    assert store.search("   ") == []
+
+
+def test_the_index_follows_a_rewritten_conversation(store):
+    """`sync` ersetzt den ganzen Verlauf — der Index muss mitkommen.
+
+    Sonst findet die Suche Text, den der Nutzer längst verworfen hat
+    („Nochmal 🔄" ersetzt die letzte Antwort), und die Trefferliste zeigt etwas,
+    das im Gespräch nicht mehr steht.
+    """
+    cid = _conversation_with(store, texts=[("assistant", "Antwort mit Rhabarber")])
+    assert store.search("Rhabarber")
+
+    store.sync(cid, [{"role": "assistant", "content": "Antwort mit Stachelbeere"}])
+
+    assert store.search("Rhabarber") == []
+    assert store.search("Stachelbeere")
+
+
+def test_deleting_a_conversation_removes_it_from_the_index(store):
+    """Der Kaskaden-Delete muss den FTS-Trigger auslösen.
+
+    Gemessen statt angenommen: SQLite feuert die Trigger der Kindtabelle auch
+    bei `ON DELETE CASCADE` — hier festgenagelt, weil ein Index, der gelöschte
+    Gespräche behält, sonst still weiterwächst.
+    """
+    cid = _conversation_with(store, texts=[("assistant", "Rhabarberbarbara")])
+    assert store.search("Rhabarberbarbara")
+
+    store.delete(cid)
+
+    assert store.search("Rhabarberbarbara") == []
+
+
+def test_conversations_from_before_the_index_are_searchable(tmp_path, monkeypatch):
+    """Der Backfill im Migrationsschritt — ohne ihn ist die Vergangenheit blind.
+
+    Nachgestellt wird eine Datei, die nur Schritt 1 gesehen hat: genau der
+    Zustand jeder bestehenden Installation vor diesem Update.
+    """
+    path = tmp_path / "conversations.sqlite3"
+    monkeypatch.setattr("storage.store._MIGRATIONS", _MIGRATIONS[:1])
+    alt = SqliteStore(path)
+    _conversation_with(alt, texts=[("assistant", "Kiwix serviert ZIM")])
+    alt.close()
+    monkeypatch.undo()
+
+    neu = SqliteStore(path)
+
+    assert neu.search("ZIM"), "das alte Gespräch ist nach der Migration unsichtbar"
+
+
+def test_without_fts5_the_store_still_records_and_search_stays_quiet(
+    tmp_path, monkeypatch
+):
+    """Ein SQLite ohne FTS5 darf nicht die ganze Ablage kosten.
+
+    `_migrate` wirft sonst, `build_store` fängt jede sqlite3.Error mit einem
+    NullStore ab — und die App liefe weiter, ohne noch irgendetwas
+    aufzuzeichnen. Der Nutzer verlöre seinen Verlauf und bekäme dafür eine
+    Logzeile: genau die stille Sorte, die #72 so teuer gemacht hat.
+    """
+    kaputt = "CREATE VIRTUAL TABLE messages_fts USING fts5_gibt_es_nicht(content);"
+    monkeypatch.setattr("storage.store._MIGRATIONS", _MIGRATIONS[:1] + (kaputt,))
+
+    store = SqliteStore(tmp_path / "conversations.sqlite3")
+    cid = _conversation_with(store, texts=[("user", "Kiwix")])
+
+    assert store.records
+    assert store.load(cid) is not None, "die Ablage arbeitet normal weiter"
+    assert store.search("Kiwix") == [], "die Suche schweigt, statt zu werfen"
+    with sqlite3.connect(str(tmp_path / "conversations.sqlite3")) as con:
+        assert con.execute("PRAGMA user_version").fetchone()[0] == 1
+
+
+def test_the_null_store_finds_nothing(tmp_path):
+    assert NullStore().search("Kiwix") == []

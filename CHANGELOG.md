@@ -32,6 +32,17 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **Full-text search across your own conversations.** A search box above the
+  picker in the history card, and `/suche <term>` in the terminal. It searches
+  every stored message and shows the matching passage with persona and date;
+  an empty box lists everything again. Several words mean AND, and special
+  characters are treated as text rather than query syntax. The same ownership
+  check as the rest of the history applies. The index (SQLite FTS5) is built on
+  the first start after this update, existing conversations included — there is
+  nothing to configure. If your SQLite was built without FTS5, the database
+  stays at its previous version, **recording keeps working unchanged**, and only
+  search returns nothing.
+
 - Ask-All can now close a round with a **verdict**: one more model run that
   summarises the personas' answers, says where they agree and differ, and
   names the strongest one. It appears as its own section below the personas.

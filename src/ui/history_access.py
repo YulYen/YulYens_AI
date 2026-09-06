@@ -24,7 +24,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ui.webui_format import history_label
+from ui.webui_format import history_label, search_label
 
 DEFAULT_HISTORY_LIMIT = 50
 
@@ -50,6 +50,35 @@ class ConversationHistory:
             self.limit = max(1, int(limit))
         except (TypeError, ValueError):
             self.limit = DEFAULT_HISTORY_LIMIT
+
+    def search_choices(self, query: str, user: str | None) -> list[tuple[str, str]]:
+        """Wie ``choices``, nur auf die Treffer eingeschränkt (#49).
+
+        **Dieselbe Form ist der ganze Trick:** Vorschau, Öffnen, Export und
+        Löschen hängen alle am selben Dropdown und bleiben unverändert — die
+        Suche schränkt nur ein, was darin steht. Eine leere Eingabe ist deshalb
+        kein Sonderfall, sondern schlicht die ganze Liste.
+
+        Ein Gespräch erscheint einmal, mit seiner besten Fundstelle: eine Liste,
+        in der derselbe Faden fünfmal steht, ist keine Auswahl mehr.
+        """
+        if not (query or "").strip():
+            return self.choices(user)
+        try:
+            hits = self._store_getter().search(
+                query, user=self._user(user), limit=self.limit
+            )
+        except Exception:
+            logging.exception("Suche über die Ablage fehlgeschlagen")
+            return []
+        seen: set[str] = set()
+        choices: list[tuple[str, str]] = []
+        for hit in hits:
+            if hit.conversation_id in seen:
+                continue
+            seen.add(hit.conversation_id)
+            choices.append((search_label(hit), hit.conversation_id))
+        return choices
 
     def _user(self, user: str | None) -> str:
         return user or self._fallback_user

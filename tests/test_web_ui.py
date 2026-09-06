@@ -29,7 +29,7 @@ from ui.webui_layout import (
 )
 from wiki.lookup import WikiLookup, WikiSnippet
 
-from tests.doubles import factory_double, streamer_double
+from tests.doubles import factory_double, store_double, streamer_double
 
 
 def test_webui_start_server_uses_configured_host_and_port():
@@ -2756,3 +2756,79 @@ def test_a_bare_filename_does_not_produce_an_empty_directory():
     ui = _ui_with_storage("conv.sqlite3")
 
     assert ui._votes_dir() == "data"
+
+
+# ---- Suche in der Verlauf-Karte (#49) --------------------------------------
+
+
+def _search_hit(conversation_id="c1", persona="LEAH", snippet="… »Kiwix« …"):
+    from storage.store import SearchHit
+
+    return SearchHit(
+        conversation_id=conversation_id,
+        persona=persona,
+        updated_at="2026-09-06T10:11:12",
+        title="Titel",
+        role="assistant",
+        idx=1,
+        snippet=snippet,
+    )
+
+
+def test_the_history_search_narrows_the_dropdown_to_the_hits():
+    web_ui = _create_web_ui()
+    store = store_double()
+    web_ui.factory.get_store.return_value = store
+    store.search.return_value = [_search_hit(), _search_hit("c2", "PETER")]
+
+    pick, preview, status = web_ui._on_history_search("Kiwix", "yulyen")
+
+    assert [value for _label, value in pick["choices"]] == ["c1", "c2"]
+    assert pick["value"] is None
+    assert preview["value"] == ""
+    assert status["visible"] is False
+
+
+def test_the_history_search_always_passes_the_user():
+    """Dieselbe Zusage wie bei Laden und Löschen (#25/#72)."""
+    web_ui = _create_web_ui()
+    store = store_double()
+    web_ui.factory.get_store.return_value = store
+    store.search.return_value = []
+
+    web_ui._on_history_search("Kiwix", "yulyen")
+
+    assert store.search.call_args.kwargs["user"] == "yulyen"
+
+
+def test_one_conversation_appears_once_even_with_several_hits():
+    web_ui = _create_web_ui()
+    store = store_double()
+    web_ui.factory.get_store.return_value = store
+    store.search.return_value = [_search_hit(), _search_hit(), _search_hit()]
+
+    pick, _preview, _status = web_ui._on_history_search("Kiwix", "yulyen")
+
+    assert len(pick["choices"]) == 1
+
+
+def test_an_empty_search_shows_the_whole_list_again():
+    web_ui = _create_web_ui()
+    store = store_double()
+    web_ui.factory.get_store.return_value = store
+    store.list_conversations.return_value = []
+
+    web_ui._on_history_search("   ", "yulyen")
+
+    store.list_conversations.assert_called_once()
+    store.search.assert_not_called()
+
+
+def test_a_search_without_hits_says_so():
+    web_ui = _create_web_ui()
+    store = store_double()
+    web_ui.factory.get_store.return_value = store
+
+    _pick, _preview, status = web_ui._on_history_search("Rhabarber", "yulyen")
+
+    assert status["visible"] is True

@@ -205,6 +205,7 @@ PERSONA_OUTPUT_KEYS = (
     "history_group",
     "history_status",
     "history_pick",
+    "history_search",
     "history_preview",
     "history_confirm",
 )
@@ -299,6 +300,7 @@ def build_ui(
     history_title,
     history_description,
     history_pick_label,
+    history_search_placeholder,
     history_open_label,
     history_export_label,
     history_delete_label,
@@ -692,6 +694,15 @@ def build_ui(
         with gr.Group(visible=False) as history_group:
             gr.Markdown(f"## {history_title}")
             history_status = gr.Markdown("", visible=False)
+            # Suchen ist dasselbe Bedürfnis wie Blättern (#49) — deshalb ein
+            # Feld *in* dieser Karte statt einer eigenen. Es schränkt die
+            # Auswahl darunter ein; Vorschau, Öffnen, Export und Löschen hängen
+            # unverändert am selben Dropdown.
+            history_search = gr.Textbox(
+                show_label=False,
+                placeholder=history_search_placeholder,
+                interactive=True,
+            )
             history_pick = gr.Dropdown(
                 choices=[], label=history_pick_label, interactive=True
             )
@@ -801,6 +812,7 @@ def build_ui(
         "history_group": history_group,
         "history_status": history_status,
         "history_pick": history_pick,
+        "history_search": history_search,
         "history_preview": history_preview,
         "history_open_btn": history_open_btn,
         "history_export_btn": history_export_btn,

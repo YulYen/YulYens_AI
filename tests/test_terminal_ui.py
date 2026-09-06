@@ -7,7 +7,7 @@ from config.texts import Texts
 from ui.terminal_ui import TerminalUI
 from wiki.lookup import WikiLookup, WikiSnippet
 
-from tests.doubles import factory_double, streamer_double
+from tests.doubles import factory_double, store_double, streamer_double
 
 
 def _create_terminal_ui() -> TerminalUI:
@@ -437,3 +437,71 @@ def test_start_menu_shows_loading_by_default(monkeypatch, capsys) -> None:
     ui._start_dialog_flow()
 
     assert ui.texts["terminal_start_menu_load_option"] in capsys.readouterr().out
+
+
+# ---- Volltextsuche (#49) ----------------------------------------------------
+
+
+def _hit(persona="LEAH", snippet="… Kiwix serviert »ZIM« …"):
+    from storage.store import SearchHit
+
+    return SearchHit(
+        conversation_id="c1",
+        persona=persona,
+        updated_at="2026-09-06T10:11:12",
+        title="Was ist Kiwix?",
+        role="assistant",
+        idx=1,
+        snippet=snippet,
+    )
+
+
+def _terminal_with_store(hits=()):
+    ui = _create_terminal_ui()
+    ui.factory = factory_double()
+    store = store_double()
+    store.search.return_value = list(hits)
+    ui.factory.get_store.return_value = store
+    return ui, store
+
+
+def test_search_command_prints_persona_date_and_the_hit(capsys) -> None:
+    ui, _store = _terminal_with_store([_hit()])
+
+    ui._handle_search_command("Kiwix")
+
+    out = capsys.readouterr().out
+    assert "LEAH" in out
+    assert "2026-09-06 10:11" in out
+    assert "ZIM" in out
+
+
+def test_search_without_a_term_shows_the_usage_and_asks_nothing(capsys) -> None:
+    """Eine leere Suche kostet keinen Datenbankzugriff — und sagt, wie es geht."""
+    ui, store = _terminal_with_store()
+
+    ui._handle_search_command("   ")
+
+    assert ui.texts["terminal_search_usage"] in capsys.readouterr().out
+    store.search.assert_not_called()
+
+
+def test_search_says_so_when_nothing_matches(capsys) -> None:
+    ui, _store = _terminal_with_store([])
+
+    ui._handle_search_command("Rhabarber")
+
+    assert ui.texts["terminal_search_empty"] in capsys.readouterr().out
+
+
+def test_the_terminal_search_is_not_user_bound(capsys) -> None:
+    """Im Terminal gibt es keine Anmeldung, die fehlen könnte (#72).
+
+    Wie `load` und `delete` dort auch: ohne `user` gerufen. Ein gesetzter Wert
+    wäre hier eine Schranke gegen die eigenen Gespräche.
+    """
+    ui, store = _terminal_with_store([])
+
+    ui._handle_search_command("Kiwix")
+
+    assert store.search.call_args.kwargs.get("user") is None
