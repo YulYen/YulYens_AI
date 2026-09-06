@@ -67,7 +67,43 @@ _MIGRATIONS: tuple[str, ...] = (
     CREATE INDEX idx_conversations_user_updated
         ON conversations(user, updated_at DESC);
     """,
+    # Schritt 2 — Volltextsuche (#49). External-Content-Index über die implizite
+    # `rowid` von `messages`: FTS5 hält nur den Index, der Text bleibt einmal in
+    # `messages`. Der Backfill gehört in denselben Schritt — ohne ihn wären alle
+    # *bestehenden* Gespräche unsichtbar, und das fiele erst dem auf, der lange
+    # sucht und nichts findet.
+    """
+    CREATE VIRTUAL TABLE messages_fts USING fts5(content, content='messages');
+    INSERT INTO messages_fts(rowid, content) SELECT rowid, content FROM messages;
+    CREATE TRIGGER messages_fts_ai AFTER INSERT ON messages BEGIN
+        INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content);
+    END;
+    CREATE TRIGGER messages_fts_ad AFTER DELETE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, content)
+            VALUES ('delete', old.rowid, old.content);
+    END;
+    CREATE TRIGGER messages_fts_au AFTER UPDATE ON messages BEGIN
+        INSERT INTO messages_fts(messages_fts, rowid, content)
+            VALUES ('delete', old.rowid, old.content);
+        INSERT INTO messages_fts(rowid, content) VALUES (new.rowid, new.content);
+    END;
+    """,
 )
+
+# Schritte, die auf einer Zielmaschine fehlschlagen *dürfen*, ohne dass die
+# Ablage als kaputt gilt.
+#
+# Nötig geworden mit Schritt 2: ein SQLite ohne FTS5-Modul ist kein Defekt der
+# Datei. Ohne diese Liste risse der Schritt aber die **ganze** Ablage mit —
+# `_migrate` wirft, `build_store` fängt jede `sqlite3.Error` mit einem
+# `NullStore` ab, und die App liefe weiter, ohne noch irgendetwas aufzuzeichnen.
+# Genau die stille Sorte Verhaltensänderung, die #72 so teuer gemacht hat: der
+# Nutzer verlöre seinen Verlauf und bekäme dafür eine Logzeile.
+#
+# Ein fehlgeschlagener optionaler Schritt **hält die Kette an** (kein `continue`):
+# Schritt 3 auf einer Datei anzuwenden, die Schritt 2 nie gesehen hat, wäre ein
+# Schema, das es in keiner Version je gab.
+_OPTIONAL_MIGRATIONS: frozenset[int] = frozenset({2})
 
 
 @dataclass(frozen=True)
@@ -83,6 +119,24 @@ class ConversationRef:
     updated_at: str
     title: str
     message_count: int
+
+
+@dataclass(frozen=True)
+class SearchHit:
+    """Eine Fundstelle der Volltextsuche (#49).
+
+    Trägt den Gesprächskopf mit, damit eine Trefferliste ohne zweiten Zugriff
+    „Persona, Datum, Fundstelle" zeigen kann — dasselbe Motiv wie bei
+    ``ConversationRef``.
+    """
+
+    conversation_id: str
+    persona: str
+    updated_at: str
+    title: str
+    role: str
+    idx: int
+    snippet: str
 
 
 class ConversationStore(Protocol):
@@ -106,6 +160,10 @@ class ConversationStore(Protocol):
     ) -> tuple[ConversationRef, list[dict[str, str]]] | None: ...
 
     def delete(self, conversation_id: str, *, user: str | None = None) -> bool: ...
+
+    def search(
+        self, query: str, *, user: str | None = None, limit: int = 50
+    ) -> list[SearchHit]: ...
 
 
 class NullStore:
@@ -135,6 +193,11 @@ class NullStore:
     def delete(self, conversation_id: str, *, user: str | None = None) -> bool:
         return False
 
+    def search(
+        self, query: str, *, user: str | None = None, limit: int = 50
+    ) -> list[SearchHit]:
+        return []
+
 
 class SqliteStore:
     """Gespräche in einer SQLite-Datei.
@@ -156,6 +219,14 @@ class SqliteStore:
         # WAL: Lesen (Verlauf-Liste) blockiert Schreiben (laufender Stream) nicht.
         self._conn.execute("PRAGMA journal_mode = WAL")
         self._migrate()
+        # Einmal beantwortet statt bei jeder Suche: der Index fehlt genau dann,
+        # wenn Schritt 2 übersprungen wurde (SQLite ohne FTS5).
+        self._searchable = bool(
+            self._conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
+                ("messages_fts",),
+            ).fetchone()
+        )
 
     def _migrate(self) -> None:
         """Wendet die ausstehenden Schritte an — jeden ganz oder gar nicht.
@@ -187,8 +258,21 @@ class SqliteStore:
                 script = f"BEGIN;\n{sql}\nPRAGMA user_version = {int(step)};\nCOMMIT;"
                 try:
                     self._conn.executescript(script)
-                except Exception:
+                except Exception as exc:
                     self._conn.rollback()
+                    if step in _OPTIONAL_MIGRATIONS:
+                        # Kein Defekt der Datei, sondern eine fehlende Fähigkeit
+                        # des SQLite auf dieser Maschine (FTS5). Weiterzuwerfen
+                        # hieße `NullStore`, also gar keine Ablage mehr.
+                        logging.warning(
+                            "[STORE] Optionaler Migrationsschritt %s übersprungen "
+                            "(%s) — die Datei bleibt auf Version %s, die Ablage "
+                            "arbeitet normal weiter.",
+                            step,
+                            exc,
+                            step - 1,
+                        )
+                        break
                     logging.error(
                         "[STORE] Migrationsschritt %s fehlgeschlagen — die Datei "
                         "bleibt unverändert auf Version %s.",
@@ -379,6 +463,56 @@ class SqliteStore:
             self._conn.commit()
             return cursor.rowcount > 0
 
+    def search(
+        self, query: str, *, user: str | None = None, limit: int = 50
+    ) -> list[SearchHit]:
+        """Volltextsuche über die eigenen Gespräche (#49).
+
+        ``user`` wirkt wie bei ``load``/``delete``: gesetzt, sieht man nur die
+        eigenen Fundstellen. Die WebUI **muss** ihn setzen, Terminal und API
+        rufen ohne.
+        """
+        match = _fts_query(query)
+        if not match:
+            return []
+        if not self._searchable:
+            # Die Datei ist auf Version 1 stehengeblieben, weil dieses SQLite
+            # kein FTS5 hat. Kein Fehler, nur nichts zu finden — die Meldung
+            # gehört an die Oberfläche, nicht in einen Stacktrace.
+            logging.info("[STORE] Suche nicht verfügbar: kein FTS5-Index angelegt")
+            return []
+
+        sql = (
+            "SELECT c.id AS conversation_id, c.persona, c.updated_at, c.title, "
+            "       m.role, m.idx, "
+            "       snippet(messages_fts, 0, '»', '«', '…', 12) AS snippet "
+            "FROM messages_fts "
+            "JOIN messages m ON m.rowid = messages_fts.rowid "
+            "JOIN conversations c ON c.id = m.conversation_id "
+            "WHERE messages_fts MATCH ? "
+        )
+        params: list[Any] = [match]
+        if user:
+            sql += "AND c.user = ? "
+            params.append(user)
+        sql += "ORDER BY rank LIMIT ?"
+        params.append(int(limit))
+
+        with self._lock:
+            rows = self._conn.execute(sql, params).fetchall()
+        return [
+            SearchHit(
+                conversation_id=row["conversation_id"],
+                persona=row["persona"],
+                updated_at=row["updated_at"],
+                title=row["title"],
+                role=row["role"],
+                idx=int(row["idx"]),
+                snippet=row["snippet"],
+            )
+            for row in rows
+        ]
+
 
 def _now() -> str:
     return datetime.now().astimezone().isoformat(timespec="seconds")
@@ -389,6 +523,19 @@ def _make_title(content: str) -> str:
     if len(text) <= _TITLE_MAX_CHARS:
         return text
     return text[:_TITLE_MAX_CHARS].rstrip() + " …"
+
+
+def _fts_query(query: str) -> str:
+    """Nutzereingabe in eine FTS5-Anfrage — jedes Wort als Phrase, UND-verknüpft.
+
+    Roh durchgereicht ist die Eingabe **Syntax**, nicht Text: ein `"`, ein `*`
+    oder ein `AND` an der falschen Stelle wirft einen ``OperationalError``, und
+    der Nutzer bekäme einen Fehler statt „nichts gefunden". Jedes Wort wird
+    deshalb gequotet (inneres `"` verdoppelt); mehrere Wörter stehen
+    nebeneinander, was in FTS5 UND bedeutet — das ist, was ein Suchfeld tut.
+    """
+    terms = ['"' + word.replace('"', '""') + '"' for word in (query or "").split()]
+    return " ".join(terms)
 
 
 def _to_ref(row: sqlite3.Row) -> ConversationRef:

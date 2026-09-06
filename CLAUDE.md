@@ -1104,9 +1104,9 @@ Zwecke:
 | „Konversation herunterladen" / Upload | JSON | Austausch, verlustfrei zurückladbar — abschaltbar über `storage.file_exchange`. Ein hochgeladenes Gespräch läuft als **eigener** Eintrag in der Ablage weiter (`app: web-import`); ohne das schriebe jeder Turn nach dem Laden ins Leere |
 
 **Migrationen** über `PRAGMA user_version` plus die Liste `_MIGRATIONS`: neue
-Schritte nur **anhängen**, nie einen ausgelieferten Schritt ändern. Die
-FTS5-Tabelle für #49 wird Schritt 2 — SQLite bringt FTS5 mit, ein eigener Index
-ist unnötig.
+Schritte nur **anhängen**, nie einen ausgelieferten Schritt ändern. Schritt 2 ist
+seit #49 die FTS5-Tabelle — SQLite bringt FTS5 mit, ein eigener Index ist
+unnötig.
 
 **Jeder Schritt läuft ganz oder gar nicht.** Vorher lief er über
 `executescript`, das die pendente Transaktion vorher committet und das Skript
@@ -1118,6 +1118,55 @@ selbst nicht klammert: scheiterte Anweisung 2 von 3, blieb Anweisung 1 stehen,
 transaktional), ein Fehlschlag rollt zurück und nennt die Schrittnummer.
 Bewusst weiter `executescript` statt einer Zerlegung an `;`: ein FTS5-Trigger
 bringt eigene Semikolons im `BEGIN…END`-Rumpf mit.
+
+**Ein Schritt darf fehlschlagen dürfen — genau einer, und der steht in einer
+Liste (#49).** Der FTS5-Schritt ist der erste, dessen Scheitern *kein* Defekt
+der Datei ist: ein SQLite ohne FTS5-Modul kann ihn schlicht nicht. Ohne
+Sonderbehandlung risse er aber die **ganze** Ablage mit — `_migrate` wirft,
+`build_store` fängt jede `sqlite3.Error` mit einem `NullStore` ab, und die App
+liefe weiter, ohne noch irgendetwas aufzuzeichnen. Der Nutzer verlöre seinen
+Verlauf und bekäme dafür eine Logzeile: dieselbe stille Sorte, die #72 so teuer
+gemacht hat, nur diesmal als Nebenwirkung eines Features, das er nicht bestellt
+hat. `_OPTIONAL_MIGRATIONS` nennt deshalb die Schrittnummern, die übersprungen
+werden dürfen; ein übersprungener Schritt **hält die Kette an** (kein
+`continue`), weil Schritt 3 auf einer Datei ohne Schritt 2 ein Schema ergäbe,
+das es in keiner Version je gab. `test_without_fts5_the_store_still_records_
+and_search_stays_quiet` hält beides fest.
+
+### Volltextsuche: die Eingabe ist Text, nicht Syntax (#49)
+
+`SqliteStore.search()` gibt die Nutzereingabe **nie roh** an FTS5. Deren
+Abfragesprache kennt `"`, `*`, `AND`, `NEAR()` und `^` — ein Suchfeld, das sie
+durchreicht, antwortet auf `"` mit einem `OperationalError` statt mit „nichts
+gefunden". `_fts_query` quotet deshalb jedes Wort einzeln (inneres `"`
+verdoppelt) und stellt sie nebeneinander, was in FTS5 UND bedeutet. Das ist,
+was ein Suchfeld tut — und es ist die einzige Stelle, an der sich das
+entscheiden lässt.
+
+Drei weitere Punkte, die man beim Anfassen leicht umdreht:
+
+1. **Der Backfill gehört in den Migrationsschritt**, nicht in einen späteren
+   Wartungslauf: ohne ihn sind alle *bestehenden* Gespräche unsichtbar, und das
+   fällt erst dem auf, der lange sucht und nichts findet.
+2. **Der Index hängt an Triggern, nicht an Aufrufern.** `sync()` ersetzt den
+   ganzen Verlauf pro Turn (DELETE + INSERT) — mit einem Trigger stimmt der
+   Index dadurch von selbst. Nachgemessen und als Test festgenagelt: SQLite
+   feuert die DELETE-Trigger der Kindtabelle auch bei `ON DELETE CASCADE`, ein
+   gelöschtes Gespräch verschwindet also mit.
+3. **Die Suche liefert dieselbe Form wie die Liste** (`[(Beschriftung, ID)]`,
+   `ConversationHistory.search_choices`). Dadurch bleiben Vorschau, Öffnen,
+   Export und Löschen unverändert — sie hängen weiter am selben Dropdown, und
+   die Suche schränkt nur ein, was darin steht. Eine leere Eingabe ist deshalb
+   kein Sonderfall, sondern die ganze Liste. `user` wird gesetzt wie überall an
+   der Ablage; im Terminal bewusst nicht, dort gibt es keine Anmeldung.
+
+**Fundstellen als Kontext ins Gespräch zu injizieren steht bewusst noch aus
+(#49b).** Das Backlog empfahl dafür `injected_message` — seit #75 wäre das eine
+Regelverletzung, und `tests/test_context_channels.py` fängt es per AST.
+Sachlich wäre es ohnehin **kein** Fremdtext-Kanal: in der Ablage stehen nur
+eigene Nutzerturns und eigene Modellausgabe, injizierter System-Kontext bleibt
+draußen — dieselbe Einordnung wie bei Karl und beim Ask-All-Fazit. Das gehört
+entschieden, nicht nebenbei gebaut.
 
 **Ohne Anmeldung wird nichts aufgezeichnet (#72).** `DisabledAuth` — der
 Default — gibt *jedem* Besucher die Identität `local`. Alle Gespräche tragen
@@ -1442,7 +1491,7 @@ Kommando** (ein `python -m venv` und zwei `pip install` reichen).
 | **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
 | **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
 | **Feedback (#40)** | 👍/👎 an jeder Bot-Bubble, append-only nach `data/feedback_votes.jsonl` (neben der Ablage, auf die es zeigt — `logs/` darf jederzeit geleert werden, gesammelte Bewertungen sind nicht reproduzierbar; eine alte Datei zieht beim ersten Zugriff automatisch um). **Eine Bot-Bubble ist nicht automatisch eine Modellantwort:** Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und die Kontext-Kompressionswarnung stehen in derselben Spalte und tragen ebenfalls einen Daumen. Erkannt wird das daran, dass Beiwerk **nie in der LLM-History** landet — wer eine neue Hinweis-Bubble einführt, bekommt den Schutz dadurch geschenkt, solange er sie nicht ins Kontextfenster gibt. Ein Vote, der sich nicht gegen die History prüfen lässt, wird verworfen: für einen Trainingsdaten-Kanal (#7) ist eine verlorene Bewertung billiger als eine erfundene. **Jede Zeile trägt seit #65 `conversation_id` + `message_index`** — ohne die ist ein Vote ein loses Textpaar, mit ihnen ein Join auf die Ablage (Persona, Modell, Zeitraum, Gesprächsverlauf davor). Der Index zählt **Positionen unter den Antwort-Bubbles**, nicht Texte: Hinweis-Bubbles stehen in der Anzeige zwischen den Antworten und in der Ablage nicht, und zweimal „Ja." im selben Gespräch ist keine Seltenheit. Den Wortlaut liefert die Ablage, nicht die Anzeige — gegen sie wird später gejoint. Ohne Anmeldung gibt es keine Ablage (#72); dann bleibt `conversation_id` leer und der Vote wird trotzdem geschrieben |
-| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
+| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Ein Suchfeld darüber schränkt die Liste auf Fundstellen ein (#49, FTS5) — dieselbe Form, damit Vorschau, Öffnen, Export und Löschen unverändert daran hängen. Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
@@ -1540,9 +1589,15 @@ an zwei Stellen, die man erst beim Lesen ihres Prompts sieht:
   Vorgehen", während Moderieren genau das ist.
 
 Übernommen wird deshalb nur `llm_options` der Persona mit der niedrigsten
-Temperatur. In `classic` sind `repeat_penalty` und `num_ctx` bei allen vieren
-gleich — es läuft also auf „Ensemble-Optionen plus niedrigste Temperatur"
-hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
+Temperatur — und davon nur, was in `INHERITED_OPTIONS` steht: die Persona leiht
+ihr **Sampling**, nicht die *Form* der Antwort. `format`, `stop`, `num_predict`,
+`system` und `template` bleiben draußen, weil ein fremdes Ensemble sie sonst
+still gegen den Moderator drehen könnte (JSON statt Fazit, nach zwanzig Tokens
+abgeschnitten, eigener Systemprompt) — und an einem Fazit sieht niemand, wie es
+hätte aussehen sollen. In `classic` ändert der Filter nichts: dort stehen nur
+`temperature`, `repeat_penalty` und `num_ctx`, bei den letzten beiden für alle
+vier gleich. Es läuft also weiter auf „Ensemble-Optionen plus niedrigste
+Temperatur" hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
 verdrahtet, damit es auch für ein fremdes Ensemble stimmt; die Regel liegt in
 `config.personas.quietest_persona_name`, weil die Stoppuhr (#42) dieselbe Wahl
 aus einem anderen Grund trifft und zwei Fassungen derselben Regel
@@ -1910,7 +1965,7 @@ denselben Pins.
   (Archiv), #14 bis auf den Server-Teil (#14a). Die Gradio-Strecke ist durch —
   #61 auf 5.50, #61a auf 6.22 mit null pip-audit-Befunden. Aus #64 offen: die
   Coverage-Schwelle (#64e), eine Richtlinienentscheidung
-- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis), #49 Volltextsuche (FTS5 als Migrationsschritt), #30 Tool-Use (Türöffner)
+- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis; #49 hat mit FTS5 den Index dafür gelegt), #30 Tool-Use (Türöffner)
 
 Bereits erledigt (Details in `backlog_archiv.md`): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
 #5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,

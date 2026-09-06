@@ -46,6 +46,7 @@ from core.streaming_provider import YulYenStreamingProvider
 from rss.feeds import RssCache
 from security.tinyguard import BasicGuard
 from storage import NullStore
+from storage.store import SqliteStore
 
 
 def streamer_double(**overrides: Any):
@@ -98,6 +99,29 @@ def permissive_guard_double(**overrides: Any):
     for name, value in overrides.items():
         setattr(double, name, value)
     return double
+
+
+def store_double(**overrides: Any):
+    """Eine Ablage nach dem Vorbild der echten.
+
+    Ergänzt ``factory_double()``, ersetzt es nicht: dort ist ``get_store()``
+    bewusst mit einem **echten** ``NullStore`` vorbelegt, weil der *falsy* ist
+    und damit die stille Richtung abdeckt (``store.records`` wäre sonst ein
+    wahres Mock). Genau deshalb taugt er aber nicht, wenn ein Test prüfen will,
+    *womit* die Ablage gerufen wurde — ``NullStore.search`` ist eine echte
+    Methode und hat kein ``assert_called_with``. Dann dieses Double setzen:
+
+        factory.get_store.return_value = store_double(...)
+
+    Vorbelegt ist nur, was sonst als wahrheitswertiges Mock durchginge:
+    ``search`` und ``list_conversations`` liefern **Listen**, damit ein
+    ``if hits:`` das Richtige tut.
+    """
+    double = create_autospec(SqliteStore, instance=True)
+    double.records = True
+    double.search.return_value = []
+    double.list_conversations.return_value = []
+    return _apply(double, overrides)
 
 
 def factory_double(**overrides: Any):

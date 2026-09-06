@@ -352,6 +352,10 @@ class WebUI:
             "history_group": gr.update(visible=False),
             "history_status": gr.update(value="", visible=False),
             "history_pick": gr.update(choices=[], value=None),
+            # Aus demselben Grund wie das Häkchen darunter: eine
+            # stehengebliebene Suche zeigte beim nächsten Öffnen eine
+            # gefilterte Liste, ohne dass das Feld noch sichtbar wäre.
+            "history_search": gr.update(value=""),
             "history_preview": gr.update(value=""),
             # Muss zurück: ein gesetztes Häkchen überlebte sonst den Weg zur
             # Startseite und der nächste Klick löschte ohne neue Bestätigung.
@@ -606,6 +610,21 @@ class WebUI:
             ),
         )
         return as_persona_outputs(updates)
+
+    def _on_history_search(self, query: str | None, user: str) -> tuple:
+        """Schränkt die Auswahlliste auf die Fundstellen ein (#49).
+
+        Leere Eingabe heißt „alles" — kein Sonderfall, sondern die Liste, die
+        ohne Suche dastünde. Die Auswahl wird dabei zurückgesetzt: ein noch
+        gewähltes Gespräch, das nicht mehr in den Treffern steht, wäre ein
+        Zustand, den die Liste nicht mehr zeigt.
+        """
+        choices = self._history.search_choices(query or "", user)
+        return (
+            gr.update(choices=choices, value=None),
+            gr.update(value=""),
+            gr.update(value=self._t("history_search_empty"), visible=not choices),
+        )
 
     def _on_history_selected(self, conversation_id: str | None, user: str) -> Any:
         """Vorschau des gewählten Gesprächs."""
@@ -1448,6 +1467,9 @@ class WebUI:
         history_title = ui.get("history_title", "Verlauf")
         history_description = ui.get("history_description", "Frühere Gespräche")
         history_pick_label = ui.get("history_pick_label", "Gespräch")
+        history_search_placeholder = ui.get(
+            "history_search_placeholder", "In den Gesprächen suchen …"
+        )
         history_open_label = ui.get("history_open_label", "Öffnen")
         history_export_label = ui.get("history_export_label", "Als Markdown")
         history_delete_label = ui.get("history_delete_label", "Löschen")
@@ -1507,6 +1529,7 @@ class WebUI:
             history_title=history_title,
             history_description=history_description,
             history_pick_label=history_pick_label,
+            history_search_placeholder=history_search_placeholder,
             history_open_label=history_open_label,
             history_export_label=history_export_label,
             history_delete_label=history_delete_label,

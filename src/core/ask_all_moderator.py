@@ -54,6 +54,18 @@ MIN_REPLIES = 2
 # ersten Satz und der Moderator bekommt vier Wortfetzen.
 MIN_CHARS_PER_REPLY = 200
 
+# Geerbt wird, was das **Sampling** betrifft — nicht, was die *Form* der Antwort
+# bestimmt. In `classic` ist das ohne Folgen (dort stehen nur `temperature`,
+# `repeat_penalty` und `num_ctx`), ein fremdes Ensemble darf in `llm_options`
+# aber alles hinschreiben, was das Backend kennt. Bewusst draußen und deshalb
+# hier benannt: `format` (machte aus dem Fazit JSON), `stop` (schnitte es ab),
+# `num_predict` (beendete es nach n Tokens), `system`/`template` (überschrieben
+# den Moderator-Prompt). Alle vier scheitern **still** — an einem Fazit sieht
+# niemand, wie es hätte aussehen sollen.
+INHERITED_OPTIONS = frozenset(
+    {"temperature", "top_p", "top_k", "repeat_penalty", "num_ctx", "seed"}
+)
+
 
 def usable_replies(replies: Mapping[str, str]) -> dict[str, str]:
     """Antworten, über die sich ein Fazit lohnt.
@@ -77,11 +89,15 @@ def moderator_options() -> dict:
     Dieselbe Wahl wie beim Bench-Default (#42): die niedrigste Temperatur
     liefert die sachlichste Zusammenfassung, und abgeleitet stimmt sie auch für
     ein fremdes Ensemble. Zusammenfassen ist keine kreative Aufgabe.
+
+    Übernommen wird nur, was in ``INHERITED_OPTIONS`` steht — die Persona leiht
+    ihr Sampling, nicht die Form der Antwort.
     """
     names = personas.get_all_persona_names()
     if not names:
         return {}
-    return dict(personas.get_options(personas.quietest_persona_name(names)) or {})
+    options = personas.get_options(personas.quietest_persona_name(names)) or {}
+    return {key: value for key, value in options.items() if key in INHERITED_OPTIONS}
 
 
 def reply_char_budget(count: int, num_ctx: int) -> int:

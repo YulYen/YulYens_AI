@@ -181,6 +181,18 @@ def history_label(ref: ConversationRef) -> str:
     return f"{stamp} · {ref.persona} · {ref.title or '—'}"
 
 
+def search_label(hit: Any) -> str:
+    """`2026-07-31 05:10 · PETER · …Kiwix serviert »ZIM«…`
+
+    Anders als `history_label` zeigt die Suche nicht den Titel, sondern die
+    **Fundstelle** — der Titel ist die erste Frage des Gesprächs und sagt bei
+    einem Treffer weiter hinten nichts darüber, warum es hier steht.
+    """
+    stamp = hit.updated_at[:16].replace("T", " ")
+    snippet = " ".join((hit.snippet or "").split())
+    return f"{stamp} · {hit.persona} · {snippet}"
+
+
 def conversation_markdown(ref: ConversationRef, messages: list[Message], t: Any) -> str:
     """Ein Gespräch als Markdown — dieselbe Form für Vorschau und Export."""
     head = t(

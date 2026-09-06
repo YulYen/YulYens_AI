@@ -169,6 +169,20 @@ Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig
 
 Fortsetzen heißt wirklich fortsetzen: die Antwort landet im selben Gesprächseintrag, es entsteht kein zweiter. Gespräche einer Gast-Persona bleiben lesbar, lassen sich aber nicht fortsetzen — deren System-Prompt lebte nur in der damaligen Sitzung.
 
+**Volltextsuche über die eigenen Gespräche.** Über dem Auswahlfeld der
+Verlauf-Karte sitzt ein Suchfeld; im Terminal tut `/suche <begriff>` dasselbe.
+Gesucht wird über alle gespeicherten Nachrichten, angezeigt wird die Fundstelle
+im Wortlaut samt Persona und Datum — leeres Feld heißt wieder „alle Gespräche".
+Ein Gespräch erscheint einmal, mit seiner besten Fundstelle. Mehrere Wörter sind
+ein UND, und Sonderzeichen sind Text: eine Anfrage mit `"` oder `*` findet
+nichts, statt einen Fehler zu werfen. Die Suche liegt hinter derselben
+Eigentümerprüfung wie der Verlauf selbst.
+
+Der Index (SQLite FTS5) wird beim ersten Start nach dem Update angelegt,
+bestehende Gespräche eingeschlossen — man muss nichts tun. Sollte das SQLite auf
+dem Rechner ohne FTS5 gebaut sein, bleibt die Datei auf ihrem bisherigen Stand,
+**die Aufzeichnung läuft unverändert weiter**, und nur die Suche findet nichts.
+
 **Nicht im Verlauf stehen Ask-All und der AI-Dialog** — und das ist Absicht, kein Fehler. „Frage an alle" sind vier parallele Antworten auf *eine* Frage und passen nicht in die Form „ein Gespräch mit einer Persona"; der AI-Dialog erzeugt ein Artefakt, zu dem der Nutzer nur den Startprompt beigesteuert hat. Wer beides behalten will, nimmt den Datei-Export.
 
 Der Austausch per Datei (JSON herunterladen/hochladen im WebUI, `/save` und „Gespräch laden" im Terminal) bleibt daneben bestehen — er ist für Backups und den Wechsel zwischen Rechnern gedacht. Wer ihn nicht braucht, schaltet ihn mit `storage.file_exchange: false` ab; der Markdown-Export im Verlauf bleibt davon unberührt.

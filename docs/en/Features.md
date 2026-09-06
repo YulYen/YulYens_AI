@@ -164,6 +164,20 @@ The MVP handles plain-text emails; HTML is pragmatically reduced to text, attach
 
 Conversations live in a local SQLite file (`storage.path`, `data/conversations.sqlite3` by default) — not in log files. The “Open history 🗂” card lists them for review, lets you **continue** one, export it as Markdown, or delete it. Only your own conversations are listed, and ownership is checked server-side.
 
+**Full-text search across your own conversations.** A search box sits above the
+picker in the history card; in the terminal, `/suche <term>` does the same. It
+searches every stored message and shows the matching passage itself, with
+persona and date — an empty box means “all conversations” again. Each
+conversation appears once, with its best match. Several words mean AND, and
+special characters are text: a query containing `"` or `*` finds nothing rather
+than raising an error. Search sits behind the same ownership check as the
+history itself.
+
+The index (SQLite FTS5) is created on the first start after the update,
+including conversations you already have — there is nothing to do. Should the
+SQLite on your machine be built without FTS5, the file stays at its previous
+version, **recording continues unchanged**, and only search comes up empty.
+
 **In the web UI this requires a login.** Without one, every visitor is the same user `local` — "your own" history would be everybody's history, continuable and deletable by anyone who reaches the page. That is why the web UI records **nothing** without a login and hides the history card; the start-up names both ways out. If you deliberately want the shared pot on a single seat, set `storage.shared_without_login: true` and accept a loud warning at start-up. The terminal and the API are unaffected — there is no login there that could be missing.
 
 Continuing really means continuing: the reply is appended to the same conversation record rather than starting a second one. Conversations from a guest persona stay readable but cannot be continued — that persona's system prompt only existed in its session.
