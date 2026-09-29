@@ -50,8 +50,9 @@ Beispiele aus dem Archiv: erst markieren, dann senden (#14). Der Guard filtert
 pro Meldung, bevor zusammengefügt wird (#73). Ein nicht deutbarer Vote-Index
 wird verworfen, nicht geraten (#61a).
 
-Wenn es so eine Stelle gibt, gehört sie außerdem nach CLAUDE.md — hier steht
-sie für den Review, dort für den nächsten Umbau.
+Wenn es so eine Stelle gibt, gehört sie außerdem nach docs/entwurf/<bereich>.md
+— hier steht sie für den Review, dort für den nächsten Umbau. In CLAUDE.md
+kommt höchstens eine Zeile mit Verweis (siehe dort, „Wohin neue Regeln gehören").
 -->
 
 ## Backlog
