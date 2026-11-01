@@ -1,5 +1,9 @@
 # Modellwechsel-Analyse — Juni 2026
 
+> **Hinweis (2026-11-01):** Dieser Bericht gilt für 8 GB VRAM und bleibt als Aufzeichnung
+> unverändert. Für 16 GB VRAM und den Modellstand vom November 2026 siehe
+> [modellwechsel_november_2026.md](modellwechsel_november_2026.md).
+
 Kontext: Yul Yen's AI Orchestra läuft lokal mit 4 Personas (LEAH, DORIS, PETER, POPCORN)
 auf einer GPU mit 8 GB VRAM. Bewertungsfokus: **Prompt-Treue, Persona-Integrität,
 Wiki-Snippet-Integration** — nicht rohe Benchmarks.

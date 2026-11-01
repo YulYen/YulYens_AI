@@ -68,7 +68,8 @@ See also: [Features.md](Features.md)
   ollama pull ministral-3:8b
   ```
   (The default model is set in `config.yaml` under `core.model_name`; a comparison of
-  candidate models can be found in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md), German only.)
+  candidate models can be found in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md) for 16 GB VRAM
+  and in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) for 8 GB, both German only.)
 - For tests without Ollama you can set `core.backend: "dummy"` – the echo backend requires no additional downloads and is suitable for CI or quick prototyping.
 - Optional for offline wiki usage:
   - [Kiwix](https://kiwix.org/) + German ZIM archive — install & update guide: [Kiwix_Setup.md](Kiwix_Setup.md)

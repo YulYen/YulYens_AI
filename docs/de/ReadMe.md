@@ -66,7 +66,8 @@ siehe auch: [Features.md](Features.md)
   ollama pull ministral-3:8b
   ```
   (Das Default-Modell steht in `config.yaml` unter `core.model_name`; eine Bewertung
-  verschiedener Modelle findet sich in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md).)
+  verschiedener Modelle findet sich in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md)
+  für 16 GB VRAM und in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) für 8 GB.)
 - Für Tests ohne Ollama kann `core.backend: "dummy"` gesetzt werden – das Echo-Backend kommt ohne
   zusätzliche Downloads aus und eignet sich für CI oder schnelles Prototyping.
 - Optional für Offline-Wiki:

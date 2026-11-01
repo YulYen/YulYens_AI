@@ -7,6 +7,12 @@ im [Archiv](backlog_archiv.md) — seit dem 2026-08-06 eine eigene Datei, weil e
 85 % dieser hier ausmachte. (Stand: 2026-08-06, nach einer Durchsicht:
 Erledigtes stand noch in den Tiers und ist ins Archiv gewandert.)
 
+## Ganz oben — Jetzt: neue Modelle auf dem 16-GB-Rechner testen
+
+| No. | Name | Description | Effort | Benefit | Category |
+| --- | --- | --- | --- | --- | --- |
+| 78 | Neue Modelle auf 16 GB VRAM testen | Der neue Rechner (RTX 5060 Ti 16 GB, Ryzen 7 8700F ohne iGPU, 32 GB DDR5) ist da. Die Top 5 aus [docs/modellwechsel_november_2026.md](docs/modellwechsel_november_2026.md) runterladen und gegen `ministral-3:8b` antreten lassen: **(1) `ministral-3:14b`** (Nachfolger, v. a. DORIS/POPCORN), **(2) `gemma4:26b`** (Herausforderer, v. a. LEAH), **(3) `qwen3.6:35b-a3b`** (PETER als Coding-Turbo), **(4) `qwen3.8:27b`** (Denker/Eval-Judge — vorher prüfen, ob Qwen4-27B inzwischen draußen ist), **(5) `devstral-small-2:24b`** (PETER-Coder mit Mistral-DNA). Je Modell: `ollama ps` (wie viel liegt auf der GPU?), `python scripts/run_evals.py -e classic` (**Ø-Judge-Score**, nicht die Quote), `make bench` (erstes Zeichen, Zeichen/s) und Handtests nach den Kriterien im Dokument. **Vorher nötig für die Qwen-Modelle:** `think=False` durchreichen — `OllamaLLMCore` setzt `think` nicht, der Stream liest nur `message.content`, und Qwen denkt standardmäßig (3.8 auf „xhigh"); ohne Fix bleibt die Antwort lange leer. **Folgeticket je nach Ergebnis:** optionales `model` pro Persona (`BasePersona` + Factory, Fallback `core.model_name`), damit schwächere Rechner beim Default bleiben; neue Modelle in `core.knowledge_cutoffs` eintragen; Ergebnis als datierten Abschnitt festhalten und ggf. den Default in `config.yaml` umstellen (dann Branch + CHANGELOG). | M | XL | Research/Quality |
+
 ## Tier A — Fokus: die LoRA-Strecke
 
 #7 ist in Arbeit. #40 und #41 gehörten logisch davor — **beide sind jetzt

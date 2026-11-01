@@ -128,7 +128,8 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 - **Python 3.10+** (die CI prüft 3.10 und 3.13; 3.11 und 3.12 sind gegen die volle Suite gefahren)
 - **Ollama** (lokal installiert)
 - mindestens ein lokales Modell, z. B. **ministral-3:8b** (Default in `config.yaml`;
-  zur Modellwahl siehe [Modellwechsel-Analyse](docs/modellwechsel_juni_2026.md))
+  zur Modellwahl siehe [Modellwechsel-Analyse November 2026](docs/modellwechsel_november_2026.md)
+  für 16 GB VRAM, die [Juni-Analyse](docs/modellwechsel_juni_2026.md) gilt für 8 GB)
 
 ---
 
