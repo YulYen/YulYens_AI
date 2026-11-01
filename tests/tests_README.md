@@ -44,6 +44,17 @@ The eval corpora under `evals/` are covered from two sides:
 
 ---
 
+## Parked tests for the 16 GB model switch (#78)
+
+`test_ai_via_api_14b.py` holds two live tests that are **skipped on purpose**
+(`@_WARTET_AUF_14B`). They describe what a 14B-class model should manage and
+`ministral-3:8b` most likely does not: writing working code for commercial
+rounding, and naming today's country of three historical birthplaces. Remove the
+marker when the default model switches — after calibrating as described in #78
+in `backlog.md`.
+
+---
+
 ## Markers
 
 We intentionally keep the marker set simple—only two markers are available:
