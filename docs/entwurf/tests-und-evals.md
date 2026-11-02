@@ -19,7 +19,10 @@ pytest tests/test_ai_via_api.py  # Gezielt
 - Test-Fixture `client_with_date_and_wiki`: echte Wiki-Integration (braucht spaCy-Modell)
 - Test-Fixture `ollama_config`: Config gegen echtes Ollama, für `@pytest.mark.ollama`-Tests
   ohne HTTP-Client (z. B. Eval-Suite)
-- Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar
+- Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar.
+  `YULYEN_TEST_MODEL` ersetzt dabei das Modell aus `config.yaml` — für
+  Modellvergleiche (#78), ohne die Config anzufassen. Gilt nur für Läufe, die
+  wirklich Ollama ansprechen; Dummy-Tests bleiben unberührt
 - Marker `@pytest.mark.browser`: fährt die **laufende** WebUI im echten Chromium
   (`make test-browser`, ~100 s). Aus allen anderen Zielen und aus der CI
   ausgenommen, weil er Playwright *und* einen Browser-Build braucht; ohne

@@ -1,5 +1,6 @@
 # tests/conftest.py
 import importlib
+import os
 import socket
 from urllib.parse import urlparse
 
@@ -46,6 +47,17 @@ def _should_use_ollama(request, cfg) -> bool:
     return True
 
 
+def _apply_test_model(cfg) -> None:
+    """`YULYEN_TEST_MODEL` ersetzt für Ollama-Tests das Modell aus der Config.
+
+    Für Modellvergleiche (#78): dieselben Tests gegen ein anderes Modell, ohne
+    `config.yaml` anzufassen. Nur für Läufe, die wirklich Ollama ansprechen.
+    """
+    model = os.environ.get("YULYEN_TEST_MODEL", "").strip()
+    if model:
+        cfg.override("core", {"model_name": model})
+
+
 @pytest.fixture(scope="function")
 def client(request):
     # Reset the config singleton and load the test configuration
@@ -59,6 +71,8 @@ def client(request):
     if not use_ollama:
         core_updates["backend"] = "dummy"
     cfg.override("core", core_updates)
+    if use_ollama:
+        _apply_test_model(cfg)
     cfg.override("wiki", {"mode": False})
     # Build the provider from the factory and inject it
     factory = AppFactory()
@@ -83,6 +97,7 @@ def ollama_config(request):
     cfg.ensemble = "classic"
     if not _should_use_ollama(request, cfg):
         pytest.skip("Test needs the 'ollama' marker and a reachable Ollama server")
+    _apply_test_model(cfg)
     cfg.override("wiki", {"mode": False})
     yield cfg
     Config.reset_instance()
@@ -100,6 +115,8 @@ def client_with_date_and_wiki(request):
     use_ollama = _should_use_ollama(request, cfg)
     if not use_ollama:
         cfg.override("core", {"backend": "dummy"})
+    else:
+        _apply_test_model(cfg)
 
     # Start the wiki proxy
     start_wiki_proxy_thread()
