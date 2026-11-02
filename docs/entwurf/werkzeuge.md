@@ -142,8 +142,16 @@ ihn auflöst** — ein Eintrag ohne Grund ist ein Stummschalter, und
 Nebenbefund, der die ganze Liste erklärte: **alle 30 getragenen Befunde hingen
 an Gradios eigenen Deckeln** (`pillow<12.0`, `starlette<1.0`). Mit dem Sprung
 auf Gradio 6.22 (#61a) sind sie sämtlich weg — auch PYSEC-2026-211, für das es
-unter 5.x gar keine Fassung gab. **Die Liste ist jetzt leer**, und der Abgleich
+unter 5.x gar keine Fassung gab. **Die Liste war danach leer**, und der Abgleich
 hat das selbst eingefordert: stehengebliebene Einträge sind rot.
+
+**Seit 2026-11-01 trägt sie wieder 56 Befunde (filelock, pillow) — diesmal
+deckelt nicht Gradio allein, sondern die eigene Untergrenze.** Python 3.10 ist
+im Oktober 2026 EOL gegangen, und die behobenen Fassungen verlangen ≥ 3.11; der
+Audit-Job läuft auf 3.10 und löst sie deshalb nie auf. Eine Pipeline, die ohne
+eine Zeile Code rot wird, ist hier also das erwartete Zeichen dafür, dass die
+Untergrenze altert — nicht dafür, dass etwas kaputt ist. Was sie auflöst, steht
+in der Allowlist.
 
 #### ⚠️ Zweite Fassung derselben Falle: ein Werkzeug als Laufzeit-Abhängigkeit
 `gradio` führt **`ruff` als eigene Abhängigkeit** und fordert `>=0.9.3`. Der Pin

@@ -12,13 +12,96 @@
 # Ein Eintrag ist eine Entscheidung, kein Stummschalter. Wer einen ergänzt,
 # schreibt dazu, warum der Befund getragen wird und was ihn auflöst.
 #
-# **Zurzeit leer, und das ist der Punkt.** Unter Gradio 5.50 standen hier 30
-# Befunde (7× gradio, 18× pillow, 5× starlette) — alle nicht behebbar, weil
-# Gradio selbst `pillow<12.0` und `starlette<1.0` deckelte. Mit dem Sprung auf
-# 6.22 (#61a) sind sie sämtlich weg; auch PYSEC-2026-211, für das es unter
-# 5.x überhaupt keine Fassung gab. Dass die Liste leer werden *musste*, hat
-# der Abgleich selbst gemeldet: stehengebliebene Einträge sind rot.
+# **Zwischen 2026-08-03 und 2026-11-01 war die Liste leer.** Unter Gradio
+# 5.50 standen hier 30 Befunde, alle an Gradios Deckeln `pillow<12.0` und
+# `starlette<1.0`; der Sprung auf 6.22 (#61a) hat sie sämtlich aufgelöst.
 #
-# Stand: 2026-08-03, nach dem Sprung auf Gradio 6.22.
+# **Seit 2026-11-01 trägt sie wieder zwei Gruppen, und beide haben dieselbe
+# Wurzel: Python 3.10 ist im Oktober 2026 EOL gegangen.** Die behobenen
+# Fassungen von filelock (4.2.1) und pillow (13.0.0) verlangen Python ≥ 3.11
+# und sind auf der versprochenen Untergrenze 3.10 — auf der dieser Job läuft —
+# nicht installierbar. Bei pillow kommt Gradios Deckel `pillow<13.0` dazu, der
+# auch in 6.31 (2026-10-28) noch steht.
+#
+# Stand: 2026-11-02, Gradio 6.22, Audit unter Python 3.10.
 
-groups: []
+groups:
+  - package: filelock
+    reason: >-
+      Behoben in 4.2.1 — aber 4.2.x verlangt **Python ≥ 3.11**; auf 3.10 endet
+      filelock bei 4.1.0. Transitiv über huggingface_hub, das Projekt sperrt
+      selbst keine Dateien damit. Alle Befunde betreffen `SoftFileLock`/
+      Lockdateien in einem Verzeichnis, das ein *anderer lokaler Nutzer*
+      beschreiben kann (CVSS AV:L) — auf einer Einzelplatz-Installation ohne
+      fremde Konten nicht erreichbar. Löst sich mit dem Anheben der
+      Python-Untergrenze auf 3.11.
+    ids:
+      - CVE-2026-112906
+      - CVE-2026-112907
+      - CVE-2026-112908
+      - CVE-2026-112909
+      - CVE-2026-112910
+      - CVE-2026-112911
+      - CVE-2026-112912
+      - CVE-2026-112913
+      - CVE-2026-112914
+      - CVE-2026-112915
+      - CVE-2026-112934
+      - CVE-2026-112935
+      - CVE-2026-112937
+      - CVE-2026-112938
+      - CVE-2026-112939
+      - CVE-2026-112940
+      - CVE-2026-112941
+
+  - package: pillow
+    reason: >-
+      Behoben in 13.0.0 — doppelt unerreichbar: 13.0 verlangt **Python ≥ 3.11**,
+      und **Gradio deckelt `pillow<13.0`** (6.22 wie 6.31). Ein eigener Pin
+      machte die Auflösung nur unlösbar. pillow ist reine
+      Transitiv-Abhängigkeit: die App öffnet damit nur die mitgelieferten
+      Persona-Porträts, alle `gr.Image` sind Anzeige ohne Upload. Das gilt
+      auch für den einzigen HIGH-Befund (GHSA-78g4, libopenjp2 über
+      `Image.open`). Löst sich, sobald Gradio den Deckel hebt *und* die
+      Untergrenze bei 3.11 liegt — wer ein Bild-Upload einbaut, muss diese
+      Gruppe vorher neu bewerten.
+    ids:
+      - CVE-2026-96638
+      - CVE-2026-96640
+      - CVE-2026-96778
+      - CVE-2026-112390
+      - CVE-2026-112391
+      - CVE-2026-112393
+      - CVE-2026-112395
+      - CVE-2026-112399
+      - CVE-2026-112400
+      - CVE-2026-112401
+      - CVE-2026-112404
+      - CVE-2026-112406
+      - CVE-2026-112891
+      - CVE-2026-112892
+      - CVE-2026-112893
+      - CVE-2026-112894
+      - CVE-2026-112895
+      - CVE-2026-112897
+      - CVE-2026-112899
+      - CVE-2026-112900
+      - GHSA-78g4-xqwv-q3g8 # HIGH, nur über Image.open erreichbar
+      - PYSEC-2026-4326
+      - PYSEC-2026-4327
+      - PYSEC-2026-4328
+      - PYSEC-2026-4329
+      - PYSEC-2026-4330
+      - PYSEC-2026-4331
+      - PYSEC-2026-4332
+      - PYSEC-2026-4333
+      - PYSEC-2026-4334
+      - PYSEC-2026-4335
+      - PYSEC-2026-4336
+      - PYSEC-2026-4337
+      - PYSEC-2026-4338
+      - PYSEC-2026-4339
+      - PYSEC-2026-4340
+      - PYSEC-2026-4341
+      - PYSEC-2026-4342
+      - PYSEC-2026-4343
