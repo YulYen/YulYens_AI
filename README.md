@@ -1,6 +1,6 @@
 # Yul Yen's AI Orchestra
 ![MIT License](https://img.shields.io/badge/License-MIT-green.svg)
-![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)
 
 Ein modulares Multi-Persona-KI-System, das **komplett lokal** läuft — kein Cloud-Zwang, keine Daten verlassen den Rechner.
 Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Charakteren, **Offline-Wikipedia-Integration** via Kiwix und drei Zugangswegen: Web-UI, Terminal und HTTP-API.
@@ -125,7 +125,7 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 
 ## ⚙️ Mindest-Anforderungen
 
-- **Python 3.10+** (die CI prüft 3.10 und 3.13; 3.11 und 3.12 sind gegen die volle Suite gefahren)
+- **Python 3.12+** (die CI prüft 3.12 und 3.14)
 - **Ollama** (lokal installiert)
 - mindestens ein lokales Modell, z. B. **ministral-3:8b** (Default in `config.yaml`;
   zur Modellwahl siehe [Modellwechsel-Analyse November 2026](docs/modellwechsel_november_2026.md)
