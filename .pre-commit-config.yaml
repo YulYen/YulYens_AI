@@ -2,7 +2,7 @@
 # Versions are kept in sync with requirements-dev.txt.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
         # Keep intentional Markdown hard line breaks (two trailing spaces)
@@ -18,6 +18,6 @@ repos:
         # We use Black for formatting; keep ruff-format off and rely on Black below.
         stages: [manual]
   - repo: https://github.com/psf/black
-    rev: 24.4.2
+    rev: 26.10.1
     hooks:
       - id: black

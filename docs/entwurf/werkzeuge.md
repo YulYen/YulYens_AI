@@ -112,7 +112,7 @@ gesamte `src`; `make types` ist die lokale Kurzform und fährt beide Läufe.
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
-sind in `requirements-dev.txt` gepinnt** (aktuell `black==24.4.2`, `ruff==0.17.3`) —
+sind in `requirements-dev.txt` gepinnt** (aktuell `black==26.10.1`, `ruff==0.17.3`) —
 exakt dieselben Versionen in `.pre-commit-config.yaml`. Eine **abweichende lokale
 Black-Version formatiert anders und lässt die CI fehlschlagen.** Daher:
 
@@ -183,11 +183,14 @@ python -m black .        # statt: black .
 python -m ruff check .   # statt: ruff check .
 ```
 
-Grund: In Sandboxes/CI-Runnern/Systemen liegt oft ein **anderes, neueres Black
-im PATH** (z. B. `/root/.local/bin/black`), das das pip-installierte, gepinnte
-24.4.2 verdeckt. Neuere Black-Versionen formatieren Multiline-Strings anders
+Grund: In Sandboxes/CI-Runnern/Systemen liegt oft ein **anderes Black im
+PATH** (z. B. `/root/.local/bin/black`), das das pip-installierte, gepinnte
+verdeckt. Black-Versionen formatieren Multiline-Strings verschieden
 ("hugging" von `gr.HTML("""…""")`) → lokal sieht alles sauber aus, aber
-`black --check .` in der CI schlägt fehl. Vor dem Formatieren im Zweifel
+`black --check .` in der CI schlägt fehl. Beim Sprung von 24.4.2 auf 26 (#79)
+war genau das Hugging der ganze Diff, zwei Dateien. Seither läuft die Gefahr
+andersherum: ein *älteres* Black aus einem nicht aufgefrischten venv macht es
+rückgängig. Vor dem Formatieren im Zweifel
 `python -m black --version` gegen den Pin in `requirements-dev.txt` prüfen
 (`black --version` zeigt ggf. das falsche PATH-Binary!). Das Makefile ruft
 bewusst `python -m black`/`python -m ruff` auf.

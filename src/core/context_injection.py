@@ -43,7 +43,7 @@ def is_injected(message: Mapping[str, Any]) -> bool:
 
 
 def conversation_only(
-    messages: Iterable[Mapping[str, Any]] | None
+    messages: Iterable[Mapping[str, Any]] | None,
 ) -> list[dict[str, Any]]:
     """Der Gesprächsstand ohne injizierten Fremdkontext.
 
