@@ -13,7 +13,7 @@ from email.header import decode_header, make_header
 from email.message import EmailMessage, Message
 from email.policy import default
 from email.utils import getaddresses, make_msgid, parseaddr
-from typing import Protocol, cast
+from typing import Protocol
 
 from api.provider import AiApiProvider
 from core.utils import resolve_secret
@@ -343,13 +343,12 @@ class EmailAdapterService:
             logging.warning("IMAP fetch for uid=%s did not contain message bytes.", uid)
             return None
 
-        # typeshed gibt `message_from_bytes(..., policy=default)` als
-        # `Message` an. Zur Laufzeit baut die Policy über ihre
-        # `message_factory` aber eine `EmailMessage` — und nur die hat
-        # `get_content()`, auf dem `_extract_text` weiter unten steht. Der
-        # cast hält genau diese Zusage fest, an der Stelle, an der sie
-        # entsteht: `policy=default` ist tragend, nicht Geschmackssache.
-        msg = cast(EmailMessage, message_from_bytes(raw, policy=default))
+        # `policy=default` ist tragend, nicht Geschmackssache: erst damit baut
+        # die Policy über ihre `message_factory` eine `EmailMessage` — und nur
+        # die hat `get_content()`, auf dem `_extract_text` weiter unten steht.
+        # Früher hielt ein `cast` das fest; seit mypy 1.20 kennt typeshed die
+        # Überladung selbst, ohne `policy` ergäbe sich hier wieder `Message`.
+        msg = message_from_bytes(raw, policy=default)
         return IncomingEmail(
             uid=uid,
             # **`From`, nicht `Reply-To`** (#14d). Über `Reply-To` liess sich

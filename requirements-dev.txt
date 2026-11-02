@@ -6,13 +6,13 @@ black==24.4.2
 # damit unerfüllbar, und ein `pip install` zog stillschweigend eine andere
 # Version über den Pin. Genau die Falle, die CLAUDE.md fürs PATH-Shadowing
 # beschreibt, nur über die Abhängigkeiten statt über den PATH.
-ruff==0.16.1
+ruff==0.17.3
 # Typprüfung über das ganze src (#52) — Konfiguration in pyproject.toml.
 # Achtung: mypy braucht dafür auch die *Laufzeit*-Abhängigkeiten aus
 # requirements.txt, sonst meldet es import-not-found statt zu prüfen.
-mypy==1.10.1
+mypy==1.20.2
 # Schichtenverträge (siehe [tool.importlinter] in pyproject.toml).
-import-linter==2.13
+import-linter==2.15
 types-requests
 types-PyYAML
 pytest>=8.2,<9.0

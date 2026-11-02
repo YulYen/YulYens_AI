@@ -8,12 +8,14 @@
 # Zurueckdrehen wieder faende: `gr.Chatbot` kennt kein `type` mehr (das
 # Paarformat ist weg, siehe webui_format.ChatMessage), und `gr.Blocks(js=…)`
 # wirkt nicht mehr — das Lade-Skript geht an `launch()`.
-fastapi==0.141.1
-starlette==1.3.1
-uvicorn[standard]==0.30.6
-gradio==6.22.0
-gradio_client==2.6.0     # gehoert zu gradio 6.22, zusammen heben
-pydantic==2.12.3
+fastapi==0.162.0
+# 1.7 ist die letzte Fassung fuer Python 3.10, ab 1.8 verlangt starlette 3.11.
+# Hoeher erst mit der neuen Untergrenze (#79).
+starlette==1.7.0
+uvicorn[standard]==0.54.0
+gradio==6.31.0
+gradio_client==2.7.2     # gehoert zu gradio 6.31, zusammen heben
+pydantic==2.14.2
 # Deckel `<1.0` ist mit #61a entfallen: er stammte daher, dass gradio 4.44
 # `HfFolder` importierte (in hf_hub 1.0 entfernt). Gradio 6 verlangt selbst
 # 1.x, der alte Pin waere unerfuellbar.
@@ -24,6 +26,6 @@ PyYAML>=6.0,<7.0
 colorama>=0.4.6,<0.5
 beautifulsoup4>=4.12,<5.0
 spacy>=3.7,<4.0
-annotated-types==0.7.0   # Ergaenzt fuer Reproduzierbarkeit
+annotated-types==0.8.0   # Ergaenzt fuer Reproduzierbarkeit
 
 # Test-/Dev-Tooling (pytest, black, ruff, pre-commit): requirements-dev.txt
