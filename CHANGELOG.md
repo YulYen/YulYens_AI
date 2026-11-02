@@ -55,6 +55,15 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
+- **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
+  reached its end of life in October 2026, and the libraries this project
+  depends on no longer ship fixes for it — security fixes for two of them
+  could not even be installed there. On 3.10 or 3.11, `pip install -r
+  requirements.txt` now fails with "no matching distribution"; create a new
+  virtual environment with 3.12+ and install the requirements again. Tested
+  in CI on 3.12 (Linux and Windows) and 3.14. 3.15 is not supported yet,
+  because the speech output (Piper) has no build for it.
+
 - The feedback vote log moved from `logs/feedback_votes.jsonl` to
   `data/feedback_votes.jsonl`, next to the conversation store it refers to.
   `logs/` holds diagnostics you may delete at any time; these votes are
