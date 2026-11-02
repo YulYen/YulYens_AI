@@ -317,8 +317,7 @@ def build_ui(
     with gr.Blocks() as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
 
-        gr.HTML(
-            """
+        gr.HTML("""
                 <style>
                 .persona-row { gap:24px; }
                 .persona-card {
@@ -418,8 +417,7 @@ def build_ui(
                 }
                 .theme-switch button:hover { opacity: 1; }
                 </style>
-            """
-        )
+            """)
         # Theme-Umschalter (#69). Der Startwert ist eine Annahme — der Server
         # weiß nicht, was der Browser gerade anzeigt; `theme_restore_js` setzt
         # die Beschriftung beim Laden gerade.

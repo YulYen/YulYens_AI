@@ -9,23 +9,19 @@
 # Paarformat ist weg, siehe webui_format.ChatMessage), und `gr.Blocks(js=…)`
 # wirkt nicht mehr — das Lade-Skript geht an `launch()`.
 fastapi==0.162.0
-# 1.7 ist die letzte Fassung fuer Python 3.10, ab 1.8 verlangt starlette 3.11.
-# Hoeher erst mit der neuen Untergrenze (#79).
-starlette==1.7.0
+# Eigener Pin, obwohl wir starlette nicht direkt importieren: er haelt die
+# Sicherheitsuntergrenze fest, die FastAPI (>=0.46) und Gradio (>=1.0.1) nicht
+# verlangen. Ab 1.8 braucht starlette Python 3.11 — seit #79 kein Hindernis.
+starlette==1.10.0
 uvicorn[standard]==0.54.0
 gradio==6.31.0
 gradio_client==2.7.2     # gehoert zu gradio 6.31, zusammen heben
 pydantic==2.14.2
-# Deckel `<1.0` ist mit #61a entfallen: er stammte daher, dass gradio 4.44
-# `HfFolder` importierte (in hf_hub 1.0 entfernt). Gradio 6 verlangt selbst
-# 1.x, der alte Pin waere unerfuellbar.
-huggingface_hub>=1.0,<2.0
 ollama>=0.1,<1.0         # Python-Client fuer Ollama
 requests>=2.31,<3.0
 PyYAML>=6.0,<7.0
 colorama>=0.4.6,<0.5
 beautifulsoup4>=4.12,<5.0
 spacy>=3.7,<4.0
-annotated-types==0.8.0   # Ergaenzt fuer Reproduzierbarkeit
 
 # Test-/Dev-Tooling (pytest, black, ruff, pre-commit): requirements-dev.txt

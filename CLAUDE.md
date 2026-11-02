@@ -120,7 +120,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 
 | Bereich | Tech |
 |---|---|
-| Sprache | Python 3.10+ |
+| Sprache | Python 3.12+ |
 | LLM-Backend | Ollama (lokal) |
 | Web-UI | Gradio 6.31 |
 | API | FastAPI + Uvicorn |

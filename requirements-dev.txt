@@ -1,6 +1,6 @@
 # Development tooling (formatting, linting, tests).
 # Pinned so CI and local runs agree on formatting decisions.
-black==24.4.2
+black==26.10.1
 # Ruff-Sprung ist von Gradio 5 erzwungen, nicht gewählt: `gradio` führt ruff
 # als *Laufzeit*-Abhängigkeit und fordert >=0.9.3 — der alte Pin 0.4.10 war
 # damit unerfüllbar, und ein `pip install` zog stillschweigend eine andere
@@ -10,11 +10,11 @@ ruff==0.17.3
 # Typprüfung über das ganze src (#52) — Konfiguration in pyproject.toml.
 # Achtung: mypy braucht dafür auch die *Laufzeit*-Abhängigkeiten aus
 # requirements.txt, sonst meldet es import-not-found statt zu prüfen.
-mypy==1.20.2
+mypy==2.4.1
 # Schichtenverträge (siehe [tool.importlinter] in pyproject.toml).
 import-linter==2.15
 types-requests
 types-PyYAML
-pytest>=8.2,<9.0
-pytest-cov>=5.0,<7.0
-pre-commit>=3.7,<4.0
+pytest>=9.2,<10.0
+pytest-cov>=7.0,<8.0
+pre-commit>=4.7,<5.0

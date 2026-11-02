@@ -184,9 +184,6 @@ def render_markdown(run: EvalRun) -> str:
         # nie zutreffen könnte. Wer den Report liest, sucht dann einen Fehler
         # im Korpus, den es nicht gibt (genau das ist beim Baseline-Lauf
         # passiert). `\|` hält die Markdown-Tabelle heil und den Regex lesbar.
-        # Die Ersetzung steht bewusst außerhalb des f-Strings: Backslashes in
-        # f-String-Ausdrücken sind erst ab Python 3.12 erlaubt, das Projekt
-        # sagt 3.10+.
         safe_note = note.replace("|", "\\|")
         lines.append(
             f"| {result.group} | `{result.case_id}` | {status} | {score} "

@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           cache: pip
       - name: Install tooling
         run: pip install -r requirements-dev.txt
@@ -36,9 +36,13 @@ jobs:
     #
     # Blockierend, aber nicht naiv: nacktes `pip-audit` stünde hier dauerhaft
     # rot, sobald eine behobene Fassung unerreichbar ist — unter Gradio 5.50
-    # durch dessen Deckel, seit 2026-11 durch die Untergrenze Python 3.10, für
-    # die filelock und pillow keine Fixes mehr bauen. Ein Job, der immer rot
-    # ist, wird ignoriert — dann entwertet er die Farbe für alle anderen mit.
+    # durch dessen Deckel, im November 2026 durch die damalige Untergrenze
+    # Python 3.10, für die filelock und pillow keine Fixes mehr bauten (#79).
+    # Ein Job, der immer rot ist, wird ignoriert — dann entwertet er die Farbe
+    # für alle anderen mit.
+    #
+    # Er läuft auf der **Untergrenze**, nicht auf der neuesten Fassung: dort
+    # löst pip am ältesten auf, also sieht er, was ein Betreiber dort bekommt.
     #
     # `scripts/audit_deps.py` hält den Befundstand deshalb gegen
     # `audit_allowlist.yaml`: bewusst getragene Befunde sind grün, ein neuer
@@ -51,7 +55,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           cache: pip
       - name: Install pip-audit
         run: pip install pip-audit PyYAML
@@ -68,7 +72,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           cache: pip
       - name: Install tooling
         # **Beide** Dateien. Solange nur src/core geprüft wurde, genügten die
@@ -95,13 +99,15 @@ jobs:
     # OS: das Projekt läuft Windows-primär, die CI lief bisher nur auf Linux —
     # winsound- und Pfadprobleme wären hier nie aufgefallen (#45).
     #
-    # Python: die Doku verspricht „3.10+", geprüft wurde nur 3.10. Getestet
-    # werden jetzt die **Enden** — die versprochene Untergrenze und die neueste
-    # Fassung. 3.11 und 3.12 bleiben bewusst draußen: alle vier Versionen sind
-    # vor dem Einbau lokal gegen die volle Suite gefahren worden (je 1154 Tests
-    # grün), und wenn beide Enden halten, ist die Mitte selten die Ausreißerin.
-    # Jede Zeile kostet CI-Minuten bei *jedem* Push — deshalb `include` statt
-    # einer Kreuzmatrix: drei Jobs, nicht vier.
+    # Python: getestet werden die **Enden** — die versprochene Untergrenze und
+    # die neueste ausgereifte Fassung. Die Mitte (3.13) bleibt draußen: wenn
+    # beide Enden halten, ist sie selten die Ausreißerin, und jede Zeile kostet
+    # CI-Minuten bei *jedem* Push — deshalb `include` statt einer Kreuzmatrix:
+    # drei Jobs, nicht vier.
+    #
+    # Untergrenze 3.12 seit #79: 3.10 ist im Oktober 2026 EOL gegangen, numpy
+    # und av verlangen schon 3.12. Oben 3.14 statt 3.15: für 3.15 gibt es noch
+    # kein onnxruntime-Wheel, Piper (Vorlesen) liefe dort nicht.
     #
     # fail-fast: false, damit ein Windows-Fehler das Linux-Ergebnis nicht
     # verschluckt (und umgekehrt).
@@ -113,14 +119,14 @@ jobs:
         include:
           # Die versprochene Untergrenze, auf beiden Betriebssystemen.
           - os: ubuntu-latest
-            python: "3.10"
+            python: "3.12"
             coverage: true
           - os: windows-latest
-            python: "3.10"
+            python: "3.12"
           # Die neueste Fassung. Linux genügt: was hier bricht, sind
           # Sprach-/Bibliotheksänderungen, keine Plattformfragen.
           - os: ubuntu-latest
-            python: "3.13"
+            python: "3.14"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -157,7 +163,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: "3.12"
           cache: pip
       - name: Install dependencies
         run: |

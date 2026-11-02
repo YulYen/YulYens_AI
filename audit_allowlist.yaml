@@ -16,55 +16,27 @@
 # 5.50 standen hier 30 Befunde, alle an Gradios Deckeln `pillow<12.0` und
 # `starlette<1.0`; der Sprung auf 6.22 (#61a) hat sie sämtlich aufgelöst.
 #
-# **Seit 2026-11-01 trägt sie wieder zwei Gruppen, und beide haben dieselbe
-# Wurzel: Python 3.10 ist im Oktober 2026 EOL gegangen.** Die behobenen
-# Fassungen von filelock (4.2.1) und pillow (13.0.0) verlangen Python ≥ 3.11
-# und sind auf der versprochenen Untergrenze 3.10 — auf der dieser Job läuft —
-# nicht installierbar. Bei pillow kommt Gradios Deckel `pillow<13.0` dazu, der
-# auch in 6.31 (2026-10-28) noch steht.
+# **Am 2026-11-01 kamen zwei Gruppen dazu, beide mit derselben Wurzel:
+# Python 3.10 war im Oktober 2026 EOL gegangen.** Die Fixes für filelock
+# (4.2.1) und pillow (13.0.0) verlangten ≥ 3.11 und waren auf der damaligen
+# Untergrenze nicht installierbar. Mit #79 (Untergrenze 3.12) ist filelock
+# erledigt — der Abgleich hat die 17 Einträge selbst als stehengeblieben
+# gemeldet. pillow bleibt: dort deckelt zusätzlich Gradio (`pillow<13.0`,
+# auch in 6.31).
 #
-# Stand: 2026-11-02, Gradio 6.22, Audit unter Python 3.10.
+# Stand: 2026-11-02, Gradio 6.31, Audit unter Python 3.12.
 
 groups:
-  - package: filelock
-    reason: >-
-      Behoben in 4.2.1 — aber 4.2.x verlangt **Python ≥ 3.11**; auf 3.10 endet
-      filelock bei 4.1.0. Transitiv über huggingface_hub, das Projekt sperrt
-      selbst keine Dateien damit. Alle Befunde betreffen `SoftFileLock`/
-      Lockdateien in einem Verzeichnis, das ein *anderer lokaler Nutzer*
-      beschreiben kann (CVSS AV:L) — auf einer Einzelplatz-Installation ohne
-      fremde Konten nicht erreichbar. Löst sich mit dem Anheben der
-      Python-Untergrenze auf 3.11.
-    ids:
-      - CVE-2026-112906
-      - CVE-2026-112907
-      - CVE-2026-112908
-      - CVE-2026-112909
-      - CVE-2026-112910
-      - CVE-2026-112911
-      - CVE-2026-112912
-      - CVE-2026-112913
-      - CVE-2026-112914
-      - CVE-2026-112915
-      - CVE-2026-112934
-      - CVE-2026-112935
-      - CVE-2026-112937
-      - CVE-2026-112938
-      - CVE-2026-112939
-      - CVE-2026-112940
-      - CVE-2026-112941
-
   - package: pillow
     reason: >-
-      Behoben in 13.0.0 — doppelt unerreichbar: 13.0 verlangt **Python ≥ 3.11**,
-      und **Gradio deckelt `pillow<13.0`** (6.22 wie 6.31). Ein eigener Pin
-      machte die Auflösung nur unlösbar. pillow ist reine
+      Behoben in 13.0.0 — aber **Gradio deckelt `pillow<13.0`** (6.22 wie
+      6.31). Ein eigener Pin machte die Auflösung nur unlösbar. pillow ist reine
       Transitiv-Abhängigkeit: die App öffnet damit nur die mitgelieferten
       Persona-Porträts, alle `gr.Image` sind Anzeige ohne Upload. Das gilt
       auch für den einzigen HIGH-Befund (GHSA-78g4, libopenjp2 über
-      `Image.open`). Löst sich, sobald Gradio den Deckel hebt *und* die
-      Untergrenze bei 3.11 liegt — wer ein Bild-Upload einbaut, muss diese
-      Gruppe vorher neu bewerten.
+      `Image.open`). Löst sich, sobald Gradio den Deckel hebt (die
+      Python-Seite ist seit #79 erfüllt) — wer ein Bild-Upload einbaut, muss
+      diese Gruppe vorher neu bewerten.
     ids:
       - CVE-2026-96638
       - CVE-2026-96640
