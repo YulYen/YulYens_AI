@@ -193,6 +193,9 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     comparison = compare(findings_from_report(report), allowed)
+    # Windows-Konsole ist cp1252 und stürzte an ✗ ab — wie in launch.py --doctor.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     print(render(comparison))
     return 0 if comparison.ok else 1
 

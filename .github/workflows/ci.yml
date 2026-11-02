@@ -10,8 +10,8 @@ jobs:
     name: Format, lint & Schichten
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           cache: pip
@@ -35,9 +35,10 @@ jobs:
     # Bekannte Schwachstellen in den gepinnten Abhängigkeiten (#61).
     #
     # Blockierend, aber nicht naiv: nacktes `pip-audit` stünde hier dauerhaft
-    # rot, weil Gradio 5.50 `pillow<12.0` und `starlette<1.0` deckelt und die
-    # Fassungen damit unerreichbar sind. Ein Job, der immer rot ist, wird
-    # ignoriert — dann entwertet er die Farbe für alle anderen mit.
+    # rot, sobald eine behobene Fassung unerreichbar ist — unter Gradio 5.50
+    # durch dessen Deckel, seit 2026-11 durch die Untergrenze Python 3.10, für
+    # die filelock und pillow keine Fixes mehr bauen. Ein Job, der immer rot
+    # ist, wird ignoriert — dann entwertet er die Farbe für alle anderen mit.
     #
     # `scripts/audit_deps.py` hält den Befundstand deshalb gegen
     # `audit_allowlist.yaml`: bewusst getragene Befunde sind grün, ein neuer
@@ -47,8 +48,8 @@ jobs:
     name: Abhängigkeiten prüfen (pip-audit)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           cache: pip
@@ -64,8 +65,8 @@ jobs:
     name: Typen (mypy)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           cache: pip
@@ -121,8 +122,8 @@ jobs:
           - os: ubuntu-latest
             python: "3.13"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "${{ matrix.python }}"
           cache: pip
@@ -153,8 +154,8 @@ jobs:
     name: Tests mit spaCy-Modell
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.10"
           cache: pip
@@ -174,7 +175,7 @@ jobs:
           echo "spacy=${ver}" >> "$GITHUB_OUTPUT"
       - name: spaCy-Modelle aus dem Cache holen
         id: spacy-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           # Key trägt die Modellversion: eine neue spaCy-Minor lädt neu, sonst nie.
           path: ~/spacy-models
