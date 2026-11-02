@@ -44,10 +44,13 @@ Befund geliefert, den der Linux-Lauf nie sehen konnte (typeshed gibt
 `SND_FILENAME` als `Literal[131072]`, das folgende `|=` macht ein `int` daraus).
 
 Was dabei **nicht** passieren darf: eine Prüfung abschalten, damit die Zahl
-sinkt. Alle 55 Befunde sind behoben, nicht stummgeschaltet; wo ein `cast` steht
-(Mail-Adapter) oder ein `Any` (`WebUI.texts`), steht die Begründung daneben —
-ein `Any` ohne Grund ist ein Stummschalter, genau wie ein Allowlist-Eintrag
-ohne Grund.
+sinkt. Alle 55 Befunde sind behoben, nicht stummgeschaltet; wo ein `Any` steht
+(`WebUI.texts`), steht die Begründung daneben — ein `Any` ohne Grund ist ein
+Stummschalter, genau wie ein Allowlist-Eintrag ohne Grund. Der `cast` im
+Mail-Adapter ist mit mypy 1.20 entfallen: typeshed kennt die Überladung von
+`message_from_bytes(..., policy=default)` inzwischen selbst, und
+`warn_redundant_casts` hat das gemeldet — eine Begründung, die der Prüfer
+überholt, gehört raus wie ein erledigter Allowlist-Eintrag.
 
 ### Schichten sind ein Vertrag, keine Absichtserklärung (import-linter)
 
@@ -109,7 +112,7 @@ gesamte `src`; `make types` ist die lokale Kurzform und fährt beide Läufe.
 
 ### Pre-commit / Versions-Pinning (wichtig!)
 CI (`.github/workflows/ci.yml`) prüft `black --check .` + `ruff check .`. **Black/Ruff
-sind in `requirements-dev.txt` gepinnt** (aktuell `black==24.4.2`, `ruff==0.16.1`) —
+sind in `requirements-dev.txt` gepinnt** (aktuell `black==24.4.2`, `ruff==0.17.3`) —
 exakt dieselben Versionen in `.pre-commit-config.yaml`. Eine **abweichende lokale
 Black-Version formatiert anders und lässt die CI fehlschlagen.** Daher:
 

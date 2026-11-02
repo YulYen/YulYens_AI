@@ -122,7 +122,7 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 |---|---|
 | Sprache | Python 3.10+ |
 | LLM-Backend | Ollama (lokal) |
-| Web-UI | Gradio 6.22 |
+| Web-UI | Gradio 6.31 |
 | API | FastAPI + Uvicorn |
 | NLP/Wiki | spaCy + Kiwix/Wikipedia |
 | TTS | Piper (ONNX; Terminal: Autoplay über winsound/CLI-Player, WebUI: Browser-Playback) |
