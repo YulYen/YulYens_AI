@@ -39,6 +39,7 @@ from ui.webui_format import (
     format_ask_all_results,
     format_wiki_sources,
     messages_to_chat_history,
+    user_bubble,
 )
 from ui.webui_layout import (
     PERSONA_OUTPUT_KEYS,
@@ -55,7 +56,6 @@ if TYPE_CHECKING:
     from config.config_singleton import Config
     from core.factory import AppFactory
 
-# One chatbot entry: (user_text, bot_text) — either side may be None.
 # Anzeige-Nachricht im `messages`-Format (#61a) — siehe webui_format.
 ChatPair = ChatMessage
 Message = dict[str, str]
@@ -889,7 +889,7 @@ class WebUI:
         title = self._t(
             "self_talk_chat_label", persona_a=persona_a, persona_b=persona_b
         )
-        chat_history = [(start_prompt, None)]
+        chat_history = [user_bubble(start_prompt)]
         history_state = [{"role": "user", "content": start_prompt}]
         meta = self._build_meta(f"self-talk:{persona_a},{persona_b}")
         return (
