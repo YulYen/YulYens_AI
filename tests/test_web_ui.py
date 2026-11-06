@@ -593,6 +593,27 @@ def test_on_start_self_talk_validates_distinct_personas():
     assert updates[0]["visible"] is True
 
 
+def test_on_start_self_talk_chatbot_value_passes_real_gradio_check():
+    """Die Startzeile muss durch das echte `gr.Chatbot` — nicht durch einen Vergleich.
+
+    Sie stand nach #61a noch im Paarformat `[(prompt, None)]`. Gradio 6 lehnt
+    das in `Chatbot._check_format` ab („Data incompatible with messages
+    format"), der Self-Talk startete in der WebUI nicht mehr. Kein Test hatte
+    den Erfolgsweg des Starts je durch Gradio geschickt.
+    """
+    # Echte Texte: der SelfTalkRunner formatiert beim Bauen seine Leitplanke.
+    web_ui = _create_web_ui(texts=Texts("de"))
+    web_ui.cfg.core = {"model_name": "m:1"}
+    session = SessionContext()
+
+    updates = web_ui._on_start_self_talk(session, "LEAH", "DORIS", "Los geht's")
+
+    chat_value = updates[1]["value"]
+    gr.Chatbot().postprocess(chat_value)
+    assert chat_value == [{"role": "user", "content": "Los geht's"}]
+    assert updates[2] == [{"role": "user", "content": "Los geht's"}]
+
+
 def test_run_self_talk_stream_yields_alternating_messages():
     web_ui = _create_web_ui()
     session = SessionContext()

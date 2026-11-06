@@ -84,6 +84,14 @@ in them turns out to be wrong, it gets corrected in a later entry.
   older file, set `wiki.offline.zim_prefix` and `zim_path` to it as well —
   the personas are told the dump date from `zim_prefix`.
 
+### Fixed
+
+- **Self-talk in the web UI starts again.** Since 2.0.0, pressing start on the
+  self-talk card failed with "Data incompatible with messages format" in the
+  console instead of opening the conversation. The opening prompt was still
+  sent to the chat window in the format of the previous Gradio version. The
+  terminal self-talk was not affected.
+
 ## [2.0.0] - 2026-08-05
 
 Baseline. Changelog-keeping starts here; this entry deliberately does not
