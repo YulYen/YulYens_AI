@@ -2,9 +2,22 @@
 
 Diese Tests sind absichtlich **ausgeschaltet**. Sie beschreiben, was ein Modell
 der 14B-Klasse (geplant: `ministral-3:14b`) können sollte, das heutige
-`ministral-3:8b` aber vermutlich nicht. Sie werden aktiviert, wenn der Default
-in `config.yaml` auf das größere Modell wechselt — vorher kalibrieren, siehe
-#78 in `backlog.md`.
+`ministral-3:8b` aber nicht — am 2026-11-02 gemessen: 0 von 5 bei beiden
+Tests. Sie werden aktiviert, wenn der Default in `config.yaml` auf das größere
+Modell wechselt — vorher kalibrieren, siehe #78 in `backlog.md`.
+
+Von Hand einschalten, ein Modell pro Lauf, mit Logdatei (PowerShell, braucht
+Ollama)::
+
+    $env:YULYEN_14B_TESTS = "1"
+    $env:YULYEN_TEST_MODEL = "leo-hessianai-13b-chat.Q5:latest"
+    python -m pytest tests/test_ai_via_api_14b.py -rA | Tee-Object logs/14b_leo13b.txt
+
+`YULYEN_TEST_MODEL` (aus `tests/conftest.py`) ersetzt das Modell aus der
+Config; ohne ihn läuft der Default. `-rA` zeigt die Antwort des Modells auch
+bei bestandenen Tests. Mehrere Läufe: die letzte Zeile in `1..5 | % { … }`
+fassen und `Tee-Object -Append` nehmen. Danach beide Variablen mit
+`Remove-Item Env:YULYEN_14B_TESTS, Env:YULYEN_TEST_MODEL` wieder entfernen.
 
 Warum gerade diese Aufgaben: In Mistrals eigener Tabelle (Ministral-3-Paper,
 arXiv 2601.08584) trennt einfacher Code die beiden Größen kaum (MBPP 70,0 gegen
@@ -16,6 +29,7 @@ Rechen- oder Programmierfleißarbeit.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -23,19 +37,23 @@ import unicodedata
 
 import pytest
 
-_WARTET_AUF_14B = pytest.mark.skip(
+_WARTET_AUF_14B = pytest.mark.skipif(
+    os.environ.get("YULYEN_14B_TESTS") != "1",
     reason=(
         "Wartet auf den Modellwechsel (#78): ministral-3:8b schafft das "
-        "vermutlich nicht, ministral-3:14b auf 16 GB VRAM hoffentlich. "
-        "Vor dem Aktivieren kalibrieren."
-    )
+        "nicht, ministral-3:14b auf 16 GB VRAM hoffentlich. Von Hand mit "
+        "YULYEN_14B_TESTS=1, siehe Modul-Docstring."
+    ),
 )
 
 
 def _frage(client, frage: str, persona: str = "PETER") -> str:
     response = client.post("/ask", json={"question": frage, "persona": persona})
     assert response.status_code == 200, response.text[:500]
-    return response.json().get("answer", "")
+    antwort = response.json().get("answer", "")
+    # Für -rA: beim Kalibrieren zählt auch, *wie* ein bestandener Lauf aussah.
+    print(f"--- Antwort ---\n{antwort}")
+    return antwort
 
 
 def _normalize(text: str) -> str:
