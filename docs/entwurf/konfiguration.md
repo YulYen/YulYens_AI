@@ -13,7 +13,7 @@ Wichtige Schalter:
 ```yaml
 core:
   backend: "ollama"          # oder "dummy" für Tests
-  model_name: "ministral-3:8b"
+  model_name: "ministral-3:14b"
   warm_up: true              # Modell beim Start im Hintergrund vorladen
   keep_alive: 600            # Sekunden im Speicher nach Request (-1 = für immer)
   include_date: true         # Datum in System-Prompts
