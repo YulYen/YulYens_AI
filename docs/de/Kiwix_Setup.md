@@ -8,7 +8,7 @@ Laufzeit. Dafür braucht es zwei Dinge:
 2. ein **ZIM-Archiv** — die eigentliche Wikipedia als eine einzige Datei
 
 Diese Anleitung beschreibt Erstinstallation und Update. Referenz-Setup ist Windows
-mit dem Ordner `C:\wikipedia-de-offline\`; unter Linux/macOS funktioniert alles
+mit dem Ordner `C:\Develop\wikipedia-de-offline\`; unter Linux/macOS funktioniert alles
 analog mit angepassten Pfaden.
 
 ---
@@ -34,7 +34,7 @@ Von der offiziellen Download-Seite: <https://download.kiwix.org/release/kiwix-to
 (für Windows das `..._win-i686.zip` bzw. aktuelle x64-Paket). Entpacken nach:
 
 ```
-C:\wikipedia-de-offline\
+C:\Develop\wikipedia-de-offline\
 ├── kiwix-serve.exe
 ├── kiwix-manage.exe
 └── kiwix-search.exe
@@ -48,8 +48,8 @@ Gesucht ist die jeweils **neueste** Datei nach dem Muster
 `wikipedia_de_all_nopic_JJJJ-MM.zim`. Download z. B. per Browser oder:
 
 ```powershell
-curl.exe -L -o "C:\wikipedia-de-offline\wikipedia_de_all_nopic_2026-01.zim" `
-  "https://download.kiwix.org/zim/wikipedia/wikipedia_de_all_nopic_2026-01.zim"
+curl.exe -L -o "C:\Develop\wikipedia-de-offline\wikipedia_de_all_nopic_2026-10.zim" `
+  "https://download.kiwix.org/zim/wikipedia/wikipedia_de_all_nopic_2026-10.zim"
 ```
 
 ⏳ Bei 14 GB je nach Anbindung 30 Minuten bis einige Stunden.
@@ -62,10 +62,10 @@ wiki:
   offline:
     host: "127.0.0.1"
     kiwix_port: 8080
-    zim_prefix: "wikipedia_de_all_nopic_2026-01"   # Dateiname ohne .zim
+    zim_prefix: "wikipedia_de_all_nopic_2026-10"   # Dateiname ohne .zim
     autostart: true                                 # kiwix-serve automatisch starten
-    kiwix_exe: "C:/wikipedia-de-offline/kiwix-serve.exe"
-    zim_path: "C:\\wikipedia-de-offline\\wikipedia_de_all_nopic_2026-01.zim"
+    kiwix_exe: "C:/Develop/wikipedia-de-offline/kiwix-serve.exe"
+    zim_path: "C:\\Develop\\wikipedia-de-offline\\wikipedia_de_all_nopic_2026-10.zim"
 ```
 
 Wichtig: `zim_prefix` muss exakt zum Dateinamen (ohne `.zim`) passen — daraus liest

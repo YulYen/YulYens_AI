@@ -73,6 +73,17 @@ in them turns out to be wrong, it gets corrected in a later entry.
   The location follows the directory of `storage.path`, so moving the store
   moves the votes with it.
 
+- The default Kiwix location in `config.yaml` moved from
+  `C:\wikipedia-de-offline\` to `C:\Develop\wikipedia-de-offline\`
+  (`wiki.offline.kiwix_exe` and `wiki.offline.zim_path`). **If your Kiwix
+  folder is still in the old place**, either move it or set both paths in
+  `config.local.yaml`. Otherwise kiwix-serve does not start, `--doctor`
+  reports Kiwix as unreachable, and answers come without Wikipedia snippets.
+  Everything else keeps working. The default dump is now
+  `wikipedia_de_all_nopic_2026-10` (previously `2026-01`). If you keep the
+  older file, set `wiki.offline.zim_prefix` and `zim_path` to it as well —
+  the personas are told the dump date from `zim_prefix`.
+
 ### Fixed
 
 - **Self-talk in the web UI starts again.** Since 2.0.0, pressing start on the
