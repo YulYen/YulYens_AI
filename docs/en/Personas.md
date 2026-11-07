@@ -2,7 +2,7 @@
 
 > ℹ️ **Translation notice (2026-07-04):** This document is an English translation of [`docs/de/Personas.md`](../de/Personas.md). For the authoritative German source, please refer to that file.
 
-The system includes **four AI personas** (agents) with different roles and characters. **All share the same base model** — configured in `config.yaml` under `core.model_name` (currently `ministral-3:8b`) — but differ through individual system prompts and specific generation parameters (defined in `ensembles/classic/personas_base.yaml`). The following sections describe each agent and its characteristics.
+The system includes **four AI personas** (agents) with different roles and characters. **All share the same base model** — configured in `config.yaml` under `core.model_name` (currently `ministral-3:14b`) — but differ through individual system prompts and specific generation parameters (defined in `ensembles/classic/personas_base.yaml`). The following sections describe each agent and its characteristics.
 
 ---
 

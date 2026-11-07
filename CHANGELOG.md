@@ -55,6 +55,15 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
+- **The default model is now `ministral-3:14b`** (previously
+  `ministral-3:8b`). It needs about 9 GB and is meant for a 16 GB graphics
+  card. **Before updating, run `ollama pull ministral-3:14b`.** Without it,
+  `--doctor` reports the model as missing and the personas cannot answer.
+  **On an 8 GB card**, keep the old model by setting
+  `core.model_name: "ministral-3:8b"` in `config.local.yaml`. Both models
+  share the same knowledge cutoff (2023-10), so the date the personas are
+  told about their knowledge stays the same.
+
 - **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
   reached its end of life in October 2026, and the libraries this project
   depends on no longer ship fixes for it — security fixes for two of them

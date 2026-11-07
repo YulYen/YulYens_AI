@@ -63,8 +63,11 @@ siehe auch: [Features.md](Features.md)
 - **Python 3.12+** — geprüft wird in der CI gegen 3.12 und 3.14
 - **Ollama** (oder anderes kompatibles Backend) mit installiertem Modell, z. B.:
   ```bash
-  ollama pull ministral-3:8b
+  ollama pull ministral-3:14b
   ```
+  Das Default-Modell `ministral-3:14b` braucht ~9 GB und ist für 16 GB VRAM gedacht.
+  Mit 8 GB VRAM `ministral-3:8b` pullen und in `config.local.yaml` unter
+  `core.model_name` eintragen.
   (Das Default-Modell steht in `config.yaml` unter `core.model_name`; eine Bewertung
   verschiedener Modelle findet sich in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md)
   für 16 GB VRAM und in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) für 8 GB.)
@@ -144,7 +147,7 @@ core:
   # Backend auswählen: "ollama" (Standard) oder "dummy" (Echo-Backend für Tests)
   backend: "ollama"
   # Standardmodell für Ollama
-  model_name: "ministral-3:8b"
+  model_name: "ministral-3:14b"
   # URL des lokal laufenden Ollama-Servers (Protokoll + Host + Port).
   # Dieser Wert muss explizit gesetzt werden – es gibt keinen stillen Default.
   ollama_url: "http://127.0.0.1:11434"

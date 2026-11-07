@@ -178,7 +178,7 @@ def ask(question: str, person: str, client) -> str:
         {
             "name": "Jens_Spahn_Amt",
             "person": "PETER",
-            "question": "Welches wichtige Amt bekleidet der Politiker Jens Spahn aktuell?",
+            "question": "Welches wichtige Amt bekleidet der Politiker Jens Spahn noch im Juni 2026?",
             # Intentionally broad (tolerant to spelling and inflection)
             "must_contain": ["vorsitzend", "cdu", "fraktion"],
         },
@@ -270,7 +270,9 @@ def test_peter_antwortet_nur_sonne_oder_mond(client):
 @pytest.mark.ollama
 def test_peter_antwortet_in_exakt_fuenf_woertern(client):
     ans_raw = ask(
-        "Antworte mit genau fünf Wörtern. Was hilft gegen Langeweile?", "PETER", client
+        "Antworte mit exakt fünf Wörtern. Nicht mehr und nicht weniger. Was hilft gegen Langeweile?",
+        "PETER",
+        client,
     )
     words = _extract_words(ans_raw)
 

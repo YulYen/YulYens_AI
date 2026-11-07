@@ -50,8 +50,9 @@ The eval corpora under `evals/` are covered from two sides:
 (`@_WARTET_AUF_14B`). They describe what a 14B-class model should manage and
 `ministral-3:8b` does not (measured 2026-11-02: 0 of 5 on both): writing
 working code for commercial rounding, and naming today's country of three
-historical birthplaces. Remove the marker when the default model switches —
-after calibrating as described in #78 in `backlog.md`.
+historical birthplaces. The default switched to `ministral-3:14b` on
+2026-11-07; remove the marker once the calibration described in #78 in
+`backlog.md` is done.
 
 To run them by hand, set `YULYEN_14B_TESTS=1`; `YULYEN_TEST_MODEL` picks the
 model (any `@pytest.mark.ollama` test honours it, see `tests/conftest.py`). The

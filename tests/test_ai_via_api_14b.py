@@ -3,8 +3,9 @@
 Diese Tests sind absichtlich **ausgeschaltet**. Sie beschreiben, was ein Modell
 der 14B-Klasse (geplant: `ministral-3:14b`) können sollte, das heutige
 `ministral-3:8b` aber nicht — am 2026-11-02 gemessen: 0 von 5 bei beiden
-Tests. Sie werden aktiviert, wenn der Default in `config.yaml` auf das größere
-Modell wechselt — vorher kalibrieren, siehe #78 in `backlog.md`.
+Tests. Der Default in `config.yaml` steht seit 2026-11-07 auf `ministral-3:14b`;
+fest eingeschaltet werden sie trotzdem erst nach der Kalibrierung, siehe #78
+in `backlog.md`.
 
 Von Hand einschalten, ein Modell pro Lauf, mit Logdatei (PowerShell, braucht
 Ollama)::
@@ -40,8 +41,8 @@ import pytest
 _WARTET_AUF_14B = pytest.mark.skipif(
     os.environ.get("YULYEN_14B_TESTS") != "1",
     reason=(
-        "Wartet auf den Modellwechsel (#78): ministral-3:8b schafft das "
-        "nicht, ministral-3:14b auf 16 GB VRAM hoffentlich. Von Hand mit "
+        "Wartet auf die Kalibrierung (#78): ministral-3:8b schafft das "
+        "nicht, ministral-3:14b (Default) hoffentlich. Von Hand mit "
         "YULYEN_14B_TESTS=1, siehe Modul-Docstring."
     ),
 )

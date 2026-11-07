@@ -1,6 +1,6 @@
 # KI-Agenten (Personas)
 
-Das System beinhaltet **vier KI-Personas** (Agenten) mit unterschiedlichen Rollen und Charakteren. **Alle nutzen dasselbe Basismodell** — konfiguriert in `config.yaml` unter `core.model_name` (aktuell `ministral-3:8b`) —, unterscheiden sich aber durch individuelle System-Prompts und spezifische Generierungs-Parameter (definiert in `ensembles/classic/personas_base.yaml`). Im Folgenden werden alle vier Agenten und ihre Eigenschaften erläutert.
+Das System beinhaltet **vier KI-Personas** (Agenten) mit unterschiedlichen Rollen und Charakteren. **Alle nutzen dasselbe Basismodell** — konfiguriert in `config.yaml` unter `core.model_name` (aktuell `ministral-3:14b`) —, unterscheiden sich aber durch individuelle System-Prompts und spezifische Generierungs-Parameter (definiert in `ensembles/classic/personas_base.yaml`). Im Folgenden werden alle vier Agenten und ihre Eigenschaften erläutert.
 
 ---
 
