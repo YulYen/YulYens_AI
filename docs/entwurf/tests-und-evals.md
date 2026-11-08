@@ -23,6 +23,13 @@ pytest tests/test_ai_via_api.py  # Gezielt
   `YULYEN_TEST_MODEL` ersetzt dabei das Modell aus `config.yaml` — für
   Modellvergleiche (#78), ohne die Config anzufassen. Gilt nur für Läufe, die
   wirklich Ollama ansprechen; Dummy-Tests bleiben unberührt
+- **Ein Test, der zwei Modelle unterscheiden soll, braucht eine Aufgabe, die
+  trennt** (#78, 2026-11-08). Die ersten 14B-Tests schaffte keins der beiden
+  Modelle (0/20); sie maßen die Aufgabe, nicht das Modell. Kandidaten deshalb
+  gegen *beide* Modelle kalibrieren und nur nehmen, was das stärkere ≥ 19/20 und
+  das schwächere deutlich seltener schafft (`tests/test_ai_via_api_14b.py`).
+  Deutsche Aufgaben mit Zahlen klären den Dezimalpunkt: „2.675" lasen beide
+  Modelle als Tausenderpunkt
 - Marker `@pytest.mark.browser`: fährt die **laufende** WebUI im echten Chromium
   (`make test-browser`, ~100 s). Aus allen anderen Zielen und aus der CI
   ausgenommen, weil er Playwright *und* einen Browser-Build braucht; ohne

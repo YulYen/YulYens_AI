@@ -104,6 +104,32 @@ def ollama_config(request):
 
 
 @pytest.fixture(scope="function")
+def client_with_date(request):
+    """Wie `client`, aber mit dem Zeitstempel-Block im Systemprompt, so wie
+    die App ausgeliefert läuft. Ohne Wiki: das Wissen muss im Modell stecken.
+
+    Gemessen am 2026-11-08 (#78): Ob der Block im Prompt steht, kippt beim 8B
+    eine Wissensfrage von 20/20 auf 0/20. Ein Test, der Modelle vergleicht,
+    misst deshalb unter Betriebsbedingungen.
+    """
+    Config.reset_instance()
+    cfg = Config("config.yaml")
+    cfg.ensemble = "classic"
+    use_ollama = _should_use_ollama(request, cfg)
+    core_updates = {"include_date": True}
+    if not use_ollama:
+        core_updates["backend"] = "dummy"
+    cfg.override("core", core_updates)
+    if use_ollama:
+        _apply_test_model(cfg)
+    cfg.override("wiki", {"mode": False})
+    set_provider(AppFactory().get_api_provider())
+    yield TestClient(app)
+    set_provider(None)
+    Config.reset_instance()
+
+
+@pytest.fixture(scope="function")
 def client_with_date_and_wiki(request):
     if not has_spacy_model("de_core_news_lg"):
         pytest.skip("spaCy model de_core_news_lg not installed")

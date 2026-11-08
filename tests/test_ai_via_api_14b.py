@@ -1,36 +1,37 @@
-"""Geparkte Live-Tests für den Modellwechsel auf 16 GB VRAM (#78).
+"""Live-Tests, die ein Modell der 14B-Klasse besteht und das 8B nicht (#78).
 
-Diese Tests sind absichtlich **ausgeschaltet**. Sie beschreiben, was ein Modell
-der 14B-Klasse (geplant: `ministral-3:14b`) können sollte, das heutige
-`ministral-3:8b` aber nicht — am 2026-11-02 gemessen: 0 von 5 bei beiden
-Tests. Der Default in `config.yaml` steht seit 2026-11-07 auf `ministral-3:14b`;
-fest eingeschaltet werden sie trotzdem erst nach der Kalibrierung, siehe #78
-in `backlog.md`.
+Seit 2026-11-07 ist `ministral-3:14b` der Default. Diese beiden Tests halten fest,
+was es dem 8B voraus hat — kalibriert am 2026-11-08 auf Yuls Kiste, je 20 Läufe
+mit PETERs Einstellungen aus dem Ensemble (siehe ``_KALIBRIERT``). Wer per
+``config.local.yaml`` beim 8B bleibt, sieht sie also rot; das ist ihr Zweck.
 
-Von Hand einschalten, ein Modell pro Lauf, mit Logdatei (PowerShell, braucht
-Ollama)::
+Die Vorgänger (kaufmännisch runden, drei Geburtsorte nach heutigen Grenzen)
+schaffte keines der beiden Modelle: 0 von 20 bei beiden. Sie maßen nur, dass
+die Aufgaben zu schwer waren. Beim Runden lasen beide Modelle "2.675" außerdem
+als deutschen Tausenderpunkt. Gesucht wurde deshalb in drei Runden nach
+Aufgaben, die *trennen*; was beide schaffen (Wochentag, ISO-Kalenderwoche,
+Palindrom mit Umlauten, Hauptstädte) oder beide nicht (IBAN-Prüfziffer,
+Euro-Format), taugt dafür nicht. Messung und Kandidaten:
+``docs/modellwechsel_november_2026.md``, Abschnitt „Messung auf Yuls Kiste".
 
-    $env:YULYEN_14B_TESTS = "1"
-    $env:YULYEN_TEST_MODEL = "leo-hessianai-13b-chat.Q5:latest"
-    python -m pytest tests/test_ai_via_api_14b.py -rA | Tee-Object logs/14b_leo13b.txt
+Gegen ein anderes Modell, ohne die Config anzufassen (PowerShell)::
 
-`YULYEN_TEST_MODEL` (aus `tests/conftest.py`) ersetzt das Modell aus der
-Config; ohne ihn läuft der Default. `-rA` zeigt die Antwort des Modells auch
-bei bestandenen Tests. Mehrere Läufe: die letzte Zeile in `1..5 | % { … }`
-fassen und `Tee-Object -Append` nehmen. Danach beide Variablen mit
-`Remove-Item Env:YULYEN_14B_TESTS, Env:YULYEN_TEST_MODEL` wieder entfernen.
+    $env:YULYEN_TEST_MODEL = "ministral-3:8b"
+    python -m pytest tests/test_ai_via_api_14b.py -m ollama -rA
+    Remove-Item Env:YULYEN_TEST_MODEL
+
+`-rA` zeigt die Antwort des Modells auch bei bestandenen Tests.
 
 Warum gerade diese Aufgaben: In Mistrals eigener Tabelle (Ministral-3-Paper,
 arXiv 2601.08584) trennt einfacher Code die beiden Größen kaum (MBPP 70,0 gegen
 71,6), Faktenwissen dagegen deutlich (TriviaQA 68,1 gegen 74,9). Beide Tests
-setzen deshalb auf *Wissen plus einen Denkschritt* statt auf reine
-Rechen- oder Programmierfleißarbeit.
+brauchen deshalb Wissen: einmal einen Algorithmus, den man kennen muss, einmal
+einen Ortsnamen.
 """
 
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
@@ -38,21 +39,19 @@ import unicodedata
 
 import pytest
 
-_WARTET_AUF_14B = pytest.mark.skipif(
-    os.environ.get("YULYEN_14B_TESTS") != "1",
-    reason=(
-        "Wartet auf die Kalibrierung (#78): ministral-3:8b schafft das "
-        "nicht, ministral-3:14b (Default) hoffentlich. Von Hand mit "
-        "YULYEN_14B_TESTS=1, siehe Modul-Docstring."
-    ),
-)
+# Kalibrierung 2026-11-08, je 20 Läufe, Ensemble "classic" wie ausgeliefert:
+#   ostersonntag:  ministral-3:8b 0/20, ministral-3:14b 20/20
+#   freud:         ministral-3:8b 0/20, ministral-3:14b 20/20  (mit Datum im Prompt;
+#                  ohne Zeitstempel-Block schafft auch das 8B 20/20)
+# Aufgenommen wird eine Aufgabe nur, wenn das 14B mindestens 19 von 20 schafft.
+_KALIBRIERT = "2026-11-08"
 
 
 def _frage(client, frage: str, persona: str = "PETER") -> str:
     response = client.post("/ask", json={"question": frage, "persona": persona})
     assert response.status_code == 200, response.text[:500]
     antwort = response.json().get("answer", "")
-    # Für -rA: beim Kalibrieren zählt auch, *wie* ein bestandener Lauf aussah.
+    # Für -rA: auch ein bestandener Lauf soll zeigen, wie die Antwort aussah.
     print(f"--- Antwort ---\n{antwort}")
     return antwort
 
@@ -63,30 +62,24 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip().lower()
 
 
-# ---- 1. Coding: PETER schreibt Code, der wirklich läuft ------------------------
+# ---- 1. Coding: ein Algorithmus, den man kennen muss -----------------------------
 
-_RUNDEN_AUFGABE = (
-    "Schreibe eine Python-Funktion runde_kaufmaennisch(betrag: str, stellen: int)"
-    " -> str. Sie bekommt einen Geldbetrag als Dezimal-String und rundet ihn"
-    " kaufmännisch auf `stellen` Nachkommastellen: genau halbe Werte immer vom"
-    " Nullpunkt weg. Rückgabe als String mit genau `stellen` Nachkommastellen."
-    ' Beispiele: runde_kaufmaennisch("2.675", 2) == "2.68" und'
-    ' runde_kaufmaennisch("-2.5", 0) == "-3". Nur Standardbibliothek. Antworte nur'
-    " mit dem Code in einem Python-Codeblock."
+_OSTERN_AUFGABE = (
+    "Schreibe eine Python-Funktion ostersonntag(jahr: int) -> str, die das Datum"
+    ' des (westlichen) Ostersonntags als "JJJJ-MM-TT" zurückgibt. Nur'
+    " Standardbibliothek. Antworte nur mit dem Code in einem Python-Codeblock."
 )
 
-# (Betrag, Stellen, erwartet) — jeder Fall fängt mindestens einen typischen Fehler:
-# round() rundet zur geraden Zahl, float kennt 2.675 und 1.005 nicht genau,
-# floor(x + 0.5) rundet negative Werte zur Null hin.
-_RUNDEN_FAELLE = [
-    ("2.675", 2, "2.68"),
-    ("1.005", 2, "1.01"),
-    ("0.125", 2, "0.13"),
-    ("2.5", 0, "3"),
-    ("-2.5", 0, "-3"),
-    ("-0.125", 2, "-0.13"),
-    ("19.995", 2, "20.00"),
-    ("7", 2, "7.00"),
+# Märzostern (2024, 1961), ein später Termin (2038) und die üblichen Jahre: wer
+# Monat und Tag aus der Gaußschen Formel falsch zusammensetzt, verfehlt mindestens
+# einen davon.
+_OSTERN_FAELLE = [
+    (2024, "2024-03-31"),
+    (2025, "2025-04-20"),
+    (2026, "2026-04-05"),
+    (2019, "2019-04-21"),
+    (2038, "2038-04-25"),
+    (1961, "1961-04-02"),
 ]
 
 _HARNISCH = """
@@ -94,37 +87,34 @@ _HARNISCH = """
 import json as _json
 import sys as _sys
 
-_faelle = _json.loads(_sys.argv[1])
-print(_json.dumps([str(runde_kaufmaennisch(b, s)) for b, s in _faelle]))
+print(_json.dumps([str(ostersonntag(j)) for j in _json.loads(_sys.argv[1])]))
 """
 
 
 def _code_aus_antwort(antwort: str) -> str:
     bloecke = re.findall(r"```[a-zA-Z]*\s*\n(.*?)```", antwort, flags=re.DOTALL)
     for block in bloecke:
-        if "def runde_kaufmaennisch" in block:
+        if "def ostersonntag" in block:
             return block
-    return antwort if "def runde_kaufmaennisch" in antwort else ""
+    return antwort if "def ostersonntag" in antwort else ""
 
 
-@_WARTET_AUF_14B
 @pytest.mark.slow
 @pytest.mark.ollama
-def test_peter_schreibt_kaufmaennisches_runden(client, tmp_path):
-    """Die Falle ist Wissen, nicht Fleiß: `round()` rundet in Python zur
-    geraden Zahl (2.5 → 2), und als float ist 2.675 in Wahrheit 2.67499….
-    Bestehen kann nur, wer zu `decimal` mit ROUND_HALF_UP greift.
+def test_peter_berechnet_ostersonntag(client, tmp_path):
+    """Das 8B kennt die Osterformel nur ungefähr und liefert Daten wie
+    "2024-04--1"; das 14B schreibt sie richtig hin.
 
     Der Code des Modells läuft in einem eigenen Python-Prozess (`-I`,
     Zeitlimit, leeres tmp-Verzeichnis), nie im Testprozess.
     """
-    antwort = _frage(client, _RUNDEN_AUFGABE)
+    antwort = _frage(client, _OSTERN_AUFGABE)
     code = _code_aus_antwort(antwort)
-    assert code, f"Keine Funktion runde_kaufmaennisch gefunden in:\n{antwort}"
+    assert code, f"Keine Funktion ostersonntag gefunden in:\n{antwort}"
 
-    faelle = [[betrag, stellen] for betrag, stellen, _ in _RUNDEN_FAELLE]
+    jahre = [jahr for jahr, _ in _OSTERN_FAELLE]
     lauf = subprocess.run(
-        [sys.executable, "-I", "-c", code + _HARNISCH, json.dumps(faelle)],
+        [sys.executable, "-I", "-c", code + _HARNISCH, json.dumps(jahre)],
         capture_output=True,
         text=True,
         timeout=20,
@@ -135,46 +125,36 @@ def test_peter_schreibt_kaufmaennisches_runden(client, tmp_path):
     ergebnisse = json.loads(zeilen[-1])
 
     falsch = [
-        f"{betrag!r}, {stellen} → {ist!r} (erwartet {soll!r})"
-        for (betrag, stellen, soll), ist in zip(_RUNDEN_FAELLE, ergebnisse)
+        f"{jahr} → {ist!r} (erwartet {soll!r})"
+        for (jahr, soll), ist in zip(_OSTERN_FAELLE, ergebnisse)
         if ist != soll
     ]
-    assert not falsch, "Falsch gerundet:\n" + "\n".join(falsch) + f"\n---\n{code}"
+    assert not falsch, "Falsches Osterdatum:\n" + "\n".join(falsch) + f"\n---\n{code}"
 
 
-# ---- 2. Schlau sein: Geburtsort von damals, Staat von heute --------------------
+# ---- 2. Wissen: ein Geburtsort, der heute anders heißt --------------------------
 
-_GEBURTSORT_FRAGE = (
-    "In welchem heutigen Staat liegt jeweils der Geburtsort von 1) Immanuel Kant,"
-    " 2) Arthur Schopenhauer, 3) Sigmund Freud? Antworte nur mit den drei"
-    " heutigen Staaten in dieser Reihenfolge, durch Kommas getrennt."
+_FREUD_FRAGE = (
+    "Wie heißt der Geburtsort von Sigmund Freud heute, und in welchem Staat"
+    " liegt er? Antworte in einem kurzen Satz."
 )
 
-# Kant: Königsberg → Kaliningrad. Schopenhauer: Danzig → Gdańsk.
-# Freud: Freiberg in Mähren → Příbor. Die Köder sind Nationalität und
-# Wirkungsort: „Deutschland", „Deutschland", „Österreich".
-_GEBURTSORT_ERWARTET = ["russ", "polen", "tschech"]
 
-
-@_WARTET_AUF_14B
 @pytest.mark.slow
 @pytest.mark.ollama
-def test_peter_denkt_an_heutige_grenzen(client):
-    """Zwei Schritte: erst den Geburtsort wissen, dann bedenken, dass sich die
-    Grenzen seither verschoben haben. Wer bei Schopenhauer „Deutschland" oder
-    bei Freud „Österreich" sagt, ist dem Köder gefolgt. Ohne Wiki — `client`
-    schaltet es ab, das Wissen muss im Modell stecken.
-    """
-    antwort = _frage(client, _GEBURTSORT_FRAGE)
-    norm = _normalize(antwort).rstrip(".")
-    teile = [t.strip() for t in re.split(r",|;|\n| und ", norm) if t.strip()]
+def test_peter_kennt_freuds_geburtsort(client_with_date):
+    """Freiberg in Mähren heißt heute Příbor und liegt in Tschechien.
 
-    assert (
-        len(teile) == 3
-    ), f"Erwartet drei Staaten, bekommen {teile!r} aus: {antwort!r}"
-    falsch = [
-        f"{nr}) {teil!r} (erwartet etwas mit {stamm!r})"
-        for nr, (teil, stamm) in enumerate(zip(teile, _GEBURTSORT_ERWARTET), start=1)
-        if stamm not in teil
-    ]
-    assert not falsch, "Falscher Staat:\n" + "\n".join(falsch) + f"\n---\n{antwort}"
+    Das 8B trifft den Staat, erfindet aber den Ort („Freiberg an der Jischl",
+    „České Velenice"). Gefragt ist nur eine Person: Die Dreierfrage mit Kant und
+    Schopenhauer davor lockte beide Modelle auf „Deutschland, Deutschland,
+    Österreich".
+
+    Mit Zeitstempel-Block (`client_with_date`), wie die App läuft: **Ohne** ihn
+    weiß das 8B den Ort (20/20), mit ihm erfindet es ihn. Ohne Wiki: Das Wissen
+    muss im Modell stecken.
+    """
+    antwort = _frage(client_with_date, _FREUD_FRAGE)
+    norm = _normalize(antwort)
+    assert "pribor" in norm, f"Erwartet Příbor als heutigen Ortsnamen:\n{antwort}"
+    assert "tschech" in norm, f"Erwartet Tschechien als Staat:\n{antwort}"
