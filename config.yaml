@@ -125,8 +125,10 @@ wiki:
     en: "https://en.wikipedia.org"
   # Port of the local proxy (always required)
   proxy_port: 8042
-  # Maximum wiki snippet length in characters (recommend 1200–1600)
-  snippet_limit: 1200
+  # Maximum wiki snippet length in characters. 2400 since #78 (2026-11-08):
+  # with ministral-3:14b and num_ctx 16384 a longer snippet costs no noticeable
+  # time. On an 8B with num_ctx 8192, 1200–1600 is the safer range.
+  snippet_limit: 2400
   # Maximum number of distinct wiki snippets to inject when multiple entities are detected
   max_wiki_snippets: 2
   timeout_connect: 5.0

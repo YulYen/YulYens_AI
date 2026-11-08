@@ -159,12 +159,12 @@ Datei für Datei: [verzeichnisstruktur.md](docs/entwurf/verzeichnisstruktur.md).
 
 | Name | Charakter | Temperatur | Besonderheit |
 |---|---|---|---|
-| **LEAH** | Warmherzig, kreativ | 0.65 | `featured: true` (Standard) |
-| **DORIS** | Bodenständig, direkt | 0.60 | |
+| **LEAH** | Warmherzig, kreativ | 0.55 | `featured: true` (Standard) |
+| **DORIS** | Bodenständig, direkt | 0.50 | |
 | **PETER** | Sachlich, präzise | 0.10 | Niedrige Temp. = faktenorientiert |
-| **POPCORN** | Verspielt, witzig | 0.80 | Höchste Kreativität |
+| **POPCORN** | Verspielt, witzig | 0.70 | Höchste Kreativität |
 
-Alle Personas: `repeat_penalty: 1.15`, `num_ctx: 8192`.
+Alle Personas: `num_ctx: 16384`, kein `repeat_penalty` (Ollama-Default) — seit #78 auf das 14B abgestimmt.
 
 ## Wichtige Architektur-Muster
 

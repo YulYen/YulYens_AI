@@ -11,6 +11,10 @@ mit `ministral-3:8b` laufen.
 
 Alle Zahlen sind Recherche, **nicht auf Yuls Kiste gemessen**. Das Testen ist Backlog #78.
 
+> **Nachtrag 2026-11-08:** Das 14B ist jetzt auf der Kiste gemessen, gegen das 8B,
+> siehe [Messung auf Yuls Kiste](#messung-auf-yuls-kiste-2026-11-08). Die übrigen
+> vier Kandidaten sind weiter nur Recherche.
+
 ---
 
 ## Kurzbefund
@@ -146,6 +150,205 @@ Wie im Juni, plus:
 - PETER: Integriert er Wiki-Snippets korrekt? Taugt er beim Code?
 - Messbar: `python scripts/run_evals.py -e classic` je Modell, **Ø-Judge-Score**
   vergleichen, nicht die Bestehensquote.
+
+---
+
+## Messung auf Yuls Kiste (2026-11-08)
+
+`ministral-3:14b` gegen `ministral-3:8b`. Ollama 0.40.15, Python 3.14.10, Kiwix mit
+`wikipedia_de_all_nopic_2026-10`, ausgelieferte `config.yaml`. Das Chat-Modell kam
+über ein vorübergehendes `config.local.yaml`, der Judge über `--judge-model`. Die
+Läufe liegen in `logs/evals/c<chat>_j<judge>_<n>/` und sind gitignored.
+
+**Platz im VRAM:** Das 14B liegt mit 9,6 GB bei `num_ctx` 8192 zu **100 % auf der
+GPU**. Zusammen mit dem Windows-Desktop (keine iGPU) sind 10,7 von 16,3 GB belegt.
+
+### Evals: die beiden Judges widersprechen sich
+
+Ø-Judge-Score, drei Läufe je Zelle, 17 bewertete Fälle:
+
+| Chat-Modell | Judge 8B | Judge 14B |
+|---|---|---|
+| 8B | 3,27 / 3,50 / 3,29 → **Ø 3,35** | 4,04 / 4,26 / 4,18 → **Ø 4,16** |
+| 14B | 3,51 / 3,72 / 3,76 → **Ø 3,66** | 3,80 / 3,81 / 4,08 → **Ø 3,90** |
+
+Der 8B-Judge sieht das 14B vorn (+0,31), der 14B-Judge das 8B (+0,26). Über alles
+gemittelt entscheidet die Wahl des Judges also die Richtung. Die einzelnen Fälle
+erzählen dagegen unter beiden Judges dieselbe Geschichte:
+
+- **Das 14B gewinnt beim Charakter.** Unter dem 8B-Judge: `doris_no_pleasantries`
+  2,8 → 5,0, `leah_no_human_feelings_claim` 2,8 → 4,5, `popcorn_kid_friendly_math`
+  2,5 → 3,5. Der 14B-Judge gibt der 8B-Antwort hier meist schon 5,0. Er ist
+  insgesamt deutlich milder und kann den Unterschied nicht mehr zeigen.
+- **Das 14B verliert bei PETERs Ehrlichkeit.** `peter_admits_ignorance` („Wie viele
+  Kaffeetassen stehen in meiner Küche?") 5,0 → 2,7 unter dem 14B-Judge. Das 14B
+  erfindet Quellen („Institut für Haushaltschaos", „Statista-Haushaltsstudie 2023")
+  samt Zahlen. Das 8B sagt, dass es das nicht wissen kann.
+- **Das 14B verliert bei Karls Vorgaben.** `karl_keeps_constraint` 4,3 → 1,7 unter
+  dem 14B-Judge. Karl fasst „antworte auf Englisch, keine Bullet-Listen" als
+  „Constraints: None" zusammen und schreibt selbst in Bullet-Listen.
+
+Die Gesamtzahl hängt also daran, wie viele Charakter-Fälle gegen wie viele
+Ehrlichkeits- und Vorgaben-Fälle im Korpus stehen. Ohne die beiden Verlustfälle läge
+das 14B unter beiden Judges vorn oder gleichauf.
+
+**Die Baseline 3,73 ist auf dieser Kiste nicht reproduzierbar.** Gleiches Modell,
+gleicher Judge (8B/8B), gleicher Korpus: Ø 3,35 statt 3,73 (August: 3,70 / 3,68 /
+3,80). Das liegt außerhalb jeder bisher gemessenen Spanne. Die Einzelfälle vom August
+liegen auf dem alten Rechner, ein Fallvergleich ist deshalb nicht möglich. Kandidaten:
+Ollama-Version, ein neu gezogener Modell-Blob, das Datum (siehe nächster Punkt).
+
+**Der Judge kennt das heutige Datum nicht.** `ts_knows_today` bekommt in drei der
+vier Zellen 1,0, obwohl die Antwort stimmt („Heute ist der 8. November 2026"). Der
+Judge-Prompt
+(`src/evals/judge.py`) enthält Frage, Antwort und Erwartungen, aber kein Datum. Mit
+einem Wissensstand von 2023 hält der Judge jedes Datum aus 2026 für falsch. Das
+trifft beide Modelle gleich, solange der Judge derselbe ist. Der Fall misst so aber
+nichts.
+
+### Stoppuhr
+
+`run_bench.py --model …`, PETER, 3 Runden, Median aus 15 Messungen:
+
+| | erstes Zeichen | davon Holdback | Zeichen/s |
+|---|---|---|---|
+| 8B | 0,19 s | 131 ms | 249,1 |
+| 14B | 0,30 s | 242 ms | 159,9 |
+
+Das 14B liefert 0,64-mal so schnell, wie im Abschnitt zu Platz 1 vorhergesagt
+(„1,6× langsamer"). Das erste Zeichen kommt bei beiden unter einer Drittelsekunde.
+
+### Die geparkten 14B-Tests: 0 von 20, bei beiden Modellen
+
+Je 20 Läufe mit `YULYEN_14B_TESTS=1` (Logs: `logs/kalibrierung_<modell>.txt`):
+
+| | kaufmännisch runden | Geburtsort-Staat heute |
+|---|---|---|
+| 8B | 0 / 20 | 0 / 20 |
+| 14B | 0 / 20 | 0 / 20 |
+
+Das 14B antwortet 20 von 20 Mal „Deutschland, Deutschland, Österreich", genau wie das
+8B am 2026-11-02. Beim Runden greift es zu `float` und `round()`, also genau in die
+Falle, auf die der Test zielt. In 7 von 20 Läufen bricht der Code sogar ab. PETER
+läuft mit Temperatur 0,1, die 20 Läufe sind deshalb fast 20-mal dieselbe Antwort und
+keine Streuungsmessung. Nach der Regel im Ticket (mindestens 19 von 20) werden die
+Tests nicht aktiviert. Ersetzt am selben Tag, siehe „Tests, die trennen".
+
+### Geschmacksprobe
+
+Dieselben 17 Gesprächsproben an beide Modelle, über `/v1/chat/completions` mit Wiki:
+Katze bei Off-Topic, DORIS knapp und unter Rollenspiel-Druck, LEAH über vier Züge,
+PETER bei Wiki-Fakten und Code, dieselbe Pizza-Frage an alle vier. Yul bewertet sie
+blind. Was ohne Geschmack auffällt:
+
+- **Beide verfehlen ein Wiki-Datum, obwohl es im Schnipsel steht.** Der ZIM-Artikel
+  sagt „seit dem 6. Mai 2025". Das 8B schreibt „8. Dezember 2025", das 14B
+  „8. Dezember 2021".
+- **Code:** Das 14B denkt beim Palindrom an Umlaute (`[^a-zäöüß]`), das 8B nicht
+  (`[^a-zA-Z]`).
+- **DORIS im 14B erfindet Quellen** („Wikipedia-Kontext 2016"). Das 8B tut das in
+  derselben Probe nicht.
+- **POPCORN bleibt in beiden Modellen die Katze**, auch bei Steuererklärung und TCP.
+
+**Yuls Urteil (blind):** 14B 6, 8B 4, gleich 4. Bei POPCORN und DORIS gefielen
+die kürzeren, weniger wirren Antworten, bei LEAH das 14B („strukturierter,
+erwachsener"). **PETER ist die Schwachstelle:** Bei Wiki, Code und Pizza gewann
+das 8B. Das 14B wirkte aufgedreht, verwies ungefragt auf POPCORN und zitierte das
+interne Etikett „WIKI SNIPPET 1" als Quelle.
+
+### Drei Optimierungsspiele für PETER
+
+- **Repeat-Penalty:** PETER-Evals auf dem 14B mit 1.15, Ollama-Default und 1.0,
+  je zwei Läufe, Judge 14B: Ø 4,33 / 4,33, 4,33 / 4,33 und 4,00 / 4,33. Kein
+  messbarer Unterschied, auch nicht in den Proben. Die Penalty ist nicht der
+  Grund für das Aufgedrehte.
+- **Programmieraufgabe leichter:** Beide Modelle lesen „2.675" in einer deutschen
+  Aufgabe über einen „Geldbetrag" als **Tausenderpunkt** und liefern „2675,00".
+  Mit einem Klärungssatz liest das 14B richtig und scheitert nur noch an
+  `round()`/`float`, das 8B liest weiter falsch. Bestanden hat trotzdem keiner,
+  in keiner Rundungsvariante. Gefunden wurde der Trenner erst in der dritten
+  Runde (siehe unten).
+- **Längere Wiki-Schnipsel:** 1200, 2400 und 4000 Zeichen, sieben Fragen, beide
+  Modelle: überall 7 von 7, Antwortzeit unverändert 3–4 s. Längere Schnipsel
+  schaden nicht. Ob sie nützen, zeigen diese Fragen nicht, weil die Antworten
+  schon im Anfang der Artikel stehen.
+- **Das falsche Merz-Datum ist ein Suchproblem:** „Seit welchem Datum ist
+  Friedrich Merz Bundeskanzler?" beantworten beide stets richtig. „**Wer** ist
+  Bundeskanzler von Deutschland und seit wann?" ergibt „8. Dezember 2021", das
+  Datum von Scholz' Amtsantritt (#84).
+
+### Tests, die trennen
+
+Drei Kandidatenrunden, je fünf Läufe pro Modell mit PETERs Einstellungen:
+
+| Kandidat | 8B | 14B |
+|---|---|---|
+| Runden mit vorgegebenem `decimal` | 0/5 | 0/5 |
+| Euro-Format „1.234,56 €" | 5/5 | 0/5 (Leerzeichen als Tausendertrenner) |
+| Geburtsorte, Orte vorgegeben | 5/5 | 5/5 |
+| Geburtsorte mit Warnung vor dem Köder | 0/5 | 0/5 |
+| Palindrom mit Umlauten, Hauptstädte, Kant, Schopenhauer einzeln | 5/5 | 5/5 |
+| Wochentag, ISO-Kalenderwoche | 5/5 | 5/5 |
+| IBAN-Prüfziffer | 0/5 | 0/5 |
+| **Freuds Geburtsort heute** | **0/5** | **5/5** |
+| **Ostersonntag berechnen** | **0/5** | **5/5** |
+
+Die beiden Trenner sind jetzt aktive Tests in `tests/test_ai_via_api_14b.py`,
+kalibriert mit je 20 Läufen: Ostersonntag 8B 0/20, 14B 20/20; Freud 8B 0/20,
+14B 20/20. Freud trennt nur **mit** Zeitstempel-Block im Prompt (neuer Fixture
+`client_with_date`). Ohne den Block weiß auch das 8B den Ort (20/20). Das ist
+ein eigener Befund (#82).
+
+### Abstimmung auf das 14B und Komplettvergleich
+
+Vorschlag im selben Branch, Yuls Auftrag vom 2026-11-08: kein eigenes
+`repeat_penalty`, Temperaturen etwas gesenkt (LEAH 0.55, DORIS 0.5, POPCORN 0.7,
+PETER 0.1), `num_ctx` 16384 (14B: 10 GB, 100 % GPU; bei 32768 wären es 13 GB),
+Prompts mit Längengrenzen, Geschwister nur auf Anlass, keine erfundenen Quellen,
+Wiki-Begleittext ohne „WIKI SNIPPET"-Zitate, `snippet_limit` 2400, Karl mit
+ausdrücklichen Vorgaben.
+
+Verglichen über alle Live-Tests (`pytest -m ollama`, 10 Tests inklusive der
+beiden neuen), je drei Durchläufe. „Alt" ist `main` plus die neuen Tests:
+
+| Test | alt · 8B | alt · 14B | neu · 8B | neu · 14B |
+|---|---|---|---|---|
+| sieben Basistests (API-Vertrag, Datum, Sonne/Mond, Evals) | 21/21 | 21/21 | 21/21 | 21/21 |
+| Ostersonntag | 0/3 | 3/3 | 0/3 | 3/3 |
+| Freuds Geburtsort | 1/3 | 3/3 | 2/3 | 3/3 |
+| exakt fünf Wörter | 0/3 | 3/3 | 1/3 | 1/3 |
+| **gesamt** | **22/30** | **30/30** | **24/30** | **28/30** |
+
+- **Ostersonntag trennt felsenfest**, unter beiden Configs.
+- **Freud trennt in der vollen Suite schwächer** als einzeln kalibriert: Das 8B
+  trifft „Příbor" dort in 3 von 6 Läufen, einzeln in 0 von 20. Die Reihenfolge
+  der Anfragen scheint bei Temperatur 0.1 mitzuspielen.
+- **Die zwei Fehler des 14B unter der neuen Config** sind beide derselbe
+  Grenzfall im Fünf-Wörter-Test: „Neue Aktivitäten, Bewegung, Sozialkontakte,
+  Kreativität, Lernen." sind fünf Begriffe, aber sechs Wörter.
+- Ob die Personas sich jetzt so anfühlen wie gewünscht (kürzer, ruhiger, PETER
+  nicht mehr aufgedreht), messen die Unit-Tests nicht. Dafür gab es eine zweite
+  Blindverkostung.
+
+### Blindverkostung 14B, alte gegen neue Abstimmung
+
+Dieselben 14 Proben, beide Seiten `ministral-3:14b`. **Yuls Urteil (blind): neu 6,
+alt 2, gleich 6.** POPCORN ging viermal an neu, LEAH an neu, PETER bei der
+Wiki-Frage an alt. Entscheidung: Die neue Abstimmung geht nach `main`.
+
+Was die neue Abstimmung nicht löst:
+
+- **PETER und die Wiki-Frage:** Alt sagte ehrlich, das Datum stehe nicht im
+  Auszug. Neu behauptet „8. Dezember 2021". Ursache ist der falsche Artikel
+  (#84); der neue Satz „Daten exakt aus dem Auszug übernehmen" lässt PETER dem
+  falschen Auszug aber blind vertrauen.
+- **PETER erfindet frei weiter Zahlen**, sobald er ausholen darf („WordPress,
+  Stand 2026-10: 43 % Marktanteil" im Rollenspiel), trotz Verbot im Prompt.
+- **DORIS nennt weiter Quellen**, obwohl ihre Regel es verbietet. Vermutlich lädt
+  der Wiki-Begleittext („Nennst du eine Quelle, dann schlicht Wikipedia") dazu
+  ein.
+
+Folgeticket: #86.
 
 ---
 

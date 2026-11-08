@@ -23,6 +23,13 @@ pytest tests/test_ai_via_api.py  # Gezielt
   `YULYEN_TEST_MODEL` ersetzt dabei das Modell aus `config.yaml` — für
   Modellvergleiche (#78), ohne die Config anzufassen. Gilt nur für Läufe, die
   wirklich Ollama ansprechen; Dummy-Tests bleiben unberührt
+- **Ein Test, der zwei Modelle unterscheiden soll, braucht eine Aufgabe, die
+  trennt** (#78, 2026-11-08). Die ersten 14B-Tests schaffte keins der beiden
+  Modelle (0/20); sie maßen die Aufgabe, nicht das Modell. Kandidaten deshalb
+  gegen *beide* Modelle kalibrieren und nur nehmen, was das stärkere ≥ 19/20 und
+  das schwächere deutlich seltener schafft (`tests/test_ai_via_api_14b.py`).
+  Deutsche Aufgaben mit Zahlen klären den Dezimalpunkt: „2.675" lasen beide
+  Modelle als Tausenderpunkt
 - Marker `@pytest.mark.browser`: fährt die **laufende** WebUI im echten Chromium
   (`make test-browser`, ~100 s). Aus allen anderen Zielen und aus der CI
   ausgenommen, weil er Playwright *und* einen Browser-Build braucht; ohne
@@ -122,6 +129,12 @@ make evals                                           # Kurzform für --guard-onl
   stabiler. Ursache ist die Schwelle: 5–7 der 17 Fälle liegen im Band 3,0–3,9,
   also direkt unter „4 besteht", und entscheiden sich an einem Zehntelpunkt. Wer
   Baseline gegen Adapter (#7) über die Quote vergleicht, misst Münzwürfe
+- **Nachtrag 2026-11-08: die 3,73 gilt nur für den alten Rechner.** Auf der neuen
+  Kiste misst dieselbe Kombination (8B/8B, gleicher Korpus) Ø 3,35 (3,27 / 3,50 /
+  3,29), außerhalb jeder bisherigen Spanne. Ein Vergleich braucht deshalb **beide
+  Seiten frisch auf derselben Kiste**, nie eine übernommene Zahl. Außerdem kennt
+  der Judge das heutige Datum nicht und wertet richtige Datumsantworten als falsch
+  (`ts_knows_today`). Details: [modellwechsel_november_2026.md](../modellwechsel_november_2026.md#messung-auf-yuls-kiste-2026-11-08)
 - **Die Baseline für #7 steht bei Ø 3,73** (2026-08-07, drei Läufe: 3,70 / 3,68 /
   3,80; Quote 5–6 von 17). Modell und Judge `ministral-3:8b`, Wiki offline über
   kiwix-serve, ausgelieferte `config.yaml`. Gemessen **nach** dem Sprung auf

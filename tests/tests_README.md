@@ -44,20 +44,23 @@ The eval corpora under `evals/` are covered from two sides:
 
 ---
 
-## Parked tests for the 16 GB model switch (#78)
+## Tests that separate 14B from 8B (#78)
 
-`test_ai_via_api_14b.py` holds two live tests that are **skipped on purpose**
-(`@_WARTET_AUF_14B`). They describe what a 14B-class model should manage and
-`ministral-3:8b` does not (measured 2026-11-02: 0 of 5 on both): writing
-working code for commercial rounding, and naming today's country of three
-historical birthplaces. The default switched to `ministral-3:14b` on
-2026-11-07; remove the marker once the calibration described in #78 in
-`backlog.md` is done.
+`test_ai_via_api_14b.py` holds two live tests (`slow`, `ollama`) that the
+default `ministral-3:14b` passes and `ministral-3:8b` fails: writing a working
+Easter Sunday function, and naming Sigmund Freud's birthplace by its current
+name (Příbor). Both were calibrated with 20 runs per model on 2026-11-08; the
+numbers are in the module. If you stay on the 8B via `config.local.yaml`, these
+two are expected to fail.
 
-To run them by hand, set `YULYEN_14B_TESTS=1`; `YULYEN_TEST_MODEL` picks the
-model (any `@pytest.mark.ollama` test honours it, see `tests/conftest.py`). The
-module docstring has the exact PowerShell lines, one model per run with its own
-log file under `logs/`.
+The two earlier tests (commercial rounding, three historical birthplaces) are
+still in the module, **skipped unless `YULYEN_ZUKUNFT_TESTS=1`**: neither model
+passed them once in 20 runs, so they wait as a yardstick for a smarter model
+that still fits 16 GB.
+
+`YULYEN_TEST_MODEL` picks another model without touching the config (any
+`@pytest.mark.ollama` test honours it, see `tests/conftest.py`). The module
+docstring has the exact PowerShell lines.
 
 ---
 

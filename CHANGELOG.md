@@ -93,6 +93,18 @@ in them turns out to be wrong, it gets corrected in a later entry.
   older file, set `wiki.offline.zim_prefix` and `zim_path` to it as well —
   the personas are told the dump date from `zim_prefix`.
 
+- **The classic personas are tuned for `ministral-3:14b`.** They answer
+  shorter and calmer, mention their siblings only when it fits, and are told
+  not to invent numbers or sources. In detail: lower temperatures (LEAH 0.55,
+  DORIS 0.5, POPCORN 0.7; PETER stays at 0.1), no `repeat_penalty` of their
+  own any more (Ollama's default applies), a context window of 16384 tokens
+  instead of 8192, and Wikipedia snippets of up to 2400 characters instead of
+  1200 (`wiki.snippet_limit`). The conversation summary now keeps the user's
+  instructions about language and format. **On an 8 GB card with the 8B
+  model**, set `num_ctx` back to 8192 in `ensembles/classic/personas_base.yaml`
+  and `wiki.snippet_limit` to 1200 in `config.local.yaml`: at 16384 the 8B
+  needs about 7.5 GB and no longer fits next to the desktop.
+
 ### Fixed
 
 - **Self-talk in the web UI starts again.** Since 2.0.0, pressing start on the

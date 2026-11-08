@@ -60,7 +60,7 @@ speaker turns, because each reply there is fetched in one go.
 
 **“Retry 🔄”** discards the last answer and has the same question answered again.
 The context stays untouched — the variation comes purely from the persona's
-temperature, so POPCORN (0.8) varies far more than PETER (0.1). Wiki and briefing
+temperature, so POPCORN (0.7) varies far more than PETER (0.1). Wiki and briefing
 hints above the answer stay in place.
 
 ## AI dialog (self-talk)

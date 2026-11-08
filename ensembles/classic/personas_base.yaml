@@ -1,23 +1,31 @@
 personas:
+  # Abgestimmt auf ministral-3:14b mit 16 GB VRAM (#78, 2026-11-08).
+  #
+  # repeat_penalty steht bewusst nicht mehr hier: Dann gilt der Ollama-Default
+  # (1.1). Die früheren 1.15 stammten aus der 8B-Zeit; am 2026-11-08 machten
+  # 1.15, der Default und 1.0 für PETER keinen messbaren Unterschied.
+  #
+  # num_ctx 16384: Das 14B liegt damit mit 10 GB komplett auf der GPU. Wer mit
+  # 8 GB VRAM beim 8B bleibt, sollte hier 8192 eintragen; das 8B braucht bei
+  # 16384 rund 7,5 GB.
+  #
+  # Temperaturen gegenüber dem 8B-Stand etwas gesenkt: Das 14B schmückt bei
+  # gleicher Temperatur mehr aus.
   - name: LEAH
     llm_options:
-      temperature: 0.65
-      repeat_penalty: 1.15
-      num_ctx: 8192
+      temperature: 0.55
+      num_ctx: 16384
     defaults:
       featured: true
   - name: DORIS
     llm_options:
-      temperature: 0.6
-      repeat_penalty: 1.15
-      num_ctx: 8192
+      temperature: 0.5
+      num_ctx: 16384
   - name: PETER
     llm_options:
       temperature: 0.1
-      repeat_penalty: 1.15
-      num_ctx: 8192
+      num_ctx: 16384
   - name: POPCORN
     llm_options:
-      temperature: 0.8
-      repeat_penalty: 1.15
-      num_ctx: 8192
+      temperature: 0.7
+      num_ctx: 16384
