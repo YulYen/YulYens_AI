@@ -172,7 +172,7 @@ wiki:
   mode: "offline"    # "offline", "online" or false (disabled)
   spacy_model_variant: "large"  # Alternatives: "medium" or direct model name
   proxy_port: 8042
-  snippet_limit: 1200           # Maximum length of a single snippet in characters
+  snippet_limit: 2400           # Maximum length of a single snippet in characters
   max_wiki_snippets: 2          # Cap for how many different snippets can be injected per question
 ```
 

@@ -63,9 +63,9 @@ def test_warm_up_passes_real_options_and_keep_alive(cfg, monkeypatch) -> None:
     call = core.calls[0]
     assert call["model_name"] == cfg.core["model_name"]
     assert call["keep_alive"] == 42
-    # Warm with the biggest persona context (classic: uniformly 8192) and a
-    # minimal generation so the dummy request stays cheap.
-    assert call["options"] == {"num_predict": 1, "num_ctx": 8192}
+    # Warm with the biggest persona context (classic: uniformly 16384 since
+    # #78) and a minimal generation so the dummy request stays cheap.
+    assert call["options"] == {"num_predict": 1, "num_ctx": 16384}
 
 
 def test_warm_up_survives_backend_errors(cfg, monkeypatch) -> None:

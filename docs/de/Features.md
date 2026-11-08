@@ -60,7 +60,7 @@ einem Zug geholt wird.
 
 **„Nochmal 🔄"** verwirft die letzte Antwort und lässt dieselbe Frage neu
 beantworten. Der Kontext bleibt unverändert — die Abwechslung kommt allein aus der
-Temperatur der Persona, POPCORN (0.8) variiert also deutlich stärker als PETER
+Temperatur der Persona, POPCORN (0.7) variiert also deutlich stärker als PETER
 (0.1). Wiki- und Briefing-Hinweise über der Antwort bleiben stehen.
 
 ## AI-Dialog (Self-Talk)

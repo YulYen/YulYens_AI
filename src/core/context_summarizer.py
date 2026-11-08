@@ -49,6 +49,13 @@ class KarlSummarizer:
                 "content": (
                     "Compress the conversation history precisely. "
                     "Preserve facts, open tasks, constraints, decisions, and unresolved questions. "
+                    # #78: ministral-3:14b summarised "answer in English, no
+                    # bullet lists" as "Constraints: None". Spell out what a
+                    # constraint is.
+                    "Constraints include every instruction the user gave about "
+                    "language, format, length or style (for example 'answer in "
+                    "English' or 'no bullet lists'); keep each one in the user's "
+                    "own words. "
                     "Do not invent content. Keep it concise and actionable."
                 ),
             },
