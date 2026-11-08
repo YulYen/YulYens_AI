@@ -327,8 +327,28 @@ beiden neuen), je drei Durchläufe. „Alt" ist `main` plus die neuen Tests:
   Grenzfall im Fünf-Wörter-Test: „Neue Aktivitäten, Bewegung, Sozialkontakte,
   Kreativität, Lernen." sind fünf Begriffe, aber sechs Wörter.
 - Ob die Personas sich jetzt so anfühlen wie gewünscht (kürzer, ruhiger, PETER
-  nicht mehr aufgedreht), messen die Unit-Tests nicht. Dafür braucht es Yuls
-  Gespräch oder eine neue Blindverkostung (#80).
+  nicht mehr aufgedreht), messen die Unit-Tests nicht. Dafür gab es eine zweite
+  Blindverkostung.
+
+### Blindverkostung 14B, alte gegen neue Abstimmung
+
+Dieselben 14 Proben, beide Seiten `ministral-3:14b`. **Yuls Urteil (blind): neu 6,
+alt 2, gleich 6.** POPCORN ging viermal an neu, LEAH an neu, PETER bei der
+Wiki-Frage an alt. Entscheidung: Die neue Abstimmung geht nach `main`.
+
+Was die neue Abstimmung nicht löst:
+
+- **PETER und die Wiki-Frage:** Alt sagte ehrlich, das Datum stehe nicht im
+  Auszug. Neu behauptet „8. Dezember 2021". Ursache ist der falsche Artikel
+  (#84); der neue Satz „Daten exakt aus dem Auszug übernehmen" lässt PETER dem
+  falschen Auszug aber blind vertrauen.
+- **PETER erfindet frei weiter Zahlen**, sobald er ausholen darf („WordPress,
+  Stand 2026-10: 43 % Marktanteil" im Rollenspiel), trotz Verbot im Prompt.
+- **DORIS nennt weiter Quellen**, obwohl ihre Regel es verbietet. Vermutlich lädt
+  der Wiki-Begleittext („Nennst du eine Quelle, dann schlicht Wikipedia") dazu
+  ein.
+
+Folgeticket: #86.
 
 ---
 
