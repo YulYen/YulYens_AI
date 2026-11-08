@@ -53,8 +53,10 @@ name (Příbor). Both were calibrated with 20 runs per model on 2026-11-08; the
 numbers are in the module. If you stay on the 8B via `config.local.yaml`, these
 two are expected to fail.
 
-They replace two earlier, parked tests (commercial rounding, three historical
-birthplaces) that neither model passed once in 20 runs.
+The two earlier tests (commercial rounding, three historical birthplaces) are
+still in the module, **skipped unless `YULYEN_ZUKUNFT_TESTS=1`**: neither model
+passed them once in 20 runs, so they wait as a yardstick for a smarter model
+that still fits 16 GB.
 
 `YULYEN_TEST_MODEL` picks another model without touching the config (any
 `@pytest.mark.ollama` test honours it, see `tests/conftest.py`). The module

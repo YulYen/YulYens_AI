@@ -6,8 +6,9 @@ mit PETERs Einstellungen aus dem Ensemble (siehe ``_KALIBRIERT``). Wer per
 ``config.local.yaml`` beim 8B bleibt, sieht sie also rot; das ist ihr Zweck.
 
 Die Vorgänger (kaufmännisch runden, drei Geburtsorte nach heutigen Grenzen)
-schaffte keines der beiden Modelle: 0 von 20 bei beiden. Sie maßen nur, dass
-die Aufgaben zu schwer waren. Beim Runden lasen beide Modelle "2.675" außerdem
+schaffte keines der beiden Modelle: 0 von 20 bei beiden. Zum Trennen von 8B und
+14B taugen sie nicht; sie stehen geparkt am Ende dieses Moduls, als Messlatte
+für ein schlaueres 16-GB-Modell (`YULYEN_ZUKUNFT_TESTS=1`). Beim Runden lasen beide Modelle "2.675" außerdem
 als deutschen Tausenderpunkt. Gesucht wurde deshalb in drei Runden nach
 Aufgaben, die *trennen*; was beide schaffen (Wochentag, ISO-Kalenderwoche,
 Palindrom mit Umlauten, Hauptstädte) oder beide nicht (IBAN-Prüfziffer,
@@ -32,6 +33,7 @@ einen Ortsnamen.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -158,3 +160,138 @@ def test_peter_kennt_freuds_geburtsort(client_with_date):
     norm = _normalize(antwort)
     assert "pribor" in norm, f"Erwartet Příbor als heutigen Ortsnamen:\n{antwort}"
     assert "tschech" in norm, f"Erwartet Tschechien als Staat:\n{antwort}"
+
+
+# ==== Geparkt für ein schlaueres Modell auf 16 GB ================================
+#
+# Die beiden ursprünglichen 14B-Tests. Am 2026-11-08 schafften sie weder
+# ministral-3:8b noch ministral-3:14b (je 0/20; das Runden mit dem Klärungssatz
+# zum Dezimalpunkt je 0/5). Sie bleiben als Messlatte für ein
+# künftiges Modell, das noch auf 16 GB passt, und sind deshalb aus:
+#
+#     $env:YULYEN_ZUKUNFT_TESTS = "1"
+#     $env:YULYEN_TEST_MODEL = "<neues Modell>"   # optional
+#     python -m pytest tests/test_ai_via_api_14b.py -m ollama -rA
+#
+# Schafft ein Modell beide in mindestens 19 von 20 Läufen, wird es interessant —
+# dann den Schalter entfernen oder ein neues Paar suchen, das trennt.
+
+_FUER_SCHLAUERE_MODELLE = pytest.mark.skipif(
+    os.environ.get("YULYEN_ZUKUNFT_TESTS") != "1",
+    reason=(
+        "Geparkt für ein schlaueres 16-GB-Modell: 8B und 14B je 0/20 "
+        "(2026-11-08). Einschalten mit YULYEN_ZUKUNFT_TESTS=1."
+    ),
+)
+
+_RUNDEN_AUFGABE = (
+    "Schreibe eine Python-Funktion runde_kaufmaennisch(betrag: str, stellen: int)"
+    " -> str. Sie bekommt einen Geldbetrag als Dezimal-String und rundet ihn"
+    " kaufmännisch auf `stellen` Nachkommastellen: genau halbe Werte immer vom"
+    " Nullpunkt weg. Rückgabe als String mit genau `stellen` Nachkommastellen."
+    # Seit 2026-11-08: Ohne diesen Satz lasen 8B und 14B "2.675" als deutschen
+    # Tausenderpunkt (2675) — dann misst der Test Leseverständnis, nicht Runden.
+    ' Der Betrag nutzt den Punkt als Dezimaltrenner wie in Python: "2.675" heißt'
+    " zwei Komma sechs sieben fünf, nicht zweitausendsechshundertfünfundsiebzig."
+    ' Beispiele: runde_kaufmaennisch("2.675", 2) == "2.68" und'
+    ' runde_kaufmaennisch("-2.5", 0) == "-3". Nur Standardbibliothek. Antworte nur'
+    " mit dem Code in einem Python-Codeblock."
+)
+
+# (Betrag, Stellen, erwartet) — jeder Fall fängt mindestens einen typischen Fehler:
+# round() rundet zur geraden Zahl, float kennt 2.675 und 1.005 nicht genau,
+# floor(x + 0.5) rundet negative Werte zur Null hin.
+_RUNDEN_FAELLE = [
+    ("2.675", 2, "2.68"),
+    ("1.005", 2, "1.01"),
+    ("0.125", 2, "0.13"),
+    ("2.5", 0, "3"),
+    ("-2.5", 0, "-3"),
+    ("-0.125", 2, "-0.13"),
+    ("19.995", 2, "20.00"),
+    ("7", 2, "7.00"),
+]
+
+_RUNDEN_HARNISCH = """
+
+import json as _json
+import sys as _sys
+
+_faelle = _json.loads(_sys.argv[1])
+print(_json.dumps([str(runde_kaufmaennisch(b, s)) for b, s in _faelle]))
+"""
+
+
+def _runden_code_aus_antwort(antwort: str) -> str:
+    bloecke = re.findall(r"```[a-zA-Z]*\s*\n(.*?)```", antwort, flags=re.DOTALL)
+    for block in bloecke:
+        if "def runde_kaufmaennisch" in block:
+            return block
+    return antwort if "def runde_kaufmaennisch" in antwort else ""
+
+
+@_FUER_SCHLAUERE_MODELLE
+@pytest.mark.slow
+@pytest.mark.ollama
+def test_peter_schreibt_kaufmaennisches_runden(client, tmp_path):
+    """Die Falle ist Wissen, nicht Fleiß: `round()` rundet in Python zur
+    geraden Zahl (2.5 → 2), und als float ist 2.675 in Wahrheit 2.67499….
+    Bestehen kann nur, wer zu `decimal` mit ROUND_HALF_UP greift.
+    """
+    antwort = _frage(client, _RUNDEN_AUFGABE)
+    code = _runden_code_aus_antwort(antwort)
+    assert code, f"Keine Funktion runde_kaufmaennisch gefunden in:\n{antwort}"
+
+    faelle = [[betrag, stellen] for betrag, stellen, _ in _RUNDEN_FAELLE]
+    lauf = subprocess.run(
+        [sys.executable, "-I", "-c", code + _RUNDEN_HARNISCH, json.dumps(faelle)],
+        capture_output=True,
+        text=True,
+        timeout=20,
+        cwd=tmp_path,
+    )
+    assert lauf.returncode == 0, f"Code bricht ab:\n{lauf.stderr}\n---\n{code}"
+    zeilen = [z for z in lauf.stdout.splitlines() if z.strip()]
+    ergebnisse = json.loads(zeilen[-1])
+
+    falsch = [
+        f"{betrag!r}, {stellen} → {ist!r} (erwartet {soll!r})"
+        for (betrag, stellen, soll), ist in zip(_RUNDEN_FAELLE, ergebnisse)
+        if ist != soll
+    ]
+    assert not falsch, "Falsch gerundet:\n" + "\n".join(falsch) + f"\n---\n{code}"
+
+
+_GEBURTSORT_FRAGE = (
+    "In welchem heutigen Staat liegt jeweils der Geburtsort von 1) Immanuel Kant,"
+    " 2) Arthur Schopenhauer, 3) Sigmund Freud? Antworte nur mit den drei"
+    " heutigen Staaten in dieser Reihenfolge, durch Kommas getrennt."
+)
+
+# Kant: Königsberg → Kaliningrad. Schopenhauer: Danzig → Gdańsk.
+# Freud: Freiberg in Mähren → Příbor. Die Köder sind Nationalität und
+# Wirkungsort: „Deutschland", „Deutschland", „Österreich".
+_GEBURTSORT_ERWARTET = ["russ", "polen", "tschech"]
+
+
+@_FUER_SCHLAUERE_MODELLE
+@pytest.mark.slow
+@pytest.mark.ollama
+def test_peter_denkt_an_heutige_grenzen(client):
+    """Zwei Schritte: erst den Geburtsort wissen, dann bedenken, dass sich die
+    Grenzen seither verschoben haben. Beide Modelle folgen dem Köder (je 0/20);
+    das 14B antwortete alle 20 Mal „Deutschland, Deutschland, Österreich".
+    """
+    antwort = _frage(client, _GEBURTSORT_FRAGE)
+    norm = _normalize(antwort).rstrip(".")
+    teile = [t.strip() for t in re.split(r",|;|\n| und ", norm) if t.strip()]
+
+    assert (
+        len(teile) == 3
+    ), f"Erwartet drei Staaten, bekommen {teile!r} aus: {antwort!r}"
+    falsch = [
+        f"{nr}) {teil!r} (erwartet etwas mit {stamm!r})"
+        for nr, (teil, stamm) in enumerate(zip(teile, _GEBURTSORT_ERWARTET), start=1)
+        if stamm not in teil
+    ]
+    assert not falsch, "Falscher Staat:\n" + "\n".join(falsch) + f"\n---\n{antwort}"
