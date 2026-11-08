@@ -38,7 +38,10 @@ class InProcessDriver:
 
     def _streamer(self, persona: str) -> Any:
         if persona not in self._streamers:
-            self._streamers[persona] = self._factory.get_streamer_for_persona(persona)
+            # Orchester-Streamer (#85): die Stoppuhr misst `core.model_name`
+            # (per `--model` überschreibbar) und schreibt genau das in den
+            # Bericht — ein Solo-Modell würde die Zeile Lügen strafen.
+            self._streamers[persona] = self._factory.get_streamer_for_orchestra(persona)
         return self._streamers[persona]
 
     def guard(self, persona: str) -> Any:

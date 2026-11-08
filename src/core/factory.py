@@ -31,6 +31,11 @@ from core.utils import (
     with_timestamps,
 )
 
+# Apps, in denen das **Orchester** spielt (#85): mehrere Personas auf dem
+# gemeinsamen ``core.model_name``. Alles andere ist ein Solo — ein Gespräch zu
+# zweit, in dem eine Persona ihr eigenes Modell bekommen darf.
+ORCHESTRA_APPS = frozenset({"ask-all", "self-talk"})
+
 
 class AppFactory:
     """
@@ -122,6 +127,31 @@ class AppFactory:
         )
         return True
 
+    def default_model(self) -> str:
+        """Das gemeinsame Modell: Orchester, Gast und jede Persona ohne eigenes."""
+        return str(self._cfg.core.get("model_name", ""))
+
+    def solo_model(self, persona_name: str) -> str:
+        """Das Modell, mit dem eine Persona **solo** antwortet (#85).
+
+        Ihr eigenes ``model`` aus ``personas_base.yaml``, sonst der Default. Ein
+        Name außerhalb des Ensembles (Gast, Self-Talk-Meta) bekommt den Default
+        — der Gast hat bewusst kein eigenes Modell.
+        """
+        try:
+            own = personas.get_model(persona_name)
+        except ValueError:
+            own = None
+        return own or self.default_model()
+
+    def has_soloists(self) -> bool:
+        """True, sobald mindestens eine Persona solo ein anderes Modell spielt."""
+        default = self.default_model()
+        return any(
+            self.solo_model(name) != default
+            for name in personas.get_all_persona_names()
+        )
+
     def open_conversation(self, persona: str, app: str, user: str = LOCAL_USER) -> str:
         """Neues Gespräch anlegen und seine ID liefern (#54).
 
@@ -133,7 +163,11 @@ class AppFactory:
             return self.get_store().start(
                 user=user or LOCAL_USER,
                 persona=persona,
-                model=str(self._cfg.core.get("model_name", "")),
+                model=(
+                    self.default_model()
+                    if app in ORCHESTRA_APPS
+                    else self.solo_model(persona)
+                ),
                 app=app,
             )
         except Exception:
@@ -228,14 +262,34 @@ class AppFactory:
         )
 
     def get_streamer_for_persona(self, persona_name: str) -> YulYenStreamingProvider:
-        """Creates a new LLM streamer for the given persona."""
+        """Streamer für das **Solo** mit dieser Persona — mit ihrem eigenen Modell.
+
+        Jeder Weg, der genau *eine* Persona fragt (Chat in Web und Terminal,
+        API, Mail), ist ein Solo (#85). Wer mehrere Personas zusammenspielen
+        lässt, nimmt ``get_streamer_for_orchestra``.
+        """
+        return self._persona_streamer(persona_name, self.solo_model(persona_name))
+
+    def get_streamer_for_orchestra(self, persona_name: str) -> YulYenStreamingProvider:
+        """Streamer für das **Orchester** (Ask-All, Self-Talk): gemeinsames Modell.
+
+        Eigene Modelle bleiben hier bewusst außen vor (#85): vier Personas auf
+        vier Modellen hieße Modellwechsel mit Ladezeit zwischen jeder Antwort
+        bzw. vier Modelle gleichzeitig im VRAM.
+        """
+        return self._persona_streamer(persona_name, self.default_model())
+
+    def _persona_streamer(
+        self, persona_name: str, model_name: str
+    ) -> YulYenStreamingProvider:
         # get_options liefert None, wenn eine Persona keine llm_options hat;
         # der Provider erwartet ein dict und würde sonst beim ersten
         # Kontext-Check über None stolpern (von mypy gefunden, #52).
         return self._build_streamer(
             persona_name,
-            _system_prompt_with_date(persona_name, self._cfg),
+            _system_prompt_with_date(persona_name, self._cfg, model_name),
             personas.get_options(persona_name) or {},
+            model_name,
         )
 
     def get_streamer_for_guest(
@@ -248,11 +302,14 @@ class AppFactory:
         mit, statt für den Gast nachgebaut zu werden.
         """
         return self._build_streamer(
-            name, with_timestamps(prompt, self._cfg), dict(options or {})
+            name,
+            with_timestamps(prompt, self._cfg),
+            dict(options or {}),
+            self.default_model(),
         )
 
     def _build_streamer(
-        self, persona_name: str, persona_prompt: str, options: dict
+        self, persona_name: str, persona_prompt: str, options: dict, model_name: str
     ) -> YulYenStreamingProvider:
         core_cfg = self._cfg.core
         log_prefix = self._cfg.logging["conversation_prefix"]
@@ -265,7 +322,10 @@ class AppFactory:
         llm_core = self._create_llm_core(backend, base_url)
 
         logging.debug(
-            "Creating streamer for %s with backend '%s'", persona_name, backend
+            "Creating streamer for %s with backend '%s', model '%s'",
+            persona_name,
+            backend,
+            model_name,
         )
 
         streamer_base_url = base_url if base_url is not None else ""
@@ -273,7 +333,7 @@ class AppFactory:
         log_cfg = getattr(self._cfg, "logging", {}) or {}
         streamer = YulYenStreamingProvider(
             base_url=streamer_base_url,
-            model_name=core_cfg["model_name"],
+            model_name=model_name,
             keep_alive=int(core_cfg.get("keep_alive", 600)),
             persona=persona_name,
             persona_prompt=persona_prompt,

@@ -25,7 +25,7 @@ def iter_broadcast_events(
 
     Args:
         factory: Object that can build a :class:`YulYenStreamingProvider` via
-            ``get_streamer_for_persona``.
+            ``get_streamer_for_orchestra``.
         user_input: Prompt to send to every persona.
         persona_names: Optional custom subset. Defaults to all personas in the
             active ensemble.
@@ -51,7 +51,7 @@ def iter_broadcast_events(
     base_messages = list(context_messages or [])
 
     for persona in personas:
-        streamer: YulYenStreamingProvider = factory.get_streamer_for_persona(persona)
+        streamer: YulYenStreamingProvider = factory.get_streamer_for_orchestra(persona)
         # Jede Persona bekommt ihr eigenes Gespräch in der Ablage (#59). Vorher
         # wurde hier nie eine Gesprächs-ID gesetzt, weshalb der ganze
         # Broadcast-Modus spurlos blieb — obwohl er dieselben Fragen und
@@ -123,7 +123,8 @@ def iter_broadcast_events_parallel(
 
     # Build streamers up front: the factory reads the config singleton and is
     # not guaranteed to be thread-safe.
-    streamers = {name: factory.get_streamer_for_persona(name) for name in personas}
+    # Orchester (#85): alle auf dem gemeinsamen Modell, nie auf Solo-Modellen.
+    streamers = {name: factory.get_streamer_for_orchestra(name) for name in personas}
 
     events: queue.Queue[dict[str, str]] = queue.Queue()
 

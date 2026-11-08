@@ -280,7 +280,7 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
 
 - **Terminal-UI**
   - Bei `ui.type: "terminal"` im Terminal nutzen
-  - Startmenü: neue Unterhaltung, Konversation laden (JSON), Self-Talk, Ask-All
+  - Startmenü in zwei Bereichen: **Solo** (neue Unterhaltung, Konversation laden) und **Orchester** (Self-Talk, Ask-All) — siehe [Solo und Orchester](Features.md#solo-und-orchester)
   - Eingabe: Fragen einfach eintippen
   - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern), `/briefing` (Persona fasst die konfigurierten RSS-Feeds zusammen), `/quellen` bzw. `/sources` (die zuletzt injizierten Wikipedia-Ausschnitte im Wortlaut, ungekürzt)
 

@@ -257,6 +257,11 @@ def build_ui(
     broadcast_enabled,
     project_title,
     choose_persona_txt,
+    solo_title,
+    solo_models,
+    solo_model_label,
+    orchestra_title,
+    orchestra_hint,
     persona_btn_suffix,
     input_placeholder,
     new_chat_label,
@@ -364,6 +369,13 @@ def build_ui(
                 .ask-all-strip .card-icon svg { height: 72px; width: 72px; }
                 .persona-card .name { font-weight:600; margin:6px 0 4px; font-size:1.1rem; }
                 .persona-card .desc { font-size:0.9rem; margin-bottom:8px; }
+                /* Solo-Modell (#85): nur sichtbar, wenn es vom Default abweicht */
+                .persona-card .solo-model {
+                    font-size:0.8rem;
+                    font-family: var(--font-mono, monospace);
+                    opacity:0.8;
+                    margin-bottom:4px;
+                }
                 .chat-input-row { align-items: stretch; gap:12px; }
                 .new-chat-btn button { margin-top: 12px; }
                 .ask-all-btn button { height: 100%; font-size: 1rem; padding: 14px 18px; }
@@ -442,8 +454,13 @@ def build_ui(
         gr.Markdown(f"# {project_title}")
 
         with gr.Group(visible=True) as grid_group:
+            # Zwei Bereiche (#85), und jede Ensemble-Persona steht in beiden:
+            # **Solo** ist das Gespräch zu zweit — mit dem eigenen Modell der
+            # Persona, falls eins konfiguriert ist —, das **Orchester** lässt
+            # alle zusammenspielen, immer auf dem gemeinsamen Modell. Ohne
+            # eigene Modelle ist das nur eine aufgeräumte Startseite.
             with gr.Row(elem_classes="persona-header-row", equal_height=True):
-                gr.Markdown(choose_persona_txt)
+                gr.Markdown(f"## {solo_title}\n{choose_persona_txt}")
             with gr.Row(elem_classes="persona-row", equal_height=True):
                 persona_buttons = []
                 for key, p in persona_info.items():
@@ -456,8 +473,18 @@ def build_ui(
                                 buttons=[],
                                 elem_classes="persona-img",
                             )
+                            # Das Modell steht nur dort, wo es vom Default
+                            # abweicht — sonst wäre es auf jeder Karte Rauschen.
+                            solo_model = solo_models.get(key)
+                            solo_line = (
+                                f"<div class='solo-model'>{solo_model_label}"
+                                f" {solo_model}</div>"
+                                if solo_model
+                                else ""
+                            )
                             gr.Markdown(
                                 f"<div class='name'>{p['name']}</div>"
+                                f"{solo_line}"
                                 f"<div class='desc'>{p['description']}</div>"
                             )
                             btn = gr.Button(
@@ -465,17 +492,9 @@ def build_ui(
                                 variant="secondary",
                             )
                             persona_buttons.append((key, btn))
-                with gr.Column(scale=1, min_width=170):
-                    with gr.Group(elem_classes="persona-card"):
-                        gr.HTML(card_icon_html("self_talk"))
-                        gr.Markdown(
-                            f"<div class='name'>{self_talk_title}</div>"
-                            f"<div class='desc'>{self_talk_description}</div>"
-                        )
-                        self_talk_card_btn = gr.Button(
-                            self_talk_button_label, variant="secondary"
-                        )
 
+                # Der Gast ist ein Gespräch zu zweit, also Solo — auf dem
+                # gemeinsamen Modell, ein eigenes bekommt er nicht.
                 with gr.Column(scale=1, min_width=170):
                     with gr.Group(elem_classes="persona-card"):
                         gr.HTML(card_icon_html("guest"))
@@ -487,20 +506,19 @@ def build_ui(
                             guest_card_label, variant="secondary"
                         )
 
-                # Ohne Ablage keine Verlauf-Karte (#72) — sie könnte sich nie füllen.
-                if history_enabled:
-                    with gr.Column(scale=1, min_width=170):
-                        with gr.Group(elem_classes="persona-card"):
-                            gr.HTML(card_icon_html("history"))
-                            gr.Markdown(
-                                f"<div class='name'>{history_title}</div>"
-                                f"<div class='desc'>{history_description}</div>"
-                            )
-                            history_card_btn = gr.Button(
-                                history_card_label, variant="secondary"
-                            )
-                else:
-                    history_card_btn = None
+            with gr.Row(elem_classes="persona-header-row", equal_height=True):
+                orchestra_md = gr.Markdown(f"## {orchestra_title}\n{orchestra_hint}")
+            with gr.Row(elem_classes="persona-row", equal_height=True):
+                with gr.Column(scale=1, min_width=170):
+                    with gr.Group(elem_classes="persona-card"):
+                        gr.HTML(card_icon_html("self_talk"))
+                        gr.Markdown(
+                            f"<div class='name'>{self_talk_title}</div>"
+                            f"<div class='desc'>{self_talk_description}</div>"
+                        )
+                        self_talk_card_btn = gr.Button(
+                            self_talk_button_label, variant="secondary"
+                        )
 
                 if broadcast_enabled:
                     with gr.Column(scale=1, min_width=170):
@@ -515,6 +533,24 @@ def build_ui(
                             )
                 else:
                     ask_all_card_btn = None
+
+                # Der Verlauf hält beides, Solo- und Orchester-Gespräche; er
+                # steht beim Orchester, damit die Reihe nicht allein bleibt.
+                # Ohne Ablage keine Verlauf-Karte (#72) — sie könnte sich nie
+                # füllen.
+                if history_enabled:
+                    with gr.Column(scale=1, min_width=170):
+                        with gr.Group(elem_classes="persona-card"):
+                            gr.HTML(card_icon_html("history"))
+                            gr.Markdown(
+                                f"<div class='name'>{history_title}</div>"
+                                f"<div class='desc'>{history_description}</div>"
+                            )
+                            history_card_btn = gr.Button(
+                                history_card_label, variant="secondary"
+                            )
+                else:
+                    history_card_btn = None
 
             with gr.Row(visible=file_exchange_enabled):
                 with gr.Column(scale=2, min_width=300):
@@ -836,6 +872,7 @@ def build_ui(
         "load_status": load_status,
         "model_dropdown": model_dropdown,
         "model_status": model_status,
+        "orchestra_md": orchestra_md,
         "mic_audio": mic_audio,
         "briefing_btn": briefing_btn,
         "read_aloud_btn": read_aloud_btn,

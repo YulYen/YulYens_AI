@@ -11,6 +11,7 @@ Kiwix or GPU.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -258,6 +259,27 @@ def check_model_fits_vram(
     return CheckResult("model_vram", free_gb >= needed_gb, WARNING, detail)
 
 
+def _solo_models(default_model: str) -> dict[str, str]:
+    """Persona → eigenes Solo-Modell, nur wo es vom Default abweicht (#85).
+
+    Ohne lesbares Ensemble gibt es nichts zu prüfen — das meldet bereits die
+    Schema-Prüfung, eine zweite Fehlermeldung hier wäre nur Lärm.
+    """
+    from config import personas
+
+    try:
+        names = personas.get_all_persona_names()
+        models = {name: personas.get_model(name) for name in names}
+    except Exception:  # noqa: BLE001 — Diagnose darf nicht selbst abbrechen
+        logging.debug("Solo-Modelle nicht lesbar", exc_info=True)
+        return {}
+    return {
+        name: model
+        for name, model in models.items()
+        if model and model != default_model
+    }
+
+
 def run_checks(cfg, *, include_vram: bool = True) -> list[CheckResult]:
     """Run every applicable check for the given Config and return the results."""
     results: list[CheckResult] = []
@@ -273,6 +295,15 @@ def run_checks(cfg, *, include_vram: bool = True) -> list[CheckResult]:
         if reachable.ok:
             results.append(check_model_available(url, core.get("model_name", "")))
             results.append(check_model_fits_vram(url, core.get("model_name", "")))
+            # Solo-Modelle (#85): fehlt eins, scheitert genau das Solo dieser
+            # Persona — so hart wie das Default-Modell, nur später.
+            for persona, model in _solo_models(core.get("model_name", "")).items():
+                check = check_model_available(url, model)
+                results.append(
+                    CheckResult(
+                        f"solo_model[{persona}]", check.ok, check.severity, check.detail
+                    )
+                )
         else:
             results.append(
                 CheckResult(

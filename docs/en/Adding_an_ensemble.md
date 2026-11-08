@@ -27,6 +27,7 @@ All ensembles live in [`ensembles/`](../../ensembles). A typical ensemble contai
    - List every persona under `personas:`.
    - `name` must be unique and also matches the directory used for images.
    - `llm_options` overrides global defaults such as temperature, seed, or `num_ctx`.
+   - `model` (optional) gives the persona **its own model for solo chats** (one-on-one). In the orchestra (Ask-All, AI dialog) it still plays on `core.model_name`. See [Solo and Orchestra](Features.md#solo-and-orchestra).
    - `defaults.featured: true` marks a persona as the default selection in the web UI.
 
 3. **Create locale files**

@@ -2,7 +2,7 @@
 
 ## Mehrere KI-Personas
 
-Das System umfasst vier unterschiedliche KI-Personas mit eigenen Charakteren. Alle Personas nutzen das gleiche zugrundeliegende Sprachmodell, unterscheiden sich jedoch durch spezielle System-Prompts, die ihren Sprachstil und Ton festlegen:
+Das System umfasst vier unterschiedliche KI-Personas mit eigenen Charakteren. Standardmäßig nutzen alle Personas das gleiche zugrundeliegende Sprachmodell (für das Gespräch zu zweit kann eine Persona ein eigenes bekommen, siehe „Solo und Orchester“) und unterscheiden sich durch spezielle System-Prompts, die ihren Sprachstil und Ton festlegen:
 
 - **Leah** – empathisch und freundlich
 - **Doris** – sarkastisch und schlagfertig humorvoll
@@ -11,7 +11,35 @@ Das System umfasst vier unterschiedliche KI-Personas mit eigenen Charakteren. Al
 
 Die Auswahl der Persona erfolgt entweder beim Start (Terminal-UI) oder über die Weboberfläche. Jede Persona reagiert im entsprechenden Stil auf Nutzeranfragen.
 
-Diese vier gehören zum Ensemble `classic` — der Standardbesetzung. Welche Personas antworten, hängt am gewählten Ensemble (siehe nächster Abschnitt).
+Diese vier gehören zum Ensemble `classic` — der Standardbesetzung. Welche Personas antworten, hängt am gewählten Ensemble (siehe „Persona-Ensembles“).
+
+## Solo und Orchester
+
+Die Startseite (Web-UI und Terminal) hat zwei Bereiche, und **jede Persona steht in beiden**:
+
+- **🎻 Solo** — das Gespräch zu zweit. Man wählt eine Persona (oder legt einen Gast an) und chattet mit ihr.
+- **🎼 Orchester** — alle zusammen: AI-Dialog und Ask-All samt Fazit. In der Web-UI steht hier auch der Verlauf.
+
+Standardmäßig spielen alle auf demselben Modell (`core.model_name`). Eine Persona kann aber **für das Solo ein eigenes Modell** bekommen — ein optionales `model:` in `personas_base.yaml`:
+
+```yaml
+  - name: PETER
+    model: "qwen3:15b"
+    llm_options:
+      temperature: 0.1
+```
+
+Dann antwortet PETER **solo mit Qwen** und **im Orchester mit dem gemeinsamen Modell**. Das Orchester bleibt bewusst auf einem Modell: Vier Personas auf vier Modellen hieße Ladezeit zwischen jeder Antwort oder vier Modelle gleichzeitig im Grafikspeicher. Was gilt, sieht man an der Oberfläche: Die Solo-Karte nennt das eigene Modell (im Terminal steht es in Klammern hinter dem Namen), der Begrüßungssatz nennt das Modell, das wirklich antwortet, und die Orchester-Überschrift nennt das gemeinsame.
+
+Zu wissen:
+
+- **Ein Solo ist jeder Weg, der genau eine Persona fragt**: Chat in Web und Terminal, One-Shot-API, OpenAI-kompatibles `/v1` (`model` = Persona-Name) und der Mail-Adapter. Alle nehmen das eigene Modell.
+- **Der Gast** spielt solo, aber immer auf dem gemeinsamen Modell.
+- **Ladezeit:** Wechselt man zwischen einer Solo-Persona mit eigenem Modell und dem Orchester, muss Ollama unter Umständen erst das andere Modell laden — die erste Antwort dauert dann länger. Das ist kein Fehler.
+- **Profi-Option** (Web-UI, „Erweitert"): Der Modellwechsel dort ändert das gemeinsame Modell. Eigene Modelle einzelner Personas bleiben, wie sie sind.
+- `llm_options` (Temperatur, `num_ctx` …) gelten für beide Modelle der Persona.
+- `--doctor` und `/healthz` prüfen jedes eingetragene Modell (`solo_model[PETER]`) — vorher also `ollama pull qwen3:15b`.
+- Ohne `model:` ändert sich nichts außer der Aufteilung der Startseite.
 
 ## Persona-Ensembles
 

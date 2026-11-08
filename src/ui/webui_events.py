@@ -119,7 +119,7 @@ def bind_events(
     model_dropdown.change(
         fn=ui._on_model_selected,
         inputs=[session_state, model_dropdown, components["conversation_state"]],
-        outputs=[model_status],
+        outputs=[model_status, components["orchestra_md"]],
         queue=False,
     )
 

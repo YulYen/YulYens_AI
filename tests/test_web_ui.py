@@ -74,6 +74,7 @@ def _create_web_ui(ui_config=None, texts=None):
         ui_config = {"experimental": {"broadcast_mode": True}}
 
     dummy_config = SimpleNamespace(
+        core={"model_name": "standard:1"},
         texts=texts if texts is not None else {},
         t=texts.format if texts is not None else (lambda key, **kwargs: key),
         ui=ui_config,
@@ -94,6 +95,11 @@ def _create_web_ui(ui_config=None, texts=None):
     factory.get_auth_provider.return_value = build_auth_provider(
         ui_config.get("web") if isinstance(ui_config, dict) else None
     )
+    # Ohne eigene Modelle (#85) spielt solo jede Persona auf dem Default —
+    # live aus der Config, wie in der echten Factory.
+    factory.solo_model.side_effect = lambda name: (
+        getattr(dummy_config, "core", {}) or {}
+    ).get("model_name", "")
     return WebUI(
         factory=factory,
         config=dummy_config,
@@ -709,7 +715,7 @@ def test_on_model_selected_overrides_config_and_rebuilds_streamer():
     web_ui.cfg.override = Mock()
     session.bot = "Karl"
 
-    update = web_ui._on_model_selected(session, "neu:1", "")
+    update, _orchestra = web_ui._on_model_selected(session, "neu:1", "")
 
     web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
     web_ui.factory.get_streamer_for_persona.assert_called_once_with("Karl")
@@ -722,7 +728,7 @@ def test_on_model_selected_without_persona_keeps_streamer_none():
     web_ui.cfg.override = Mock()
     session.bot = None
 
-    update = web_ui._on_model_selected(session, "neu:1", "")
+    update, _orchestra = web_ui._on_model_selected(session, "neu:1", "")
 
     web_ui.cfg.override.assert_called_once_with("core", {"model_name": "neu:1"})
     web_ui.factory.get_streamer_for_persona.assert_not_called()
@@ -735,7 +741,7 @@ def test_on_model_selected_empty_choice_is_noop():
     session = SessionContext()
     web_ui.cfg.override = Mock()
 
-    update = web_ui._on_model_selected(session, "", "")
+    update, _orchestra = web_ui._on_model_selected(session, "", "")
 
     web_ui.cfg.override.assert_not_called()
     assert update["visible"] is False

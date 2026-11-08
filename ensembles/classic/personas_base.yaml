@@ -11,6 +11,11 @@ personas:
   #
   # Temperaturen gegenüber dem 8B-Stand etwas gesenkt: Das 14B schmückt bei
   # gleicher Temperatur mehr aus.
+  #
+  # Optional je Persona: `model: "<ollama-name>"` — ein eigenes Modell nur fürs
+  # Solo, also das Gespräch zu zweit (#85). Im Orchester (Ask-All, Fazit,
+  # AI-Dialog) spielen alle weiter auf core.model_name. Ohne Eintrag gilt
+  # überall core.model_name.
   - name: LEAH
     llm_options:
       temperature: 0.55

@@ -55,8 +55,9 @@ class SelfTalkRunner:
         self.persona_b = persona_b
         self.turn_a = True
         self.turn_index = 1
-        self.streamer_a = factory.get_streamer_for_persona(persona_a)
-        self.streamer_b = factory.get_streamer_for_persona(persona_b)
+        # Self-Talk ist Orchester (#85): beide auf dem gemeinsamen Modell.
+        self.streamer_a = factory.get_streamer_for_orchestra(persona_a)
+        self.streamer_b = factory.get_streamer_for_orchestra(persona_b)
         # Je ein Gespräch pro Seite (#59). Ohne ID steigt die Ablage aus, und
         # der AI-Dialog blieb spurlos.
         for persona, streamer in (

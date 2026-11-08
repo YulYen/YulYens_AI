@@ -9,15 +9,25 @@ from config.personas import _load_system_prompts
 
 
 def prompt_persona_choice(
-    names: list[str], texts: Mapping[str, str], prompt_key: str
+    names: list[str],
+    texts: Mapping[str, str],
+    prompt_key: str,
+    *,
+    models: Mapping[str, str] | None = None,
 ) -> str:
-    """Print numbered persona list, prompt for a choice, and return the selected name."""
+    """Print numbered persona list, prompt for a choice, and return the selected name.
+
+    ``models`` maps a persona to its own solo model (#85); only those that
+    differ from the default are passed, and only those get the suffix.
+    """
     print(texts["choose_persona"])
     for idx, name in enumerate(names, start=1):
         desc = next(p for p in _load_system_prompts() if p["name"] == name)[
             "description"
         ]
-        print(f"{idx}. {name} – {desc}")
+        model = (models or {}).get(name)
+        suffix = f" [{model}]" if model else ""
+        print(f"{idx}. {name}{suffix} – {desc}")
     while True:
         sel = input(f"{texts[prompt_key]} ").strip()
         try:
