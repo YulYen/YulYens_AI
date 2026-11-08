@@ -232,7 +232,7 @@ Das 14B antwortet 20 von 20 Mal „Deutschland, Deutschland, Österreich", genau
 Falle, auf die der Test zielt. In 7 von 20 Läufen bricht der Code sogar ab. PETER
 läuft mit Temperatur 0,1, die 20 Läufe sind deshalb fast 20-mal dieselbe Antwort und
 keine Streuungsmessung. Nach der Regel im Ticket (mindestens 19 von 20) werden die
-Tests nicht aktiviert. **Offen:** Fall anpassen oder streichen.
+Tests nicht aktiviert. Ersetzt am selben Tag, siehe „Tests, die trennen".
 
 ### Geschmacksprobe
 
@@ -250,8 +250,85 @@ blind. Was ohne Geschmack auffällt:
   derselben Probe nicht.
 - **POPCORN bleibt in beiden Modellen die Katze**, auch bei Steuererklärung und TCP.
 
-**Offen:** Yuls Urteil aus der Blindverkostung und damit die Frage, ob der Default
-`ministral-3:14b` bleibt.
+**Yuls Urteil (blind):** 14B 6, 8B 4, gleich 4. Bei POPCORN und DORIS gefielen
+die kürzeren, weniger wirren Antworten, bei LEAH das 14B („strukturierter,
+erwachsener"). **PETER ist die Schwachstelle:** Bei Wiki, Code und Pizza gewann
+das 8B. Das 14B wirkte aufgedreht, verwies ungefragt auf POPCORN und zitierte das
+interne Etikett „WIKI SNIPPET 1" als Quelle.
+
+### Drei Optimierungsspiele für PETER
+
+- **Repeat-Penalty:** PETER-Evals auf dem 14B mit 1.15, Ollama-Default und 1.0,
+  je zwei Läufe, Judge 14B: Ø 4,33 / 4,33, 4,33 / 4,33 und 4,00 / 4,33. Kein
+  messbarer Unterschied, auch nicht in den Proben. Die Penalty ist nicht der
+  Grund für das Aufgedrehte.
+- **Programmieraufgabe leichter:** Beide Modelle lesen „2.675" in einer deutschen
+  Aufgabe über einen „Geldbetrag" als **Tausenderpunkt** und liefern „2675,00".
+  Mit einem Klärungssatz liest das 14B richtig und scheitert nur noch an
+  `round()`/`float`, das 8B liest weiter falsch. Bestanden hat trotzdem keiner,
+  in keiner Rundungsvariante. Gefunden wurde der Trenner erst in der dritten
+  Runde (siehe unten).
+- **Längere Wiki-Schnipsel:** 1200, 2400 und 4000 Zeichen, sieben Fragen, beide
+  Modelle: überall 7 von 7, Antwortzeit unverändert 3–4 s. Längere Schnipsel
+  schaden nicht. Ob sie nützen, zeigen diese Fragen nicht, weil die Antworten
+  schon im Anfang der Artikel stehen.
+- **Das falsche Merz-Datum ist ein Suchproblem:** „Seit welchem Datum ist
+  Friedrich Merz Bundeskanzler?" beantworten beide stets richtig. „**Wer** ist
+  Bundeskanzler von Deutschland und seit wann?" ergibt „8. Dezember 2021", das
+  Datum von Scholz' Amtsantritt (#84).
+
+### Tests, die trennen
+
+Drei Kandidatenrunden, je fünf Läufe pro Modell mit PETERs Einstellungen:
+
+| Kandidat | 8B | 14B |
+|---|---|---|
+| Runden mit vorgegebenem `decimal` | 0/5 | 0/5 |
+| Euro-Format „1.234,56 €" | 5/5 | 0/5 (Leerzeichen als Tausendertrenner) |
+| Geburtsorte, Orte vorgegeben | 5/5 | 5/5 |
+| Geburtsorte mit Warnung vor dem Köder | 0/5 | 0/5 |
+| Palindrom mit Umlauten, Hauptstädte, Kant, Schopenhauer einzeln | 5/5 | 5/5 |
+| Wochentag, ISO-Kalenderwoche | 5/5 | 5/5 |
+| IBAN-Prüfziffer | 0/5 | 0/5 |
+| **Freuds Geburtsort heute** | **0/5** | **5/5** |
+| **Ostersonntag berechnen** | **0/5** | **5/5** |
+
+Die beiden Trenner sind jetzt aktive Tests in `tests/test_ai_via_api_14b.py`,
+kalibriert mit je 20 Läufen: Ostersonntag 8B 0/20, 14B 20/20; Freud 8B 0/20,
+14B 20/20. Freud trennt nur **mit** Zeitstempel-Block im Prompt (neuer Fixture
+`client_with_date`). Ohne den Block weiß auch das 8B den Ort (20/20). Das ist
+ein eigener Befund (#82).
+
+### Abstimmung auf das 14B und Komplettvergleich
+
+Vorschlag im selben Branch, Yuls Auftrag vom 2026-11-08: kein eigenes
+`repeat_penalty`, Temperaturen etwas gesenkt (LEAH 0.55, DORIS 0.5, POPCORN 0.7,
+PETER 0.1), `num_ctx` 16384 (14B: 10 GB, 100 % GPU; bei 32768 wären es 13 GB),
+Prompts mit Längengrenzen, Geschwister nur auf Anlass, keine erfundenen Quellen,
+Wiki-Begleittext ohne „WIKI SNIPPET"-Zitate, `snippet_limit` 2400, Karl mit
+ausdrücklichen Vorgaben.
+
+Verglichen über alle Live-Tests (`pytest -m ollama`, 10 Tests inklusive der
+beiden neuen), je drei Durchläufe. „Alt" ist `main` plus die neuen Tests:
+
+| Test | alt · 8B | alt · 14B | neu · 8B | neu · 14B |
+|---|---|---|---|---|
+| sieben Basistests (API-Vertrag, Datum, Sonne/Mond, Evals) | 21/21 | 21/21 | 21/21 | 21/21 |
+| Ostersonntag | 0/3 | 3/3 | 0/3 | 3/3 |
+| Freuds Geburtsort | 1/3 | 3/3 | 2/3 | 3/3 |
+| exakt fünf Wörter | 0/3 | 3/3 | 1/3 | 1/3 |
+| **gesamt** | **22/30** | **30/30** | **24/30** | **28/30** |
+
+- **Ostersonntag trennt felsenfest**, unter beiden Configs.
+- **Freud trennt in der vollen Suite schwächer** als einzeln kalibriert: Das 8B
+  trifft „Příbor" dort in 3 von 6 Läufen, einzeln in 0 von 20. Die Reihenfolge
+  der Anfragen scheint bei Temperatur 0.1 mitzuspielen.
+- **Die zwei Fehler des 14B unter der neuen Config** sind beide derselbe
+  Grenzfall im Fünf-Wörter-Test: „Neue Aktivitäten, Bewegung, Sozialkontakte,
+  Kreativität, Lernen." sind fünf Begriffe, aber sechs Wörter.
+- Ob die Personas sich jetzt so anfühlen wie gewünscht (kürzer, ruhiger, PETER
+  nicht mehr aufgedreht), messen die Unit-Tests nicht. Dafür braucht es Yuls
+  Gespräch oder eine neue Blindverkostung (#80).
 
 ---
 
