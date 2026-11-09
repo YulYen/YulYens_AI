@@ -9,6 +9,12 @@ Deutsch, Wiki-Nutzung** — dazu neu die Frage, ob PETER zum Coding-Helfer ausge
 werden kann, gern mit eigenem Modell pro Persona. Schwächere Rechner sollen weiter
 mit `ministral-3:8b` laufen.
 
+> **Hinweis (2026-11-09):** Der Ollama-Tag für Qwen3.6-35B-A3B heißt `qwen3.6:35b`
+> (23 GB), nicht `qwen3.6:35b-a3b` wie unten in der Tabelle. Sonst Stand unverändert:
+> Qwen4 (auch das 27B) hat bis zum 03.11. keine Gewichte veröffentlicht. Für Gemma 4
+> 26B-A4B gibt es Googles offizielle QAT-Version, die komplett in 16 GB passt:
+> `hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf` (14,4 GB).
+
 Alle Zahlen sind Recherche, **nicht auf Yuls Kiste gemessen**. Das Testen ist Backlog #78.
 
 > **Nachtrag 2026-11-08:** Das 14B ist jetzt auf der Kiste gemessen, gegen das 8B,
