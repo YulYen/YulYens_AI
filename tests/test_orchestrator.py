@@ -14,7 +14,7 @@ class _DummyFactory:
     def __init__(self):
         self._cache: dict[str, YulYenStreamingProvider] = {}
 
-    def get_streamer_for_persona(self, persona: str) -> YulYenStreamingProvider:
+    def get_streamer_for_orchestra(self, persona: str) -> YulYenStreamingProvider:
         if persona not in self._cache:
             self._cache[persona] = YulYenStreamingProvider(
                 base_url="",
@@ -61,7 +61,7 @@ class _RecordingFactory:
     def __init__(self):
         self.seen_messages: dict[str, list[dict[str, str]]] = {}
 
-    def get_streamer_for_persona(self, persona: str):
+    def get_streamer_for_orchestra(self, persona: str):
         factory = self
 
         class _Streamer:
@@ -180,7 +180,7 @@ def test_parallel_broadcast_streams_personas_concurrently():
     started = {"Alpha": threading.Event(), "Beta": threading.Event()}
 
     class _LockstepFactory:
-        def get_streamer_for_persona(self, persona: str):
+        def get_streamer_for_orchestra(self, persona: str):
             other = "Beta" if persona == "Alpha" else "Alpha"
 
             class _Streamer:
@@ -204,7 +204,7 @@ def test_parallel_broadcast_streams_personas_concurrently():
 
 
 class _EndlessFactory:
-    def get_streamer_for_persona(self, persona: str):
+    def get_streamer_for_orchestra(self, persona: str):
         class _Streamer:
             def stream(self, messages):
                 for i in range(100_000):
@@ -275,8 +275,8 @@ class _StoreBackedFactory(_DummyFactory):
         super().__init__()
         self.store = store
 
-    def get_streamer_for_persona(self, persona):
-        streamer = super().get_streamer_for_persona(persona)
+    def get_streamer_for_orchestra(self, persona):
+        streamer = super().get_streamer_for_orchestra(persona)
         streamer.store = self.store
         return streamer
 

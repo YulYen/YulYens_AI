@@ -277,13 +277,45 @@ class WebUI:
         # verloren, an der _continuable_persona den Gast erkennt.
         return {
             "created_at": datetime.now().isoformat(),
-            "model": str(self.cfg.core.get("model_name")),
+            "model": self._chat_model(persona_name, app),
             "persona": persona_name,
             "app": app,
             # Nie leer: ohne Anmeldung der lokale Standardnutzer, sonst der
             # angemeldete Name — #25 und #24 sollen sich darauf verlassen können.
             "user": user or self._fallback_user(),
         }
+
+    def _chat_model(self, persona_name: str, app: str = "web") -> str:
+        """Das Modell, mit dem dieses Gespräch zu zweit läuft (#85).
+
+        Eine Ensemble-Persona hat solo ggf. ihr eigenes Modell; der Gast nie —
+        auch nicht, wenn er zufällig wie eine Ensemble-Persona heißt. Live
+        gelesen, weil die Profi-Option den Default zur Laufzeit wechseln kann.
+        """
+        if app == GUEST_APP:
+            return str(self.cfg.core.get("model_name", ""))
+        return str(self.factory.solo_model(persona_name))
+
+    def _solo_models(self) -> dict[str, str]:
+        """Persona-Key → eigenes Modell, nur wo es vom Default abweicht (#85)."""
+        default = str(self.cfg.core.get("model_name", ""))
+        result: dict[str, str] = {}
+        for name in get_all_persona_names():
+            model = str(self.factory.solo_model(name))
+            if model and model != default:
+                result[name.lower()] = model
+        return result
+
+    def _orchestra_hint(self) -> str:
+        return self._t(
+            "web_orchestra_hint", model_name=str(self.cfg.core.get("model_name", ""))
+        )
+
+    def _orchestra_markdown(self) -> str:
+        """Die Orchester-Überschrift der Startseite — wie in `build_ui`."""
+        return (
+            f"## {self.texts.get('web_orchestra_title', '')}\n{self._orchestra_hint()}"
+        )
 
     def _persona_thumbnail_path(self, persona_name: str) -> str:
         ensemble = getattr(self.cfg, "ensemble", None)
@@ -374,8 +406,8 @@ class WebUI:
         app: str = "web",
     ) -> tuple:
         display_name = persona["name"].title()
-        # Modell live aus der Config lesen (kann per Profi-Option gewechselt sein)
-        model_name = str(self.cfg.core.get("model_name", ""))
+        # Modell live lesen (Profi-Option) — und solo ggf. das eigene (#85).
+        model_name = self._chat_model(persona["name"], app)
         greeting = greeting_template.format(
             persona_name=display_name, model_name=model_name
         )
@@ -497,10 +529,16 @@ class WebUI:
     def _on_model_selected(
         self, session: SessionContext, choice: str | None, conversation_id: str
     ):
-        """Session-Override des Modells; config.yaml bleibt unangetastet."""
+        """Override des Default-Modells; config.yaml bleibt unangetastet.
+
+        Liefert (Statuszeile, Orchester-Überschrift): das Orchester spielt auf
+        dem Default und nennt es (#85), die Zeile darf also nicht beim alten
+        Modell stehen bleiben. Solo-Modelle einzelner Personas bleiben, wie sie
+        sind — die Profi-Option wechselt nur den Default.
+        """
         choice = (choice or "").strip()
         if not choice:
-            return gr.update(value="", visible=False)
+            return gr.update(value="", visible=False), gr.update()
         self.cfg.override("core", {"model_name": choice})
         if session.bot:
             # Laufendes Gespräch: Streamer neu bauen (History lebt im gr.State),
@@ -514,8 +552,11 @@ class WebUI:
             self._stamp_conversation(session, conversation_id)
             self._stamp_user(session, "")
         logging.info("Modell per UI gewechselt: %s", choice)
-        return gr.update(
-            value=self._t("web_model_switched", model_name=choice), visible=True
+        return (
+            gr.update(
+                value=self._t("web_model_switched", model_name=choice), visible=True
+            ),
+            gr.update(value=self._orchestra_markdown()),
         )
 
     def _on_mic_recorded(self, audio_path: str | None, current_text: str | None):
@@ -1406,7 +1447,7 @@ class WebUI:
         ui = self.texts
         default_model = str(self.cfg.core.get("model_name", ""))
         project_title = ui.get("project_name")
-        choose_persona_txt = ui.get("choose_persona")
+        choose_persona_txt = ui.get("web_solo_hint", ui.get("choose_persona"))
         new_chat_label = ui.get("new_chat")
         send_button_label = ui.get("send_button")
         # Mit Fallback wie die Lookups darunter: ohne ihn liefert ein
@@ -1486,6 +1527,11 @@ class WebUI:
             broadcast_enabled=self.features.broadcast,
             project_title=project_title,
             choose_persona_txt=choose_persona_txt,
+            solo_title=ui.get("web_solo_title", "Solo"),
+            solo_models=self._solo_models(),
+            solo_model_label=ui.get("web_solo_model_label", "Modell:"),
+            orchestra_title=ui.get("web_orchestra_title", "Orchester"),
+            orchestra_hint=self._orchestra_hint(),
             persona_btn_suffix=persona_btn_suffix,
             input_placeholder=input_placeholder,
             new_chat_label=new_chat_label,

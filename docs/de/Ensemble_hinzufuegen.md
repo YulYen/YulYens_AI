@@ -25,6 +25,7 @@ Alle Ensembles liegen im Verzeichnis [`ensembles/`](../../ensembles). Ein Ensemb
    - Lege unter `personas:` alle Charaktere an.
    - `name` muss eindeutig sein und dient gleichzeitig als Schlüssel für Bilder.
    - `llm_options` überschreibt globale Einstellungen wie Temperatur, Seed oder `num_ctx`.
+   - `model` (optional) gibt der Persona ein **eigenes Modell fürs Solo**, also für das Gespräch zu zweit. Im Orchester (Ask-All, AI-Dialog) spielt sie trotzdem auf `core.model_name`. Siehe [Solo und Orchester](Features.md#solo-und-orchester).
    - `defaults.featured: true` markiert eine Persona für die Web-UI als Startauswahl.
 
 3. **Sprachdateien erstellen**

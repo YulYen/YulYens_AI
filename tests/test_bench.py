@@ -426,13 +426,13 @@ def test_the_in_process_driver_reuses_one_streamer_per_persona():
     """Ein frischer Streamer je Messung würde seinen Aufbau mitmessen."""
     streamer = streamer_double()
     factory = factory_double()
-    factory.get_streamer_for_persona.return_value = streamer
+    factory.get_streamer_for_orchestra.return_value = streamer
 
     driver = InProcessDriver(factory)
     driver.stream("PETER", "Frage?")
     driver.stream("PETER", "Andere Frage?")
 
-    assert factory.get_streamer_for_persona.call_count == 1
+    assert factory.get_streamer_for_orchestra.call_count == 1
 
 
 def test_the_in_process_driver_reads_the_streamers_own_stats():
@@ -444,7 +444,7 @@ def test_the_in_process_driver_reads_the_streamers_own_stats():
 
     streamer = streamer_double(last_stream_stats=_Stats())
     factory = factory_double()
-    factory.get_streamer_for_persona.return_value = streamer
+    factory.get_streamer_for_orchestra.return_value = streamer
 
     driver = InProcessDriver(factory)
     driver.stream("PETER", "Frage?")

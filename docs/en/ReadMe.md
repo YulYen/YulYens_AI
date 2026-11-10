@@ -270,7 +270,7 @@ versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
 
 - **Terminal UI**
   - Use in the terminal when `ui.type: "terminal"`
-  - Start menu: new conversation, load conversation (JSON), self-talk, ask-all
+  - Start menu in two sections: **Solo** (new conversation, load conversation) and **Orchestra** (self-talk, ask-all) — see [Solo and Orchestra](Features.md#solo-and-orchestra)
   - Input: simply type your questions
   - Commands: `exit` (quit), `clear` (start a new conversation), `/save <path>` (save the conversation as JSON), `/briefing` (persona summarizes the configured RSS feeds), `/sources` or `/quellen` (the Wikipedia excerpts last injected, verbatim and untruncated)
 

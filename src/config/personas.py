@@ -82,6 +82,8 @@ def _parse_persona_files(
             "description": localized.get("description", ""),
             "drink": localized.get("drink", "Coffee"),
             "llm_options": base_persona.get("llm_options", {}),
+            # Solo-Modell (#85): nur fürs Gespräch zu zweit. Leer = Default.
+            "model": str(base_persona.get("model") or "").strip() or None,
         }
 
         defaults = base_persona.get("defaults")
@@ -106,6 +108,20 @@ def get_options(name: str) -> dict[str, Any] | None:
     for persona in _load_system_prompts():
         if persona["name"].lower() == name.lower():
             return persona.get("llm_options") or None
+    raise ValueError(f"Persona '{name}' not found.")
+
+
+def get_model(name: str) -> str | None:
+    """Das eigene Modell einer Persona für das **Solo** (#85) — oder ``None``.
+
+    ``None`` heißt: die Persona spielt auch solo auf ``core.model_name``. Das
+    Orchester (Ask-All, Fazit, Self-Talk) fragt hier nie nach — dort spielen
+    alle auf dem gemeinsamen Modell. Welches Modell am Ende gilt, entscheidet
+    ``AppFactory.solo_model``, weil nur sie den Default kennt.
+    """
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return persona.get("model")
     raise ValueError(f"Persona '{name}' not found.")
 
 

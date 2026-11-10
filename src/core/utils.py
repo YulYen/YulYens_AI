@@ -41,13 +41,16 @@ def extract_zim_date(zim_prefix: str | None) -> str | None:
     return f"{match.group(1)}-{match.group(2)}" if match else None
 
 
-def _cutoff_timestamp_text(cfg) -> str:
-    """The model's training-knowledge cutoff, looked up per model name."""
+def _cutoff_timestamp_text(cfg, model: str | None = None) -> str:
+    """The model's training-knowledge cutoff, looked up per model name.
+
+    ``model`` overrides ``core.model_name`` — a soloist (#85) answers from its
+    own model, so its prompt must state that model's cutoff, not the default's.
+    """
     core = getattr(cfg, "core", {}) or {}
     cutoffs = core.get("knowledge_cutoffs") or {}
-    cutoff = (
-        cutoffs.get(core.get("model_name", "")) if isinstance(cutoffs, dict) else None
-    )
+    model_name = model or core.get("model_name", "")
+    cutoff = cutoffs.get(model_name) if isinstance(cutoffs, dict) else None
     if cutoff:
         return cfg.t("persona_ts_cutoff", cutoff=cutoff)
     return cfg.t("persona_ts_cutoff_unknown")
@@ -67,7 +70,7 @@ def _wiki_timestamp_text(cfg) -> str | None:
     return None
 
 
-def with_timestamps(base: str, cfg) -> str:
+def with_timestamps(base: str, cfg, model: str | None = None) -> str:
     """Append a clearly separated 'three timestamps' block to a system prompt:
     today's date, the model's training cutoff, and the wiki data date. Keeping
     the three distinct stops personas from claiming their knowledge reaches today.
@@ -83,7 +86,7 @@ def with_timestamps(base: str, cfg) -> str:
         return base
     parts = [
         cfg.t("persona_ts_today", date=datetime.now().strftime("%Y-%m-%d")),
-        _cutoff_timestamp_text(cfg),
+        _cutoff_timestamp_text(cfg, model),
     ]
     wiki_part = _wiki_timestamp_text(cfg)
     if wiki_part:
@@ -92,15 +95,15 @@ def with_timestamps(base: str, cfg) -> str:
     return f"{base} | {' '.join(parts)}"
 
 
-def _system_prompt_with_date(name: str, cfg) -> str:
+def _system_prompt_with_date(name: str, cfg, model: str | None = None) -> str:
     """Same block for a persona from the ensemble YAML."""
-    return with_timestamps(get_prompt_by_name(name), cfg)
+    return with_timestamps(get_prompt_by_name(name), cfg, model)
 
 
-def _greeting_text(cfg, bot) -> str:
+def _greeting_text(cfg, bot, model: str | None = None) -> str:
     tpl = cfg.texts["greeting"]
     values = {
-        "model_name": cfg.core["model_name"],
+        "model_name": model or cfg.core["model_name"],
         "persona_name": bot,
     }
     return tpl.format_map(values)

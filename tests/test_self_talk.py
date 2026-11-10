@@ -18,7 +18,7 @@ def test_self_talk_runner_alternates_histories():
     streamer_b = streamer_double()
     streamer_a.stream.return_value = iter(["Antwort A"])
     streamer_b.stream.return_value = iter(["Antwort B _endegelaende_"])
-    factory.get_streamer_for_persona.side_effect = [streamer_a, streamer_b]
+    factory.get_streamer_for_orchestra.side_effect = [streamer_a, streamer_b]
 
     class _Texts:
         @staticmethod
@@ -58,7 +58,7 @@ def _terminal_run_fixture(monkeypatch, replies_b):
     streamer_b = streamer_double()
     streamer_a.stream.side_effect = lambda messages: iter(["Hallo von A"])
     streamer_b.stream.side_effect = lambda messages: iter(replies_b)
-    factory.get_streamer_for_persona.side_effect = [streamer_a, streamer_b]
+    factory.get_streamer_for_orchestra.side_effect = [streamer_a, streamer_b]
 
     personas = iter(["Karl", "Yul"])
     monkeypatch.setattr(self_talk, "_choose_persona", lambda t, key: next(personas))
@@ -89,10 +89,10 @@ def test_terminal_self_talk_run_handles_keyboard_interrupt(monkeypatch, capsys):
     def _interrupt(messages):
         raise KeyboardInterrupt
 
-    factory.get_streamer_for_persona.side_effect = None
+    factory.get_streamer_for_orchestra.side_effect = None
     streamer = streamer_double()
     streamer.stream.side_effect = _interrupt
-    factory.get_streamer_for_persona.return_value = streamer
+    factory.get_streamer_for_orchestra.return_value = streamer
 
     self_talk.run(factory, config, terminal_ui)
 
@@ -127,7 +127,7 @@ def test_self_talk_records_both_sides_in_the_store(tmp_path):
         return provider
 
     factory = factory_double()
-    factory.get_streamer_for_persona.side_effect = lambda p: _streamer(p)
+    factory.get_streamer_for_orchestra.side_effect = lambda p: _streamer(p)
     factory.open_conversation.side_effect = lambda persona, app, user="local": (
         store.start(user=user, persona=persona, model="dummy", app=app)
     )

@@ -4,7 +4,7 @@
 
 ## Multiple AI personas
 
-The system comprises four distinct AI personas with their own personalities. Every persona uses the same underlying language model but differs through dedicated system prompts that determine tone and voice:
+The system comprises four distinct AI personas with their own personalities. By default every persona uses the same underlying language model (for one-on-one chats a persona can get its own, see "Solo and Orchestra") and differs through dedicated system prompts that determine tone and voice:
 
 - **Leah** – empathetic and friendly
 - **Doris** – sarcastic with quick-witted humor
@@ -13,7 +13,35 @@ The system comprises four distinct AI personas with their own personalities. Eve
 
 The persona can be selected either at start-up (terminal UI) or via the web interface. Each persona responds to user requests in its characteristic manner.
 
-These four belong to the `classic` ensemble — the default cast. Which personas answer depends on the selected ensemble (see the next section).
+These four belong to the `classic` ensemble — the default cast. Which personas answer depends on the selected ensemble (see "Persona ensembles").
+
+## Solo and Orchestra
+
+The start page (web UI and terminal) has two sections, and **every persona appears in both**:
+
+- **🎻 Solo** — a one-on-one chat. Pick a persona (or create a guest) and talk to it.
+- **🎼 Orchestra** — everyone together: AI dialog and Ask-All with its verdict. In the web UI the history card lives here too.
+
+By default everyone plays on the same model (`core.model_name`). A persona can, however, get **its own model for solo chats** — an optional `model:` in `personas_base.yaml`:
+
+```yaml
+  - name: PETER
+    model: "qwen3:15b"
+    llm_options:
+      temperature: 0.1
+```
+
+PETER then answers **with Qwen when you talk to him alone** and **with the shared model in the orchestra**. The orchestra deliberately stays on one model: four personas on four models would mean loading time between every answer, or four models in GPU memory at once. The interface shows which one applies: the solo card names the persona's own model (the terminal shows it in brackets after the name), the greeting names the model that actually answers, and the orchestra heading names the shared one.
+
+Good to know:
+
+- **Solo is every path that asks exactly one persona**: chat in the web UI and terminal, the one-shot API, the OpenAI-compatible `/v1` (`model` = persona name) and the mail adapter. All of them use the persona's own model.
+- **Guest personas** play solo, but always on the shared model.
+- **Loading time:** switching between a solo persona with its own model and the orchestra may make Ollama load the other model first, so the first answer takes longer. That is expected.
+- **Advanced option** (web UI, "Advanced"): switching the model there changes the shared model. Personas with their own model keep it.
+- `llm_options` (temperature, `num_ctx` …) apply to both of a persona's models.
+- `--doctor` and `/healthz` check every configured model (`solo_model[PETER]`) — so run `ollama pull qwen3:15b` first.
+- Without any `model:` nothing changes except the start page layout.
 
 ## Persona ensembles
 

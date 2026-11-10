@@ -299,6 +299,9 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   `user`-Nachricht; gekürzt mit Marker; von der ruhigsten Persona nur
   `INHERITED_OPTIONS` (`config.personas.quietest_persona_name`).
 - **Broadcast:** ein Token-Event trägt nur sein Token (sonst quadratisch).
+- **Solo/Orchester (#85):** wer mehrere Personas zusammenspielen lässt, nimmt
+  `get_streamer_for_orchestra`, nie `get_streamer_for_persona` (das ist das
+  Solo mit eigenem Modell); der Gast bekommt nie ein eigenes Modell.
 - **Mail-Adapter:** Antwort an `From`, nie `Reply-To`; **erst markieren, dann
   senden**; ohne `allowed_senders` kein Start; einmal beim Lesen kürzen.
 - **API:** `model` = Persona; `api_key` gilt für **alle** Endpunkte

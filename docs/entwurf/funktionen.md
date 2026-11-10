@@ -21,6 +21,44 @@ Die Feature-Modi im Detail, die RSS-Entscheidungen (#73), das Ask-All-Fazit (#27
 | **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
 | **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
 
+### Solo und Orchester: wer welches Modell bekommt (#85)
+
+Eine Persona darf in `personas_base.yaml` ein eigenes `model` tragen — **nur
+fürs Solo**. Yuls Konzept vom 2026-11-08 ersetzt einen ersten Entwurf mit
+Config-Schalter, der Ask-All und Self-Talk beim Einschalten ganz abgeschaltet
+hätte. Jetzt steht jede Persona in beiden Bereichen der Startseite und
+antwortet je nach Bereich mit einem anderen Modell. Was dabei leicht umfällt:
+
+1. **Die Weiche liegt in der Factory, nicht in der Oberfläche.**
+   `get_streamer_for_persona` ist das Solo (eigenes Modell),
+   `get_streamer_for_orchestra` das Orchester (`core.model_name`). Orchester
+   sind `core/orchestrator.py` (beide Broadcast-Varianten), `ui/self_talk.py`
+   und die Stoppuhr (`bench/drivers.py` — sie schreibt `core.model_name` in den
+   Bericht, ein Solo-Modell würde die Zeile Lügen strafen). Das Fazit läuft
+   über `get_streamer_for_guest` und damit ohnehin auf dem Default. **Wer einen
+   neuen Weg baut, der mehrere Personas zusammenspielen lässt, nimmt den
+   Orchester-Streamer** — sonst lädt Ollama zwischen den Antworten Modelle um.
+   `tests/test_solo_orchestra.py` hält das für Ask-All fest.
+2. **Der Gast spielt solo, aber nie mit eigenem Modell** — auch nicht, wenn er
+   wie eine Ensemble-Persona heißt. Deshalb fragt `WebUI._chat_model` zuerst
+   nach `GUEST_APP` und erst dann nach dem Namen; dieselbe Falle wie in
+   `ui/continuation.py`.
+3. **Was angezeigt und aufgezeichnet wird, ist das Modell, das antwortet.**
+   Begrüßung, `meta.model`, `ConversationStore.start(model=…)` und die
+   Cutoff-Zeile im System-Prompt (#19) nehmen das Solo-Modell; die Ablage
+   unterscheidet über `ORCHESTRA_APPS` in `core/factory.py`. Ein Solo-Modell
+   ohne Eintrag in `core.knowledge_cutoffs` bekommt ehrlich „unbekannt".
+4. **Angezeigt wird ein Modell nur, wo es abweicht.** Ohne `model:` sieht die
+   Startseite bis auf die Zweiteilung aus wie vorher; eine Persona, deren
+   `model` gleich dem Default ist, gilt nicht als Solistin.
+5. **Die Profi-Option wechselt den Default**, nicht die Solo-Modelle; die
+   Orchester-Überschrift zieht beim Wechsel mit.
+
+Offen gelassen: eigene `llm_options` je Modell (Temperatur und Prompt sind auf
+das 14B abgestimmt und gelten auch fürs Solo-Modell), und ob ein aus Ask-All
+gespeichertes Gespräch beim Fortsetzen still auf das Solo-Modell wechseln
+soll — heute tut es das, und der Begrüßungssatz nennt dann das Solo-Modell.
+
 ### RSS: vier Entscheidungen, die man leicht umdreht (#73)
 
 1. **Der Guard filtert *pro Meldung*, bevor zusammengefügt wird.** Seit alles in

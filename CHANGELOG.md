@@ -32,6 +32,21 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **A persona can have its own model for one-on-one chats.** Add an optional
+  `model:` to a persona in `personas_base.yaml` (for example
+  `model: "qwen3:15b"` for PETER). That persona then answers with this model
+  whenever you talk to it alone — in the web UI, the terminal, the API and the
+  mail adapter. In **Ask-All, the verdict and the AI dialog** every persona
+  still plays on the shared `core.model_name`, so PETER answers with Qwen alone
+  and with the default model in the group. The start page shows the own model
+  on the persona's card (terminal: next to its name), and the greeting names
+  the model actually in use. Guest personas always use the default model.
+  `--doctor` and `/healthz` check every configured model, so **run
+  `ollama pull` for it first**. Switching between a persona's own model and the
+  group can mean Ollama has to load a model, which makes the first answer
+  slower. Without any `model:` entry nothing changes except the start page
+  layout (see below).
+
 - **Full-text search across your own conversations.** A search box above the
   picker in the history card, and `/suche <term>` in the terminal. It searches
   every stored message and shows the matching passage with persona and date;
@@ -54,6 +69,12 @@ in them turns out to be wrong, it gets corrected in a later entry.
   not written to the conversation store.
 
 ### Changed
+
+- **The start page is split into two sections**, in the web UI and the
+  terminal: **Solo** (chat with one persona, plus the guest persona) and
+  **Orchestra** (AI dialog and Ask-All, plus the history card in the web UI).
+  Every persona of the ensemble appears in both. In the terminal menu the
+  numbers stay the same (`1`–`4`); the Ask-All entry now reads `[4] Ask-All`.
 
 - **The default model is now `ministral-3:14b`** (previously
   `ministral-3:8b`). It needs about 9 GB and is meant for a 16 GB graphics

@@ -347,6 +347,8 @@ class BasePersona(BaseModel):
 
     name: str = Field(min_length=1)
     llm_options: LlmOptions | None = None
+    # Eigenes Modell fürs Solo (#85); das Orchester bleibt auf core.model_name.
+    model: str | None = None
 
 
 class PersonasBase(BaseModel):

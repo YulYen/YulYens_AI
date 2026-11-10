@@ -76,8 +76,15 @@ class TerminalUI:
     def choose_persona(self) -> None:
         """Asks the user for the desired persona and configures the streamer."""
         names = get_all_persona_names()
+        # Solo (#85): das eigene Modell steht nur dort, wo es abweicht.
+        default = str(self.config.core.get("model_name", ""))
+        solo_models = {
+            name: model
+            for name in names
+            if (model := str(self.factory.solo_model(name))) and model != default
+        }
         persona_name = prompt_persona_choice(
-            names, self.texts, "terminal_persona_prompt"
+            names, self.texts, "terminal_persona_prompt", models=solo_models
         )
         self._set_persona(persona_name)
         print(self._t("terminal_persona_selected", persona_name=self.bot))
@@ -126,9 +133,19 @@ class TerminalUI:
     def _start_dialog_flow(self) -> bool:
         while True:
             print(self.texts["terminal_start_menu_title"])
+            # Zwei Bereiche wie in der WebUI (#85): Solo ist das Gespräch zu
+            # zweit (ggf. mit eigenem Modell), das Orchester spielt auf dem
+            # gemeinsamen Modell.
+            print(self.texts["terminal_start_menu_solo_heading"])
             print(self.texts["terminal_start_menu_new_option"])
             if self.file_exchange_enabled:
                 print(self.texts["terminal_start_menu_load_option"])
+            print(
+                self._t(
+                    "terminal_start_menu_orchestra_heading",
+                    model_name=str(self.config.core.get("model_name", "")),
+                )
+            )
             print(self.texts["terminal_start_menu_self_talk_option"])
 
             if self.broadcast_enabled:
@@ -182,7 +199,9 @@ class TerminalUI:
         # Build the streamer for the selected persona
         self.streamer = self.factory.get_streamer_for_persona(persona_name)
         self.bot = persona_name
-        self.greeting = _greeting_text(self.config, self.bot)
+        self.greeting = _greeting_text(
+            self.config, self.bot, str(self.factory.solo_model(persona_name))
+        )
         # Auch das Terminal zeichnet in der Ablage auf (#54) — ohne Anmeldung
         # unter dem lokalen Nutzer. Vorher landete hier gar nichts mehr, seit
         # der JSONL-Mitschnitt standardmäßig aus ist.
@@ -193,7 +212,11 @@ class TerminalUI:
     def _reset_meta(self) -> None:
         self.meta = {
             "created_at": datetime.now().isoformat(),
-            "model": str(self.config.core.get("model_name")),
+            "model": (
+                str(self.factory.solo_model(self.bot))
+                if self.bot
+                else str(self.config.core.get("model_name"))
+            ),
             "persona": self.bot or "",
             "app": "terminal",
         }
