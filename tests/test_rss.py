@@ -262,7 +262,7 @@ def test_the_guard_filters_per_item_before_merging():
     """
 
     guard = permissive_guard_double()
-    guard.check_input.side_effect = lambda text: (
+    guard.check_input.side_effect = lambda text, **_kwargs: (
         {"ok": True, "reason": "ok", "detail": None}
         if "Zweite" not in text
         else {"ok": False, "reason": "prompt_injection", "detail": ""}

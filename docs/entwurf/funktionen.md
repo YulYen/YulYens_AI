@@ -90,6 +90,14 @@ nicht treffen darf.
 `feed_aliases`): „Was sagt die Tagesschau?" zieht nur diese Quelle. Wer einen
 Feed ergänzt, bekommt seinen Auslöser geschenkt — keine zweite Wortliste.
 
+**Gattungswörter im Feed-Namen lösen nichts aus (#87).** „Jedes Wort ab vier
+Zeichen" unterschied nicht zwischen Eigenname und Gattungswort: mit dem
+ausgelieferten Feed „heise online" holte jeder Satz mit „online" die
+heise-Schlagzeilen in den Prompt („Kann ich die Pizza online bestellen?").
+`_GENERIC_FEED_WORDS` in `rss/trigger.py` nimmt diese Wörter aus; der volle Name
+bleibt ein Auslöser. Was die Liste nicht lösen kann: ein Feed, dessen
+*Eigenname* ein Alltagswort ist („Die Zeit", „Der Spiegel").
+
 ### Das Ask-All-Fazit: opt-in, und ausdrücklich kein Kontext-Kanal (#27)
 
 `core/ask_all_moderator.py` hängt an eine fertige Ask-All-Runde einen weiteren
@@ -190,6 +198,13 @@ umdreht und die dann teuer sind:
    wird bei jedem Poll neu beantwortet (gemessen: 4 Zyklen, 4 identische
    Antworten, `run_once()` meldete jedes Mal 0). `_mark_processed` fällt
    deshalb auf `\Seen` zurück, wenn das Verschieben scheitert.
+   **Der Status zählt, nicht das Ausbleiben einer Ausnahme (#87):** `imaplib`
+   wirft nur bei `BAD`, ein `NO` kommt als Rückgabewert. Ungeprüft war die
+   Regel bei fehlenden Rechten oder einem abgelehnten Schlüsselwort wirkungslos
+   — die Mail blieb UNSEEN und wurde bei jedem Poll beantwortet. Jedes `STORE`
+   wird jetzt geprüft; lehnt der Server `(\Seen YulYenProcessed)` ab, wird
+   `(\Seen)` allein versucht, und erst wenn auch das scheitert, unterbleibt
+   das Senden.
 3. **Ohne `allowed_senders` startet der Adapter nicht.** Fail-closed wie bei
    fehlenden Zugangsdaten: der Dienst kostet LLM-Läufe und verschickt Mail.
 4. **Gekürzt wird einmal beim Lesen** (`max_body_chars`), nicht an jeder

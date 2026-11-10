@@ -189,6 +189,74 @@ nach `tmp_path`. Wer künftig am ersten vorbeikommt, schreibt trotzdem nicht ins
 Repo — und wer ein Config-Objekt von Hand baut, sollte es ohnehin nicht tun
 (siehe `tests/doubles.py`).
 
+### Kompression kürzt den Prompt, nicht das Gespräch (#87)
+
+Gefunden bei der Fehlersuche am 2026-11-10, nachgestellt gegen die echte Ablage:
+acht Turns bei kleinem `num_ctx`, danach standen noch die letzten vier im Store,
+und der Titel war von „Frage 0" auf „Frage 4" gewandert.
+
+**Die Ursache war keine falsche Zeile, sondern eine Liste mit zwei Aufgaben.**
+Der LLM-Verlauf (`history_state` im WebUI, `TerminalUI.history`) ist zugleich
+der Prompt *und* das, was die Oberfläche in die Ablage spiegelt (`sync`
+ersetzt, #59). Karl und der heuristische Trim taten, was sie sollen — sie
+nahmen alte Turns aus dem Prompt —, und `sync` tat, was es soll: es brachte die
+Ablage auf den Stand der Liste. Zusammen löschten sie den Anfang jedes langen
+Gesprächs, in Verlauf, Suche, Markdown-Export und JSON-Download.
+
+**Jetzt wird markiert statt gelöscht.** `shrink_history_for_context` legt die
+herausgenommenen Gesprächs-Turns mit `COMPRESSED_KEY` (`core/context_injection.py`)
+wieder an den Anfang der Liste. Es bleibt bei **einer** Liste; zwei Fragen
+trennen ihre Leser:
+
+| Wer liest | fragt | sieht komprimierte Turns |
+|---|---|---|
+| `stream()`, Füllstand (`_token_stats`), Statuszeile | `prompt_only` | nein |
+| Ablage (`sync`), Vote-Zählregel | `recorded_turns` | ja |
+| JSON-Download, `/save`, Markdown | `conversation_only` | ja, ohne Markierung |
+
+Verworfen wurden zwei Alternativen. Ein zweites Feld an der Sitzung („was
+schon archiviert ist") hätte an jedem Gesprächswechsel zurückgesetzt werden
+müssen — vergisst man es einmal, wandern Turns in ein fremdes Gespräch. Und ein
+Abgleich in `sync` selbst („wo setzt die neue Liste in der gespeicherten
+an?") wäre bei wiederholten Nachrichten geraten statt gewusst.
+
+**Wer einen neuen Leser des Verlaufs baut, entscheidet zuerst: Prompt oder
+Gespräch?** Ein Weg, der den Verlauf am Streamer vorbei an ein Modell gibt,
+muss `prompt_only` fragen — sonst schickt er den ganzen Verlauf wieder mit.
+
+Bereits gekürzte Gespräche in einer bestehenden Ablage lassen sich nicht
+wiederherstellen; die Turns standen nirgends sonst.
+
+### Die Ablage und die Vote-Zählregel zählen dieselbe Folge (#87)
+
+`store_index_of` (`ui/feedback.py`) zeigt auf eine Nachricht der Ablage, indem
+es im LLM-Verlauf zählt. Seit #60 steht injizierter Fremdkontext dort als
+`user` — `sync` filtert ihn heraus, die Zählregel zählte ihn weiter mit. Pro
+Wiki- oder RSS-Treffer vor der bewerteten Antwort lag `message_index` um eins
+zu weit hinten, und weil der Wortlaut des Votes aus der Ablage geholt wird
+(„die Ablage hat das letzte Wort"), stand im Feld `answer` dann die *nächste
+Frage* des Nutzers. Nachgestellt: 👍 auf „Ein Offline-Reader." schrieb
+`answer: "Und ZIM?"`.
+
+Beide Seiten benutzen jetzt `recorded_turns` — **eine** Stelle für „was steht
+in der Ablage". Wer den Filter in `sync` ändert, ändert ihn dort.
+
+**Vote-Zeilen aus Gesprächen mit Wiki-/RSS-Kontext, die vor dem Fix entstanden
+sind, sind unzuverlässig** (`message_index` und ggf. `answer`). Vor der
+Verwendung für #7 gegen die Ablage prüfen: stimmt `answer` nicht mit der
+Nachricht an `message_index` überein *und* ist diese keine `assistant`-Nachricht,
+ist die Zeile verschoben.
+
+### Ein hochgeladenes Gespräch gehört dem, der es hochlädt (#87)
+
+`_on_load_conversation` nahm den Eigentümer aus `meta.user` der JSON-Datei. Das
+ist ein Feld, das der Browser schickt — dieselbe Sorte Wert wie die ID aus dem
+Dropdown, die schon einmal keine Schranke war. Mit Anmeldung legte eine
+präparierte Datei ein Gespräch in den Verlauf eines anderen Nutzers; ohne böse
+Absicht reichte eine alte Datei mit `user: local`, damit das eigene,
+fortgesetzte Gespräch im eigenen Verlauf fehlte. Der Handler bekommt jetzt
+`user_state` wie jeder Verlauf-Handler.
+
 ### Anmeldung (#53): eine Naht, kein Sicherheitsprodukt
 `src/auth/provider.py` beantwortet „wer bedient die UI". Drei Provider über
 `ui.web.auth.provider`:
@@ -268,3 +336,12 @@ Zeilen blieben liegen, neue kämen woanders dazu, und auffallen würde es erst
 beim Zusammenstellen der Trainingsdaten. Liegen beide Dateien, wird **nichts**
 angefasst und laut gewarnt — welche die richtige ist, kann der Code nicht
 wissen, und Zusammenführen wäre geraten.
+
+### Geheimnisse werden als Bytes verglichen (#87)
+
+`hmac.compare_digest` nimmt `str` nur in reinem ASCII und wirft sonst
+`TypeError`. Mit einem Umlaut im Passwort (`ui.web.auth`) kam der Nutzer nie
+hinein, mit einem im `api_key` antwortete die API jedem mit 500 — und schon ein
+*Versuch* mit Sonderzeichen ließ die Prüfung abstürzen statt ablehnen. Verglichen
+wird jetzt über `core.utils.constant_time_equals` (UTF-8-Bytes), an beiden
+Stellen. Wer eine dritte Geheimnisprüfung baut, nimmt diese Funktion.

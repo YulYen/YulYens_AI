@@ -106,7 +106,7 @@ def test_way_2_upload_refuses_a_guest_conversation(tmp_path):
     session = SessionContext()
     path = _write_conversation(tmp_path, "LEAH", GUEST_APP)
 
-    web_ui._on_load_conversation(session, str(path), PERSONA_INFO, "Tippe")
+    web_ui._on_load_conversation(session, str(path), "local", PERSONA_INFO, "Tippe")
 
     assert session.bot is None
 

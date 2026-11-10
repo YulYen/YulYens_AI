@@ -24,7 +24,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Protocol
 
-from core.utils import LOCAL_USER, resolve_secret
+from core.utils import LOCAL_USER, constant_time_equals, resolve_secret
 
 
 class AuthConfigError(RuntimeError):
@@ -118,9 +118,9 @@ class LocalUsersAuth:
         if expected is None:
             # Trotzdem vergleichen: ein früher Abbruch verriete über die
             # Laufzeit, welche Benutzernamen existieren.
-            _constant_time_equals("", password or "")
+            constant_time_equals("", password or "")
             return False
-        return _constant_time_equals(expected, password or "")
+        return constant_time_equals(expected, password or "")
 
     def gradio_auth(self):
         if not self._users:
@@ -180,12 +180,6 @@ class HeaderAuth:
         if not value:
             return ANONYMOUS
         return Identity(name=str(value), source=self.name)
-
-
-def _constant_time_equals(a: str, b: str) -> bool:
-    import hmac
-
-    return hmac.compare_digest(a, b)
 
 
 def build_auth_provider(web_cfg: dict | None) -> AuthProvider:

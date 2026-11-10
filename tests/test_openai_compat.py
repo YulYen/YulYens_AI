@@ -538,3 +538,31 @@ def test_health_stays_reachable_without_a_key(client):
     Config().override("api", {"openai_compatible": {"api_key": "geheim"}})
 
     assert client.get("/health").status_code == 200
+
+
+def test_a_non_ascii_key_attempt_is_a_401_not_a_crash(client):
+    """``hmac.compare_digest`` wirft bei Nicht-ASCII-Zeichenketten ``TypeError``.
+
+    Ein unangemeldeter Client konnte damit einen 500er samt Stacktrace im Log
+    auslösen — abgewiesen gehört er mit demselben 401 wie jeder falsche Key.
+    """
+    Config().override("api", {"openai_compatible": {"api_key": "geheim"}})
+
+    response = client.get(
+        "/v1/models", headers={"Authorization": "Bearer schlüssel".encode()}
+    )
+
+    assert response.status_code == 401
+
+
+def test_an_api_key_with_umlauts_is_usable(client):
+    """Mit einem Key wie „schlüssel" war die API für *jeden* Aufrufer tot."""
+    Config().override("api", {"openai_compatible": {"api_key": "schlüssel"}})
+
+    wrong = client.get("/v1/models", headers={"Authorization": "Bearer geheim"})
+    right = client.get(
+        "/v1/models", headers={"Authorization": "Bearer schlüssel".encode()}
+    )
+
+    assert wrong.status_code == 401
+    assert right.status_code == 200

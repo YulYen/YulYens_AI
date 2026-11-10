@@ -363,7 +363,7 @@ class EmailAdapterService:
             recipients=_recipients(msg),
             subject=_decode_header(msg.get("Subject", "")),
             body=_truncate_body(_extract_text(msg), self.cfg.max_body_chars),
-            message_id=msg.get("Message-ID"),
+            message_id=_decode_header(msg.get("Message-ID", "")) or None,
             date=_decode_header(msg.get("Date", "")),
             automated=_is_automated(msg),
         )
@@ -411,7 +411,8 @@ class EmailAdapterService:
         Deshalb fällt die Methode auf ``\\Seen`` zurück: das reicht, damit die
         ``UNSEEN``-Suche die Mail nicht ein zweites Mal findet. Erst wenn auch
         das scheitert, gibt sie auf — dann darf und soll der Aufrufer das
-        Senden unterlassen.
+        Senden unterlassen. „Scheitert" heißt dabei auch: der Server antwortet
+        ``NO``.
         """
         if self.cfg.processed_mailbox:
             try:
@@ -419,7 +420,10 @@ class EmailAdapterService:
                 copy_status, _ = imap.uid("copy", uid, self.cfg.processed_mailbox)
                 if copy_status != "OK":
                     raise RuntimeError(f"IMAP COPY returned {copy_status!r}")
-                imap.uid("store", uid, "+FLAGS.SILENT", "(\\Deleted \\Seen)")
+                _require_ok(
+                    imap.uid("store", uid, "+FLAGS.SILENT", "(\\Deleted \\Seen)"),
+                    "IMAP STORE",
+                )
                 imap.expunge()
                 return
             except Exception as exc:
@@ -431,8 +435,19 @@ class EmailAdapterService:
                     exc,
                 )
 
+        # **Der Status zählt, nicht das Ausbleiben einer Ausnahme.** `imaplib`
+        # wirft nur bei `BAD`; ein `NO` (fehlende Rechte, Schlüsselwort nicht
+        # erlaubt) kommt als Rückgabewert. Ungeprüft blieb die Mail UNSEEN,
+        # die Antwort ging trotzdem raus — bei jedem Poll, genau die Mailflut,
+        # die „erst markieren, dann senden" verhindern soll.
         flags = f"(\\Seen {self.cfg.processed_flag})"
-        imap.uid("store", uid, "+FLAGS.SILENT", flags)
+        status, _ = imap.uid("store", uid, "+FLAGS.SILENT", flags)
+        if status == "OK":
+            return
+        # Manche Server lassen keine eigenen Schlüsselwörter zu und lehnen
+        # dann das ganze STORE ab. `\Seen` allein genügt, damit die
+        # UNSEEN-Suche die Mail nicht wieder findet.
+        _require_ok(imap.uid("store", uid, "+FLAGS.SILENT", "(\\Seen)"), "IMAP STORE")
 
 
 def start_email_adapter(
@@ -465,6 +480,13 @@ def open_smtp(cfg: EmailAdapterConfig) -> SmtpClient:
     if cfg.smtp_ssl:
         return smtplib.SMTP_SSL(cfg.smtp_host, cfg.smtp_port)
     return smtplib.SMTP(cfg.smtp_host, cfg.smtp_port)
+
+
+def _require_ok(response, what: str) -> None:
+    """Wirft, wenn der Server nicht ``OK`` gesagt hat."""
+    status = response[0] if response else None
+    if status != "OK":
+        raise RuntimeError(f"{what} returned {status!r}")
 
 
 def _safe_imap_logout(imap: ImapClient) -> None:
@@ -573,9 +595,16 @@ def _recipients(msg: Message) -> list[str]:
 
 
 def _decode_header(value: str) -> str:
+    """Header-Wert als eine Zeile.
+
+    Ein kodiertes Wort kann einen Zeilenumbruch enthalten (``=0A``). Der kommt
+    beim Dekodieren heraus, und ``EmailMessage`` weist ihn beim Setzen eines
+    Headers ab — die Antwort scheiterte dann *nach* dem Markieren und ging
+    verloren. Leerraum wird deshalb zusammengezogen.
+    """
     if not value:
         return ""
-    return str(make_header(decode_header(value)))
+    return " ".join(str(make_header(decode_header(value))).split())
 
 
 def _extract_text(msg: EmailMessage) -> str:

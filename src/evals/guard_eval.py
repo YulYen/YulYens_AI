@@ -90,8 +90,7 @@ def evaluate_guard_case(
         from security.tinyguard import context_verdict
 
         # `context_verdict` statt `context_rejection`: es trägt den Regelnamen
-        # mit und prüft nur *einmal* — ein zweiter `check_input`-Aufruf würde
-        # den Wrongdoing-Lock ein weiteres Mal armieren.
+        # mit. Den Wrongdoing-Lock berührt die Kontextprüfung nicht.
         verdict = context_verdict(guard, case.text)
         observed["injected"] = verdict is None
         observed["reason"] = verdict["reason"] if verdict else "ok"

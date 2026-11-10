@@ -109,7 +109,9 @@ def bind_events(
             persona_info=persona_info,
             input_placeholder=input_placeholder,
         ),
-        inputs=[session_state, load_input],
+        # user_state wie bei jedem Verlauf-Handler: das hochgeladene Gespräch
+        # gehört dem, der es hochlädt, nicht dem Namen in der Datei.
+        inputs=[session_state, load_input, user_state],
         outputs=persona_outputs,
         queue=False,
     )

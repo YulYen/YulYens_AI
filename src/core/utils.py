@@ -1,4 +1,5 @@
 # --------- General utilities (no external side effects) ---------
+import hmac
 import importlib.util
 import os
 import re
@@ -178,6 +179,18 @@ def resolve_secret(value) -> str:
     if match:
         return os.environ.get(match.group(1), "")
     return text
+
+
+def constant_time_equals(a: str, b: str) -> bool:
+    """Zwei Geheimnisse vergleichen, ohne über die Laufzeit etwas zu verraten.
+
+    Über **Bytes**, nicht über Zeichenketten: ``hmac.compare_digest`` nimmt
+    ``str`` nur in reinem ASCII und wirft sonst ``TypeError``. Ein Passwort
+    oder API-Key mit Umlaut machte damit jede Anmeldung zum Absturz statt zur
+    Absage — und zwar auch dann, wenn nur der *Versuch* ein Sonderzeichen
+    enthielt.
+    """
+    return hmac.compare_digest((a or "").encode("utf-8"), (b or "").encode("utf-8"))
 
 
 def is_file_exchange_enabled(cfg) -> bool:

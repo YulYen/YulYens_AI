@@ -111,3 +111,32 @@ def test_short_words_in_a_feed_name_are_not_triggers():
 def test_a_feed_name_is_matched_as_a_whole_word():
     """`heise` darf nicht in `heiser` treffen."""
     assert feeds_for_question("Ich bin heiser.", FEEDS) == ()
+
+
+# ---- Allerweltswörter im Feed-Namen sind kein Auslöser ---------------------
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        "Kann ich die Pizza online bestellen?",
+        "Wie funktioniert Online-Banking?",
+        "Ist das Spiel auch online spielbar?",
+    ],
+)
+def test_a_generic_word_from_a_feed_name_triggers_nothing(question):
+    """„heise online" hing an jedem „online" — in der ausgelieferten Config.
+
+    Die Regel „jedes Wort ab vier Zeichen" unterscheidet nicht zwischen dem
+    Eigennamen (heise) und dem Gattungswort daneben. Wer online Pizza
+    bestellen wollte, bekam die heise-Schlagzeilen in den Prompt.
+    """
+    assert feeds_for_question(question, FEEDS) == ()
+
+
+def test_generic_words_are_not_aliases_but_the_full_name_still_is():
+    aliases = feed_aliases("heise online")
+    assert aliases == ("heise online", "heise")
+    assert feeds_for_question("Gibt es was bei heise online?", FEEDS) == (
+        "heise online",
+    )

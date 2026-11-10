@@ -17,7 +17,6 @@ endpoint.
 
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import time
@@ -27,7 +26,7 @@ from threading import Lock
 from typing import Any, Literal, NamedTuple
 
 from core.context_utils import approx_token_count
-from core.utils import resolve_secret
+from core.utils import constant_time_equals, resolve_secret
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -222,6 +221,20 @@ class AccessDenied(NamedTuple):
     code: str | None = None
 
 
+def _header_text(value: str) -> str:
+    """Einen Header-Wert so lesen, wie der Client ihn gemeint hat.
+
+    HTTP-Header kommen als Latin-1 an; ein Client, der einen Key mit Umlaut
+    schickt, schickt aber UTF-8-Bytes. Ohne den Rückweg vergliche man
+    „schlÃ¼ssel" mit „schlüssel". Lässt sich der Wert nicht als UTF-8 lesen,
+    bleibt er, wie er ist — dann passt er eben nicht.
+    """
+    try:
+        return value.encode("latin-1").decode("utf-8")
+    except UnicodeError:
+        return value
+
+
 def check_api_access(
     request: Request, authorization: str | None
 ) -> AccessDenied | None:
@@ -242,10 +255,10 @@ def check_api_access(
     if expected:
         provided = ""
         if authorization and authorization.lower().startswith("bearer "):
-            provided = authorization[7:].strip()
-        # compare_digest statt '!=': die Laufzeit soll nicht verraten, wie viele
+            provided = _header_text(authorization[7:].strip())
+        # Konstante Laufzeit statt '!=': sie soll nicht verraten, wie viele
         # Zeichen des Schlüssels stimmen.
-        if not hmac.compare_digest(provided, expected):
+        if not constant_time_equals(provided, expected):
             return AccessDenied(
                 401,
                 "Incorrect API key provided.",

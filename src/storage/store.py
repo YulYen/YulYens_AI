@@ -31,7 +31,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from core.context_injection import is_injected
+from core.context_injection import recorded_turns
 from core.utils import LOCAL_USER, ensure_dir_exists
 
 # Wohin die Ablage schreibt, wenn `storage.path` nichts sagt. Als Konstante,
@@ -355,7 +355,7 @@ class SqliteStore:
         **Die Rollenprüfung allein reicht seit #60 nicht mehr.** Der Fremdtext
         steht jetzt als ``user`` im Prompt (er soll keine Systemautorität
         haben), sähe hier also aus wie eine Frage des Nutzers. Ohne
-        ``is_injected`` landete ab diesem Umbau jeder abgerufene Artikel in der
+        ``recorded_turns`` landete ab diesem Umbau jeder abgerufene Artikel in der
         Ablage — und über Verlauf, Markdown-Export und JSON-Download wieder
         heraus.
 
@@ -367,8 +367,7 @@ class SqliteStore:
             return
         rows = [
             (str(m.get("role")), str(m.get("content") or ""))
-            for m in messages or []
-            if m.get("role") in ("user", "assistant") and not is_injected(m)
+            for m in recorded_turns(messages)
         ]
         now = _now()
         first_question = next((text for role, text in rows if role == "user"), "")

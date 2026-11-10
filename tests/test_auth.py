@@ -195,3 +195,19 @@ def test_exposure_warning_only_when_it_matters(host, has_auth, expect_warning, c
         )
 
     assert ("[SICHERHEIT]" in caplog.text) is expect_warning
+
+
+def test_a_password_with_umlauts_works():
+    """``hmac.compare_digest`` nimmt Zeichenketten nur in ASCII.
+
+    Mit einem Passwort wie „Grüße2026" warf jeder Anmeldeversuch einen
+    ``TypeError`` — der Nutzer kam nie hinein, und es sah aus wie ein falsches
+    Passwort. Dasselbe passierte, sobald *irgendwer* ein Sonderzeichen ins
+    Passwortfeld tippte, auch bei einem unbekannten Benutzernamen.
+    """
+    provider = LocalUsersAuth({"yulyen": "Grüße2026", "ascii": "plain"})
+
+    assert provider.check("yulyen", "Grüße2026") is True
+    assert provider.check("yulyen", "Gruesse2026") is False
+    assert provider.check("ascii", "Größe") is False
+    assert provider.check("niemand", "über") is False

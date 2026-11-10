@@ -42,6 +42,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from core.context_injection import recorded_turns
 from core.utils import ensure_dir_exists
 from ui.webui_format import ChatMessage, bubble_text, find_question_for_row
 
@@ -118,7 +119,8 @@ def store_index_of(
     k-te Antwort-Bubble ist die k-te ``assistant``-Nachricht, weil Anzeige und
     LLM-Verlauf im Gleichschritt wachsen (auch „Nochmal 🔄" entfernt aus
     beiden). ``ConversationStore.sync`` nummeriert genau diese Folge durch —
-    Systemkontext filtert es heraus —, also stimmt der Index auf beiden Seiten.
+    System- und injizierten Fremdkontext filtert es heraus —, und beide Seiten
+    benutzen dafür ``recorded_turns``, damit der Index nicht auseinanderläuft.
     """
     answers = {
         (m.get("content") or "").strip()
@@ -145,10 +147,10 @@ def store_index_of(
 
     # … und die wievielte Nachricht ist das in der Ablage?
     position = 0
-    for store_idx, message in enumerate(
-        [m for m in (llm_history or []) if m.get("role") in ("user", "assistant")]
-    ):
-        if message.get("role") != "assistant":
+    # Dieselbe Folge, die `sync` durchnummeriert — injizierter Fremdkontext
+    # steht seit #60 als `user` im Verlauf, in der Ablage aber nicht.
+    for store_idx, turn in enumerate(recorded_turns(llm_history)):
+        if turn.get("role") != "assistant":
             continue
         position += 1
         if position == seen:

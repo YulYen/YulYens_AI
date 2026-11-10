@@ -128,6 +128,47 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **A saved conversation keeps its beginning after context compression.** Once
+  a long chat hit the context limit, Karl or the heuristic trim removed the
+  oldest turns from the prompt — and the stored conversation lost them too:
+  history, search, Markdown export and JSON download only showed the tail, and
+  the title switched to a later question. The prompt is still compressed
+  exactly as before; the conversation is no longer cut with it. Conversations
+  that were already truncated cannot be restored.
+- **Votes after a Wikipedia or news lookup point at the right answer.** In a
+  conversation with injected context, a 👍/👎 was recorded one message off per
+  lookup: `message_index` pointed past the answer, and the `answer` field of
+  the vote line could contain the *next question* instead. Vote lines written
+  by earlier versions in such conversations are unreliable — check them
+  against the store before using them as training data.
+- **Passwords and API keys may contain non-ASCII characters.** With an umlaut
+  in a `ui.web.auth` password, that user could never log in; with one in
+  `api.openai_compatible.api_key`, every API request failed with a 500. Any
+  login or API attempt that merely *contained* such a character crashed the
+  check instead of being rejected.
+- **The mail adapter no longer answers the same mail on every poll when the
+  server refuses to flag it.** A `NO` from the IMAP server (missing rights,
+  custom keywords not allowed) was not noticed; the mail stayed unseen and got
+  a new reply each cycle. Now no reply is sent unless the mail could be marked,
+  and `\Seen` alone is tried when the server rejects the custom keyword.
+- **An uploaded conversation belongs to whoever uploads it.** The owner was
+  taken from the `user` field inside the JSON file, so with login enabled a
+  file could place a conversation in someone else's history — and your own
+  continued conversation was missing from yours.
+- **`security.wrongdoing_lock_turns` counts user inputs only.** Retrieved
+  Wikipedia snippets and news items went through the same counter: an article
+  that matched a rule locked the user's next inputs, and after a real hit the
+  snippets of the follow-up question used the lock up before the follow-up was
+  checked. Only relevant if you set the option above 0.
+- **A question containing "online" no longer pulls in the heise headlines.**
+  Every word of a feed name was a trigger, so with the shipped feed
+  `heise online` any sentence with "online" injected its news. Generic words
+  in feed names (online, news, magazin, …) are no longer triggers; the proper
+  name ("heise") and the full name still are.
+- **A mail with a line break hidden in its subject gets its reply**, a guest
+  persona whose name contains `&` or `#` is named correctly in the Wikipedia
+  hint, and the status line no longer shows the speed of the previous answer
+  after pressing Stop.
 - **Self-talk in the web UI starts again.** Since 2.0.0, pressing start on the
   self-talk card failed with "Data incompatible with messages format" in the
   console instead of opening the conversation. The opening prompt was still

@@ -25,6 +25,7 @@ from security.tinyguard import BasicGuard, zeigefinger_message
 from storage import ConversationStore, NullStore
 from wiki.lookup import WikiLookup, inject_wiki_context
 
+from core.context_injection import prompt_only
 from core.context_utils import approx_token_count
 from core.utils import LOCAL_USER, ensure_dir_exists, is_ollama_module_not_found
 
@@ -468,6 +469,15 @@ class YulYenStreamingProvider:
         beendet, statt auf den GC zu warten.
         """
         guard_texts = getattr(self.guard, "texts", None) if self.guard else None
+        # Der Verlauf der Oberfläche trägt auch die Turns, die die
+        # Kontext-Kompression aus dem Prompt genommen hat — sie gehören zum
+        # Gespräch (Ablage), aber nicht mehr ans Modell.
+        messages = prompt_only(messages)
+        # Die Kennzahlen gehören zu *diesem* Stream (#36). Gesetzt werden sie
+        # erst am regulären Ende — ein abgebrochener, abgelehnter oder
+        # gescheiterter Stream ließe sonst die der vorigen Antwort stehen, und
+        # die Statuszeile zeigte sie unter der falschen Bubble.
+        self.last_stream_stats = None
         # Pre-check: validate the latest user message
         if self.guard:
             for m in reversed(messages):

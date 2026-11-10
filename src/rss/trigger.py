@@ -50,19 +50,47 @@ _PERSONAL = re.compile(r"\b(bei|von|über)\s+(dir|euch)\b|\baus\s+dein", re.IGNO
 # nicht an jedem „der" hängen.
 _MIN_FEED_WORD = 4
 
+# Gattungswörter, die in Feed-Namen stehen, aber nichts über die Quelle sagen:
+# „heise online" hört auf „heise", nicht auf jedes „online" im Satz — sonst
+# bekommt, wer online Pizza bestellen will, die heise-Schlagzeilen in den
+# Prompt (so geschehen mit der ausgelieferten Config). Bewusst kurz und nur
+# das, was als Namensteil von Nachrichtenquellen wirklich vorkommt; der volle
+# Name bleibt immer ein Auslöser.
+_GENERIC_FEED_WORDS = frozenset(
+    {
+        "online",
+        "news",
+        "nachrichten",
+        "aktuell",
+        "magazin",
+        "zeitung",
+        "ticker",
+        "newsticker",
+        "feed",
+        "blog",
+        "daily",
+        "world",
+    }
+)
+
 
 def feed_aliases(name: str) -> tuple[str, ...]:
     """Unter welchen Namen ist dieser Feed ansprechbar?
 
-    Der volle Name plus jedes Wort daraus ab vier Zeichen — „heise online"
-    hört damit auch auf „heise", „Der Spiegel" auf „Spiegel". Die Liste kommt
+    Der volle Name plus jedes Wort daraus ab vier Zeichen, das kein
+    Gattungswort ist (``_GENERIC_FEED_WORDS``) — „heise online" hört damit
+    auch auf „heise", „Der Spiegel" auf „Spiegel". Die Liste kommt
     aus der Config, nicht aus einer gepflegten Wortliste: **wer einen Feed
     ergänzt, bekommt seinen Auslöser geschenkt.**
     """
     lowered = (name or "").strip().lower()
     if not lowered:
         return ()
-    words = [w for w in re.split(r"\W+", lowered) if len(w) >= _MIN_FEED_WORD]
+    words = [
+        w
+        for w in re.split(r"\W+", lowered)
+        if len(w) >= _MIN_FEED_WORD and w not in _GENERIC_FEED_WORDS
+    ]
     return tuple(dict.fromkeys([lowered, *words]))
 
 

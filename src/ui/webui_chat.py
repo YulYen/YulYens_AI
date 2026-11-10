@@ -107,11 +107,13 @@ class ChatController:
 
     # ---------- Ablage ----------
     @staticmethod
-    def record_conversation(
-        session: SessionContext, messages: list[Message] | None
-    ) -> None:
-        """Den Gesprächsstand in die Ablage spiegeln (#59)."""
-        recorder = getattr(session.streamer, "record_conversation", None)
+    def record_conversation(streamer: Any, messages: list[Message] | None) -> None:
+        """Den Gesprächsstand in die Ablage spiegeln (#59).
+
+        Nimmt den **Streamer**, nicht die Sitzung: aufgezeichnet wird in das
+        Gespräch des Streams, der gerade endet — siehe `stream_reply`.
+        """
+        recorder = getattr(streamer, "record_conversation", None)
         if callable(recorder):
             recorder(list(messages or []))
 
@@ -150,7 +152,11 @@ class ChatController:
         nicht. Die isinstance-Prüfung hält halbe Werte aus der Anzeige heraus,
         statt sie zu formatieren.
         """
-        stats = getattr(session.streamer, "last_stream_stats", None)
+        return ChatController._stats_of(session.streamer)
+
+    @staticmethod
+    def _stats_of(streamer: Any) -> StreamStats | None:
+        stats = getattr(streamer, "last_stream_stats", None)
         return stats if isinstance(stats, StreamStats) else None
 
     def status_update(
@@ -216,7 +222,15 @@ class ChatController:
         # Explizites Iterator-Handle, damit der Stream beim Stop deterministisch
         # geschlossen wird (close() löst das finally im Streaming-Provider aus und
         # beendet damit den Ollama-Stream) statt erst irgendwann per GC.
-        tokens = session.streamer.stream(messages=message_history)
+        #
+        # Der Streamer wird hier *einmal* gebunden und bis zum Schluss benutzt.
+        # Die Sitzung kann währenddessen weiterziehen („Neues Gespräch", andere
+        # Persona): der Kill-Switch wirkt erst beim nächsten Token, und bis
+        # dahin hängt an `session.streamer` schon der Streamer des *neuen*
+        # Gesprächs. Am Ende noch einmal aus der Sitzung gelesen, landeten
+        # Frage und Teilantwort im falschen Gespräch.
+        streamer = session.streamer
+        tokens = streamer.stream(messages=message_history)
         try:
             for token in tokens:
                 if self._stop_requested(session, stop):
@@ -251,8 +265,8 @@ class ChatController:
         # Abbruch: die Teilantwort ist das, was der Nutzer behält, also gehört
         # sie in die Ablage. Vorher zeichnete `stream()` Versuche auf, weshalb
         # „Nochmal" verdoppelte und „Stop" die Antwort ganz verlor.
-        self.record_conversation(session, message_history)
-        stats = self.last_stream_stats(session)
+        self.record_conversation(streamer, message_history)
+        stats = self._stats_of(streamer)
         yield (
             None,
             chat_history,

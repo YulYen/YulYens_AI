@@ -673,3 +673,28 @@ def test_the_one_shot_answer_is_moderated_by_the_stream_alone() -> None:
     # der One-Shot dieselbe Behandlung bekommt wie der Stream.
     assert answer != secret
     assert "Zeigefinger" in answer
+
+
+# ---- Kennzahlen gehören zu *diesem* Stream (#36) --------------------------
+
+
+def test_an_aborted_stream_does_not_keep_the_previous_stats():
+    """„Stop ⏹" schließt den Generator, bevor die Kennzahlen gesetzt werden.
+
+    Die Statuszeile zeigte dann Tempo und Zeit-bis-zum-ersten-Token der
+    *vorigen* Antwort unter der abgebrochenen — eine Zahl, die zu nichts auf
+    dem Bildschirm gehört.
+    """
+    provider = create_streaming_provider(
+        llm_core=FakeTokenCore(["eins ", "zwei ", "drei"])
+    )
+    question = [{"role": "user", "content": "Hallo"}]
+
+    list(provider.stream(question))
+    assert provider.last_stream_stats is not None
+
+    second = provider.stream(question)
+    next(second)
+    second.close()
+
+    assert provider.last_stream_stats is None
