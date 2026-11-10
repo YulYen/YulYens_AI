@@ -223,6 +223,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   und der fängt an echten ZIM-Artikeln nur 6 von 33 Umformulierungen.
 - **Fremdtext zählt nicht als Runde:** `check_input(text, count_as_turn=False)`
   — sonst setzt oder verbraucht ein Wikipedia-Ausschnitt den Wrongdoing-Lock.
+- **Kontext-Regeln hängen an der Anrede** (`du bist`, Imperativ, `your`) —
+  nie um Formen der dritten Person erweitern („X schlüpft in die Rolle …").
 - **Neue Regel: erst fragen, ob der Nutzer das darf.** Wenn ja (Persona
   umdefinieren, Antwortformat vorgeben), gehört sie in `check_context_only`.
 - **Neue Injection-Regel = Gegenprobe daneben** (`ok_…` in

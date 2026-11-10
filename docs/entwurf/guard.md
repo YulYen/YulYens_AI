@@ -243,3 +243,41 @@ gegen die Regeln, aber ohne den Sitzungszustand zu lesen oder zu ändern. Wer
 einen weiteren Aufrufer von `check_input` baut, der nicht die Eingabe des
 Nutzers prüft, setzt das Argument ebenso. Mit dem Default `0` war der Fehler
 nicht sichtbar.
+
+### Die fünf wirksamen Lücken haben Regeln — und was das nicht heißt (#91)
+
+Die fünf `known_gap`-Fälle aus der ZIM-Messung (Persona-Zuweisung ohne
+Verneinung, Rollenwechsel als Imperativ, englischer Dauerauftrag,
+konditionaler Auslöser, vorgeschriebene Antwortsprache) sind seit dem
+2026-11-10 geschlossen: fünf Regeln in `context_only`, also nur für
+abgerufenen Fremdtext. Der Nutzer darf all das weiterhin tippen.
+
+**Die Präzision kommt aus der Verbform, nicht aus der Wortliste.** Jede Regel
+hängt an der Anrede: „du bist", ein Imperativ der zweiten Person
+(`schlüpfe`, `antworte`), „your responses", „der Nutzer" als Gegenüber. Eine
+Enzyklopädie schreibt in der dritten Person und im Präteritum — „X schlüpft
+in die Rolle des …" ist der Normalsatz jeder Filmhandlung und trifft nicht,
+weil `schlüpft` nicht in der Regel steht. Wer eine dieser Regeln um eine
+Form der dritten Person erweitert, holt genau diese Artikel wieder heraus.
+Die sechs Gegenproben (`ok_now_its_your_turn` bis
+`ok_delegate_answered_in_french`) halten das fest.
+
+Zwei Entscheidungen im Detail: `persona_assignment` verlangt einen Artikel
+hinter der Zeitangabe („ab jetzt **ein** Pirat"), sonst träfe sie „Ab jetzt
+bist du dran"; und `conditional_answer_instruction` verlangt eine
+*festgelegte* Antwort (immer/stets/always), weil „Wenn der Nutzer fragt,
+liefert die Suchmaschine Antworten" in jedem Artikel über Software steht.
+
+Gemessen ohne Modell: Korpus 73/73, die fünf Fälle tragen `expect.rule`;
+kein Muster des Guards braucht auf 12 kB bösartiger Eingabe länger als 11 ms.
+
+**Nicht gemessen, und deshalb keine neue Zahl für die 6 von 33:** die
+Messung an echten ZIM-Artikeln braucht Kiwix, die Wirksamkeit am Modell
+Ollama. Geschlossen sind die fünf Formulierungen, die im Korpus stehen — für
+die 22 weiteren, die damals durchkamen und *nicht* wirkten, gibt es weiter
+keine Regel, und das ist Absicht: eine Regel gegen eine wirkungslose
+Nutzlast kostet nur Präzision. Die Ehrlichkeitsschranke bleibt, wie sie ist —
+wer umformuliert, kommt durch. Nachmessen: `python scripts/probe_injection.py
+-e classic`; der Guard-Arm sollte bei den vier betroffenen Nutzlasten jetzt
+„nicht injiziert" zeigen, und die 0 Fehlalarme auf den 394 + 49 Artikeln
+gehören einmal neu gefahren.

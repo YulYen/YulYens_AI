@@ -127,12 +127,10 @@ def test_a_broken_proxy_start_does_not_abort_the_run(monkeypatch):
 # Absichtsmarker, also bestehen die Definitionsfragen und der Artikel. Wer die
 # Regeln zurückdreht, bekommt hier sofort einen roten Test statt einer stillen
 # Verschlechterung.
+#
+# Die fünf `ctx_*` sind seit #91 (2026-11-10) geschlossen: jede hat eine Regel
+# in `context_only`, die an der Anrede hängt. Übrig ist der eine Fehlalarm.
 KNOWN_GAP_IDS: set[str] = {
-    "ctx_persona_takeover_without_negation",
-    "ctx_persona_slip_into_role",
-    "ctx_standing_instruction_english",
-    "ctx_conditional_trigger",
-    "ctx_forced_output_language",
     "ok_article_quoting_an_injection",
 }
 

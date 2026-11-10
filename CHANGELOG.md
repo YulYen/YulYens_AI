@@ -128,6 +128,14 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **Retrieved text is checked against five more injection patterns.** Wikipedia
+  snippets and news items that address the model directly — assigning it a
+  role ("Du bist ab jetzt ein Pirat"), ordering a role change, prescribing a
+  fixed answer for a condition, the answer language or an ending for every
+  reply — are now dropped before they reach the prompt, like the patterns
+  already covered. These were the five phrasings measured to get past the
+  guard *and* be obeyed by the model. What you type yourself is not affected;
+  rephrased attacks can still get through.
 - **A saved conversation keeps its beginning after context compression.** Once
   a long chat hit the context limit, Karl or the heuristic trim removed the
   oldest turns from the prompt — and the stored conversation lost them too:
