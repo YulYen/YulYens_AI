@@ -160,9 +160,10 @@ make evals                                           # Kurzform für --guard-onl
   Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist. Genau
   so ist #62 abgenommen worden: `ctx_code_snippet_in_article_is_kept` fing an zu
   bestehen, also musste das Flag fallen. `KNOWN_GAP_IDS` in
-  `tests/test_evals_cli.py` war danach leer und trägt seit der ZIM-Messung
-  (2026-08-07) wieder **sechs** Einträge — die Lücken aus dem Abschnitt „Die
-  Rollenverschiebung wirkt nicht" in [guard.md](guard.md); der Test hält Korpus und Liste deckungsgleich
+  `tests/test_evals_cli.py` war danach leer und trug seit der ZIM-Messung
+  (2026-08-07) wieder sechs Einträge. Seit #91 (2026-11-10) ist es **einer**: die
+  fünf wirksamen Lücken haben Regeln, übrig ist der Fehlalarm
+  `ok_article_quoting_an_injection` — siehe [guard.md](guard.md); der Test hält Korpus und Liste deckungsgleich
   und schlägt in beide Richtungen an
 - **Der Judge-Parser liest Markdown mit, aber nicht mehr (#71):** ein reales 8B-Modell
   antwortet `1: **5** | …` statt `1: 5 | …` — formattreu, nur fett. Vorher wurde daraus

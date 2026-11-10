@@ -152,12 +152,39 @@ PR-Vorlage — dort wird danach gefragt, hier steht, was die Antwort ist.
 Zwei Dateien seit dem 2026-08-06: [backlog.md](../../backlog.md) sind die **offenen**
 Tickets mit Effort/Benefit-Matrix, [backlog_archiv.md](../../backlog_archiv.md) das
 Erledigte samt Begründung. Der Schnitt trennt zwei Schreibmuster — die Tiers
-werden ständig umgeschrieben, ein Archiveintrag nie wieder. Highlights:
+werden ständig umgeschrieben, ein Archiveintrag nie wieder. Highlights (Stand 2026-11-10 — maßgeblich ist immer `backlog.md` selbst):
 
+- **Ganz oben (Modelle auf 16 GB):** #78 Kandidaten 2–5 gegen `ministral-3:14b` messen, #80 Komplettvergleich
+  (entschieden: die 14B-Abstimmung ist auf `main`), #86 Abstimmung nachschärfen
 - **Tier A (LoRA-Strecke):** #40 Feedback-Daumen ✅ → #41 Eval-Suite ✅ → #7 LoRA-Finetuning
   (in Arbeit, LeoLM13B; nicht mehr blockiert). #41a (Baseline-Lauf) ist gefahren —
   Baseline und Adapter über den **Ø-Judge-Score** vergleichen, nicht über die
   Bestehensquote. Offen: #40b Blind-Ranking
+
+- **Quick Wins:** #81–#84 (Judge-Datum, Zeitstempel-Block, Kiwix-Adresse, falscher Wiki-Artikel),
+  #88–#90 aus der Fehlersuche #87, #77 (Ask-All/Self-Talk aufzeichnen: Entscheidung offen),
+  #53a Identität für API/Mail. #27 (Ask-All-Moderator) ist
+  erledigt — das Fazit hängt hinter einem Häkchen, Default aus.
+  #42 (Perf-Benchmark) und #42a (erster Messlauf) sind erledigt — die Baseline
+  steht bei 0,46 s bis zum ersten Zeichen und 107 Zeichen/s
+- **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
+  (Archiv), #14 bis auf den Server-Teil (#14a). Die Gradio-Strecke ist durch —
+  #61 auf 5.50, #61a auf 6.22 mit null pip-audit-Befunden. Aus #64 offen: die
+  Coverage-Schwelle (#64e), eine Richtlinienentscheidung
+- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis; #49 hat mit FTS5 den Index dafür gelegt), #30 Tool-Use (Türöffner)
+
+Bereits erledigt (Details in `backlog_archiv.md`): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
+#5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
+#2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update, #23 Paralleler Broadcast,
+#17 Faster first token, #6 Modell-Auswahl (WebUI, session-only), #13 STT MVP (WebUI-Mikro
+via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen),
+#33 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
+#37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
+#32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
+#43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
+#61 Gradio 5.50 (+ pip-audit in der CI), #41a Report-Leitkennzahl,
+#58 Moderator-Umschreibung, #59 Ablage = Gespräch, #62 Guard-Regelwerk, #67 Test-Doubles,
+#54 Gesprächs-Ablage (SQLite), #25 Verlauf, #55 Review-Befunde, #57 Review-Befunde Runde 2.
 
 ### Das Training läuft nicht in diesem Repo (#7)
 
@@ -175,25 +202,3 @@ kaputte Abhängigkeit, einmal als Versuchung, „schnell ein Trainings-venv
 daneben" anzulegen. Beim zweiten Mal ist es tatsächlich passiert; die
 Umgebung existierte im Schwesterprojekt längst, funktionsfähig und mit
 denselben Pins.
-- **Quick Wins:** #53a Identität für API/Mail. #27 (Ask-All-Moderator) ist
-  erledigt — das Fazit hängt hinter einem Häkchen, Default aus.
-  #42 (Perf-Benchmark) und #42a (erster Messlauf) sind erledigt — die Baseline
-  steht bei 0,46 s bis zum ersten Zeichen und 107 Zeichen/s
-- **Aus Review-Runde 2 (#57):** #58, #59, #62, #64, #65, #66 und #67 sind erledigt
-  (Archiv), #14 bis auf den Server-Teil (#14a). Die Gradio-Strecke ist durch —
-  #61 auf 5.50, #61a auf 6.22 mit null pip-audit-Befunden. Aus #64 offen: die
-  Coverage-Schwelle (#64e), eine Richtlinienentscheidung
-- **Strategisch:** #24 Langzeit-Gedächtnis (größter UX-Hebel, Store aus #54 als Basis; #49 hat mit FTS5 den Index dafür gelegt), #30 Tool-Use (Türöffner)
-
-Bereits erledigt (Details in `backlog_archiv.md`): #18 Wrongdoing-Guardrail, #19 Drei-Zeitstempel,
-#5 `/healthz`, #21 `--doctor`, #14 E-Mail-Adapter (MVP), #12 Karl (opt-in), #20 Ask-All-Ansicht,
-#2 Stream-Abbruch, #9 Wiki im Broadcast, #22 Kiwix/ZIM-Update, #23 Paralleler Broadcast,
-#17 Faster first token, #6 Modell-Auswahl (WebUI, session-only), #13 STT MVP (WebUI-Mikro
-via faster-whisper, `src/stt/ReadMe.md`), #15 Briefing (RSS-MVP, IoT-Teil offen),
-#25 TTS im WebUI (Vorlesen-Button, Browser-Playback), #35 Stop/Regenerate,
-#37 OpenAI-kompatible API, #41 Eval-Suite, #50 Guard-Braces-Lücke, #51 Holdback-Latenz,
-#32/#32a Wiki-Quellen-Transparenz, #52 mypy für `src/core`, #36 WebUI-Politur,
-#43 Config-/Ensemble-Validierung, #53 Identitäts-Naht, #28 Gast-Persona,
-#61 Gradio 5.50 (+ pip-audit in der CI), #41a Report-Leitkennzahl,
-#58 Moderator-Umschreibung, #59 Ablage = Gespräch, #62 Guard-Regelwerk, #67 Test-Doubles,
-#54 Gesprächs-Ablage (SQLite), #25 Verlauf, #55 Review-Befunde, #57 Review-Befunde Runde 2.

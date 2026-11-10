@@ -13,7 +13,7 @@ Store ≠ Logfile (#54/#59), Migrationen, Volltextsuche (#49), keine Aufzeichnun
 
 | Artefakt | Rolle |
 |---|---|
-| `data/conversations.sqlite3` | **das Gespräch**, wie der Nutzer es sieht — Verlauf (#25), später Suche (#49) und Fakten (#24) |
+| `data/conversations.sqlite3` | **das Gespräch**, wie der Nutzer es sieht — Verlauf (#25), Suche (#49), später Fakten (#24) |
 | `logs/conversation_*.json` | roher Mitschnitt der *Versuche* zum Debuggen, **opt-in** über `logging.conversation_jsonl` |
 
 **Die Rollenverteilung stimmt erst seit #59.** Vorher schrieb `stream()` beides,

@@ -23,7 +23,9 @@ Die Datei-für-Datei-Karte. `CLAUDE.md` trägt nur noch die Paketebene.
 │   │   ├── orchestrator.py    # Broadcast an alle Personas
 │   │   ├── ask_all_moderator.py  # Fazit über eine Ask-All-Runde (#27)
 │   │   ├── factory.py         # AppFactory (Lazy Singletons)
-│   │   ├── context_utils.py   # Token-Zählung
+│   │   ├── context_utils.py   # Token-Zählung + Kontext-Kompression (Trim, Karl-Aufruf)
+│   │   ├── context_channels.py  # Register der Kontext-Kanäle: die eine Tür in den Prompt (#75)
+│   │   ├── context_injection.py # Marker an Nachrichten: injiziert / komprimiert (#60, #87)
 │   │   ├── context_summarizer.py  # "Karl": LLM-basierte Kontext-Zusammenfassung
 │   │   ├── system_checks.py   # Deep-Checks für /healthz und --doctor
 │   │   └── utils.py           # Hilfsfunktionen
@@ -44,6 +46,7 @@ Die Datei-für-Datei-Karte. `CLAUDE.md` trägt nur noch die Paketebene.
 │   │   ├── feedback.py          # 👍/👎-Votes + Schlüssel in die Ablage (#40/#65)
 │   │   ├── webui_events.py      # Verdrahtung der Gradio-Events (#56)
 │   │   ├── history_access.py    # nutzergebundener Zugriff auf die Ablage (#25)
+│   │   ├── continuation.py      # darf ein gespeichertes Gespräch fortgesetzt werden? (#55)
 │   │   ├── conversation_io_terminal.py  # JSON-Im-/Export (Austausch, nicht Ablage)
 │   │   ├── persona_chooser.py   # Geteilte interaktive Persona-Auswahl (Terminal)
 │   │   └── self_talk.py         # AI-Dialog-Modus
@@ -72,7 +75,7 @@ Die Datei-für-Datei-Karte. `CLAUDE.md` trägt nur noch die Paketebene.
 │   ├── rss/
 │   │   ├── feeds.py             # RSS/Atom als Kontextquelle: Cache + Block (#73)
 │   │   └── trigger.py           # Heuristik „ist das eine Nachrichtenfrage?"
-│   ├── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report
+│   ├── evals/                   # Eval-Suite (#41): Korpus-Loader, Judge, Runner, Report, Injection-Probe (#60b)
 │   ├── bench/                   # Stoppuhr (#42): Harness, Treiber, Fragensatz, Report
 │   └── version.py               # __version__ — die einzige Quelle der Version (#74)
 ├── evals/                       # Eval-Korpora als YAML (siehe evals/ReadMe.md)
@@ -82,21 +85,34 @@ Die Datei-für-Datei-Karte. `CLAUDE.md` trägt nur noch die Paketebene.
 │   └── guard_redteam.yaml       # Angriff → erwartetes Guard-Verhalten
 ├── scripts/
 │   ├── run_evals.py             # Einstieg der Eval-Suite
-│   └── run_bench.py             # Einstieg der Stoppuhr (#42)
+│   ├── run_bench.py             # Einstieg der Stoppuhr (#42)
+│   ├── probe_injection.py       # Injection-Probe am echten Modell (#60b, braucht Ollama)
+│   ├── audit_deps.py            # pip-audit gegen audit_allowlist.yaml (make audit)
+│   └── mail_smoketest.py        # Mail-Adapter von Hand gegen einen echten Server prüfen
 ├── ensembles/
-│   └── classic/
-│       ├── personas_base.yaml   # LLM-Optionen pro Persona
-│       └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
+│   ├── classic/
+│   │   ├── personas_base.yaml   # LLM-Optionen pro Persona (optional `model:` fürs Solo, #85)
+│   │   └── locales/{de,en}/personas.yaml  # Lokalisierte Prompts
+│   └── examples/spaceship_crew/ # Beispiel-Ensemble, gleicher Aufbau
 ├── tests/
-│   ├── conftest.py              # Fixtures: client, client_with_date_and_wiki
+│   ├── conftest.py              # Fixtures: client, client_with_date, client_with_date_and_wiki, ollama_config
+│   ├── doubles.py               # Test-Doubles per create_autospec (#67)
+│   ├── config.yaml              # Test-Konfiguration
 │   └── test_*.py                # ein Modul je Bereich (inkl. test_web_ui_wiring.py,
 │                                #   test_continuation.py, test_imports.py)
 ├── locales/
 │   ├── de.yaml                  # UI-Texte Deutsch (Parität mit en.yaml, per Test)
 │   └── en.yaml                  # UI-Texte Englisch
 ├── config.yaml                  # Hauptkonfiguration
-├── pyproject.toml               # Black/Ruff + pytest-Konfiguration
-├── Makefile                     # make setup / format / lint / types / test / test-ci / evals / bench / clean / run
+├── audit_allowlist.yaml         # getragene pip-audit-Befunde, je mit Begründung (#61)
+├── requirements.txt             # Laufzeit-Abhängigkeiten (gepinnt)
+├── requirements-dev.txt         # Black, Ruff, mypy, import-linter, pytest (gepinnt)
+├── .pre-commit-config.yaml      # dieselben Black/Ruff-Versionen wie requirements-dev.txt
+├── .github/workflows/ci.yml     # CI: Lint + Schichten, Audit, mypy, Tests, spaCy-Tests
+├── pyproject.toml               # Black, Ruff, pytest, mypy und die import-linter-Verträge
+├── Makefile                     # make check (lint, lint-imports, types, test) / setup / format / fix /
+│                                #   test-ci / test-all / test-browser / coverage / audit / evals /
+│                                #   evals-full / bench / clean / run
 ├── docs/
 │   ├── {de,en}/                 # Betreiber-Doku (ReadMe, Features, …)
 │   └── entwurf/                 # Begründungen und Messungen hinter CLAUDE.md

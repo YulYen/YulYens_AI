@@ -192,7 +192,9 @@ rss/feeds.py (RSS-Cache) ──→ Guard (Kontext) ──┘
 ```
 
 ### AppFactory
-- Baut und cached alle Komponenten (Streamer, UI, API-Provider, Store, `WikiLookup`)
+- Baut alle Komponenten und cached UI, API-Provider, Store, `WikiLookup` und
+  RSS-Cache. **Streamer und Guard entstehen bei jedem Aufruf frisch** — der
+  Guard trägt Sitzungszustand (Wrongdoing-Lock)
 - Zustand in Tests via `set_provider(None)` + `Config.reset_instance()` zurücksetzen
 
 ### WikiLookup: ein Objekt statt fünf Attributen
@@ -315,8 +317,9 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Mail-Adapter:** Antwort an `From`, nie `Reply-To`; **erst markieren, dann
   senden** — und den IMAP-Status prüfen, `imaplib` wirft bei `NO` nicht; ohne
   `allowed_senders` kein Start; einmal beim Lesen kürzen.
-- **API:** `model` = Persona; `api_key` gilt für **alle** Endpunkte
-  (`check_api_access`); OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
+- **API:** `model` = Persona; `api_key` gilt für **alle Endpunkte, die ein LLM
+  ansprechen** (`/ask` und `/v1`, über `check_api_access`) — `/health` und
+  `/healthz` sind offen; OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
   Sampling-Parameter werden ignoriert.
 
 ### Konfiguration → [konfiguration.md](docs/entwurf/konfiguration.md)

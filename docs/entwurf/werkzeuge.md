@@ -10,7 +10,7 @@ Code-Stil, mypy-Abbruch, import-linter, `make check`, CI-Jobs, Versions-Pins, Au
 
 - **Black** mit `line-length = 88`
 - **Ruff** Regeln: E, F, I (Imports), UP (pyupgrade), ISC
-- `make format` → Black + Ruff-Fix
+- `make format` → Black; `make fix` → Ruff mit `--fix`
 - `make lint` → Ruff check only
 - Keine Docstrings für einfache Methoden, kurze Inline-Kommentare nur wenn nötig
 

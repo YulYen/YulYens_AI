@@ -259,8 +259,9 @@ security:
   #  - Ausgang: es wird nichts maskiert — der Holdback dient dann allein dem
   #    output_blocklist (Schlüsselmaterial).
   # Einschalten, wenn andere mitlesen können oder echte fremde Daten im Spiel
-  # sind. Achtung: die Maskierung greift heute nur in der Anzeige, nicht in der
-  # Ablage — siehe Backlog #58, vorher nicht als Datenschutz verlassen.
+  # sind. Maskiert wird seit #58 auch, was in Ablage, Verlauf und Export landet
+  # — nicht nur die Anzeige. Grenze: ein Muster, das länger ist als
+  # stream_holdback_chars, kann mit seinem Anfang durchrutschen.
   pii_protection: false
   output_blocklist: true
   wrongdoing_protection: true
