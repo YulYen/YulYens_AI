@@ -2,23 +2,11 @@
 
 Testaufrufe und Fixtures, was der Browser-Test sieht, warum Doubles aus `tests/doubles.py` kommen, die Eval-Suite (#41) samt Baseline.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ## Tests ausführen
 
-```bash
-pytest -q                     # Schnelldurchlauf (Dummy-Backend)
-pytest -m "not slow"          # Ohne langsame Tests
-pytest -m "ollama"            # Nur wenn Ollama läuft
-pytest tests/test_ai_via_api.py  # Gezielt
-```
+Die Kommandos stehen im `Makefile` (und in `CLAUDE.md`), die Fixtures in
+`tests/conftest.py`. Was man dort nicht sieht:
 
-- Test-Fixture `client`: Dummy-Backend, Wiki deaktiviert
-- Test-Fixture `client_with_date_and_wiki`: echte Wiki-Integration (braucht spaCy-Modell)
-- Test-Fixture `ollama_config`: Config gegen echtes Ollama, für `@pytest.mark.ollama`-Tests
-  ohne HTTP-Client (z. B. Eval-Suite)
 - Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar.
   `YULYEN_TEST_MODEL` ersetzt dabei das Modell aus `config.yaml` — für
   Modellvergleiche (#78), ohne die Config anzufassen. Gilt nur für Läufe, die

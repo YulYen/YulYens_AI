@@ -2,10 +2,6 @@
 
 Store ≠ Logfile (#54/#59), Migrationen, Volltextsuche (#49), keine Aufzeichnung ohne Anmeldung (#72), die Identitäts-Naht (#53), was in `logs/` und was in `data/` liegt.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ### Ablage der Gespräche (#54): Store ≠ Logfile
 `src/storage/store.py` hält die Gespräche in einer SQLite-Datei
 (`storage.path`, gitignored). **Das Gesprächs-Logfile war vorher die Persistenz**

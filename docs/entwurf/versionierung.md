@@ -2,10 +2,6 @@
 
 Wo die Version steht, was ins Changelog gehört, welche Stelle springt, wie getaggt wird.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ## Versionierung und Changelog (#74)
 
 Die Version steht in **`src/version.py`** und sonst nirgends; `CHANGELOG.md`

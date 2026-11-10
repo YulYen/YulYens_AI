@@ -2,10 +2,6 @@
 
 Die Stoppuhr (#42) und ihr erster Lauf (#42a), der Guard-Holdback (#51) mit allen Messtabellen, der Freigabe-Index über den rohen Text.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ## Die Stoppuhr (#42)
 
 Die messbare Antwort auf „ist es schneller geworden?" — und das Gegenstück zur

@@ -2,10 +2,6 @@
 
 Modulschnitt (#56), Sitzungszustand im `gr.State`, und die Gradio-Fallen: Dataframe, `messages`-Format, `js=`, Button-Updates, Links, `cancels`, Kill-Switch.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ### Ein Modul bekommt eine Regel, nicht hundert Zeilen (#56)
 
 `web_ui.py` ist von 2440 auf 1438 Zeilen geschrumpft — die Zahl ist aber nicht

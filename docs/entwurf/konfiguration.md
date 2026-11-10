@@ -2,81 +2,10 @@
 
 Die wichtigsten Schalter aus `config.yaml`, das lokale Override, die Schema-Prüfung (#43/#66).
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ## Konfiguration (config.yaml)
 
-Wichtige Schalter:
-
-```yaml
-core:
-  backend: "ollama"          # oder "dummy" für Tests
-  model_name: "ministral-3:14b"
-  warm_up: true              # Modell beim Start im Hintergrund vorladen
-  keep_alive: 600            # Sekunden im Speicher nach Request (-1 = für immer)
-  include_date: true         # Datum in System-Prompts
-
-ui:
-  type: web                  # "web" | "terminal" | null (API-only)
-  experimental:
-    broadcast_mode: true     # Ask-All aktivieren
-
-wiki:
-  mode: offline              # "offline" (Kiwix) | "online" (Wikipedia) | false
-  proxy_port: 8042
-
-tts:
-  enabled: true
-  features:
-    terminal_auto_create_wav: true  # WAV in out/ bei jeder Antwort
-    web_read_aloud: true            # "Vorlesen"-Button im WebUI (braucht piper-tts)
-
-stt:
-  enabled: true              # WebUI-Mikro; braucht zusätzlich `pip install faster-whisper`
-  model: "small"             # tiny | base | small | medium | large-v3
-  language: "de"             # null = Auto-Erkennung
-
-rss:                         # war `briefing:` — alter Name wird gelesen + gewarnt (#73)
-  enabled: true              # EIN Schalter: Cache, Heuristik und Knopf
-  show_button: true          # Knopf getrennt abschaltbar, Quelle bleibt aktiv
-  refresh_minutes: 60        # Hintergrund-Thread; nie im Request-Pfad
-  max_chars_per_item: 400    # Budget je Meldung, alles zusammen ist EIN Block
-  feeds:                     # Liste von {name, url} (RSS 2.0 oder Atom)
-    - name: "tagesschau"
-      url: "https://www.tagesschau.de/index~rss2.xml"
-
-api:
-  enabled: true
-  port: 8013
-  openai_compatible:         # /v1/models + /v1/chat/completions (#37)
-    enabled: true
-    api_key: ""              # leer = offen; besser "env:YULYEN_API_KEY"
-    rate_limit_per_minute: 60
-
-storage:
-  enabled: true              # Gesprächs-Ablage (SQLite)
-  file_exchange: true        # JSON-Down-/Upload im WebUI, /save im Terminal
-  history_limit: 50          # wie viele Gespräche der Verlauf zeigt
-  shared_without_login: false  # WebUI ohne Anmeldung trotzdem aufzeichnen (#72)
-
-security:
-  enabled: true
-  guard: BasicGuard
-
-email_adapter:
-  enabled: false             # opt-in IMAP/SMTP-Bridge (Personas per Mail)
-  allowed_senders: []        # PFLICHT bei enabled: true (#14e)
-  max_body_chars: 4000       # Kappt Prompt *und* Antwortzitat (#14h)
-
-context_management:
-  strategy: "heuristic"      # "heuristic" (Default) | "karl" (LLM-Zusammenfassung)
-
-evals:                       # nur von scripts/run_evals.py gelesen (#41)
-  out_dir: "logs/evals"
-  judge_model: "same_as_chat"  # eigenes Modell = weniger Judge-Bias
-```
+Die Schalter stehen in `config.yaml` und sind dort kommentiert; ihre Typen und
+Defaults in `src/config/schema.py`. Hier steht nur, was beides nicht sagt.
 
 ### Lokales Override: `config.local.yaml` (gitignored)
 Beim Laden wird ein optionales `config.local.yaml` (neben `config.yaml`) **per

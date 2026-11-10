@@ -2,10 +2,6 @@
 
 Streaming-Flow, die zwei Eingänge des Guards, Kontext-Kanäle (#75), die Rollenverschiebung (#60/#60a) samt ZIM-Messung, das Regelwerk (#62).
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ### Streaming-Flow
 ```
 User-Input ──→ SecurityGuard (Eingang) ──┐

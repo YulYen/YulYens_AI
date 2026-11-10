@@ -2,17 +2,11 @@
 
 Code-Stil, mypy-Abbruch, import-linter, `make check`, CI-Jobs, Versions-Pins, Audit-Job und die PATH-Shadowing-Falle in allen Fassungen.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ## Code-Stil
 
-- **Black** mit `line-length = 88`
-- **Ruff** Regeln: E, F, I (Imports), UP (pyupgrade), ISC
-- `make format` → Black; `make fix` → Ruff mit `--fix`
-- `make lint` → Ruff check only
-- Keine Docstrings für einfache Methoden, kurze Inline-Kommentare nur wenn nötig
+Black und Ruff, konfiguriert in `pyproject.toml`; `make format` ist Black,
+`make fix` Ruff mit `--fix`. Keine Docstrings für einfache Methoden, kurze
+Inline-Kommentare nur wenn nötig.
 
 ### ⚠️ Ein Prüfer, der abbricht, meldet *weniger* Fehler — nicht keine
 
@@ -142,26 +136,13 @@ Beschlüsse). **Wer einen Eintrag ergänzt, schreibt die Begründung dazu und wa
 ihn auflöst** — ein Eintrag ohne Grund ist ein Stummschalter, und
 `test_audit_deps.py` besteht darauf.
 
-Nebenbefund, der die ganze Liste erklärte: **alle 30 getragenen Befunde hingen
-an Gradios eigenen Deckeln** (`pillow<12.0`, `starlette<1.0`). Mit dem Sprung
-auf Gradio 6.22 (#61a) sind sie sämtlich weg — auch PYSEC-2026-211, für das es
-unter 5.x gar keine Fassung gab. **Die Liste war danach leer**, und der Abgleich
-hat das selbst eingefordert: stehengebliebene Einträge sind rot.
-
-**Seit 2026-11-01 trägt sie wieder 56 Befunde (filelock, pillow) — diesmal
-deckelt nicht Gradio allein, sondern die eigene Untergrenze.** Python 3.10 ist
-im Oktober 2026 EOL gegangen, und die behobenen Fassungen verlangen ≥ 3.11; der
-Audit-Job läuft auf 3.10 und löst sie deshalb nie auf. Eine Pipeline, die ohne
-eine Zeile Code rot wird, ist hier also das erwartete Zeichen dafür, dass die
-Untergrenze altert — nicht dafür, dass etwas kaputt ist. Was sie auflöst, steht
-in der Allowlist.
-
-**Mit #79 (Untergrenze 3.12) fiel die filelock-Gruppe weg** — der Abgleich hat
-sie als erledigt gemeldet, wie er soll. pillow bleibt, bis Gradio `pillow<13.0`
-hebt. Die Lehre fürs nächste Mal: die Untergrenze altert mit dem Kalender, und
-ein Jahr nach dem EOL einer Version steht sie im Weg. Hebt man sie, dann bis
-dorthin, wo numpy & Co. schon sind — nicht eine Stufe, sonst wiederholt sich
-derselbe rote Job ein Jahr später.
+**Die Liste altert mit dem Kalender, nicht nur mit dem Code.** Zweimal war sie
+voll, ohne dass eine Zeile Code sich geändert hatte: einmal deckelte Gradio 5
+`pillow` und `starlette` (weg mit Gradio 6, #61a), einmal die eigene
+Python-Untergrenze nach dem EOL von 3.10 (weg mit #79). Ein roter Audit-Job
+ohne Codeänderung heißt deshalb zuerst: was deckelt hier? Und wer die
+Untergrenze hebt, hebt sie bis dorthin, wo numpy & Co. schon sind — nicht eine
+Stufe, sonst ist derselbe Job ein Jahr später wieder rot.
 
 #### ⚠️ Zweite Fassung derselben Falle: ein Werkzeug als Laufzeit-Abhängigkeit
 `gradio` führt **`ruff` als eigene Abhängigkeit** und fordert `>=0.9.3`. Der Pin
