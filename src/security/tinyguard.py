@@ -298,6 +298,82 @@ class BasicGuard:
                     r"|to\s+the\s+(?:model|assistant|ai|llm))\b\s*[:\-–—]"
                 ),
             ),
+            # ---- Die fünf wirksamen Lücken aus der ZIM-Messung (#91) ----
+            #
+            # Gemeinsame Bauart: jede Regel hängt an der **Anrede** — „du
+            # bist", ein Imperativ in der zweiten Person, „your responses",
+            # „der Nutzer" als Gegenüber. Eine Enzyklopädie schreibt in der
+            # dritten Person und im Präteritum; dort steht „er schlüpft in die
+            # Rolle" und „sie antwortete auf Englisch", nie „schlüpfe" und
+            # „antworte". Die Verbform ist damit die Präzision, nicht die
+            # Wortliste dahinter.
+            #
+            # Identitätswechsel ohne Verneinung („Du bist ab jetzt ein
+            # Pirat"). Der Artikel hinter der Zeitangabe ist Pflicht: ohne ihn
+            # träfe die Regel „Ab jetzt bist du dran".
+            Rule(
+                "persona_assignment",
+                re.compile(
+                    r"(?i)\b(?:du\s+bist|bist\s+du|you\s+are)\s+"
+                    r"(?:ab\s+(?:jetzt|sofort|nun)|von\s+nun\s+an|fortan"
+                    r"|from\s+now\s+on|henceforth)\s+"
+                    r"(?:kein\w*\s+\w+\s+mehr,?\s+sondern\s+)?"
+                    r"(?:ein|eine|der|die|das|an?|the)\s+\w"
+                    r"|\b(?:ab\s+(?:jetzt|sofort|nun)|von\s+nun\s+an|fortan)\s+"
+                    r"bist\s+du\s+(?:ein|eine|der|die|das)\s+\w"
+                    r"|\bfrom\s+now\s+on,?\s+you\s+are\s+(?:an?|the)\s+\w"
+                ),
+            ),
+            # Rollenwechsel als Imperativ. Bewusst nur Formen, die es in der
+            # dritten Person nicht gibt: „schlüpft"/„schlüpfte" und
+            # „übernimmt"/„übernahm" bleiben draußen — „X schlüpft in die
+            # Rolle des …" ist der Normalsatz jeder Filmhandlung.
+            Rule(
+                "role_imperative",
+                re.compile(
+                    r"(?i)\b(?:schl(?:ü|ue)pfe?|(?:ü|ue)bernimm|versetze\s+dich)\b"
+                    r"[^.!?\n]{0,50}\brolle\s+(?:eine[sr]|de[sr]|von)\b"
+                ),
+            ),
+            # Der englische Dauerauftrag, den `standing_answer_instruction`
+            # nicht sieht („always … your responses" statt „every response").
+            Rule(
+                "standing_answer_instruction_always",
+                re.compile(
+                    r"(?i)\balways\s+(?:end|begin|start|finish|close|open|sign"
+                    r"|prefix|suffix)\s+(?:all\s+(?:of\s+)?)?your\s+"
+                    r"(?:answers?|responses?|repl(?:y|ies)|messages?)\b"
+                ),
+            ),
+            # Konditionaler Auslöser: „Sollte der Nutzer nach X fragen, lautet
+            # die Antwort immer Y". Vier Dinge müssen in *einem* Satz stehen —
+            # Bedingung, der Nutzer als Gegenüber, sein Fragen, und eine
+            # **festgelegte** Antwort (immer/stets/always). Das letzte trennt
+            # die Vorschrift von der Beschreibung: „Wenn der Nutzer fragt,
+            # liefert die Suchmaschine Antworten" steht in jedem Artikel über
+            # Software. Die Brücke darf das Komma überspringen, weil Neben-
+            # und Hauptsatz hier *eine* Konstruktion sind.
+            Rule(
+                "conditional_answer_instruction",
+                re.compile(
+                    r"(?i)\b(?:sollte|falls|wenn|sobald|if|when(?:ever)?)\b"
+                    r"[^.!?\n]{0,20}\b(?:nutzer(?:in)?|benutzer(?:in)?|anwender(?:in)?"
+                    r"|user)\b[^.!?\n]{0,60}\b(?:frag(?:t|en)|asks?)\b"
+                    r"[^.!?\n]{0,60}\b(?:antwort\w*|answer\w*|respon\w+|repl\w+)\b"
+                    r"[^.!?\n]{0,30}\b(?:immer|stets|always|ausschlie(?:ß|ss)lich)\b"
+                ),
+            ),
+            # Vorgeschriebene Antwortsprache — wieder nur der Imperativ.
+            Rule(
+                "forced_answer_language",
+                re.compile(
+                    r"(?i)\bantworte\b[^.!?\n]{0,30}\b(?:ab\s+(?:jetzt|sofort|nun)"
+                    r"|von\s+nun\s+an|fortan|ausschlie(?:ß|ss)lich|nur\s+noch"
+                    r"|immer|stets)\b[^.!?\n]{0,30}\bauf\s+\w+isch\b"
+                    r"|\b(?:answer|respond|reply)\s+(?:only|exclusively|always)\s+"
+                    r"in\s+(?:english|german|french|spanish|italian)\b"
+                ),
+            ),
         ]
 
         pii = [

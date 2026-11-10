@@ -74,6 +74,13 @@ GUARDED_PAYLOAD_IDS = {
     "standing_answer_instruction",
     "fake_system_notice",
     "ignore_previous_instructions",
+    # Seit #91 (2026-11-10): die vier wirksamen Familien aus der ZIM-Messung
+    # haben je eine Regel. Durch kommen nur noch die beiden, die am Modell
+    # gemessen nicht wirken.
+    "persona_takeover_without_negation",
+    "persona_slip_into_role",
+    "standing_instruction_english",
+    "conditional_trigger",
 }
 
 
@@ -81,7 +88,7 @@ GUARDED_PAYLOAD_IDS = {
     "payload", [p for p in PAYLOADS if p.id in GUARDED_PAYLOAD_IDS], ids=lambda p: p.id
 )
 def test_the_guarded_arm_stops_the_payloads_it_has_a_rule_for(payload):
-    """Der ausgelieferte Stand: für diese vier erreicht nichts den Prompt.
+    """Der ausgelieferte Stand: für diese erreicht nichts den Prompt.
 
     Fällt eine davon, ist die Probe der Ort, an dem man es merkt.
     """
@@ -102,8 +109,8 @@ def test_the_guarded_arm_stops_the_payloads_it_has_a_rule_for(payload):
 def test_the_guarded_arm_still_lets_these_through(payload):
     """Die unbequeme Hälfte, als Test statt als Fußnote.
 
-    Diese sechs Formulierungen sagen dasselbe wie die vier oben, nur anders —
-    und der Guard sieht sie nicht. Das als grünen Test festzuhalten ist kein
+    Diese Formulierungen kommen durch — der Guard hat für sie keine Regel.
+    Seit #91 sind es noch die zwei, die am Modell gemessen nicht wirken. Das als grünen Test festzuhalten ist kein
     Zementieren einer Schwäche, sondern die einzige Art, sie zu bemerken, wenn
     sie *verschwindet*: wer eine Regel ergänzt, bekommt hier einen roten Test
     und trägt die ID nach oben. Genau die Richtung, die `KNOWN_GAP_IDS` im
