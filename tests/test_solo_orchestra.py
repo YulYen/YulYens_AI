@@ -110,7 +110,7 @@ def test_profi_option_moves_the_default_but_not_the_soloist(cfg, peter_solo):
 
 @pytest.mark.parametrize(
     ("app", "expected"),
-    [("web", SOLO), ("api", SOLO), ("ask-all", DEFAULT), ("self-talk", DEFAULT)],
+    [("web", SOLO), ("api", SOLO), ("terminal", SOLO)],
 )
 def test_the_store_records_the_model_that_actually_answers(
     cfg, peter_solo, monkeypatch, app, expected

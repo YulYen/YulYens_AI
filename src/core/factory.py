@@ -31,11 +31,6 @@ from core.utils import (
     with_timestamps,
 )
 
-# Apps, in denen das **Orchester** spielt (#85): mehrere Personas auf dem
-# gemeinsamen ``core.model_name``. Alles andere ist ein Solo — ein Gespräch zu
-# zweit, in dem eine Persona ihr eigenes Modell bekommen darf.
-ORCHESTRA_APPS = frozenset({"ask-all", "self-talk"})
-
 
 class AppFactory:
     """
@@ -163,11 +158,9 @@ class AppFactory:
             return self.get_store().start(
                 user=user or LOCAL_USER,
                 persona=persona,
-                model=(
-                    self.default_model()
-                    if app in ORCHESTRA_APPS
-                    else self.solo_model(persona)
-                ),
+                # Aufgezeichnet wird nur das Solo (#77) — also immer mit dem
+                # Modell, das solo antwortet (#85).
+                model=self.solo_model(persona),
                 app=app,
             )
         except Exception:

@@ -45,8 +45,8 @@ antwortet je nach Bereich mit einem anderen Modell. Was dabei leicht umfällt:
    `ui/continuation.py`.
 3. **Was angezeigt und aufgezeichnet wird, ist das Modell, das antwortet.**
    Begrüßung, `meta.model`, `ConversationStore.start(model=…)` und die
-   Cutoff-Zeile im System-Prompt (#19) nehmen das Solo-Modell; die Ablage
-   unterscheidet über `ORCHESTRA_APPS` in `core/factory.py`. Ein Solo-Modell
+   Cutoff-Zeile im System-Prompt (#19) nehmen das Solo-Modell; aufgezeichnet
+   wird ohnehin nur das Solo (#77). Ein Solo-Modell
    ohne Eintrag in `core.knowledge_cutoffs` bekommt ehrlich „unbekannt".
 4. **Angezeigt wird ein Modell nur, wo es abweicht.** Ohne `model:` sieht die
    Startseite bis auf die Zweiteilung aus wie vorher; eine Persona, deren
@@ -55,9 +55,7 @@ antwortet je nach Bereich mit einem anderen Modell. Was dabei leicht umfällt:
    Orchester-Überschrift zieht beim Wechsel mit.
 
 Offen gelassen: eigene `llm_options` je Modell (Temperatur und Prompt sind auf
-das 14B abgestimmt und gelten auch fürs Solo-Modell), und ob ein aus Ask-All
-gespeichertes Gespräch beim Fortsetzen still auf das Solo-Modell wechseln
-soll — heute tut es das, und der Begrüßungssatz nennt dann das Solo-Modell.
+das 14B abgestimmt und gelten auch fürs Solo-Modell).
 
 ### RSS: vier Entscheidungen, die man leicht umdreht (#73)
 
@@ -228,7 +226,7 @@ POST http://127.0.0.1:8013/ask
   → { "answer": "..." }
 
 GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet) — ohne Schlüssel
-GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler)
+GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler) — mit Schlüssel, falls gesetzt
 
 # OpenAI-kompatibel (#37) — "model" ist der Persona-Name
 GET  http://127.0.0.1:8013/v1/models
@@ -239,9 +237,9 @@ POST http://127.0.0.1:8013/v1/chat/completions
 ### OpenAI-Kompatibilität: worauf zu achten ist
 - **`model` = Persona**, nicht LLM. `/v1/models` listet Personas; das echte Modell
   bleibt Serversache (`core.model_name`).
-- **`api.openai_compatible.api_key` gilt für alle Endpunkte, die ein LLM
-  ansprechen, auch für `/ask`** — der Name sagt nur, wo die Option steht.
-  `/health` und `/healthz` sind offen (zu `/healthz` siehe #93). Vorher hing `require_access` allein am
+- **`api.openai_compatible.api_key` gilt für alle Endpunkte außer `/health`**
+  — also `/ask`, `/v1` und seit #93 auch `/healthz`. Der Name sagt nur, wo die
+  Option steht. Vorher hing `require_access` allein am
   `/v1`-Router, während `/ask` auf demselben Port dieselbe Fähigkeit ohne
   Schlüssel und ohne Rate-Limit anbot. Die Regel liegt in `check_api_access`,
   die Fehler*form* bleibt pro Router verschieden (`/v1`: OpenAI, `/ask`:

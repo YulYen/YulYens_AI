@@ -20,9 +20,8 @@ Store ≠ Logfile (#54/#59), Migrationen, Volltextsuche (#49), keine Aufzeichnun
 und damit protokollierte die Ablage Generierungs*versuche* statt des Gesprächs:
 „Nochmal 🔄" hängte Frage und verworfene Antwort erneut an (dreimal gedrückt →
 drei Fragen und drei Antworten im Store, während die Oberfläche eine zeigte),
-„Stop ⏹" ließ die Antwort ganz weg. Ask-All und Self-Talk zeichneten gar nichts
-auf, weil dort nie eine Gesprächs-ID gesetzt wurde — das ist bis heute so und
-**seit 2026-08-05 eine bewusste Entscheidung**, siehe unten.
+„Stop ⏹" ließ die Antwort ganz weg. Ask-All und Self-Talk zeichnen nicht auf
+— eine bewusste Entscheidung, siehe unten.
 
 Jetzt gilt: **die Oberfläche besitzt den Gesprächsstand, die Ablage spiegelt
 ihn.** `stream()` schreibt nur noch den JSONL-Mitschnitt (der *soll* Versuche
@@ -36,21 +35,12 @@ Wer einen **neuen Antwortweg** baut, muss `record_conversation` aufrufen —
 sonst bleibt er spurlos. Aufgezeichnet wird heute aus Einzelchat, Briefing,
 „Nochmal", Terminal, API und Mail-Adapter.
 
-> **⚠️ Datierter Hinweis (2026-09-05): die nächsten zwei Absätze widersprechen
-> dem Code — nachgemessen, nicht strittig.** `iter_broadcast_events`/`_parallel`
-> eröffnen seit #59 (Commit `6f5e16a`, 2026-08-01 — also *vor* der Entscheidung
-> vom 2026-08-05) je Persona ein Gespräch (`app: ask-all`) und rufen
-> `record_conversation`; `SelfTalkRunner` ebenso (`app: self-talk`). Tests
-> nageln das als Absicht fest. Auf einer Default-Installation fällt der
-> Widerspruch nicht auf, weil ohne Anmeldung ein `NullStore` läuft (#72) — mit
-> Anmeldung wird aufgezeichnet, unter dem Eigentümer `local`, für niemanden im
-> Verlauf sichtbar. Welche Seite gilt, entscheidet **#77** (backlog.md); bis
-> dahin ist weder auf diese Absätze noch auf die Docstrings in
-> `ask_all_moderator.py` Verlass.
-
-**Zwei Wege zeichnen bewusst nicht auf: Ask-All und Self-Talk (#75, verworfen
-am 2026-08-05).** Das ist keine Lücke, sondern eine Entscheidung — und sie steht
-hier, weil der Satz davor sonst wie ein unerledigter Fehler aussieht:
+**Zwei Wege zeichnen bewusst nicht auf: Ask-All und Self-Talk (#77).** Das ist
+keine Lücke, sondern eine Entscheidung — und sie steht hier, weil der Satz
+davor sonst wie ein unerledigter Fehler aussieht. Zwischen #59 und dem
+2026-11-10 tat der Code das Gegenteil (je Persona ein Gespräch unter dem
+Eigentümer `local`); solche Altzeilen mit `app: ask-all`/`self-talk` können in
+einer bestehenden Ablage noch liegen.
 
 - **Ask-All** sind vier parallele Antworten auf *eine* Frage. Das Datenmodell
   der Ablage ist „eine Persona, ein Faden"; Ask-All hineinzuzwingen hieße, eine

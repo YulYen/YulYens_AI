@@ -301,7 +301,7 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
 - **API (FastAPI)**
   - Automatisch aktiv bei `api.enabled: true`
   - `GET /health` — schneller Liveness-Check (`{"status": "ok", "version": "…"}`)
-  - `GET /healthz` — Deep-Check (Ollama, Modell, spaCy, Kiwix, VRAM); HTTP 503 bei kritischem Ausfall
+  - `GET /healthz` — Deep-Check (Ollama, Modell, spaCy, Kiwix, VRAM); HTTP 503 bei kritischem Ausfall. Ist ein `api_key` gesetzt, verlangt auch dieser Endpunkt ihn; `/health` bleibt offen
   - Beispielaufruf per `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \

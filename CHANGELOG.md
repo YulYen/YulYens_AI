@@ -70,6 +70,12 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
+- **`/healthz` requires the API key once one is configured.** The deep check
+  names models, paths and configuration problems and queries Ollama and Kiwix
+  on every call, so it now sits behind `api.openai_compatible.api_key` and the
+  rate limit, like `/ask` and `/v1`. **If a monitor polls `/healthz` and you
+  have set a key**, give it the `Authorization: Bearer …` header or point it at
+  `/health`, which stays open. Without a configured key nothing changes.
 - **The start page is split into two sections**, in the web UI and the
   terminal: **Solo** (chat with one persona, plus the guest persona) and
   **Orchestra** (AI dialog and Ask-All, plus the history card in the web UI).
@@ -128,6 +134,13 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **Ask-All and the AI dialog are no longer written to the conversation
+  store** — as the documentation has said all along. Since 2.0.0 every Ask-All
+  question created one stored conversation per persona and every AI dialog two,
+  all owned by `local`: invisible with login enabled, and cluttering the
+  history with `storage.shared_without_login`. Entries already stored (`app`
+  `ask-all` / `self-talk`) are left alone; delete them from the history if they
+  bother you. To keep such a round, use the file export.
 - **Retrieved text is checked against five more injection patterns.** Wikipedia
   snippets and news items that address the model directly — assigning it a
   role ("Du bist ab jetzt ein Pirat"), ordering a role change, prescribing a

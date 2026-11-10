@@ -243,6 +243,9 @@ api:
     # demselben Port dieselbe Fähigkeit ohne Schlüssel anbot; wer ihn setzte,
     # hielt die API damit für abgesichert, ohne es zu sein.
     # /health bleibt bewusst frei, sonst meldet ein Monitor den Prozess als tot.
+    # /healthz (Deep-Check) verlangt den Schlüssel dagegen mit: es nennt
+    # Modellnamen, Pfade und Config-Befunde. Ein Monitor braucht dort also den
+    # Bearer-Header — oder fragt /health.
     api_key: ""
     # Fixed-Window-Limit pro Client und Minute; 0 schaltet es ab. Klein
     # angesetzt, weil ein einzelnes Ollama die Anfragen ohnehin serialisiert.

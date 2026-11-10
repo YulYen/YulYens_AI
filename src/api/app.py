@@ -66,7 +66,11 @@ def health():
     return {"status": "ok", "version": __version__}
 
 
-@app.get("/healthz")
+# Hinter demselben Schlüssel und Rate-Limit wie /ask (#93): die Antwort nennt
+# Modellnamen, Pfade und Config-Befunde, und jeder Aufruf fragt Ollama und
+# Kiwix an. /health darüber bleibt offen — Liveness darf nicht am Schlüssel
+# hängen. Ohne konfigurierten Schlüssel ändert sich nichts.
+@app.get("/healthz", dependencies=[Depends(require_ask_access)])
 def healthz(response: Response):
     # Deep readiness probe: Ollama/model/spaCy/Kiwix/VRAM. 503 on a critical fail.
     from config.config_singleton import Config

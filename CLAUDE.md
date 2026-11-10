@@ -260,9 +260,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Kompression markiert, sie löscht nicht (#87).** Der Verlauf ist Prompt
   *und* Gespräch: wer den Prompt meint, fragt `prompt_only`, wer in der Ablage
   zählt, `recorded_turns` — nie den rohen Verlauf nach Rolle filtern.
-- **Ask-All und Self-Talk: offen (#77).** Der Code zeichnet seit #59 auf
-  (`app: ask-all`/`self-talk`), eine Entscheidung vom 2026-08-05 sagt
-  „bewusst nicht". Bis #77 entschieden ist, auf keine der beiden Seiten bauen.
+- **Ask-All und Self-Talk zeichnen bewusst nicht auf (#77)** — kein Versehen,
+  nicht nachrüsten.
 - **Ohne Anmeldung zeichnet die WebUI nichts auf (#72)** — `NullStore`; die
   Verlauf-Karte hängt an `store.records` und kann `None` sein.
 - **Die WebUI setzt bei `load()`/`delete()`/`search()` immer `user`** — die
@@ -317,9 +316,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Mail-Adapter:** Antwort an `From`, nie `Reply-To`; **erst markieren, dann
   senden** — und den IMAP-Status prüfen, `imaplib` wirft bei `NO` nicht; ohne
   `allowed_senders` kein Start; einmal beim Lesen kürzen.
-- **API:** `model` = Persona; `api_key` gilt für **alle Endpunkte, die ein LLM
-  ansprechen** (`/ask` und `/v1`, über `check_api_access`) — `/health` und
-  `/healthz` sind offen; OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
+- **API:** `model` = Persona; `api_key` gilt für **alle Endpunkte außer
+  `/health`** (`check_api_access`), auch für `/healthz`; OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
   Sampling-Parameter werden ignoriert.
 
 ### Konfiguration → [konfiguration.md](docs/entwurf/konfiguration.md)

@@ -344,11 +344,11 @@ class YulYenStreamingProvider:
         Frage und verworfene Antwort erneut an, „Stop ⏹" ließ die Antwort ganz
         weg.
 
-        **Ask-All und Self-Talk rufen das hier bewusst nicht** (#75, verworfen
-        am 2026-08-05): vier parallele Antworten sind kein *ein* Gespräch, und
-        Self-Talk erzeugt ein Artefakt statt eines Nutzergesprächs. Begründung
-        in CLAUDE.md, Abschnitt „Ablage der Gespräche" — hier steht es, damit
-        niemand die fehlenden Aufrufe für ein Versehen hält.
+        **Ask-All und Self-Talk rufen das hier bewusst nicht** (#77): vier
+        parallele Antworten sind kein *ein* Gespräch, und Self-Talk erzeugt ein
+        Artefakt statt eines Nutzergesprächs. Begründung in
+        ``docs/entwurf/ablage-und-anmeldung.md`` — hier steht es, damit niemand
+        die fehlenden Aufrufe für ein Versehen hält.
 
         Aufzeichnen darf den Betrieb nie stören — dieselbe Regel wie zuvor.
         """

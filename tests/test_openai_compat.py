@@ -566,3 +566,44 @@ def test_an_api_key_with_umlauts_is_usable(client):
 
     assert wrong.status_code == 401
     assert right.status_code == 200
+
+
+# ---- /healthz hinter dem Schlüssel (#93) ----------------------------------
+
+
+def _quiet_checks(monkeypatch):
+    """Die Deep-Checks selbst sind hier nicht das Thema — und kosten Netz."""
+    import core.system_checks as system_checks
+
+    monkeypatch.setattr(system_checks, "run_checks", lambda _cfg: [])
+
+
+def test_healthz_needs_the_key_once_one_is_configured(client, monkeypatch):
+    """`/healthz` nennt Modellnamen, Pfade und Config-Befunde.
+
+    Es war der einzige Endpunkt mit Inhalt, der ohne Schlüssel antwortete —
+    und jeder Aufruf fragt Ollama und Kiwix an. `/health` bleibt offen: es
+    sagt nur „der Prozess lebt" und die Version.
+    """
+    _quiet_checks(monkeypatch)
+    Config().override("api", {"openai_compatible": {"api_key": "geheim"}})
+
+    assert client.get("/healthz").status_code == 401
+    ok = client.get("/healthz", headers={"Authorization": "Bearer geheim"})
+    assert ok.status_code == 200
+    assert client.get("/health").status_code == 200
+
+
+def test_healthz_stays_open_without_a_configured_key(client, monkeypatch):
+    """Der Default ändert sich nicht — lokal ohne Schlüssel bleibt alles wie es war."""
+    _quiet_checks(monkeypatch)
+
+    assert client.get("/healthz").status_code == 200
+
+
+def test_the_rate_limit_also_covers_healthz(client, monkeypatch):
+    _quiet_checks(monkeypatch)
+    Config().override("api", {"openai_compatible": {"rate_limit_per_minute": 1}})
+
+    assert client.get("/healthz").status_code == 200
+    assert client.get("/healthz").status_code == 429

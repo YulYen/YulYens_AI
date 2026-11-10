@@ -291,7 +291,7 @@ versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
 - **API (FastAPI)**
   - Automatically active when `api.enabled: true`
   - `GET /health` — fast liveness check (`{"status": "ok", "version": "…"}`)
-  - `GET /healthz` — deep check (Ollama, model, spaCy, Kiwix, VRAM); HTTP 503 on critical failure
+  - `GET /healthz` — deep check (Ollama, model, spaCy, Kiwix, VRAM); HTTP 503 on critical failure. Once an `api_key` is set, this endpoint requires it too; `/health` stays open
   - Example request using `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \
