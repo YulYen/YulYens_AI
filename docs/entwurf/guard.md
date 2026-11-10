@@ -225,3 +225,21 @@ Gemessen an 20 alltäglichen Sätzen (lokale URLs, Code-Fragen, Rollenbitten):
 daneben, den sie nicht treffen darf** (`ok_…`). Ohne diese Gegenprobe ist eine
 Verschärfung nicht messbar — die Recall-Seite meldet sich von selbst, die
 Precision-Seite nie.
+
+### Der Wrongdoing-Lock gehört den Nutzereingaben (#87)
+
+`security.wrongdoing_lock_turns` sperrt nach einem Treffer die nächsten N
+**Eingaben**. `context_verdict` prüfte Fremdtext aber über dasselbe
+`check_input` und damit über denselben Zähler. Zwei Folgen, beide nachgestellt:
+
+- Ein Wikipedia-Ausschnitt, der eine Wrongdoing-Regel trifft, setzte den Lock —
+  der Nutzer hatte harmlos gefragt, seine nächsten Eingaben wurden abgelehnt.
+- Nach einem echten Treffer verbrauchten die Schnipsel der Folgefrage die
+  Lock-Runden (die WebUI holt das Wiki vor der Eingangsprüfung), und der
+  Umgehungsversuch, für den der Lock gebaut ist, ging durch.
+
+Fremdtext wird deshalb mit `check_input(text, count_as_turn=False)` geprüft:
+gegen die Regeln, aber ohne den Sitzungszustand zu lesen oder zu ändern. Wer
+einen weiteren Aufrufer von `check_input` baut, der nicht die Eingabe des
+Nutzers prüft, setzt das Argument ebenso. Mit dem Default `0` war der Fehler
+nicht sichtbar.

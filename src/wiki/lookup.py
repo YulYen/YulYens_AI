@@ -165,7 +165,10 @@ def lookup_wiki_snippet(
         encoded_topic = quote(topic, safe="")
         url = (
             f"{proxy_base.rstrip('/')}/{encoded_topic}"
-            f"?json=1&limit={limit}&online={online_flag}&persona={persona_name}"
+            f"?json=1&limit={limit}&online={online_flag}"
+            # Auch der Name wird kodiert: eine Gast-Persona heißt, wie der
+            # Nutzer will, und ein „&" oder „#" zerschnitt sonst die Query.
+            f"&persona={quote(persona_name or '', safe='')}"
         )
         try:
             proxy_response = requests.get(url, timeout=timeout)

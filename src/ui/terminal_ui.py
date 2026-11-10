@@ -9,6 +9,7 @@ from typing import Any
 from colorama import Fore, Style, init
 from config.personas import get_all_persona_names, get_drink
 from core.ask_all_moderator import iter_verdict
+from core.context_injection import prompt_only
 from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
@@ -617,7 +618,10 @@ class TerminalUI:
         wait_msg = self._t("context_wait_message", persona_name=self.bot, drink=drink)
         print(wait_msg)
 
-        original_length = len(self.history)
+        # Gezählt wird, was noch an das Modell geht: die herausgenommenen
+        # Turns bleiben markiert im Verlauf, damit die Ablage das ganze
+        # Gespräch behält.
+        original_length = len(prompt_only(self.history))
         self.history = shrink_history_for_context(
             self.history,
             self.config,
@@ -627,7 +631,7 @@ class TerminalUI:
             persona_name=self.bot,
         )
 
-        removed = original_length - len(self.history)
+        removed = original_length - len(prompt_only(self.history))
         if removed > 0:
             logging.info(
                 "TerminalUI: Removed %s older messages to free up context.",

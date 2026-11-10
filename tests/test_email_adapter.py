@@ -476,3 +476,93 @@ def test_an_oversized_body_is_cut_once_for_prompt_and_quote():
     quoted = smtp.messages[0].get_content()
     assert "A" * 101 not in quoted
     assert "[…]" in quoted
+
+
+# ---- IMAP sagt „NO" — und imaplib wirft dabei nicht -----------------------
+
+
+class RefusingImap(FakeImap):
+    """Ein Server, der STORE (und wahlweise COPY) mit ``NO`` beantwortet.
+
+    ``imaplib`` wirft nur bei ``BAD``; ein ``NO`` kommt als Status zurück. Der
+    bisherige ``fail_store``-Schalter warf eine Ausnahme und prüfte damit einen
+    Fall, den es so am echten Server kaum gibt — der häufige (fehlende Rechte,
+    unbekanntes Schlüsselwort) blieb ungeprüft.
+    """
+
+    def __init__(self, raw_messages, *, refuse_copy=True, refuse_flags=None):
+        super().__init__(raw_messages)
+        self.refuse_copy = refuse_copy
+        # None = jedes STORE scheitert; sonst nur, wenn eines der Wörter vorkommt.
+        self.refuse_flags = refuse_flags
+
+    def uid(self, command, *args):
+        command_l = command.lower()
+        if command_l == "copy" and self.refuse_copy:
+            self.commands.append(("uid", command, *args))
+            return "NO", [b"[TRYCREATE] Mailbox does not exist"]
+        if command_l == "store":
+            flags = args[-1]
+            if self.refuse_flags is None or any(
+                word in flags for word in self.refuse_flags
+            ):
+                self.commands.append(("uid", command, *args))
+                return "NO", [b"[NOPERM] Permission denied"]
+        return super().uid(command, *args)
+
+
+def test_a_refused_store_does_not_send_a_reply():
+    """Die Zusage aus #14f: scheitert auch ``\\Seen``, wird nicht gesendet.
+
+    Sie galt nur für Ausnahmen. Bei einem ``NO`` blieb die Mail UNSEEN, die
+    Antwort ging trotzdem raus — und beim nächsten Poll wieder.
+    """
+    smtp = FakeSmtp()
+    sent_per_poll = []
+    for _poll in range(3):
+        imap = RefusingImap({b"201": _raw_mail()})
+        before = len(smtp.messages)
+        assert _service(imap, smtp).run_once() == 0
+        sent_per_poll.append(len(smtp.messages) - before)
+
+    assert sent_per_poll == [0, 0, 0]
+
+
+def test_a_refused_keyword_falls_back_to_seen_alone():
+    """Ein Server ohne freie Schlüsselwörter lehnt ``(\\Seen YulYenProcessed)`` ab.
+
+    ``\\Seen`` allein genügt, damit die UNSEEN-Suche die Mail nicht wieder
+    findet — daran darf die Antwort nicht scheitern.
+    """
+    imap = RefusingImap({b"202": _raw_mail()}, refuse_flags=("YulYenProcessed",))
+    smtp = FakeSmtp()
+
+    assert _service(imap, smtp).run_once() == 1
+
+    assert len(smtp.messages) == 1
+    assert ("uid", "store", b"202", "+FLAGS.SILENT", "(\\Seen)") in imap.commands
+
+
+def test_a_copy_without_the_delete_flag_is_not_a_processed_mail():
+    """COPY gelingt, das Markieren danach nicht: die Mail läge weiter UNSEEN da."""
+    imap = RefusingImap({b"203": _raw_mail()}, refuse_copy=False)
+    smtp = FakeSmtp()
+
+    assert _service(imap, smtp).run_once() == 0
+
+    assert smtp.messages == []
+
+
+def test_a_line_break_hidden_in_the_subject_does_not_swallow_the_reply():
+    """Ein kodiertes ``=0A`` im Betreff wird beim Dekodieren zum Zeilenumbruch.
+
+    Den lehnt ``EmailMessage`` als Header ab — nach dem Markieren. Die Mail
+    war damit erledigt, eine Antwort bekam der Absender nie.
+    """
+    raw = _raw_mail().replace(b"Subject: Frage", b"Subject: =?utf-8?q?Hallo=0AWelt?=")
+    imap = FakeImap({b"301": raw})
+    smtp = FakeSmtp()
+
+    assert _service(imap, smtp).run_once() == 1
+
+    assert smtp.messages[0]["Subject"] == "Re: Hallo Welt"

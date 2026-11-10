@@ -16,7 +16,7 @@ import pytest
 import requests
 from auth import build_auth_provider
 from config.texts import Texts
-from core.context_injection import is_injected
+from core.context_injection import is_injected, prompt_only
 from core.streaming_provider import StreamStats
 from rss.feeds import RssCache, RssItem
 from storage import NullStore
@@ -230,7 +230,7 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
     mock_prepare.assert_not_called()
     mock_karl.assert_called_once()
     final_state = outputs[-1][2]
-    assert final_state[0] == {"role": "system", "content": "S"}
+    assert prompt_only(final_state)[0] == {"role": "system", "content": "S"}
 
 
 def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
@@ -1208,6 +1208,38 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     # #65 nahm an, hier liefe etwas auseinander; das stimmt seit #35/#59 nicht
     # mehr, und dieser Satz hält fest, dass es so bleibt.
     assert outputs[-1][2][-1] == {"role": "assistant", "content": reply}
+
+
+def test_a_stopped_stream_records_into_its_own_conversation():
+    """Der Stream schreibt in *sein* Gespräch — auch wenn die Sitzung weiterzog.
+
+    „Neues Gespräch" setzt den Kill-Switch und räumt die Persona ab; der alte
+    Generator bemerkt das erst beim nächsten Token. Wählt der Nutzer bis dahin
+    eine andere Persona, hängt an der Sitzung schon deren Streamer — und der
+    alte Stream las ihn erst *am Ende* aus der Sitzung: Frage und Teilantwort
+    an LEAH landeten im frisch angelegten Gespräch mit DORIS.
+    """
+    web_ui = _create_web_ui()
+    session = SessionContext()
+    old_streamer = streamer_double()
+    old_streamer.stream.return_value = _BlockingStream("Teil ")
+    session.streamer = old_streamer
+    question = [{"role": "user", "content": "Frage an LEAH"}]
+
+    generator = web_ui.chat.stream_reply(session, list(question), [])
+    clock = iter(1000.0 + i for i in range(100))
+    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+        next(generator)
+        # Zurück zum Start, dann sofort eine andere Persona.
+        web_ui._on_reset_to_start(session)
+        new_streamer = streamer_double()
+        session.streamer = new_streamer
+        list(generator)
+
+    new_streamer.record_conversation.assert_not_called()
+    old_streamer.record_conversation.assert_called_once()
+    recorded = old_streamer.record_conversation.call_args[0][0]
+    assert recorded[0] == question[0]
 
 
 def test_stop_clears_the_switch_so_the_next_stream_runs():
@@ -2422,6 +2454,7 @@ def test_uploading_a_guest_conversation_does_not_continue_as_the_persona(tmp_pat
     updates = web_ui._on_load_conversation(
         session,
         _uploaded(tmp_path, app=app),
+        "local",
         {"leah": {"name": "LEAH", "description": "warm"}},
         "Tippe",
     )
@@ -2439,6 +2472,7 @@ def test_uploading_a_real_conversation_still_works(tmp_path):
     updates = web_ui._on_load_conversation(
         session,
         _uploaded(tmp_path, persona="LEAH", app="web"),
+        "local",
         {"leah": {"name": "LEAH", "description": "warm"}},
         "Tippe",
     )
@@ -2496,6 +2530,7 @@ def test_an_uploaded_conversation_is_recorded_when_continued(tmp_path):
     updates = web_ui._on_load_conversation(
         session,
         _uploaded(tmp_path, persona="LEAH", app="web", user="yulyen"),
+        "yulyen",
         {"leah": {"name": "LEAH", "description": "warm"}},
         "Tippe",
     )
@@ -2513,6 +2548,33 @@ def test_an_uploaded_conversation_is_recorded_when_continued(tmp_path):
     assert messages[-1]["content"] == "Frage nach dem Laden"
 
 
+def test_an_uploaded_conversation_belongs_to_whoever_uploads_it(tmp_path):
+    """Der Eigentümer kommt aus der Sitzung, nicht aus der hochgeladenen Datei.
+
+    ``meta.user`` ist ein Feld in einer Datei, die der Browser schickt. Wurde
+    es übernommen, legte Bob mit einer präparierten JSON ein Gespräch in
+    Alices Verlauf an — und sein eigenes, fortgesetztes Gespräch tauchte bei
+    ihm nie auf. Derselbe Grundsatz wie beim Verlauf: was vom Client kommt,
+    ist keine Schranke.
+    """
+    web_ui, store = _history_web_ui(tmp_path)
+    session = SessionContext()
+    session.streamer = Mock()
+
+    updates = web_ui._on_load_conversation(
+        session,
+        _uploaded(tmp_path, persona="LEAH", app="web", user="alice"),
+        "bob",
+        {"leah": {"name": "LEAH", "description": "warm"}},
+        "Tippe",
+    )
+
+    assert store.list_conversations(user="alice") == []
+    assert [ref.persona for ref in store.list_conversations(user="bob")] == ["LEAH"]
+    session.streamer.set_user.assert_called_once_with("bob")
+    assert updates[PERSONA_OUTPUT_KEYS.index("meta_state")]["user"] == "bob"
+
+
 def test_a_rejected_upload_records_nothing(tmp_path):
     web_ui, store = _history_web_ui(tmp_path)
     session = SessionContext()
@@ -2520,6 +2582,7 @@ def test_a_rejected_upload_records_nothing(tmp_path):
     web_ui._on_load_conversation(
         session,
         _uploaded(tmp_path),  # Gast „Leah"
+        "local",
         {"leah": {"name": "LEAH", "description": "warm"}},
         "Tippe",
     )

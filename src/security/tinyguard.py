@@ -490,7 +490,18 @@ class BasicGuard:
 
     # ---- Public API -------------------------------------------------------
 
-    def check_input(self, text: str) -> SecurityResult:
+    def check_input(self, text: str, *, count_as_turn: bool = True) -> SecurityResult:
+        """Prüft einen Text gegen die Eingangsregeln.
+
+        ``count_as_turn=False`` ist für alles, was **keine Eingabe des Nutzers**
+        ist — abgerufener Fremdtext (:func:`context_verdict`). Der Text wird
+        dann nur an den Regeln gemessen; der Sitzungs-Lock wird weder gelesen
+        noch gesetzt noch heruntergezählt. Vorher lief beides über denselben
+        Zähler: ein Wikipedia-Ausschnitt, der eine Wrongdoing-Regel traf,
+        sperrte die nächsten Eingaben des Nutzers, und nach einem echten
+        Treffer verbrauchten die Schnipsel der Folgefrage den Lock, bevor die
+        Folgefrage selbst geprüft wurde.
+        """
         if not self.enabled:
             return self._ok()
 
@@ -499,12 +510,13 @@ class BasicGuard:
         # ("it's for a novel"). With the default (0 turns) only the matching
         # input is refused.
         if self.flags.get("wrongdoing_protection"):
-            if self._wrongdoing_lock_remaining > 0:
+            if count_as_turn and self._wrongdoing_lock_remaining > 0:
                 self._wrongdoing_lock_remaining -= 1
                 return self._bad("wrongdoing", "session_locked", "session_lock")
             m = self._first_match(self._wrong, text)
             if m:
-                self._wrongdoing_lock_remaining = self.wrongdoing_lock_turns
+                if count_as_turn:
+                    self._wrongdoing_lock_remaining = self.wrongdoing_lock_turns
                 return self._bad("wrongdoing", m[1], m[0])
 
         if self.flags.get("prompt_injection_protection"):
@@ -646,13 +658,16 @@ CONTEXT_BLOCKING_REASONS = frozenset({"prompt_injection", "wrongdoing"})
 def context_verdict(guard: BasicGuard | None, text: str) -> SecurityResult | None:
     """Der Befund, der abgerufenen Text aus dem Prompt hält — oder ``None``.
 
-    Trägt gegenüber :func:`context_rejection` zusätzlich den Regelnamen. Die
-    Eval-Suite braucht den, und sie darf ``check_input`` nicht ein zweites Mal
-    rufen: der Wrongdoing-Lock ist Sitzungszustand und würde mitzählen.
+    Trägt gegenüber :func:`context_rejection` zusätzlich den Regelnamen; die
+    Eval-Suite braucht den.
+
+    Fremdtext zählt nicht als Runde (``count_as_turn=False``): der
+    Wrongdoing-Lock ist Sitzungszustand des *Nutzers* und darf von einem
+    abgerufenen Artikel weder ausgelöst noch verbraucht werden.
     """
     if guard is None or not text:
         return None
-    result = guard.check_input(text)
+    result = guard.check_input(text, count_as_turn=False)
     if not result["ok"]:
         return result if result["reason"] in CONTEXT_BLOCKING_REASONS else None
     return guard.check_context_only(text)

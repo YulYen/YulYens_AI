@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+from core.context_injection import prompt_only, recorded_turns
 from core.context_summarizer import KarlSummarizationError
 from core.context_utils import (
     apply_heuristic_context_trim,
@@ -152,4 +153,11 @@ def test_shrink_dispatches_to_karl():
             chat_model_name="chat-model",
         )
     mock_karl.assert_called_once()
-    assert result == summary
+    # Der Prompt ist Karls Ergebnis; die Turns davor bleiben markiert im
+    # Verlauf, damit die Ablage sie behält.
+    assert prompt_only(result) == summary
+    assert [m["content"] for m in recorded_turns(result)] == [
+        "Alte Frage",
+        "Antwort",
+        "Neue Frage",
+    ]

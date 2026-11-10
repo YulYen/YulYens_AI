@@ -5,6 +5,12 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
+from core.context_injection import (
+    compressed_copy,
+    is_compressed,
+    prompt_only,
+    recorded_turns,
+)
 from core.context_summarizer import KarlSummarizationError, KarlSummarizer
 
 Message = dict[str, Any]
@@ -25,6 +31,11 @@ def _token_stats(messages: Sequence[Message]) -> tuple[int, int, int]:
 
     for message in messages:
         if not isinstance(message, dict):
+            continue
+        # Komprimierte Turns stehen noch im Verlauf, gehen aber nicht mehr an
+        # das Modell — sie zählen deshalb nicht zum Füllstand. Sonst gälte der
+        # Kontext nach jeder Kompression weiter als voll.
+        if is_compressed(message):
             continue
         content = message.get("content")
         if not content:
@@ -234,14 +245,23 @@ def shrink_history_for_context(
     chat_model_name: str,
     persona_name: str | None = None,
 ) -> list[Message]:
-    """Apply the configured context-management strategy and return the new history."""
+    """Apply the configured context-management strategy and return the new history.
+
+    **Gekürzt wird der Prompt, nicht das Gespräch.** Die Strategien entfernen
+    Nachrichten; was davon ein Turn des Gesprächs war, kommt hier markiert
+    (``COMPRESSED_KEY``) wieder an den Anfang der Liste. Der Verlauf ist das,
+    was die Oberflächen in die Ablage spiegeln — ohne diesen Schritt verlor ein
+    gespeichertes Gespräch mit der ersten Kompression seinen Anfang.
+    """
 
     context_management = require_context_management_config(cfg)
+    items = list(history)
+    active = prompt_only(items)
 
     if context_management["strategy"] == "karl":
         core_cfg = getattr(cfg, "core", None) or {}
-        return apply_karl_context_summary(
-            history,
+        shrunk = apply_karl_context_summary(
+            active,
             context_management["karl"],
             persona_options,
             llm_core=llm_core,
@@ -249,7 +269,38 @@ def shrink_history_for_context(
             persona_name=persona_name,
             keep_alive=int(core_cfg.get("keep_alive", 600)),
         )
+    else:
+        shrunk = apply_heuristic_context_trim(
+            active, persona_options, persona_name=persona_name
+        )
 
-    return apply_heuristic_context_trim(
-        history, persona_options, persona_name=persona_name
-    )
+    already_compressed = [message for message in items if is_compressed(message)]
+    return [*already_compressed, *_compressed_turns(active, shrunk), *shrunk]
+
+
+def _compressed_turns(active: list[Message], shrunk: list[Message]) -> list[Message]:
+    """Die Gesprächs-Turns, die eine Strategie aus ``active`` genommen hat.
+
+    Beide Strategien liefern „Kopf + das Ende des bisherigen Verlaufs": Karl
+    eine Zusammenfassung vor den letzten n Nachrichten, der Trim (allenfalls)
+    die erste Systemnachricht vor dem Rest. Wie viel vom Ende geblieben ist,
+    zeigt der gemeinsame Schluss beider Listen — verglichen über den Inhalt,
+    weil Karl mit Kopien arbeitet. Alles davor ist herausgefallen, bis auf
+    das, was als Kopf wieder drinsteht.
+
+    Markiert zurück kommt nur, was in der Ablage steht (``recorded_turns``):
+    Systemnachrichten und injizierter Fremdkontext sind Prompt-Material und
+    dürfen wirklich weg.
+    """
+    kept = 0
+    while (
+        kept < min(len(active), len(shrunk)) and active[-1 - kept] == shrunk[-1 - kept]
+    ):
+        kept += 1
+    head = shrunk[: len(shrunk) - kept]
+    dropped = [
+        message
+        for message in active[: len(active) - kept]
+        if not any(message is survivor for survivor in head)
+    ]
+    return [compressed_copy(message) for message in recorded_turns(dropped)]

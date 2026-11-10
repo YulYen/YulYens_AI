@@ -411,3 +411,79 @@ def test_the_default_directory_is_not_the_log_directory():
     """Der eigentliche Punkt dieser Runde, als Zusicherung."""
     assert DEFAULT_VOTES_DIR == "data"
     assert LEGACY_VOTES_DIR == "logs"
+
+
+# ---- Injizierter Fremdkontext zählt nicht mit (#60) -----------------------
+
+
+def _wiki_history():
+    """Ein Verlauf, wie ihn ein Turn mit Wiki-Treffer hinterlässt."""
+    from core.context_injection import injected_message
+
+    return [
+        {"role": "system", "content": "Nutze ausschließlich diesen Kontext."},
+        injected_message("«Kiwix ist ein Offline-Reader.»", "wiki"),
+        _bubble("user", "Was ist Kiwix?"),
+        _bubble("assistant", "Ein Offline-Reader."),
+        _bubble("user", "Und ZIM?"),
+        _bubble("assistant", "Das Dateiformat dazu."),
+    ]
+
+
+def test_injected_context_does_not_shift_the_store_index():
+    """Seit #60 steht Fremdtext als ``user`` im Verlauf — die Ablage lässt ihn weg.
+
+    ``store_index_of`` zählte ihn mit. Jeder Vote in einem Gespräch mit
+    Wiki- oder RSS-Kontext zeigte damit eine Nachricht zu weit nach hinten.
+    """
+    chat = [
+        _bubble("user", "Was ist Kiwix?"),
+        _bubble("assistant", "🕵️ PETER schlägt nach …"),
+        _bubble("assistant", "Ein Offline-Reader."),
+        _bubble("user", "Und ZIM?"),
+        _bubble("assistant", "Das Dateiformat dazu."),
+    ]
+    llm = _wiki_history()
+
+    assert store_index_of("Ein Offline-Reader.", 2, chat, llm) == 1
+    assert store_index_of("Das Dateiformat dazu.", 4, chat, llm) == 3
+
+
+def test_a_vote_after_a_wiki_turn_records_the_voted_answer(tmp_path):
+    """Die Folge des verschobenen Index: die *nächste Frage* stand als Antwort da.
+
+    Gegen die echte Ablage geprüft, nicht gegen eine Attrappe — der Fehler lag
+    genau im Zusammenspiel von ``sync`` (filtert) und Zählregel (filterte nicht).
+    """
+    from storage.store import SqliteStore
+
+    store = SqliteStore(tmp_path / "c.sqlite3")
+    conversation_id = store.start(user="yul", persona="PETER", model="m", app="web")
+    llm = _wiki_history()
+    store.sync(conversation_id, llm)
+    chat = [
+        _bubble("user", "Was ist Kiwix?"),
+        _bubble("assistant", "Ein Offline-Reader."),
+        _bubble("user", "Und ZIM?"),
+        _bubble("assistant", "Das Dateiformat dazu."),
+    ]
+    log = _log(
+        tmp_path,
+        store_loader=lambda cid, idx: store.load(cid)[1][idx]["content"],
+    )
+
+    assert log.record(
+        row=1,
+        liked=True,
+        value="",
+        chat_history=chat,
+        llm_history=llm,
+        meta={},
+        conversation_id=conversation_id,
+    )
+
+    (line,) = _lines(tmp_path / "votes.jsonl")
+    assert line["answer"] == "Ein Offline-Reader."
+    assert line["message_index"] == 1
+    _ref, stored = store.load(conversation_id)
+    assert stored[line["message_index"]]["content"] == line["answer"]

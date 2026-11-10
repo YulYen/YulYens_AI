@@ -1243,6 +1243,7 @@ class WebUI:
         self,
         session: SessionContext,
         upload_path: str | None,
+        user: str,
         persona_info: dict[str, dict[str, Any]],
         input_placeholder: str,
     ) -> tuple:
@@ -1269,7 +1270,11 @@ class WebUI:
             )
             return self._load_failure_updates(msg)
 
-        user = str(meta.get("user") or "")
+        # Der Eigentümer ist, wer hochlädt — nicht, wer in der Datei steht.
+        # `meta.user` kommt vom Client; übernommen, legte eine präparierte
+        # Datei ein Gespräch in den Verlauf eines *anderen* Nutzers, und das
+        # eigene fortgesetzte Gespräch fehlte im eigenen.
+        user = user or self._fallback_user()
         loaded_persona = str(persona["name"])
         session.bot = loaded_persona
         session.streamer = self.factory.get_streamer_for_persona(loaded_persona)
@@ -1284,6 +1289,7 @@ class WebUI:
 
         normalized_meta = dict(meta)
         normalized_meta.setdefault("app", "web")
+        normalized_meta["user"] = user
 
         return self._conversation_loaded_updates(
             persona_key,

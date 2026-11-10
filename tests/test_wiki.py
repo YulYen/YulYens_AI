@@ -111,6 +111,33 @@ def test_lookup_wiki_snippet_url_encodes_topic(monkeypatch):
     assert "/C%2B%2B" in captured["url"]
 
 
+def test_lookup_wiki_snippet_url_encodes_the_persona(monkeypatch):
+    """Eine Gast-Persona heißt, wie der Nutzer will — auch „Tom & Jerry".
+
+    Der Name stand roh in der Query. Ab dem ``&`` begann ein neuer Parameter,
+    der Hinweis im Chat nannte dann „Tom " als Persona; ein ``#`` schnitt den
+    Rest der Anfrage ganz ab.
+    """
+    from urllib.parse import parse_qs, urlparse
+
+    seen = {}
+
+    def _fake_get(url, timeout):
+        seen["url"] = url
+        return SimpleNamespace(status_code=404)
+
+    monkeypatch.setattr("wiki.lookup.requests.get", _fake_get)
+    finder = SimpleNamespace(find_keywords=lambda _q: ["Berlin"])
+
+    lookup_wiki_snippet(
+        "Frage", "Tom & Jerry #1", finder, "offline", 8042, 100, (1, 1), 1
+    )
+
+    query = parse_qs(urlparse(seen["url"]).query)
+    assert query["persona"] == ["Tom & Jerry #1"]
+    assert query["online"] == ["0"]
+
+
 def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     """A config reset with a language change is reflected in the wiki hints."""
 

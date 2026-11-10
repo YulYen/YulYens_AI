@@ -204,3 +204,14 @@ Und ein Nachspann darf den Hauptgang nicht mitnehmen: die Fazit-Phase liegt in
 einem `try`, weil sonst eine Ausnahme darin den Schluss-Yield überspringt — die
 Eingabe bliebe gesperrt und die vier Antworten wären für einen Fehler in der
 Zugabe verloren.
+
+### ⚠️ Ein laufender Stream bindet seinen Streamer am Anfang (#87)
+
+`stream_reply` las `session.streamer` am Ende noch einmal, um aufzuzeichnen.
+Die Sitzung kann bis dahin weitergezogen sein: „Neues Gespräch" setzt den
+Kill-Switch, der alte Generator bemerkt ihn aber erst beim nächsten Token —
+und bis das erste Token kommt, vergehen Sekunden. Wählte der Nutzer in der
+Zeit eine andere Persona, schrieb der alte Stream Frage und Teilantwort in
+deren frisch angelegtes Gespräch. Der Streamer wird deshalb einmal gebunden
+und bis zum Schluss benutzt; dieselbe Überlegung wie beim Kill-Switch, der
+über Identität geprüft wird.

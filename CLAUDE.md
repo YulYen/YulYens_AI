@@ -221,6 +221,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Die Rollentrennung (#60) ist kein Schutz** — ein 8B-Modell befolgt
   eingeschleuste Anweisungen unabhängig von der Rolle. Was wirkt, ist der Guard,
   und der fängt an echten ZIM-Artikeln nur 6 von 33 Umformulierungen.
+- **Fremdtext zählt nicht als Runde:** `check_input(text, count_as_turn=False)`
+  — sonst setzt oder verbraucht ein Wikipedia-Ausschnitt den Wrongdoing-Lock.
 - **Neue Regel: erst fragen, ob der Nutzer das darf.** Wenn ja (Persona
   umdefinieren, Antwortformat vorgeben), gehört sie in `check_context_only`.
 - **Neue Injection-Regel = Gegenprobe daneben** (`ok_…` in
@@ -251,13 +253,17 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Die Oberfläche besitzt den Gesprächsstand, die Ablage spiegelt ihn.**
   `stream()` schreibt nur den JSONL-Mitschnitt; wer einen **neuen Antwortweg**
   baut, ruft `record_conversation(messages)`, sonst bleibt er spurlos.
+- **Kompression markiert, sie löscht nicht (#87).** Der Verlauf ist Prompt
+  *und* Gespräch: wer den Prompt meint, fragt `prompt_only`, wer in der Ablage
+  zählt, `recorded_turns` — nie den rohen Verlauf nach Rolle filtern.
 - **Ask-All und Self-Talk: offen (#77).** Der Code zeichnet seit #59 auf
   (`app: ask-all`/`self-talk`), eine Entscheidung vom 2026-08-05 sagt
   „bewusst nicht". Bis #77 entschieden ist, auf keine der beiden Seiten bauen.
 - **Ohne Anmeldung zeichnet die WebUI nichts auf (#72)** — `NullStore`; die
   Verlauf-Karte hängt an `store.records` und kann `None` sein.
 - **Die WebUI setzt bei `load()`/`delete()`/`search()` immer `user`** — die
-  Auswahl im Dropdown ist keine Schranke. Fremd = nicht existent.
+  Auswahl im Dropdown ist keine Schranke. Fremd = nicht existent. Dasselbe
+  gilt für den Upload: Eigentümer ist die Sitzung, nie `meta.user` der Datei.
 - **Migrationen nur anhängen**, jeder Schritt in `BEGIN`/`COMMIT`. Ein
   optionaler Schritt (`_OPTIONAL_MIGRATIONS`, z. B. FTS5) hält die Kette an,
   statt die ganze Ablage zum `NullStore` zu machen.
@@ -266,6 +272,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   `data/feedback_votes.jsonl`, nicht in `logs/` (das ist wegwerfbar).
 - **Anmeldung:** `provider: local` ohne auflösbaren Nutzer bricht den Start ab;
   `header` nur hinter einem Proxy, der den Header von außen entfernt.
+  Geheimnisse vergleicht `core.utils.constant_time_equals` (Bytes) — das nackte
+  `hmac.compare_digest` wirft bei einem Umlaut.
 
 ### WebUI und Gradio → [webui.md](docs/entwurf/webui.md)
 
@@ -303,7 +311,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   `get_streamer_for_orchestra`, nie `get_streamer_for_persona` (das ist das
   Solo mit eigenem Modell); der Gast bekommt nie ein eigenes Modell.
 - **Mail-Adapter:** Antwort an `From`, nie `Reply-To`; **erst markieren, dann
-  senden**; ohne `allowed_senders` kein Start; einmal beim Lesen kürzen.
+  senden** — und den IMAP-Status prüfen, `imaplib` wirft bei `NO` nicht; ohne
+  `allowed_senders` kein Start; einmal beim Lesen kürzen.
 - **API:** `model` = Persona; `api_key` gilt für **alle** Endpunkte
   (`check_api_access`); OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
   Sampling-Parameter werden ignoriert.
