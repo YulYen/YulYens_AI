@@ -184,3 +184,27 @@ zwischen Eval-Suite und dem Antwortweg, den sie benutzt:
   Ablage. Mit aktiver Ablage standen nach jedem Lauf sämtliche Korpusfragen als
   Gespräche von `local` im Verlauf. `evals/cli.py` schaltet `storage.enabled`
   für den Prozess ab.
+
+### Die Nähte, die keinen Test hatten (#96)
+
+Drei Stellen standen nach den Fehlersuchen #87/#95 in den PRs unter „Nicht
+geprüft", obwohl kein fehlendes Werkzeug schuld war — sie waren schlicht nicht
+testbar gebaut:
+
+- **Der echte Start.** `launch.main()` ist die Stelle, an der Config, Factory,
+  Anmeldung und Oberfläche zusammenkommen, und hatte keinen Test.
+  `tests/test_launch_start.py` startet `python src/launch.py` als Prozess mit
+  der ausgelieferten Config (Dummy-Backend, alles Äußere aus) und prüft die
+  beiden Abbruchpfade der Anmeldung: Exit 4, lesbare Meldung, kein Stacktrace.
+  Als Subprozess, weil genau das die Aussage ist — so startet der Betreiber.
+  Kostet rund 3,5 s je Fall; wer einen weiteren Startpfad absichern will,
+  hängt ihn an `_start()`.
+- **Eine Eingabe im Terminal.** Die Schleife in `TerminalUI.launch()` hing an
+  `input()`. Ihr Rumpf ist jetzt `handle_input(text) -> bool` (`False` beendet
+  die Sitzung) und damit ohne Attrappe prüfbar: Kommandos, leere Eingabe und
+  die Reihenfolge Guard → Wiki → Modell.
+- **Ask-All mit abgelehnter Frage** — gegen einen echten Guard aus der Factory.
+
+Dazu läuft der Browser-Rauchtest jetzt auch in der Sandbox (siehe
+[arbeitsweise.md](arbeitsweise.md)). Die Suche nach dem mitgelieferten Chromium
+im Test griff übrigens ins Leere: der Ordner heißt inzwischen `chrome-linux64`.

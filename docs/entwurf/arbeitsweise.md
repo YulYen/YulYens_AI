@@ -128,6 +128,14 @@ die man beim Anfassen leicht umdreht:
    die sonst sauber übersprungen werden; der Download bei jedem Start wäre der
    schlechtere Tausch.
 
+4. **Playwright installiert er in der Version des Node-Pakets** (#96). Die
+   Sandbox bringt Chromium mit, aber nur das Node-Paket dazu; der Browser-Test
+   ist Python und wurde deshalb übersprungen — fünf PRs in Folge stand
+   `make test-browser` unter „Nicht geprüft". Die Version wird *abgelesen*
+   (`require('playwright/package.json').version`), nicht festgeschrieben: ein
+   Python-Paket anderer Version erwartet eine andere Browser-Revision und
+   findet den vorhandenen Build nicht. Kein Browser-Download, ein paar MB.
+
 **`.gitignore` hatte `.claude/`** — der Hook wäre also stumm nicht mitgekommen.
 Jetzt steht dort `.claude/*` mit zwei Ausnahmen: aus einem ausgeschlossenen
 *Verzeichnis* lassen sich einzelne Dateien nicht zurückholen, git steigt gar

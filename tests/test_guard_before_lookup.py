@@ -149,3 +149,66 @@ def test_the_openai_endpoint_still_looks_up_a_harmless_question(lookups):
     )
 
     assert lookups == [HARMLESS]
+
+
+# ---- Terminal --------------------------------------------------------------
+
+
+def _terminal(guard=None):
+    from pathlib import Path
+
+    from config.texts import Texts
+    from ui.terminal_ui import TerminalUI
+
+    catalog = Texts(
+        language="de", locales_dir=Path(__file__).resolve().parents[1] / "locales"
+    )
+    cfg = SimpleNamespace(
+        texts=catalog,
+        t=catalog.format,
+        core={"model_name": "dummy"},
+        ui={},
+        context_management={"strategy": "heuristic"},
+    )
+    ui = TerminalUI(
+        factory=None,
+        config=cfg,
+        wiki=WikiLookup(mode="offline", keyword_finder=object()),
+    )
+    ui.bot = "PETER"
+    ui.streamer = _streamer(guard or _guard())
+    return ui
+
+
+def test_the_terminal_does_not_look_up_a_refused_input(lookups, capsys):
+    ui = _terminal()
+
+    assert ui.handle_input(ATTACK) is True
+
+    assert lookups == []
+    assert "abgelehnt" in capsys.readouterr().out
+    assert ui.history[-1]["content"].startswith("abgelehnt")
+
+
+def test_the_terminal_still_looks_up_a_harmless_question(lookups, capsys):
+    ui = _terminal()
+
+    ui.handle_input(HARMLESS)
+
+    assert lookups == [HARMLESS]
+    assert "🕵️ schlägt nach" in capsys.readouterr().out
+    assert ui.history[-1]["content"].startswith("ECHO:")
+
+
+def test_an_empty_line_in_the_terminal_asks_nothing(lookups):
+    ui = _terminal()
+
+    assert ui.handle_input("") is True
+
+    assert lookups == []
+    assert ui.history == []
+
+
+@pytest.mark.parametrize("word", ["exit", "quit", "EXIT"])
+def test_exit_ends_the_terminal_session(word, capsys):
+    assert _terminal().handle_input(word) is False
