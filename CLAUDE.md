@@ -129,7 +129,7 @@ faster-whisper (STT). Versionen und Pins: `requirements.txt`,
 | `src/launch.py` | Einstieg (`--doctor`, `--list-ensembles`, `--version`) |
 | `src/core/` | LLM-Abstraktion, Streamer + Moderator, Orchestrator (Ask-All), Fazit, AppFactory, Kontext-Kanäle, Karl |
 | `src/config/` | Config-Singleton, Ensemble-Loader, pydantic-Schema, i18n |
-| `src/ui/` | WebUI (aufgeteilt in Layout/Format/Chat/Features/Events), Terminal, Sitzung, Feedback, Verlauf, Self-Talk |
+| `src/ui/` | WebUI (aufgeteilt in Layout/Format/Chat/Ask-All/Features/Events), Terminal, Sitzung, Feedback, Verlauf, Self-Talk |
 | `src/api/` | FastAPI (`/ask`, `/health`, `/healthz`) + OpenAI-kompatibles `/v1` |
 | `src/security/tinyguard.py` | BasicGuard: benannte Regeln für Eingang, Kontext und Ausgang |
 | `src/wiki/`, `src/rss/` | die zwei Kontextquellen |

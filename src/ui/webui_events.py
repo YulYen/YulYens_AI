@@ -341,7 +341,7 @@ def bind_events(
     )
 
     ask_all_submit_evt = ask_all_submit.click(
-        fn=ui._on_submit_ask_all,
+        fn=ui.ask_all.submit,
         inputs=[
             session_state,
             ask_all_question,
@@ -353,7 +353,7 @@ def bind_events(
     )
 
     ask_all_question_evt = ask_all_question.submit(
-        fn=ui._on_submit_ask_all,
+        fn=ui.ask_all.submit,
         inputs=[
             session_state,
             ask_all_question,
