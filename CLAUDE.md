@@ -95,7 +95,7 @@ Details: [versionierung.md](docs/entwurf/versionierung.md).
 | Clone | **flach** — `git tag` schweigt, `git log --reverse` lügt (Hook vertieft) | vollständig |
 | Ollama, Modell | nicht da → `@pytest.mark.ollama` wird übersprungen | da |
 | spaCy `de_core_news_lg` | nicht da → Keyword-/Wiki-Tests übersprungen | da |
-| Playwright | Paket fehlt, **Chromium liegt aber** unter `/opt/pw-browsers` | nach Bedarf |
+| Playwright | Hook installiert das Paket passend zum Chromium unter `/opt/pw-browsers` → **`make test-browser` läuft** | nach Bedarf |
 | Kiwix/ZIM, Piper, faster-whisper, echter Mailserver, Windows | nichts davon | teils |
 | `git push` | Branches und `main` ja, **Tag-Refs nein** (403 vom Gateway) | alles |
 
@@ -104,6 +104,8 @@ Details: [versionierung.md](docs/entwurf/versionierung.md).
   `git fetch --unshallow origin`. `v1.0.0` wäre fast überschrieben worden.
 - Der Hook `.claude/hooks/session-start.sh` läuft **nur remote**, endet
   **immer mit 0** und holt das spaCy-Modell **bewusst nicht**.
+- **Wer die WebUI anfasst, fährt `make test-browser` selbst** — auch in der
+  Sandbox, es gehört nicht mehr unter „Nicht geprüft".
 - Was die Sandbox nicht prüfen kann, gehört in „Nicht geprüft" der PR-Vorlage.
 
 Details: [arbeitsweise.md](docs/entwurf/arbeitsweise.md).
@@ -316,7 +318,7 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 ```bash
 make check          # lint → lint-imports → types → test; vor jedem Push
 make test           # Suite ohne slow/ollama/browser
-make test-browser   # laufende WebUI im echten Chromium (~100 s)
+make test-browser   # laufende WebUI im echten Chromium (~20 s in der Sandbox)
 make evals          # Guard-Red-Team ohne Modell
 make bench          # Stoppuhr, braucht Ollama
 ```

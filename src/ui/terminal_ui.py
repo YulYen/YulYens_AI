@@ -424,78 +424,88 @@ class TerminalUI:
             user_input = self.prompt_user()
             logging.debug("[Terminal] User input received (%d chars)", len(user_input))
             print()  # add a small blank line after the input
-
-            # Leere Eingabe: nichts fragen, statt einen Modelllauf zu starten.
-            if not user_input:
-                continue
-
-            # Exit
-            if user_input.lower() in ("exit", "quit"):
-                self.print_exit()
+            if not self.handle_input(user_input):
                 break
 
-            # Save conversation
-            if user_input.lower().startswith("/save"):
-                save_target = user_input[len("/save") :].strip()
-                self._handle_save_command(save_target)
-                continue
+    def handle_input(self, user_input: str) -> bool:
+        """Verarbeitet **eine** Eingabe; ``False`` beendet die Sitzung.
 
-            # Clear / start a new conversation
-            if user_input.lower() == "clear":
-                if not self._start_dialog_flow():
-                    break
-                continue
+        Aus der Schleife herausgelöst, damit das, was mit einer Eingabe
+        passiert, ohne `input()`-Attrappe prüfbar ist: Kommandos, die leere
+        Eingabe, und die Reihenfolge Guard → Wiki → Modell (#88). Vorher stand
+        all das in `launch()` und hatte keinen Test.
+        """
 
-            # Briefing: summarize the configured RSS feeds
-            if user_input.lower() == "/briefing":
-                if self.briefing_enabled:
-                    self._handle_briefing_command()
-                continue
+        # Leere Eingabe: nichts fragen, statt einen Modelllauf zu starten.
+        if not user_input:
+            return True
 
-            # Quellen des zuletzt injizierten Wiki-Kontexts (#32a).
-            # Beide Schreibweisen, damit das Kommando auch in der englischen
-            # Locale greift — die Kommandos selbst sind nicht übersetzt.
-            if user_input.lower() in ("/quellen", "/sources"):
-                self._handle_sources_command()
-                continue
+        # Exit
+        if user_input.lower() in ("exit", "quit"):
+            self.print_exit()
+            return False
 
-            # Volltextsuche über die eigenen Gespräche (#49). Beide
-            # Schreibweisen wie bei /quellen — Kommandos sind nicht übersetzt.
-            if user_input.lower().startswith(("/suche", "/search")):
-                self._handle_search_command(
-                    user_input.split(maxsplit=1)[1] if " " in user_input else ""
+        # Save conversation
+        if user_input.lower().startswith("/save"):
+            save_target = user_input[len("/save") :].strip()
+            self._handle_save_command(save_target)
+            return True
+
+        # Clear / start a new conversation
+        if user_input.lower() == "clear":
+            if not self._start_dialog_flow():
+                return False
+            return True
+
+        # Briefing: summarize the configured RSS feeds
+        if user_input.lower() == "/briefing":
+            if self.briefing_enabled:
+                self._handle_briefing_command()
+            return True
+
+        # Quellen des zuletzt injizierten Wiki-Kontexts (#32a).
+        # Beide Schreibweisen, damit das Kommando auch in der englischen
+        # Locale greift — die Kommandos selbst sind nicht übersetzt.
+        if user_input.lower() in ("/quellen", "/sources"):
+            self._handle_sources_command()
+            return True
+
+        # Volltextsuche über die eigenen Gespräche (#49). Beide
+        # Schreibweisen wie bei /quellen — Kommandos sind nicht übersetzt.
+        if user_input.lower().startswith(("/suche", "/search")):
+            self._handle_search_command(
+                user_input.split(maxsplit=1)[1] if " " in user_input else ""
+            )
+            return True
+
+        # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
+        # Erst der Guard, dann das Netz (#88): was `stream()` gleich
+        # ablehnt, löst keinen Abruf aus.
+        guard = getattr(self.streamer, "guard", None)
+        if self.wiki.keyword_finder and not input_refused(guard, user_input):
+            wiki_hints, contexts = self.wiki.snippets(user_input, self.bot or "", guard)
+
+            self.last_wiki_snippets = list(contexts)
+
+            # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
+            for wiki_hint in wiki_hints:
+                if wiki_hint:
+                    print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
+
+            # Insert the snippet as system context (guardrail plus context)
+            if contexts:
+                inject_wiki_context(
+                    self.history, contexts, getattr(self.streamer, "guard", None)
                 )
-                continue
 
-            # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
-            # Erst der Guard, dann das Netz (#88): was `stream()` gleich
-            # ablehnt, löst keinen Abruf aus.
-            guard = getattr(self.streamer, "guard", None)
-            if self.wiki.keyword_finder and not input_refused(guard, user_input):
-                wiki_hints, contexts = self.wiki.snippets(
-                    user_input, self.bot or "", guard
-                )
+        # --- (2) Append the user question to history ---
+        self.history.append({"role": "user", "content": user_input})
 
-                self.last_wiki_snippets = list(contexts)
+        self._ensure_context_headroom()
 
-                # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
-                for wiki_hint in wiki_hints:
-                    if wiki_hint:
-                        print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
-
-                # Insert the snippet as system context (guardrail plus context)
-                if contexts:
-                    inject_wiki_context(
-                        self.history, contexts, getattr(self.streamer, "guard", None)
-                    )
-
-            # --- (2) Append the user question to history ---
-            self.history.append({"role": "user", "content": user_input})
-
-            self._ensure_context_headroom()
-
-            # --- (3) + (4) Stream the answer and record it in history ---
-            self._stream_and_record_reply()
+        # --- (3) + (4) Stream the answer and record it in history ---
+        self._stream_and_record_reply()
+        return True
 
     def _stream_and_record_reply(self) -> None:
         """Streams the reply token by token, records it and finishes cleanly."""

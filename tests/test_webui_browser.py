@@ -41,7 +41,11 @@ pytestmark = pytest.mark.browser
 # Der Container bringt Chromium mit, aber nicht zwingend in der Revision, die
 # das installierte Playwright erwartet. Erst den mitgelieferten Build suchen,
 # sonst Playwright selbst entscheiden lassen.
-_BUNDLED_CHROMIUM = sorted(glob.glob("/opt/pw-browsers/chromium-*/chrome-linux/chrome"))
+# `chrome-linux*`: der Ordner heißt je nach Playwright-Version `chrome-linux`
+# oder `chrome-linux64` — mit dem festen Namen griff die Suche ins Leere.
+_BUNDLED_CHROMIUM = sorted(
+    glob.glob("/opt/pw-browsers/chromium-*/chrome-linux*/chrome")
+)
 
 
 def _launch_browser(playwright):

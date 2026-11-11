@@ -50,6 +50,22 @@ else
     || echo "[session-start] pip install fehlgeschlagen — 'make setup' von Hand nachholen."
 fi
 
+# --- 3. Playwright passend zum mitgelieferten Chromium -----------------------
+# Die Sandbox bringt Chromium unter /opt/pw-browsers mit, aber nur das
+# Node-Paket dazu — `make test-browser` wurde deshalb übersprungen, und jede
+# WebUI-Änderung stand im PR unter "Nicht geprüft". Das Python-Paket muss
+# dieselbe Version haben wie das Node-Paket: eine andere erwartet eine andere
+# Browser-Revision und findet den vorhandenen Build nicht. Die Version wird
+# deshalb abgelesen, nicht festgeschrieben. Ein paar MB, kein Browser-Download.
+if [ -d /opt/pw-browsers ] && ! python -c "import playwright" >/dev/null 2>&1; then
+  pw_version="$(cd / && node -e "console.log(require('playwright/package.json').version)" 2>/dev/null)"
+  if [ -n "$pw_version" ]; then
+    echo "[session-start] Installiere playwright==$pw_version (passend zum Chromium der Sandbox)…"
+    python -m pip install -q "playwright==$pw_version" \
+      || echo "[session-start] playwright nicht installierbar — 'make test-browser' wird übersprungen."
+  fi
+fi
+
 # Das spaCy-Modell (~575 MB) wird **nicht** geholt. Es schaltet nur die
 # Keyword-/Wiki-Tests frei, die sonst sauber übersprungen werden — der
 # Download bei jedem Sitzungsstart wäre der schlechtere Tausch.
