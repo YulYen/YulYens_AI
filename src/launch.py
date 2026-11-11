@@ -11,8 +11,10 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import NoReturn
 
 # Core and configuration
+from auth.provider import AuthConfigError
 from config.config_singleton import Config
 
 # Logging setup
@@ -161,7 +163,13 @@ def main():
     # konfigurierten Takt — und ein Chat-Turn wartet nie darauf.
     factory.get_rss_cache().start()
 
-    ui = factory.get_ui()
+    # Schon der Bau der WebUI fragt nach der Anmeldung — ein unbekannter
+    # `ui.web.auth.provider` bricht deshalb hier ab (#89), nicht erst beim
+    # Start des Servers.
+    try:
+        ui = factory.get_ui()
+    except AuthConfigError as exc:
+        _exit_for_unusable_auth(exc)
     api_provider = factory.get_api_provider()
     email_cfg = getattr(cfg, "email_adapter", {})
     email_provider = (
@@ -185,17 +193,22 @@ def main():
         threading.Event().wait()
         return
     else:
-        from auth.provider import AuthConfigError
-
         try:
             ui.launch()  # Terminal UI or Web UI
         except AuthConfigError as exc:
-            # Eine konfigurierte, aber unbenutzbare Anmeldung ist ein
-            # Konfigurationsfehler, kein Absturz — also lesbar melden statt
-            # einen Stacktrace zu zeigen.
-            print(f"[Yul Yens AI] Anmeldung nicht benutzbar: {exc}", file=sys.stderr)
-            logging.error("[AUTH] Start abgebrochen: %s", exc)
-            sys.exit(4)
+            _exit_for_unusable_auth(exc)
+
+
+def _exit_for_unusable_auth(exc: Exception) -> NoReturn:
+    """Eine konfigurierte, aber unbenutzbare Anmeldung beendet den Start.
+
+    Das ist ein Konfigurationsfehler, kein Absturz — also lesbar melden statt
+    einen Stacktrace zu zeigen. Zwei Stellen landen hier: der Bau der WebUI
+    (unbekannter Provider, #89) und ihr Start (`local` ohne auflösbaren Nutzer).
+    """
+    print(f"[Yul Yens AI] Anmeldung nicht benutzbar: {exc}", file=sys.stderr)
+    logging.error("[AUTH] Start abgebrochen: %s", exc)
+    sys.exit(4)
 
 
 def _load_config_for_cli(config_path: str | None) -> "Config":

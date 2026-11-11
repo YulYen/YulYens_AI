@@ -51,6 +51,8 @@ ui:
     # ACHTUNG: Basic-Auth geht über HTTP im Klartext. Ohne TLS ist das eine
     # Trennung von Nutzern, kein Schutz gegen Mitlesen.
     auth:
+      # Ein unbekannter Wert (Tippfehler wie "lokal") bricht den Start ab —
+      # er fällt nicht auf "disabled" zurück.
       provider: "disabled"   # disabled | local | header
       # provider: local — Passwörter als env:NAME, nicht im Klartext hier:
       users: {}

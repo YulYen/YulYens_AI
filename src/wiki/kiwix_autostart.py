@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import subprocess
 import time
@@ -52,9 +53,10 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
         logger.warning("Kiwix autostart requested, but kiwix_exe/zim_path not set.")
         return False
 
+    command = [exe, f"--port={port}", *_address_argument(host), zim]
     try:
-        subprocess.Popen([exe, f"--port={port}", zim])
-        logger.info("Starting kiwix-serve: %s --port %s %s", exe, port, zim)
+        subprocess.Popen(command)
+        logger.info("Starting kiwix-serve: %s", " ".join(command))
     except Exception as e:
         logger.error("Failed to start kiwix-serve: %s", e)
         return False
@@ -68,3 +70,24 @@ def ensure_kiwix_running_if_offlinemode_and_autostart(cfg):
 
     logger.warning("Kiwix did not become ready within %s s.", timeout_s)
     return False
+
+
+def _address_argument(host) -> list[str]:
+    """`--address=<ip>`, damit kiwix-serve nur dort lauscht, wo die Config es will.
+
+    Ohne das Argument bindet kiwix-serve an **alle** Schnittstellen — die
+    Offline-Wikipedia war damit im ganzen LAN lesbar, obwohl
+    `wiki.offline.host` auf `127.0.0.1` steht (#83). `--address` nimmt nur
+    eine IP: steht in der Config ein Name wie `localhost`, bleibt das Argument
+    weg und eine Warnung sagt, warum der Server dann überall lauscht.
+    """
+    try:
+        ipaddress.ip_address(str(host))
+    except ValueError:
+        logger.warning(
+            "wiki.offline.host ist '%s' und keine IP-Adresse — kiwix-serve wird "
+            "ohne --address gestartet und lauscht auf allen Schnittstellen.",
+            host,
+        )
+        return []
+    return [f"--address={host}"]
