@@ -25,6 +25,7 @@ import sys
 import threading
 import time
 import warnings
+from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType
 from unittest.mock import patch
@@ -96,14 +97,17 @@ def _fake_piper_module():
     return module
 
 
-@pytest.fixture(scope="module")
-def live_app(tmp_path_factory):
-    """Startet die echte App auf einem freien Port und gibt ihre URL zurück."""
+@contextmanager
+def _running_app(workdir, **storage_overrides):
+    """Startet die echte App auf einem freien Port und gibt ihre URL zurück.
+
+    ``storage_overrides`` ergänzt die `storage`-Sektion — damit lässt sich
+    dieselbe App einmal ohne Ablage (die ausgelieferte Lage, #72) und einmal
+    mit gemeinsamer Ablage fahren, ohne den Aufbau zu doppeln.
+    """
     from config.config_singleton import Config
     from core.dummy_llm_core import DummyLLMCore
     from core.factory import AppFactory
-
-    workdir = tmp_path_factory.mktemp("webui")
 
     Config.reset_instance()
     cfg = Config("config.yaml")
@@ -126,7 +130,12 @@ def live_app(tmp_path_factory):
     # Ablage an, aber ohne Anmeldung: genau die Lage aus #72, in der die
     # Verlauf-Karte wegfallen muss.
     cfg.override(
-        "storage", {"enabled": True, "path": str(workdir / "data" / "conv.sqlite3")}
+        "storage",
+        {
+            "enabled": True,
+            "path": str(workdir / "data" / "conv.sqlite3"),
+            **storage_overrides,
+        },
     )
 
     captured: dict = {}
@@ -185,6 +194,13 @@ def live_app(tmp_path_factory):
 
 
 @pytest.fixture(scope="module")
+def live_app(tmp_path_factory):
+    """Die App, wie sie ausgeliefert wird: ohne Anmeldung, also ohne Ablage."""
+    with _running_app(tmp_path_factory.mktemp("webui")) as app:
+        yield app
+
+
+@pytest.fixture(scope="module")
 def browser():
     with sync_playwright() as playwright:
         instance = _launch_browser(playwright)
@@ -194,8 +210,8 @@ def browser():
             instance.close()
 
 
-@pytest.fixture
-def page(browser, live_app):
+@contextmanager
+def _open_page(browser, url):
     # `locale` festnageln: Gradio 6 übersetzt sein *eigenes* Bedienchrom nach
     # der Browsersprache — der Daumen heißt auf einem deutschen System
     # „Gefällt mir", auf einem englischen „Like". Ohne diese Zeile hängt der
@@ -208,12 +224,18 @@ def page(browser, live_app):
     page = context.new_page()
     # Nicht `networkidle`: Gradio hält eine Verbindung offen, der Zustand tritt
     # nie ein. Stattdessen auf ein Element warten, das die App gebaut hat.
-    page.goto(live_app.url, wait_until="domcontentloaded")
+    page.goto(url, wait_until="domcontentloaded")
     page.wait_for_selector(".persona-card", timeout=30_000)
     try:
         yield page
     finally:
         context.close()
+
+
+@pytest.fixture
+def page(browser, live_app):
+    with _open_page(browser, live_app.url) as opened:
+        yield opened
 
 
 def _pick_persona(page, name="LEAH"):
@@ -474,3 +496,88 @@ def test_the_real_start_path_hands_over_the_load_script(live_app):
     assert kwargs.get("js"), "das Lade-Skript erreicht launch() nicht"
     assert "show_api" not in kwargs, "show_api gibt es in Gradio 6 nicht mehr"
     assert "api" not in (kwargs.get("footer_links") or [])
+
+
+# ---- Frage an alle (#20/#23) ----------------------------------------------
+
+
+def test_ask_all_streams_an_answer_from_every_persona(page):
+    """Der Weg, der im Browser bisher ungeprüft war (#97 zog ihn in ein eigenes Modul).
+
+    Vier Worker schreiben parallel in **eine** Markdown-Komponente; ob deren
+    Yields ankommen und die Eingabe danach wieder frei ist, entscheidet das
+    Frontend — in-process steht am Ende nur ein Tupel aus `gr.update`.
+    """
+    page.get_by_role("button", name="Frage an alle", exact=False).first.click()
+    question = page.get_by_placeholder("Stelle eine Frage an alle Personas …")
+    expect(question).to_be_visible(timeout=15_000)
+
+    question.fill("Was meint ihr")
+    question.press("Enter")
+
+    # `.prose` aus demselben Grund wie bei `.chat-status`: die Klasse sitzt am
+    # Block *und* am Markdown darin.
+    results = page.locator(".prose.ask-all-results")
+    for persona in ("LEAH", "DORIS", "PETER", "POPCORN"):
+        expect(results).to_contain_text(persona, timeout=30_000)
+    expect(results.get_by_text("ECHO: Was meint ihr")).to_have_count(4, timeout=30_000)
+    # Die Runde ist erst vorbei, wenn die Eingabe wieder bedienbar ist.
+    expect(question).to_be_editable(timeout=30_000)
+
+
+# ---- Verlauf mit Ablage (#25/#54) -----------------------------------------
+
+
+@pytest.fixture(scope="module")
+def recording_app(tmp_path_factory):
+    """Dieselbe App mit gemeinsamer Ablage — die Lage, in der es einen Verlauf gibt.
+
+    Bewusst als **letzte** App des Moduls: beide laufen bis zum Modulende, und
+    die Config ist ein Singleton. Tests gegen `live_app` stehen deshalb alle
+    weiter oben.
+    """
+    with _running_app(
+        tmp_path_factory.mktemp("webui-store"), shared_without_login=True
+    ) as app:
+        yield app
+
+
+def test_a_conversation_can_be_reopened_and_continued_from_the_history(
+    browser, recording_app
+):
+    """Aufzeichnen, wiederfinden, fortsetzen — durch die echte Oberfläche.
+
+    Die Kette hat drei Nähte, die sich in dieser Woche alle geändert haben:
+    die Ablage spiegelt den Verlauf (#59/#87), der Verlauf-Handler lädt mit
+    dem Nutzer der Sitzung, und das Fortsetzen schreibt in **dasselbe**
+    Gespräch statt in ein neues. Geprüft wird am Ende gegen die Datei.
+    """
+    from storage.store import SqliteStore
+
+    with _open_page(browser, recording_app.url) as page:
+        _pick_persona(page)
+        _ask(page, "Merke dir das")
+        expect(page.get_by_text("ECHO: Merke dir das")).to_be_visible(timeout=30_000)
+
+        page.get_by_role("button", name="Neue Unterhaltung", exact=False).first.click()
+        page.get_by_role("button", name="Verlauf", exact=False).first.click()
+        page.get_by_label("Gespräch").click()
+        page.get_by_role("option", name=re.compile("Merke dir das")).first.click()
+        page.get_by_role("button", name="Öffnen", exact=False).first.click()
+
+        expect(page.get_by_text("ECHO: Merke dir das")).to_be_visible(timeout=15_000)
+        _ask(page, "Und weiter")
+        expect(page.get_by_text("ECHO: Und weiter")).to_be_visible(timeout=30_000)
+
+    store = SqliteStore(recording_app.workdir / "data" / "conv.sqlite3")
+    conversations = store.list_conversations()
+    with_messages = [ref for ref in conversations if ref.message_count]
+    assert len(with_messages) == 1, "Fortsetzen darf kein zweites Gespräch anlegen"
+    _ref, messages = store.load(with_messages[0].id)
+    # `strip()`: der Test-Stream liefert Wörter mit angehängtem Leerzeichen.
+    assert [m["content"].strip() for m in messages] == [
+        "Merke dir das",
+        "ECHO: Merke dir das",
+        "Und weiter",
+        "ECHO: Und weiter",
+    ]

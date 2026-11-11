@@ -57,6 +57,17 @@ Zwei Dinge, die beim Bauen wehtaten und beim nächsten Mal Zeit sparen:
   deutsch. Nebenbei der Grund, warum der Anker im Regex zählt — „Gefällt mir"
   ist ein Präfix von „Gefällt mir nicht".
 
+**Seit #98 fährt er auch Ask-All und den Verlauf.** Zwei Fälle, mehr nicht:
+„Frage an alle" bis alle vier Antworten da sind und die Eingabe wieder frei
+ist, und die Kette aufzeichnen → Verlauf öffnen → fortsetzen, am Ende gegen die
+SQLite-Datei geprüft (ein Gespräch, vier Nachrichten). Für den Verlauf läuft
+eine **zweite** App mit `storage.shared_without_login` — die ausgelieferte Lage
+hat ohne Anmeldung keine Ablage (#72). Der App-Start ist dafür ein
+Kontextmanager (`_running_app`); beide Apps leben bis zum Modulende, und weil
+die Config ein Singleton ist, stehen alle Tests gegen die erste App **vor** dem
+Fixture der zweiten. Wer einen weiteren Fall gegen die erste App schreibt,
+setzt ihn darüber.
+
 **Und warum das erst hier auffiel:** der Marker ist aus CI und `make check`
 ausgenommen, der Test läuft also nur, wenn ihn jemand von Hand startet. Nach
 dem Sprung auf Gradio 6.22 war er auf einer deutschen Windows-Kiste rot, ohne
