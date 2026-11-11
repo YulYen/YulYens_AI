@@ -296,6 +296,19 @@ class ChatController:
             )
             return
 
+        # Eine leere Eingabe ist keine Frage. Enter im leeren Feld schickte
+        # sonst einen vollen Modelllauf los und legte ein Gespräch ohne Titel
+        # in die Ablage; Ask-All und `/ask` weisen sie ebenfalls ab.
+        if not (user_input or "").strip():
+            yield (
+                "",
+                chat_history,
+                history_state,
+                *self.wiki_sources_unchanged(),
+                gr.update(),
+            )
+            return
+
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
 

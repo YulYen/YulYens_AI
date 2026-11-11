@@ -298,3 +298,27 @@ def _loader_without_ensemble(original):
         self.ensemble = None
 
     return _patched
+
+
+def test_an_eval_run_leaves_the_conversation_store_alone(tmp_path):
+    """Ein Messlauf ist kein Gespräch.
+
+    Die Fragen gehen über denselben One-Shot-Provider wie `/ask`, und der
+    zeichnet auf. Mit eingeschalteter Ablage (Terminal, oder WebUI mit
+    Anmeldung) schrieb jeder Eval-Lauf sämtliche Korpusfragen als Gespräche
+    des Nutzers `local` in die Ablage — bei jedem Lauf erneut, im Verlauf und
+    in der Suche zwischen den echten Gesprächen.
+    """
+    from storage.store import SqliteStore
+
+    db = tmp_path / "conversations.sqlite3"
+    cfg = Config("config.yaml")
+    cfg.ensemble = "classic"
+    cfg.override("core", {"backend": "dummy", "include_date": False})
+    cfg.override("wiki", {"mode": False})
+    cfg.override("ui", {"type": "terminal"})
+    cfg.override("storage", {"enabled": True, "path": str(db)})
+
+    main(["-e", "classic", "--no-judge", "--skip-karl", "--out", str(tmp_path / "o")])
+
+    assert SqliteStore(db).list_conversations() == []

@@ -511,3 +511,32 @@ def test_run_ok_reflects_case_outcomes(passed_case):
         [_persona_corpus()], lambda p, q: "x", Judge(_FakeCore(verdict_text), "m")
     )
     assert run.ok is passed_case
+
+
+# ---- Ein Backend-Ausfall ist kein schlechtes Modell -----------------------
+
+
+def test_a_backend_error_text_is_an_error_not_a_scored_answer():
+    """`stream()` fängt Backend-Fehler und liefert sie als Text aus.
+
+    Der Runner hielt „[ERROR] LLM is not responding correctly." deshalb für
+    eine Antwort: die Checks schlugen fehl, der Judge vergab eine 1, und ein
+    Aussetzer von Ollama zog den Ø-Score des Laufs nach unten — genau die
+    Zahl, über die Modelle verglichen werden. Die Stoppuhr kennt den Fall
+    längst („eine Fehlermeldung ist keine Bestzeit").
+    """
+    from core.streaming_provider import LLM_ERROR_MESSAGE
+
+    judge_core = _FakeCore("1: 1 | keine Antwort")
+    judge = Judge(llm_core=judge_core, model_name="judge")
+
+    results = run_persona_corpora(
+        (_persona_corpus(),), lambda _persona, _question: LLM_ERROR_MESSAGE, judge
+    )
+    run = EvalRun(model="m", judge_model="judge", results=results)
+
+    assert results[0].error is not None and "backend" in results[0].error.lower()
+    assert results[0].verdict is None
+    assert judge_core.calls == [], "ein Ausfall wird nicht bewertet"
+    assert run.errors == 1
+    assert run.average_score is None

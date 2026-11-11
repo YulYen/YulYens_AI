@@ -425,6 +425,10 @@ class TerminalUI:
             logging.debug("[Terminal] User input received (%d chars)", len(user_input))
             print()  # add a small blank line after the input
 
+            # Leere Eingabe: nichts fragen, statt einen Modelllauf zu starten.
+            if not user_input:
+                continue
+
             # Exit
             if user_input.lower() in ("exit", "quit"):
                 self.print_exit()

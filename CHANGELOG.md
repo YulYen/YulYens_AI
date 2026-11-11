@@ -146,6 +146,18 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **An Ollama outage during an eval run no longer lowers the score.** The
+  backend's error text was treated as the model's answer: checks failed, the
+  judge gave it a 1, and the average — the number runs are compared by —
+  dropped. Such a case is now reported as an error and left out of the
+  average. If an earlier run had outages, its average is too low.
+- **Eval runs no longer fill the conversation store.** With the store active
+  (terminal, or web UI with login), every `run_evals.py` run saved all corpus
+  questions as conversations of the user `local` — again on each run. Entries
+  already stored carry `app: api` and the corpus questions as titles.
+- **Pressing Enter on an empty input does nothing.** In the web UI chat and the
+  terminal it used to send an empty question to the model: a full model run
+  for nothing, and an untitled conversation in the history.
 - **A rejected input no longer triggers a Wikipedia or news lookup.** In the
   web UI, the terminal, Ask-All and `/v1/chat/completions`, the lookup ran
   before the guard looked at the input: the chat showed "looking it up" and

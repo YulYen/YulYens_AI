@@ -165,3 +165,22 @@ make evals                                           # Kurzform für --guard-onl
 - `expect.rule` nennt die Regel, die einen Guard-Fall fangen *soll* (#62). Nur
   `reason` zu prüfen reicht nicht: ein Fall, der von der falschen Regel gefangen
   wird, sieht sonst aus wie ein Erfolg
+
+### Ein Messlauf misst das Modell — nicht den Ausfall, und er hinterlässt nichts (#95)
+
+Zwei Befunde aus dem zweiten Durchgang der Fehlersuche, beide an der Naht
+zwischen Eval-Suite und dem Antwortweg, den sie benutzt:
+
+- **Der Fehlertext des Backends ist kein Fall.** `stream()` fängt
+  Backend-Fehler und liefert `LLM_ERROR_MESSAGE` als Text aus. Der Runner hielt
+  das für eine Antwort: Checks rot, Judge-Note 1, Ø-Score des Laufs gedrückt —
+  ausgerechnet die Zahl, über die verglichen wird. `_run_case` erkennt den Text
+  jetzt und meldet einen Fehler; der Fall fehlt im Durchschnitt, statt ihn zu
+  verfälschen. Die Stoppuhr kennt dieselbe Regel („eine Fehlermeldung ist keine
+  Bestzeit"). **Ein älterer Lauf mit Aussetzern hat einen zu niedrigen Ø** —
+  im Zweifel neu fahren, nicht vergleichen.
+- **Der Lauf zeichnet nicht auf.** Die Fragen gehen über den One-Shot-Provider
+  (damit Guard und Wiki wie im Betrieb mitlaufen), und der schreibt in die
+  Ablage. Mit aktiver Ablage standen nach jedem Lauf sämtliche Korpusfragen als
+  Gespräche von `local` im Verlauf. `evals/cli.py` schaltet `storage.enabled`
+  für den Prozess ab.

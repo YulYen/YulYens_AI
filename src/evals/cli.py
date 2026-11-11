@@ -211,6 +211,15 @@ def main(argv: list[str] | None = None) -> int:
 
         from core.factory import AppFactory
 
+        # Ein Messlauf ist kein Gespräch. Die Fragen gehen über den
+        # One-Shot-Provider, und der zeichnet auf — ohne diese Zeile schrieb
+        # jeder Lauf den ganzen Korpus als Gespräche des Nutzers `local` in
+        # die Ablage, bei jedem Lauf erneut. Nur für diesen Prozess; die
+        # config.yaml bleibt unberührt.
+        # Zuweisen statt `override`: das greift auch, wenn die Sektion fehlt.
+        storage_cfg = {**(getattr(cfg, "storage", None) or {}), "enabled": False}
+        setattr(cfg, "storage", storage_cfg)
+
         factory = AppFactory()
         answer_fn = build_answer_fn(factory)
 
