@@ -24,7 +24,14 @@
 # gemeldet. pillow bleibt: dort deckelt zusätzlich Gradio (`pillow<13.0`,
 # auch in 6.31).
 #
-# Stand: 2026-11-02, Gradio 6.31, Audit unter Python 3.12.
+# **2026-11-11: ein weiterer pillow-Befund (PYSEC-2026-4363), ohne dass sich
+# hier etwas geändert hätte** — eine neu veröffentlichte Meldung, derselbe
+# Deckel. Betroffen ist der TIFF-Encoder beim *Speichern* von Bildern mit
+# fremdbestimmten Metadaten. Die App speichert keine Bilder und nimmt keine
+# entgegen (der einzige Upload ist die Gesprächs-JSON); die Begründung der
+# Gruppe trägt also auch ihn.
+#
+# Stand: 2026-11-11, Gradio 6.31, Audit unter Python 3.12.
 
 groups:
   - package: pillow
@@ -77,3 +84,4 @@ groups:
       - PYSEC-2026-4341
       - PYSEC-2026-4342
       - PYSEC-2026-4343
+      - PYSEC-2026-4363
