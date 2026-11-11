@@ -9,9 +9,10 @@ alle ``rss.refresh_minutes`` auf. Ein Turn nimmt, was da ist — auch nichts.
 Ein Lazy-Load wäre der Rückfall: dann wartet die erste Frage nach Ablauf doch
 wieder auf zwei Feeds mit je 13 s Timeout (die Lektion aus #51).
 
-**Alles zusammen als *eine* System-Nachricht.** Vorher war jedes Item eine
-eigene; bei 2 Feeds × 4 Items waren das neun System-Nachrichten ohne
-Zeichenbudget in einem 8k-Fenster.
+**Alles zusammen als *ein* Block.** Vorher war jedes Item eine eigene
+Nachricht; bei 2 Feeds × 4 Items waren das neun ohne Zeichenbudget in einem
+8k-Fenster. Seit #60 ist der Block ein zitierter ``user``-Fremdtext, nur die
+Anweisung davor bleibt ``system`` (siehe :func:`inject_rss_context`).
 """
 
 from __future__ import annotations

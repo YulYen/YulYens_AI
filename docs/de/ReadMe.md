@@ -282,7 +282,7 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
   - Bei `ui.type: "terminal"` im Terminal nutzen
   - Startmenü in zwei Bereichen: **Solo** (neue Unterhaltung, Konversation laden) und **Orchester** (Self-Talk, Ask-All) — siehe [Solo und Orchester](Features.md#solo-und-orchester)
   - Eingabe: Fragen einfach eintippen
-  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern), `/briefing` (Persona fasst die konfigurierten RSS-Feeds zusammen), `/quellen` bzw. `/sources` (die zuletzt injizierten Wikipedia-Ausschnitte im Wortlaut, ungekürzt)
+  - Befehle: `exit` (beenden), `clear` (neue Unterhaltung starten), `/save <pfad>` (Konversation als JSON speichern), `/briefing` (Persona fasst die konfigurierten RSS-Feeds zusammen), `/quellen` bzw. `/sources` (die zuletzt injizierten Wikipedia-Ausschnitte im Wortlaut, ungekürzt), `/suche <begriff>` bzw. `/search` (Volltextsuche über die gespeicherten Gespräche)
 
 - **Web-UI**
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
@@ -300,8 +300,8 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
 
 - **API (FastAPI)**
   - Automatisch aktiv bei `api.enabled: true`
-  - `GET /health` — schneller Liveness-Check (`{"status": "ok"}`)
-  - `GET /healthz` — Deep-Check (Ollama, Modell, spaCy, Kiwix, VRAM); HTTP 503 bei kritischem Ausfall
+  - `GET /health` — schneller Liveness-Check (`{"status": "ok", "version": "…"}`)
+  - `GET /healthz` — Deep-Check (Ollama, Modell, spaCy, Kiwix, VRAM); HTTP 503 bei kritischem Ausfall. Ist ein `api_key` gesetzt, verlangt auch dieser Endpunkt ihn; `/health` bleibt offen
   - Beispielaufruf per `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \

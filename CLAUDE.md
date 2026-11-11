@@ -20,11 +20,9 @@ hier verweist darauf.
 | Linter, mypy, CI, Pins, Audit | [docs/entwurf/werkzeuge.md](docs/entwurf/werkzeuge.md) |
 | Version, Changelog, Tag | [docs/entwurf/versionierung.md](docs/entwurf/versionierung.md) |
 | Branches, Doku-Pflicht, Sandbox | [docs/entwurf/arbeitsweise.md](docs/entwurf/arbeitsweise.md) |
-| „Welche Datei macht was?" | [docs/entwurf/verzeichnisstruktur.md](docs/entwurf/verzeichnisstruktur.md) |
 
-Die Überschriften sind beim Umzug (2026-09-29) **wortgleich** geblieben. Ein
-älterer Verweis der Form „CLAUDE.md, Abschnitt „X"" — in Code-Kommentaren, im
-Archiv, im Changelog — findet sich mit `grep -rn "X" docs/entwurf`.
+Ein älterer Verweis der Form „CLAUDE.md, Abschnitt „X"" (Code-Kommentare,
+Archiv, Changelog) findet sich mit `grep -rn "X" docs/entwurf`.
 
 ## Arbeitsweise
 
@@ -58,10 +56,8 @@ Archiv, im Changelog — findet sich mit `grep -rn "X" docs/entwurf`.
 
 ### Wohin neue Regeln gehören
 
-Diese Datei war bis zum 2026-09-29 auf 2083 Zeilen gewachsen — ein Achtel des
-Quellcodes, bei jeder Sitzung komplett geladen. Die wichtigen Regeln standen
-zwischen Messtabellen, und drei Abschnitte weiter widersprach sie sich selbst
-(#77). Damit das nicht wieder passiert:
+Diese Datei wird bei jeder Sitzung komplett geladen. Sie war schon einmal auf
+2083 Zeilen gewachsen und widersprach sich dann selbst. Deshalb:
 
 1. **Begründung, Messung, Geschichte → `docs/entwurf/<bereich>.md`.** Dort
    darf es ausführlich sein.
@@ -69,6 +65,10 @@ zwischen Messtabellen, und drei Abschnitte weiter widersprach sie sich selbst
    nächsten Umbau *ohne Nachschlagen* umfallen würde. Mit Verweis.
 3. Passt eine Regel in keinen Bereich, ist das ein Hinweis auf einen neuen
    Bereich, nicht auf einen neuen Abschnitt hier.
+4. **Nichts hierher, was der Code selbst sagt** — Versionen stehen in
+   `requirements*.txt`, Schalter in `config.yaml`, Persona-Werte im Ensemble,
+   Tickets im Backlog. Eine Kopie davon veraltet, ohne dass ein Test es merkt
+   (#92: ein Dutzend solcher Stellen).
 
 ## Versionierung und Changelog (#74)
 
@@ -116,22 +116,9 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 
 **Start:** `python src/launch.py -e classic`
 
-## Technologie-Stack
-
-| Bereich | Tech |
-|---|---|
-| Sprache | Python 3.12+ |
-| LLM-Backend | Ollama (lokal) |
-| Web-UI | Gradio 6.31 |
-| API | FastAPI + Uvicorn |
-| NLP/Wiki | spaCy + Kiwix/Wikipedia |
-| TTS | Piper (ONNX; Terminal: Autoplay über winsound/CLI-Player, WebUI: Browser-Playback) |
-| STT | faster-whisper (optional, WebUI-Mikro) |
-| Security | BasicGuard (tinyguard.py) |
-| Tests | pytest |
-| Formatting | Black (88), Ruff |
-| Schichten | import-linter (Verträge in `pyproject.toml`) |
-| Typen | mypy über das ganze `src` (Linux **und** `--platform win32`) |
+Python 3.12+, Ollama, Gradio, FastAPI, spaCy + Kiwix, Piper (TTS),
+faster-whisper (STT). Versionen und Pins: `requirements.txt`,
+`requirements-dev.txt`, `pyproject.toml`.
 
 ## Verzeichnisse
 
@@ -153,18 +140,14 @@ Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und
 | `locales/{de,en}.yaml` | UI-Texte, Parität per Test |
 | `backlog.md` / `backlog_archiv.md` | offene Tickets / Erledigtes samt Begründung |
 
-Datei für Datei: [verzeichnisstruktur.md](docs/entwurf/verzeichnisstruktur.md).
+Jede Datei erklärt sich im eigenen Modulkopf — dort steht auch das *Warum*.
+Eine Datei-für-Datei-Liste gibt es bewusst nicht mehr (sie veraltete, #92).
 
-## Die 4 Personas (Ensemble "classic")
+## Personas
 
-| Name | Charakter | Temperatur | Besonderheit |
-|---|---|---|---|
-| **LEAH** | Warmherzig, kreativ | 0.55 | `featured: true` (Standard) |
-| **DORIS** | Bodenständig, direkt | 0.50 | |
-| **PETER** | Sachlich, präzise | 0.10 | Niedrige Temp. = faktenorientiert |
-| **POPCORN** | Verspielt, witzig | 0.70 | Höchste Kreativität |
-
-Alle Personas: `num_ctx: 16384`, kein `repeat_penalty` (Ollama-Default) — seit #78 auf das 14B abgestimmt.
+LEAH (Standard), DORIS, PETER, POPCORN — Ensemble `classic`. Prompts,
+Temperaturen und `num_ctx` stehen in `ensembles/classic/`; seit #78 sind sie
+auf `ministral-3:14b` abgestimmt.
 
 ## Wichtige Architektur-Muster
 
@@ -192,16 +175,15 @@ rss/feeds.py (RSS-Cache) ──→ Guard (Kontext) ──┘
 ```
 
 ### AppFactory
-- Baut und cached alle Komponenten (Streamer, UI, API-Provider, Store, `WikiLookup`)
+- Baut alle Komponenten und cached UI, API-Provider, Store, `WikiLookup` und
+  RSS-Cache. **Streamer und Guard entstehen bei jedem Aufruf frisch** — der
+  Guard trägt Sitzungszustand (Wrongdoing-Lock)
 - Zustand in Tests via `set_provider(None)` + `Config.reset_instance()` zurücksetzen
 
-### WikiLookup: ein Objekt statt fünf Attributen
-`wiki/lookup.py` bündelt Modus, Port, Limit, Snippet-Zahl, Timeout und den
-Keyword-Finder. `AppFactory.get_wiki_lookup()` baut es einmal; WebUI, TerminalUI,
-API-Provider und `respond_one_shot` bekommen es als **ein** Argument. Vorher stand
-derselbe Achter-Aufruf an sechs Stellen und dieselben fünf `wiki_*`-Attribute in
-drei Klassen — eine neue Wiki-Option hätte man überall nachziehen müssen. Neue
-Optionen also **in `WikiLookup`**, nicht als weiteres Argument.
+### WikiLookup
+`wiki/lookup.py` bündelt alle Wiki-Einstellungen in **einem** Objekt, das die
+Factory einmal baut. Eine neue Wiki-Option gehört **in `WikiLookup`**, nicht
+als weiteres Argument an die Oberflächen.
 
 ## Regeln, die still umfallen
 
@@ -258,9 +240,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Kompression markiert, sie löscht nicht (#87).** Der Verlauf ist Prompt
   *und* Gespräch: wer den Prompt meint, fragt `prompt_only`, wer in der Ablage
   zählt, `recorded_turns` — nie den rohen Verlauf nach Rolle filtern.
-- **Ask-All und Self-Talk: offen (#77).** Der Code zeichnet seit #59 auf
-  (`app: ask-all`/`self-talk`), eine Entscheidung vom 2026-08-05 sagt
-  „bewusst nicht". Bis #77 entschieden ist, auf keine der beiden Seiten bauen.
+- **Ask-All und Self-Talk zeichnen bewusst nicht auf (#77)** — kein Versehen,
+  nicht nachrüsten.
 - **Ohne Anmeldung zeichnet die WebUI nichts auf (#72)** — `NullStore`; die
   Verlauf-Karte hängt an `store.records` und kann `None` sein.
 - **Die WebUI setzt bei `load()`/`delete()`/`search()` immer `user`** — die
@@ -315,8 +296,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Mail-Adapter:** Antwort an `From`, nie `Reply-To`; **erst markieren, dann
   senden** — und den IMAP-Status prüfen, `imaplib` wirft bei `NO` nicht; ohne
   `allowed_senders` kein Start; einmal beim Lesen kürzen.
-- **API:** `model` = Persona; `api_key` gilt für **alle** Endpunkte
-  (`check_api_access`); OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
+- **API:** `model` = Persona; `api_key` gilt für **alle Endpunkte außer
+  `/health`** (`check_api_access`), auch für `/healthz`; OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
   Sampling-Parameter werden ignoriert.
 
 ### Konfiguration → [konfiguration.md](docs/entwurf/konfiguration.md)

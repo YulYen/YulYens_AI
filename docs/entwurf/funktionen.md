@@ -1,25 +1,13 @@
 # Funktionen: Modi, RSS, Ask-All-Fazit, Mail, API
 
-Die Feature-Modi im Detail, die RSS-Entscheidungen (#73), das Ask-All-Fazit (#27), der E-Mail-Adapter (#14), Sprachstrategie und die API samt OpenAI-Kompatibilität (#37).
-
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
+Solo und Orchester (#85), die RSS-Entscheidungen (#73), das Ask-All-Fazit (#27), der E-Mail-Adapter (#14) und die OpenAI-Kompatibilität der API (#37).
 
 ## Feature-Modi
 
-| Modus | Beschreibung |
-|---|---|
-| **Chat** | Einzelne Persona, Streaming |
-| **AI-Dialog** | Zwei Personas konversieren automatisch (Stop: Antwort enthält `endegelaende` oder endet auf `_ende_`) |
-| **Broadcast/Ask-All** | Eine Frage an alle Personas; Antworten live tokenweise gestreamt als Markdown-Sektion pro Persona. WebUI streamt **parallel** (`iter_broadcast_events_parallel`: Worker-Thread + Queue pro Persona; Fallback `ui.experimental.broadcast_parallel: false`), Terminal sequenziell (`iter_broadcast_events`). Echter Speedup braucht `OLLAMA_NUM_PARALLEL` ≥ Persona-Zahl, sonst serialisiert Ollama. **Ein Token-Event trägt nur sein Token** (#64d) — der kumulative Text wurde pro Token neu gebaut und ins Event gelegt, also quadratisch in der Antwortlänge; wer den laufenden Text braucht, sammelt in einer Liste und fügt beim Anzeigen zusammen (so macht es die WebUI, ein paar Mal pro Sekunde statt einmal pro Token). Ein Häkchen unter dem Eingabefeld hängt ein **Fazit 🎭** an die Runde (#27, Default aus, kostet einen vollen Modelllauf) |
-| **RSS als Quelle (#73)** | Nachrichten verhalten sich wie das Wiki: eine Quelle, die sich meldet, wenn die Frage danach ist (`rss/trigger.py`), statt eines Knopfes, der alles abkippt. Geholt wird **im Hintergrund** (`RssCache`, Start + alle `rss.refresh_minutes`) — ein Turn nimmt, was da ist, notfalls nichts. Alle Meldungen zusammen als **eine** System-Nachricht, je Meldung `max_chars_per_item` und ein Datum. Der Knopf „Briefing 📰" bzw. `/briefing` nutzt denselben Cache und ist über `rss.show_button` abschaltbar, ohne die Quelle abzuschalten |
-| **Quellen (#32)** | Zugeklapptes Accordion „Quellen 📚" unter dem Chat. Zeigt pro injiziertem Wikipedia-Snippet den Titel als Link auf kiwix-serve, die Herkunft und **den Snippet-Text selbst** samt Zeichenzahl (`1200 von 9800 Zeichen injiziert (gekürzt)` bzw. `51 Zeichen (vollständig)`). `wiki.snippet_limit` kürzt — erst die Anzeige macht sichtbar, was das Modell nie gesehen hat. Datenquelle ist `WikiSnippet` aus `wiki/lookup.py`; die Originallänge liefert der Proxy als `full_length` mit. Ask-All hat ein eigenes Accordion innerhalb seiner Gruppe (#32a), im Terminal zeigt `/quellen` denselben Inhalt ungekürzt. Meta-Zeile geteilt über `format_snippet_meta` |
-| **Statuszeile (#36)** | Unter dem Chat: `Kontext █░░░ 424 / 8.192 Token (5 %) · 24,0 Tok/s · erster Token nach 1,9 s`. Füllstand aus `approx_token_count` + `num_ctx`, Tempo aus `StreamStats` (der Provider legt sie nach jedem Stream auf sich selbst ab). Ab `context_utils.threshold` (75 %) fett — ab da greift die Kompression. Wert nur im Schluss-Yield, sonst `gr.update()` |
-| **Feedback (#40)** | 👍/👎 an jeder Bot-Bubble, append-only nach `data/feedback_votes.jsonl` (neben der Ablage, auf die es zeigt — `logs/` darf jederzeit geleert werden, gesammelte Bewertungen sind nicht reproduzierbar; eine alte Datei zieht beim ersten Zugriff automatisch um). **Eine Bot-Bubble ist nicht automatisch eine Modellantwort:** Wiki-Hinweise, die Meldung über verworfene Quellen, Briefing-Hinweise und die Kontext-Kompressionswarnung stehen in derselben Spalte und tragen ebenfalls einen Daumen. Erkannt wird das daran, dass Beiwerk **nie in der LLM-History** landet — wer eine neue Hinweis-Bubble einführt, bekommt den Schutz dadurch geschenkt, solange er sie nicht ins Kontextfenster gibt. Ein Vote, der sich nicht gegen die History prüfen lässt, wird verworfen: für einen Trainingsdaten-Kanal (#7) ist eine verlorene Bewertung billiger als eine erfundene. **Jede Zeile trägt seit #65 `conversation_id` + `message_index`** — ohne die ist ein Vote ein loses Textpaar, mit ihnen ein Join auf die Ablage (Persona, Modell, Zeitraum, Gesprächsverlauf davor). Der Index zählt **Positionen unter den Antwort-Bubbles**, nicht Texte: Hinweis-Bubbles stehen in der Anzeige zwischen den Antworten und in der Ablage nicht, und zweimal „Ja." im selben Gespräch ist keine Seltenheit. Den Wortlaut liefert die Ablage, nicht die Anzeige — gegen sie wird später gejoint. Ohne Anmeldung gibt es keine Ablage (#72); dann bleibt `conversation_id` leer und der Vote wird trotzdem geschrieben |
-| **Verlauf (#25)** | Karte „Verlauf öffnen 🗂" listet die Gespräche des angemeldeten Nutzers aus dem Store (#54). Auswahl per `gr.Dropdown` (kein `gr.Dataframe`, siehe Stolperfalle unten), Vorschau als Markdown, dazu Öffnen (fortsetzbar — dieselbe Gesprächs-ID), Markdown-Export und Löschen. Länge über `storage.history_limit` (Default 50, neueste zuerst). Ein Suchfeld darüber schränkt die Liste auf Fundstellen ein (#49, FTS5) — dieselbe Form, damit Vorschau, Öffnen, Export und Löschen unverändert daran hängen. Gespräche von Gast-Personas bleiben lesbar, aber nicht fortsetzbar — erkannt an ihrem eigenen `app` (`web-guest`) **und** am exakten Personennamen, sonst öffnete ein Gast namens „Leah" das Gespräch still als die echte LEAH. Die Regel steht in `ui/continuation.py` und gilt für **alle drei** Wege in ein gespeichertes Gespräch: Verlauf, JSON-Upload und der Ladepfad im Terminal. Jeder Handler prüft zusätzlich den Eigentümer (`user_state`) |
-| **Gast-Persona (#28)** | Karte „Gast anlegen 🎭" → Formular (Name, System-Prompt, Temperatur). Lebt **nur in der Sitzung**: kein YAML, kein Reload. Läuft über `AppFactory.get_streamer_for_guest`, das sich mit dem Persona-Pfad einen `_build_streamer` teilt — Guard, Wiki, Statuszeile, Quellen und Gesprächs-Ablage kommen dadurch gratis mit. Persistenz nach `ensembles/custom/` wäre V2 |
-| **Stop / Nochmal (#35)** | Während eines Streams ersetzt „Stop ⏹" den Senden-Button; der Kill-Switch `SessionContext.stream_stop` beendet den Generator geordnet und **behält die Teilantwort** (Suffix `web_stream_stopped_suffix`). Gilt für Einzelchat, Briefing und Self-Talk — dort erst zwischen den Turns, weil `run_turn()` die Antwort in einem Zug holt. „Nochmal 🔄" verwirft die letzte Antwort in Anzeige und LLM-Verlauf und streamt denselben Kontext erneut (Varianz allein aus der Persona-Temperatur); Wiki-/Briefing-Hints bleiben stehen |
+Was die Modi tun, beschreibt `docs/de/Features.md`; das *Warum* je Modus steht
+im Kopf des Moduls, das ihn baut (`core/orchestrator.py`, `rss/feeds.py`,
+`ui/feedback.py`, `ui/webui_chat.py`, `ui/continuation.py`, `wiki/lookup.py`).
+Hier stehen nur die Entscheidungen, die mehrere Module zugleich betreffen.
 
 ### Solo und Orchester: wer welches Modell bekommt (#85)
 
@@ -45,8 +33,8 @@ antwortet je nach Bereich mit einem anderen Modell. Was dabei leicht umfällt:
    `ui/continuation.py`.
 3. **Was angezeigt und aufgezeichnet wird, ist das Modell, das antwortet.**
    Begrüßung, `meta.model`, `ConversationStore.start(model=…)` und die
-   Cutoff-Zeile im System-Prompt (#19) nehmen das Solo-Modell; die Ablage
-   unterscheidet über `ORCHESTRA_APPS` in `core/factory.py`. Ein Solo-Modell
+   Cutoff-Zeile im System-Prompt (#19) nehmen das Solo-Modell; aufgezeichnet
+   wird ohnehin nur das Solo (#77). Ein Solo-Modell
    ohne Eintrag in `core.knowledge_cutoffs` bekommt ehrlich „unbekannt".
 4. **Angezeigt wird ein Modell nur, wo es abweicht.** Ohne `model:` sieht die
    Startseite bis auf die Zweiteilung aus wie vorher; eine Persona, deren
@@ -55,9 +43,7 @@ antwortet je nach Bereich mit einem anderen Modell. Was dabei leicht umfällt:
    Orchester-Überschrift zieht beim Wechsel mit.
 
 Offen gelassen: eigene `llm_options` je Modell (Temperatur und Prompt sind auf
-das 14B abgestimmt und gelten auch fürs Solo-Modell), und ob ein aus Ask-All
-gespeichertes Gespräch beim Fortsetzen still auf das Solo-Modell wechseln
-soll — heute tut es das, und der Begrüßungssatz nennt dann das Solo-Modell.
+das 14B abgestimmt und gelten auch fürs Solo-Modell).
 
 ### RSS: vier Entscheidungen, die man leicht umdreht (#73)
 
@@ -213,34 +199,14 @@ umdreht und die dann teuer sind:
 Nicht behoben und deshalb ticketiert (#14a): der IMAP-Ordnertrenner wird
 geraten statt per `LIST` erfragt. Regel 2 nimmt dem Fehler die Katastrophe.
 
-## Sprachstrategie
-
-- Projekt-Sprache in `config.yaml`: `language: "de"` (Standard)
-- Locale-Dateien: `locales/de.yaml`, `locales/en.yaml`
-- Persona-Prompts lokalisiert in `ensembles/classic/locales/{de,en}/personas.yaml`
-- UI-Texte via `Config.t()` formatiert
-
-## Wichtige API-Endpunkte
-
-```
-POST http://127.0.0.1:8013/ask
-  Body: { "question": "Hallo", "persona": "LEAH" }
-  → { "answer": "..." }
-
-GET  http://127.0.0.1:8013/health    # Liveness (Prozess antwortet) — ohne Schlüssel
-GET  http://127.0.0.1:8013/healthz   # Readiness (Ollama/Modell/spaCy/Kiwix/VRAM, 503 bei kritischem Fehler)
-
-# OpenAI-kompatibel (#37) — "model" ist der Persona-Name
-GET  http://127.0.0.1:8013/v1/models
-POST http://127.0.0.1:8013/v1/chat/completions
-  Body: { "model": "DORIS", "messages": [...], "stream": true|false }
-```
+## API
 
 ### OpenAI-Kompatibilität: worauf zu achten ist
 - **`model` = Persona**, nicht LLM. `/v1/models` listet Personas; das echte Modell
   bleibt Serversache (`core.model_name`).
-- **`api.openai_compatible.api_key` gilt für *alle* Endpunkte, auch für `/ask`** —
-  der Name sagt nur, wo die Option steht. Vorher hing `require_access` allein am
+- **`api.openai_compatible.api_key` gilt für alle Endpunkte außer `/health`**
+  — also `/ask`, `/v1` und seit #93 auch `/healthz`. Der Name sagt nur, wo die
+  Option steht. Vorher hing `require_access` allein am
   `/v1`-Router, während `/ask` auf demselben Port dieselbe Fähigkeit ohne
   Schlüssel und ohne Rate-Limit anbot. Die Regel liegt in `check_api_access`,
   die Fehler*form* bleibt pro Router verschieden (`/v1`: OpenAI, `/ask`:

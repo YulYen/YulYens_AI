@@ -1,6 +1,7 @@
 import threading
 import time
 
+import pytest
 from core.dummy_llm_core import DummyLLMCore
 from core.orchestrator import (
     broadcast_to_ensemble,
@@ -265,7 +266,7 @@ def test_parallel_broadcast_external_stop_event_stops_workers():
     assert not _broadcast_worker_threads()
 
 
-# ---- Ask-All landet in der Ablage (#59) -------------------------------------
+# ---- Ask-All zeichnet nicht auf (#77) -------------------------------------
 
 
 class _StoreBackedFactory(_DummyFactory):
@@ -290,38 +291,23 @@ def _broadcast_store(tmp_path):
     return SqliteStore(tmp_path / "conversations.sqlite3")
 
 
-def test_sequential_broadcast_records_one_conversation_per_persona(tmp_path):
-    """Ask-All zeichnete gar nichts auf — es wurde nie eine Gesprächs-ID gesetzt.
+@pytest.mark.parametrize(
+    "broadcast", [iter_broadcast_events, iter_broadcast_events_parallel]
+)
+def test_a_broadcast_leaves_no_trace_in_the_store(tmp_path, broadcast):
+    """Ask-All zeichnet nicht auf — entschieden am 2026-11-10 (#77).
 
-    Dabei erzeugt der Broadcast dieselben Frage-Antwort-Paare wie ein
-    Einzelchat; im Verlauf fehlten sie trotzdem vollständig.
+    Vier parallele Antworten auf eine Frage sind kein „Gespräch mit einer
+    Persona", und mehr kennt die Ablage nicht. Der Code tat seit #59 das
+    Gegenteil der Doku: je Frage vier Gespräche unter dem Eigentümer `local`,
+    mit Anmeldung für niemanden sichtbar, im gemeinsamen Topf mitten im
+    Verlauf. Beide Wege stehen hier, weil der parallele ein eigener Codeweg
+    ist.
     """
     store = _broadcast_store(tmp_path)
     factory = _StoreBackedFactory(store)
 
-    list(iter_broadcast_events(factory, "Ping", persona_names=["Alpha", "Beta"]))
+    events = list(broadcast(factory, "Ping", persona_names=["Alpha", "Beta"]))
 
-    refs = store.list_conversations()
-    assert {ref.persona for ref in refs} == {"Alpha", "Beta"}
-    assert {ref.app for ref in refs} == {"ask-all"}
-    for ref in refs:
-        _r, messages = store.load(ref.id)
-        assert [m["role"] for m in messages] == ["user", "assistant"]
-        assert messages[0]["content"] == "Ping"
-        assert messages[1]["content"] == "ECHO: Ping"
-
-
-def test_parallel_broadcast_records_too(tmp_path):
-    """Der parallele Pfad ist ein eigener Codeweg — also auch ein eigener Test."""
-    store = _broadcast_store(tmp_path)
-    factory = _StoreBackedFactory(store)
-
-    list(
-        iter_broadcast_events_parallel(factory, "Ping", persona_names=["Alpha", "Beta"])
-    )
-
-    refs = store.list_conversations()
-    assert {ref.persona for ref in refs} == {"Alpha", "Beta"}
-    for ref in refs:
-        _r, messages = store.load(ref.id)
-        assert messages[1]["content"] == "ECHO: Ping"
+    assert [e["reply"] for e in events if e["type"] == "done"] == ["ECHO: Ping"] * 2
+    assert store.list_conversations() == []

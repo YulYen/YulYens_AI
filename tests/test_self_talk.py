@@ -100,13 +100,11 @@ def test_terminal_self_talk_run_handles_keyboard_interrupt(monkeypatch, capsys):
     assert "Stopping AI Dialog." in out
 
 
-def test_self_talk_records_both_sides_in_the_store(tmp_path):
-    """Der AI-Dialog zeichnete gar nichts auf (#59).
+def test_self_talk_leaves_no_trace_in_the_store(tmp_path):
+    """Der AI-Dialog zeichnet nicht auf — entschieden am 2026-11-10 (#77).
 
-    Er erzeugt dieselben Frage-Antwort-Paare wie ein Einzelchat, aber es wurde
-    nie eine Gesprächs-ID gesetzt — und `sync` steigt bei leerer ID aus.
-    Beide Seiten bekommen ein eigenes Gespräch, damit im Verlauf erkennbar
-    bleibt, welche Persona was gesagt hat.
+    Er erzeugt ein Artefakt, kein Nutzergespräch: der Nutzer steuert nur den
+    Startprompt bei. Wer ihn behalten will, nimmt den Datei-Export.
     """
     from core.dummy_llm_core import DummyLLMCore
     from core.streaming_provider import YulYenStreamingProvider
@@ -140,10 +138,6 @@ def test_self_talk_records_both_sides_in_the_store(tmp_path):
     runner = SelfTalkRunner(factory, _StoreTexts(), "Karl", "Yul", "Start")
     runner.run_turn()
 
-    refs = store.list_conversations()
-    assert {ref.persona for ref in refs} == {"Karl", "Yul"}
-    assert {ref.app for ref in refs} == {"self-talk"}
-    # Der Sprecher der ersten Runde hat eine Antwort in seiner Ablage.
-    karl = next(ref for ref in refs if ref.persona == "Karl")
-    _r, messages = store.load(karl.id)
-    assert [m["role"] for m in messages][-1] == "assistant"
+    assert runner.history_a[-1]["role"] == "assistant"
+    assert store.list_conversations() == []
+    factory.open_conversation.assert_not_called()

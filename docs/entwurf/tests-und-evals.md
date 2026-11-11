@@ -2,23 +2,11 @@
 
 Testaufrufe und Fixtures, was der Browser-Test sieht, warum Doubles aus `tests/doubles.py` kommen, die Eval-Suite (#41) samt Baseline.
 
-> Bis zum 2026-09-29 stand das wortgleich in `CLAUDE.md`. Dort steht jetzt nur
-> noch die Regel als Kurzfassung mit Verweis hierher; die Begründung, die
-> Messungen und die Geschichte dahinter stehen hier.
-
 ## Tests ausführen
 
-```bash
-pytest -q                     # Schnelldurchlauf (Dummy-Backend)
-pytest -m "not slow"          # Ohne langsame Tests
-pytest -m "ollama"            # Nur wenn Ollama läuft
-pytest tests/test_ai_via_api.py  # Gezielt
-```
+Die Kommandos stehen im `Makefile` (und in `CLAUDE.md`), die Fixtures in
+`tests/conftest.py`. Was man dort nicht sieht:
 
-- Test-Fixture `client`: Dummy-Backend, Wiki deaktiviert
-- Test-Fixture `client_with_date_and_wiki`: echte Wiki-Integration (braucht spaCy-Modell)
-- Test-Fixture `ollama_config`: Config gegen echtes Ollama, für `@pytest.mark.ollama`-Tests
-  ohne HTTP-Client (z. B. Eval-Suite)
 - Marker `@pytest.mark.ollama`: wird geskippt wenn Ollama nicht erreichbar.
   `YULYEN_TEST_MODEL` ersetzt dabei das Modell aus `config.yaml` — für
   Modellvergleiche (#78), ohne die Config anzufassen. Gilt nur für Läufe, die
@@ -160,9 +148,10 @@ make evals                                           # Kurzform für --guard-onl
   Fehlschlag); ein Gegentest schlägt an, sobald die Lücke geschlossen ist. Genau
   so ist #62 abgenommen worden: `ctx_code_snippet_in_article_is_kept` fing an zu
   bestehen, also musste das Flag fallen. `KNOWN_GAP_IDS` in
-  `tests/test_evals_cli.py` war danach leer und trägt seit der ZIM-Messung
-  (2026-08-07) wieder **sechs** Einträge — die Lücken aus dem Abschnitt „Die
-  Rollenverschiebung wirkt nicht" in [guard.md](guard.md); der Test hält Korpus und Liste deckungsgleich
+  `tests/test_evals_cli.py` war danach leer und trug seit der ZIM-Messung
+  (2026-08-07) wieder sechs Einträge. Seit #91 (2026-11-10) ist es **einer**: die
+  fünf wirksamen Lücken haben Regeln, übrig ist der Fehlalarm
+  `ok_article_quoting_an_injection` — siehe [guard.md](guard.md); der Test hält Korpus und Liste deckungsgleich
   und schlägt in beide Richtungen an
 - **Der Judge-Parser liest Markdown mit, aber nicht mehr (#71):** ein reales 8B-Modell
   antwortet `1: **5** | …` statt `1: 5 | …` — formattreu, nur fett. Vorher wurde daraus

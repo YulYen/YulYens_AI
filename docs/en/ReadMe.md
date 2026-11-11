@@ -272,7 +272,7 @@ versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
   - Use in the terminal when `ui.type: "terminal"`
   - Start menu in two sections: **Solo** (new conversation, load conversation) and **Orchestra** (self-talk, ask-all) — see [Solo and Orchestra](Features.md#solo-and-orchestra)
   - Input: simply type your questions
-  - Commands: `exit` (quit), `clear` (start a new conversation), `/save <path>` (save the conversation as JSON), `/briefing` (persona summarizes the configured RSS feeds), `/sources` or `/quellen` (the Wikipedia excerpts last injected, verbatim and untruncated)
+  - Commands: `exit` (quit), `clear` (start a new conversation), `/save <path>` (save the conversation as JSON), `/briefing` (persona summarizes the configured RSS feeds), `/sources` or `/quellen` (the Wikipedia excerpts last injected, verbatim and untruncated), `/search <term>` or `/suche` (full-text search across the stored conversations)
 
 - **Web UI**
   - With `ui.type: "web"`, a web interface starts automatically
@@ -290,8 +290,8 @@ versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
 
 - **API (FastAPI)**
   - Automatically active when `api.enabled: true`
-  - `GET /health` — fast liveness check (`{"status": "ok"}`)
-  - `GET /healthz` — deep check (Ollama, model, spaCy, Kiwix, VRAM); HTTP 503 on critical failure
+  - `GET /health` — fast liveness check (`{"status": "ok", "version": "…"}`)
+  - `GET /healthz` — deep check (Ollama, model, spaCy, Kiwix, VRAM); HTTP 503 on critical failure. Once an `api_key` is set, this endpoint requires it too; `/health` stays open
   - Example request using `curl`:
     ```bash
     curl -X POST http://127.0.0.1:8013/ask \
