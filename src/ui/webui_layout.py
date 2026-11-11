@@ -225,7 +225,7 @@ STREAM_OUTPUT_KEYS = (
 # Was _with_stream_controls hinter STREAM_OUTPUT_KEYS anhängt.
 STREAM_CONTROL_KEYS = ("send_btn", "stop_btn", "regenerate_btn")
 
-# Reihenfolge der Ask-All-Ausgaben — dieselbe, die _ask_all_state aufbaut.
+# Reihenfolge der Ask-All-Ausgaben — dieselbe, die AskAllController.state aufbaut.
 ASK_ALL_OUTPUT_KEYS = (
     "ask_all_question",
     "ask_all_status",

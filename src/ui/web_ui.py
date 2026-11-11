@@ -16,12 +16,9 @@ from typing import TYPE_CHECKING, Any
 import gradio as gr
 import requests
 from config.personas import _load_system_prompts, get_all_persona_names
-from core.ask_all_moderator import iter_verdict
 from core.context_injection import conversation_only
-from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.system_checks import fetch_model_names
 from rss.feeds import _rss_cache_of
-from security.tinyguard import input_refused
 from stt.whisper_stt import transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
@@ -30,6 +27,7 @@ from ui.feedback import DEFAULT_VOTES_DIR, FeedbackLog
 from ui.history_access import ConversationHistory
 from ui.self_talk import SelfTalkRunner
 from ui.session import SessionContext
+from ui.webui_ask_all import AskAllController
 from ui.webui_chat import STREAM_FLUSH_INTERVAL_S, ChatController
 from ui.webui_events import bind_events
 from ui.webui_features import WebFeatures
@@ -37,8 +35,6 @@ from ui.webui_format import (
     ChatMessage,
     bot_bubble,
     conversation_markdown,
-    format_ask_all_results,
-    format_wiki_sources,
     messages_to_chat_history,
     user_bubble,
 )
@@ -50,7 +46,6 @@ from ui.webui_layout import (
 )
 from wiki.lookup import (
     WikiLookup,
-    inject_wiki_context,
 )
 
 if TYPE_CHECKING:
@@ -174,7 +169,14 @@ class WebUI:
         # *nicht* hierher: die WebUI ist ein Singleton und bedient alle Browser
         # gleichzeitig. Sie liegen in einem SessionContext pro Sitzung
         # (`ui/session.py`) und werden als gr.State durchgereicht.
-        self.ask_all_placeholder = ""
+        # Schon hier aufgelöst, nicht erst in `launch()`: der Wert wird an den
+        # AskAllController weitergereicht, und was weitergereicht wird, kommt
+        # beim Bauen herein (siehe docs/entwurf/webui.md).
+        self.ask_all_placeholder = str(
+            self.texts.get(
+                "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
+            )
+        )
         self.self_talk_prompt_placeholder = ""
         self.stt_cfg = getattr(config, "stt", {}) or {}
         self.rss_cfg = getattr(config, "rss", {}) or {}
@@ -191,6 +193,16 @@ class WebUI:
             wiki,
             _rss_cache_of(factory),
             self.rss_cfg,
+        )
+        # „Frage an alle" (siehe ui/webui_ask_all.py) — ebenfalls ohne
+        # Sitzungszustand, deshalb genügt ein Exemplar.
+        self.ask_all = AskAllController(
+            self._t,
+            factory,
+            wiki,
+            enabled=self.features.broadcast,
+            parallel=self.features.broadcast_parallel,
+            placeholder=self.ask_all_placeholder,
         )
 
     def _reset_conversation_state(self) -> list[Message]:
@@ -491,16 +503,8 @@ class WebUI:
             conversation_id=conversation_id,
         )
 
-    @staticmethod
-    def _cancel_ask_all_broadcast(session: SessionContext) -> None:
-        """Stops the workers of a running ask-all broadcast (if any)."""
-        stop = session.ask_all_stop
-        if stop is not None:
-            stop.set()
-            session.ask_all_stop = None
-
     def _on_reset_to_start(self, session: SessionContext) -> tuple:
-        self._cancel_ask_all_broadcast(session)
+        self.ask_all.cancel(session)
         # Zusätzlich zum `cancels` am Reset-Button: das cancels bricht nur den
         # asyncio-Task ab, der Kill-Switch beendet die Arbeit im Backend (#35).
         stop = session.stream_stop
@@ -987,211 +991,6 @@ class WebUI:
             if session.stream_stop is stop:
                 session.stream_stop = None
 
-    def _ask_all_state(
-        self,
-        question: str,
-        results_md: str,
-        *,
-        editable: bool = False,
-        submit_visible: bool = True,
-        submit_interactive: bool = True,
-        status: str = "",
-        sources_md: str = "",
-    ) -> tuple:
-        """Builds the tuple of updates every Ask-All yield consists of.
-
-        ``sources_md`` läuft wie ``status`` durch alle Yields mit: der
-        Wiki-Lookup passiert einmal vorab, das Ergebnis muss danach in jedem
-        Update wieder mitgeschickt werden (#32a).
-
-        Der Default ist der **laufende** Broadcast: Eingabe gesperrt, Senden
-        weg. Vorher stand dafür ein `running`-dict, das an drei Stellen mit
-        `**` hineingereicht wurde — eine Form, die weder mypy noch ein Leser
-        auf die Parameter abbilden kann. Die drei Werte gehören ohnehin
-        zusammen; sie einzeln setzen konnte niemand gebrauchen.
-        """
-        return (
-            gr.update(
-                value=question,
-                visible=True,
-                interactive=editable,
-                placeholder=self.ask_all_placeholder,
-            ),
-            gr.update(value=status, visible=bool(status)),
-            gr.update(value=results_md, visible=bool(results_md)),
-            gr.update(visible=submit_visible, interactive=submit_interactive),
-            gr.update(visible=True),
-            gr.update(visible=bool(sources_md)),
-            gr.update(value=sources_md),
-        )
-
-    def _on_submit_ask_all(
-        self,
-        session: SessionContext,
-        question: str | None,
-        current_results: str | None = None,
-        with_verdict: bool = False,
-    ) -> Iterator[tuple]:
-        question = (question or "").strip()
-        existing = current_results or ""
-
-        if not self.features.broadcast:
-            yield self._ask_all_state(
-                question,
-                existing,
-                editable=True,
-                submit_interactive=False,
-                status=self._t("ask_all_disabled"),
-            )
-            return
-
-        if not question:
-            yield self._ask_all_state(
-                "",
-                existing,
-                editable=True,
-                status=self._t("empty_question"),
-            )
-            return
-
-        # Alle Personas vorab mit Platzhalter anlegen, dann Token für Token
-        # hineinstreamen; gedrosselt, damit nicht jedes Token den kompletten
-        # Markdown-Block über den Socket schickt.
-        replies = {name: "…" for name in get_all_persona_names()}
-        yield self._ask_all_state(
-            question,
-            format_ask_all_results(replies),
-        )
-
-        # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
-        # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
-        # Erst der Guard, dann das Netz (#88) — die Absage selbst liefert danach
-        # jede Persona aus ihrem eigenen `stream()`.
-        wiki_hints, contexts = (
-            ([], [])
-            if input_refused(self.factory.build_guard(), question)
-            else self.wiki.snippets(question, "ask_all", self.factory.build_guard())
-        )
-        context_messages: list[Message] = []
-        if contexts:
-            # Ask-All hat hier noch keinen Streamer: der Kontext entsteht
-            # einmal für alle Personas, bevor die Worker gebaut werden.
-            inject_wiki_context(context_messages, contexts, self.factory.build_guard())
-        wiki_status = "\n\n".join(hint for hint in wiki_hints if hint)
-        # Die Quellen stehen hier bereits fest und reisen ab jetzt in jedem
-        # Yield mit — genau wie wiki_status (#32a).
-        sources_md = format_wiki_sources(contexts, self._t)
-        if wiki_status or sources_md:
-            yield self._ask_all_state(
-                question,
-                format_ask_all_results(replies),
-                status=wiki_status,
-                sources_md=sources_md,
-            )
-
-        # Der Kill-Switch gilt in beiden Zweigen: der sequenzielle Broadcast
-        # kennt ihn zwar nicht, das Fazit danach (#27) aber schon — sonst liefe
-        # ein zusätzlicher Modelllauf weiter, nachdem der Nutzer abgebrochen hat.
-        stop = threading.Event()
-        session.ask_all_stop = stop
-
-        # Parallel: alle Personas streamen gleichzeitig in ihre Sektionen;
-        # sequenzieller Fallback per ui.experimental.broadcast_parallel: false.
-        if self.features.broadcast_parallel:
-            events_iter = iter_broadcast_events_parallel(
-                self.factory,
-                question,
-                context_messages=context_messages,
-                stop_event=stop,
-            )
-        else:
-            events_iter = iter_broadcast_events(
-                self.factory, question, context_messages=context_messages
-            )
-        # Der laufende Text wird hier gesammelt, nicht vom Orchestrator in jedes
-        # Token-Event gelegt (#64d). Zusammengefügt wird nur, wenn wirklich
-        # gezeigt wird — also ein paar Mal pro Sekunde statt einmal pro Token.
-        parts: dict[str, list[str]] = {name: [] for name in replies}
-        finished: set[str] = set()
-        last_flush = 0.0
-        for event in events_iter:
-            persona = event["persona"]
-            if event["type"] == "done":
-                # Der fertige Text ist der maßgebliche — er ist gestrippt.
-                replies[persona] = event["reply"] or "…"
-                finished.add(persona)
-            else:
-                parts.setdefault(persona, []).append(event["token"])
-
-            now = time.monotonic()
-            if event["type"] == "done" or now - last_flush >= STREAM_FLUSH_INTERVAL_S:
-                for name, chunks in parts.items():
-                    if name not in finished and chunks:
-                        replies[name] = "".join(chunks)
-                last_flush = now
-                yield self._ask_all_state(
-                    question,
-                    format_ask_all_results(replies),
-                    status=wiki_status,
-                    sources_md=sources_md,
-                )
-
-        # Das Fazit läuft *nach* der Runde und nur auf Wunsch (#27): es kostet
-        # einen vollen Modelllauf. Bricht der Nutzer ab, bleibt der Text stehen,
-        # den es bis dahin geschrieben hat — wie „Stop" im Einzelchat.
-        verdict = ""
-        verdict_heading = self._t("ask_all_moderator_heading")
-        # `stop` ist hier ein verlässliches „der Nutzer hat abgebrochen": der
-        # Broadcast setzt es seit dieser Runde nicht mehr selbst (siehe
-        # `iter_broadcast_events_parallel`).
-        if with_verdict and not stop.is_set():
-            verdict_parts: list[str] = []
-            last_flush = 0.0
-            try:
-                for event in iter_verdict(
-                    self.factory, question, replies, stop_event=stop
-                ):
-                    if event["type"] == "done":
-                        verdict = event["reply"]
-                    else:
-                        verdict_parts.append(event["token"])
-
-                    now = time.monotonic()
-                    if (
-                        event["type"] == "done"
-                        or now - last_flush >= STREAM_FLUSH_INTERVAL_S
-                    ):
-                        last_flush = now
-                        yield self._ask_all_state(
-                            question,
-                            format_ask_all_results(
-                                replies,
-                                verdict=verdict or "".join(verdict_parts),
-                                verdict_heading=verdict_heading,
-                            ),
-                            status=wiki_status,
-                            sources_md=sources_md,
-                        )
-            except Exception:
-                # Das Fazit ist Zugabe — es darf die Runde nicht mitnehmen.
-                # Ohne diesen Riegel bliebe die Eingabe gesperrt und
-                # `session.ask_all_stop` stehen: der Schluss-Yield unten wird
-                # nie erreicht, und der Nutzer verlöre Bedienbarkeit und
-                # Antworten für einen Fehler im Nachspann.
-                logging.exception("Ask-All: das Fazit ist fehlgeschlagen")
-
-        session.ask_all_stop = None
-        # Broadcast fertig: Eingabe und Senden wieder freigeben für Folgefragen
-        yield self._ask_all_state(
-            question,
-            format_ask_all_results(
-                replies, verdict=verdict, verdict_heading=verdict_heading
-            ),
-            status=wiki_status,
-            sources_md=sources_md,
-            editable=True,
-        )
-
     def _load_failure_updates(self, message: str) -> tuple:
         updates = self._reset_updates()
         updates["load_status"] = gr.update(value=message, visible=True)
@@ -1469,9 +1268,7 @@ class WebUI:
         persona_btn_suffix = ui.get("persona_button_suffix")
         ask_all_button_label = ui.get("ask_all_button_label", "Frage an alle")
         ask_all_title = ui.get("ask_all_title", "Frage an alle Personas")
-        ask_all_input_placeholder = ui.get(
-            "ask_all_input_placeholder", "Stelle eine Frage an alle Personas …"
-        )
+        ask_all_input_placeholder = self.ask_all_placeholder
         ask_all_moderator_label = ui.get(
             "ask_all_moderator_label", "Fazit 🎭 dazu (ein zusätzlicher Modelllauf)"
         )
@@ -1527,7 +1324,6 @@ class WebUI:
         history_delete_label = ui.get("history_delete_label", "Löschen")
         history_confirm_label = ui.get("history_confirm_label", "Löschen bestätigen")
 
-        self.ask_all_placeholder = ask_all_input_placeholder
         self.self_talk_prompt_placeholder = self_talk_prompt_placeholder
 
         persona_info = {p["name"].lower(): p for p in _load_system_prompts()}

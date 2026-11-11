@@ -18,9 +18,26 @@ Der Test ist deshalb: **besitzt das Modul eine Regel?** `feedback.py` besitzt
 besitzt „jeder Zugriff trägt `user`". `webui_chat.py` besitzt den
 Stream-Lebenszyklus (Button-Updates im selben Yield, genau ein
 `record_conversation`, Kill-Switch über Identität). `webui_features.py` besitzt
-„welche Funktion ist verfügbar — und warum nicht". Gast, Self-Talk und die
-Ask-All-Handler besitzen keine und bleiben deshalb, wo sie sind; sie zu
-verschieben wäre Kosmetik, die sich als Fortschritt ausgibt.
+„welche Funktion ist verfügbar — und warum nicht". Gast und Self-Talk
+besitzen keine und bleiben deshalb, wo sie sind; sie zu verschieben wäre
+Kosmetik, die sich als Fortschritt ausgibt.
+
+**Nachtrag 2026-11-11 (#97): Ask-All ist umgezogen — weil sich die Antwort auf
+die Frage geändert hat, nicht die Zeilenzahl.** Als dieser Abschnitt entstand,
+besaßen die Ask-All-Handler keine Regel. Seither sind vier dazugekommen, jede
+einmal als Fehler passiert: der Guard vor dem Abruf (#88), der Kill-Switch,
+den der Broadcast nur liest (#27), das Fazit als Zugabe, die die Runde nicht
+mitnehmen darf, und Hinweis samt Quellen in jedem Yield (#32a). Sie stehen
+jetzt im Kopf von `ui/webui_ask_all.py`. Bewusst **nicht** mitgezogen:
+`_on_show_ask_all` — das ist Navigation und gehört zu den anderen
+`_on_show_…`-Handlern. Und bewusst bei diesem einen Schnitt geblieben: was in
+`web_ui.py` jetzt noch steht (Navigation, Verlauf, Gast, Self-Talk, Laden), ist
+genau die stark gekoppelte Masse, vor der der Absatz oben warnt.
+
+Beim Umzug ist die zweite Falle von unten prompt wieder aufgetreten: ein
+Testhelfer setzte `web_ui.features = replace(…, broadcast_parallel=False)`
+*nach* dem Bauen, der Controller hatte den Schalter da schon. Zwei Tests liefen
+still durch den parallelen Weg und fielen erst an der Ausgabe auf.
 
 Zwei Dinge, die beim Schneiden wehtaten:
 
