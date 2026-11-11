@@ -79,7 +79,7 @@ Baseline und Adapter über den **Ø-Judge-Score** zu vergleichen sind, nicht
 
 Die abgeschlossenen Tickets stehen seit dem 2026-08-06 in einer eigenen Datei:
 
-**➜ [backlog_archiv.md](backlog_archiv.md)** — 61 erledigte Tickets mit
+**➜ [backlog_archiv.md](backlog_archiv.md)** — 62 erledigte Tickets mit
 Begründung, neueste zuerst.
 
 Sie ist der ausführliche Teil der Projektgeschichte: warum etwas so gebaut
