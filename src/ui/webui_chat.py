@@ -50,6 +50,7 @@ from core.context_utils import context_near_limit, shrink_history_for_context
 from core.streaming_provider import StreamStats
 from rss.feeds import RssCache, inject_rss_context
 from rss.trigger import feeds_for_question
+from security.tinyguard import input_refused
 from ui.session import SessionContext
 from ui.webui_format import (
     ChatMessage,
@@ -295,6 +296,19 @@ class ChatController:
             )
             return
 
+        # Eine leere Eingabe ist keine Frage. Enter im leeren Feld schickte
+        # sonst einen vollen Modelllauf los und legte ein Gespräch ohne Titel
+        # in die Ablage; Ask-All und `/ask` weisen sie ebenfalls ab.
+        if not (user_input or "").strip():
+            yield (
+                "",
+                chat_history,
+                history_state,
+                *self.wiki_sources_unchanged(),
+                gr.update(),
+            )
+            return
+
         # 1) Maintain a dedicated LLM history without UI hints (and compress if needed)
         llm_history = list(history_state or [])
 
@@ -306,8 +320,15 @@ class ChatController:
         yield "", chat_history, llm_history, *self.wiki_source_updates([]), gr.update()
 
         # 3) Wiki hint and snippet (top hit)
-        wiki_hints, contexts = self.wiki.snippets(
-            user_input, session.bot, getattr(session.streamer, "guard", None)
+        #
+        # Erst der Guard, dann das Netz (#88): eine Eingabe, die `stream()`
+        # gleich ablehnt, löst keinen Abruf aus — sonst stünde im Chat erst
+        # „schlägt nach" und dann die Absage, und im Online-Modus ginge der
+        # Suchbegriff trotzdem hinaus.
+        guard = getattr(session.streamer, "guard", None)
+        refused = input_refused(guard, user_input)
+        wiki_hints, contexts = (
+            ([], []) if refused else self.wiki.snippets(user_input, session.bot, guard)
         )
 
         # Display the UI hints (do not add them to the LLM context window)
@@ -332,7 +353,11 @@ class ChatController:
         # 4b) Optional: RSS-Meldungen, wenn die Frage danach ist (#73).
         #     Nichts wird hier geholt — der Cache ist schon gefüllt oder eben
         #     nicht; ein Turn wartet nie auf das Netz.
-        rss_hint = self._inject_rss_if_asked(session, user_input, llm_history)
+        rss_hint = (
+            None
+            if refused
+            else self._inject_rss_if_asked(session, user_input, llm_history)
+        )
         if rss_hint:
             chat_history.append(bot_bubble(rss_hint))
             yield (

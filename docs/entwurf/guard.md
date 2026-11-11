@@ -277,3 +277,24 @@ wer umformuliert, kommt durch. Nachmessen: `python scripts/probe_injection.py
 -e classic`; der Guard-Arm sollte bei den vier betroffenen Nutzlasten jetzt
 „nicht injiziert" zeigen, und die 0 Fehlalarme auf den 394 + 49 Artikeln
 gehören einmal neu gefahren.
+
+### Erst der Guard, dann das Netz — auf jedem Weg (#88)
+
+#64b hatte die Reihenfolge für `respond_one_shot` gedreht; WebUI, Terminal,
+Ask-All und `/v1/chat/completions` holten das Wiki weiter *vor* der
+Eingangsprüfung. Eine abgelehnte Eingabe löste dort den Abruf aus (online:
+mit fremdbestimmtem Suchbegriff ins Netz), und im Chat stand erst der
+Wiki-Hinweis, dann die Absage.
+
+Alle vier fragen jetzt `security.tinyguard.input_refused(guard, text)` vor,
+bevor sie nachschlagen. **Die Vorprüfung ist keine zweite Eingangsprüfung:**
+sie kostet keine Runde (`count_as_turn=False`) und liest den Sitzungs-Lock,
+statt ihn herunterzuzählen — die verbindliche Prüfung samt Absagetext bleibt
+die in `stream()`. Ohne diese Trennung zählte jeder Turn den Lock doppelt.
+
+Bewusst eine Funktion und keine Guard-Methode: ein `create_autospec`-Double
+liefert für eine unbekannte Methode ein wahres Mock und schaltete damit still
+jeden Abruf in den Tests ab (die „stille Richtung" aus `tests/doubles.py`).
+
+**Wer einen neuen Weg baut, der vor dem Stream etwas für die Eingabe tut,
+fragt zuerst `input_refused`.**

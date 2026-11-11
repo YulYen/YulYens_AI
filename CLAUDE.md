@@ -198,6 +198,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   `tests/test_context_channels.py`).
 - **Erst filtern, dann zusammenfügen.** Guard-Brücken mit `\s+` überspringen
   Zeilenumbrüche; zwei harmlose Schlagzeilen ergeben zusammen einen Treffer.
+- **Erst der Guard, dann das Netz:** vor jedem Wiki-/RSS-Abruf
+  `input_refused(guard, text)` fragen (zählt nicht als Runde, #88).
 - **Gefiltert wird in `WikiLookup.snippets()`**, sonst zeigt die Quellen-Karte
   Quellen, die das Modell nie sah.
 - **Die Rollentrennung (#60) ist kein Schutz** — ein 8B-Modell befolgt
@@ -253,7 +255,8 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Sucheingabe ist Text, nicht FTS5-Syntax** (`_fts_query` quotet jedes Wort).
 - Aufzeichnen darf **nie** den Stream abbrechen. Votes liegen in
   `data/feedback_votes.jsonl`, nicht in `logs/` (das ist wegwerfbar).
-- **Anmeldung:** `provider: local` ohne auflösbaren Nutzer bricht den Start ab;
+- **Anmeldung:** `provider: local` ohne auflösbaren Nutzer bricht den Start ab,
+  ein unbekannter Provider ebenso (#89) — nie auf „offen" zurückfallen;
   `header` nur hinter einem Proxy, der den Header von außen entfernt.
   Geheimnisse vergleicht `core.utils.constant_time_equals` (Bytes) — das nackte
   `hmac.compare_digest` wirft bei einem Umlaut.

@@ -749,6 +749,27 @@ def context_verdict(guard: BasicGuard | None, text: str) -> SecurityResult | Non
     return guard.check_context_only(text)
 
 
+def input_refused(guard: BasicGuard | None, text: str) -> bool:
+    """Würde der Guard diese Eingabe ablehnen? — ohne dass es eine Runde kostet.
+
+    Für die Aufrufer, die **vor** dem eigentlichen Stream etwas für die Eingabe
+    tun: Wiki und RSS nachschlagen. Eine abgelehnte Eingabe soll keinen Abruf
+    auslösen (#64b, #88) — schon gar nicht im Online-Modus, wo der Suchbegriff
+    dann ins Netz geht. Die verbindliche Prüfung bleibt die in ``stream()``;
+    diese hier fragt nur vor, deshalb zählt sie nicht (``count_as_turn=False``)
+    und liest den Sitzungs-Lock, statt ihn herunterzuzählen.
+
+    Als Funktion und nicht als Methode: ein Guard-Double (``create_autospec``)
+    lieferte für eine unbekannte Methode ein wahres Mock — und schaltete damit
+    still jeden Abruf ab.
+    """
+    if guard is None:
+        return False
+    if getattr(guard, "_wrongdoing_lock_remaining", 0) > 0:
+        return True
+    return not guard.check_input(text or "", count_as_turn=False)["ok"]
+
+
 def context_rejection(guard: BasicGuard | None, text: str) -> str | None:
     """Grund, warum abgerufener Text nicht in den Prompt darf — oder ``None``.
 

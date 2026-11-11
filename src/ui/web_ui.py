@@ -21,6 +21,7 @@ from core.context_injection import conversation_only
 from core.orchestrator import iter_broadcast_events, iter_broadcast_events_parallel
 from core.system_checks import fetch_model_names
 from rss.feeds import _rss_cache_of
+from security.tinyguard import input_refused
 from stt.whisper_stt import transcribe_wav
 from ui.continuation import GUEST_APP as _GUEST_APP
 from ui.continuation import continuable_persona
@@ -1064,8 +1065,12 @@ class WebUI:
 
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
-        wiki_hints, contexts = self.wiki.snippets(
-            question, "ask_all", self.factory.build_guard()
+        # Erst der Guard, dann das Netz (#88) — die Absage selbst liefert danach
+        # jede Persona aus ihrem eigenen `stream()`.
+        wiki_hints, contexts = (
+            ([], [])
+            if input_refused(self.factory.build_guard(), question)
+            else self.wiki.snippets(question, "ask_all", self.factory.build_guard())
         )
         context_messages: list[Message] = []
         if contexts:

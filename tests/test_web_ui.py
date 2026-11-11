@@ -180,6 +180,27 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     streamer.stream.assert_called_once()
 
 
+@pytest.mark.parametrize("empty", ["", "   ", "\n"])
+def test_an_empty_input_does_not_reach_the_model(empty):
+    """Enter im leeren Eingabefeld schickte eine leere Frage an das Modell.
+
+    Ein voller Modelllauf für nichts, eine leere Bubble im Chat und — mit
+    Ablage — ein Gespräch ohne Titel im Verlauf. Ask-All und `/ask` wiesen
+    die leere Frage längst ab, der Einzelchat nicht.
+    """
+    web_ui = _create_web_ui()
+    session = SessionContext(bot="LEAH", streamer=streamer_double())
+    chat = [{"role": "assistant", "content": "Hallo"}]
+    history = [{"role": "assistant", "content": "Hallo"}]
+
+    outputs = list(web_ui.chat.respond_streaming(session, empty, chat, history))
+
+    session.streamer.stream.assert_not_called()
+    session.streamer.record_conversation.assert_not_called()
+    assert outputs[-1][1] == [{"role": "assistant", "content": "Hallo"}]
+    assert outputs[-1][2] == history
+
+
 def test_webui_heuristic_strategy_never_instantiates_karl():
     web_ui = _create_web_ui()
     session = SessionContext()

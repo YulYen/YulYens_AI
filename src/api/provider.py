@@ -5,6 +5,7 @@ from typing import Any
 
 from config.config_singleton import Config
 from config.personas import get_all_persona_names
+from security.tinyguard import input_refused
 from wiki.lookup import WikiLookup, inject_wiki_context
 
 
@@ -70,8 +71,13 @@ class AiApiProvider:
         )
         if last_user_index is not None:
             question = str(history[last_user_index].get("content") or "")
-            _hints, contexts = self.wiki.snippets(
-                question, canonical_persona, getattr(streamer, "guard", None)
+            guard = getattr(streamer, "guard", None)
+            # Erst der Guard, dann das Netz — wie in `respond_one_shot` (#64b).
+            # Die Absage selbst kommt weiter aus `stream()`.
+            contexts = (
+                []
+                if input_refused(guard, question)
+                else self.wiki.snippets(question, canonical_persona, guard)[1]
             )
             if contexts:
                 # Wie im UI: die Kontext-System-Messages stehen unmittelbar vor

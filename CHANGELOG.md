@@ -70,6 +70,18 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
+- **An unknown `ui.web.auth.provider` now stops the start** (exit code 4)
+  instead of silently running without login. A typo such as `provider: lokal`
+  used to log a warning and open the web UI to everyone who could reach it.
+  **If your installation starts with a warning about an unknown provider
+  today, it will no longer start** — correct the value to `local`, `header`
+  or `disabled`.
+- **kiwix-serve is started on the configured address only.** With
+  `wiki.offline.autostart`, the server used to listen on every network
+  interface, so the offline Wikipedia was readable from the whole LAN although
+  `wiki.offline.host` said `127.0.0.1`. It is now started with `--address`.
+  If `host` is a name rather than an IP address (e.g. `localhost`), the
+  argument is left out and a warning says so.
 - **`/healthz` requires the API key once one is configured.** The deep check
   names models, paths and configuration problems and queries Ollama and Kiwix
   on every call, so it now sits behind `api.openai_compatible.api_key` and the
@@ -134,6 +146,23 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **An Ollama outage during an eval run no longer lowers the score.** The
+  backend's error text was treated as the model's answer: checks failed, the
+  judge gave it a 1, and the average — the number runs are compared by —
+  dropped. Such a case is now reported as an error and left out of the
+  average. If an earlier run had outages, its average is too low.
+- **Eval runs no longer fill the conversation store.** With the store active
+  (terminal, or web UI with login), every `run_evals.py` run saved all corpus
+  questions as conversations of the user `local` — again on each run. Entries
+  already stored carry `app: api` and the corpus questions as titles.
+- **Pressing Enter on an empty input does nothing.** In the web UI chat and the
+  terminal it used to send an empty question to the model: a full model run
+  for nothing, and an untitled conversation in the history.
+- **A rejected input no longer triggers a Wikipedia or news lookup.** In the
+  web UI, the terminal, Ask-All and `/v1/chat/completions`, the lookup ran
+  before the guard looked at the input: the chat showed "looking it up" and
+  then the refusal, and in online mode the search term still left the machine.
+  `/ask` already did this in the right order.
 - **Ask-All and the AI dialog are no longer written to the conversation
   store** — as the documentation has said all along. Since 2.0.0 every Ask-All
   question created one stored conversation per persona and every AI dialog two,

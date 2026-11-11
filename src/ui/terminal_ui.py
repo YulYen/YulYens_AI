@@ -14,6 +14,7 @@ from core.context_utils import context_near_limit, shrink_history_for_context
 from core.orchestrator import broadcast_to_ensemble
 from core.utils import _greeting_text, is_broadcast_enabled, is_file_exchange_enabled
 from rss.feeds import _rss_cache_of, inject_rss_context
+from security.tinyguard import input_refused
 from ui import self_talk
 from ui.continuation import continuable_persona, persona_info_from_names
 from ui.conversation_io_terminal import load_conversation, save_conversation
@@ -320,7 +321,9 @@ class TerminalUI:
         # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
         # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
         context_messages: list[dict[str, str]] = []
-        if self.wiki.keyword_finder:
+        if self.wiki.keyword_finder and not input_refused(
+            self.factory.build_guard(), question
+        ):
             wiki_hints, contexts = self.wiki.snippets(
                 question, "ask_all", self.factory.build_guard()
             )
@@ -422,6 +425,10 @@ class TerminalUI:
             logging.debug("[Terminal] User input received (%d chars)", len(user_input))
             print()  # add a small blank line after the input
 
+            # Leere Eingabe: nichts fragen, statt einen Modelllauf zu starten.
+            if not user_input:
+                continue
+
             # Exit
             if user_input.lower() in ("exit", "quit"):
                 self.print_exit()
@@ -461,9 +468,12 @@ class TerminalUI:
                 continue
 
             # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
-            if self.wiki.keyword_finder:
+            # Erst der Guard, dann das Netz (#88): was `stream()` gleich
+            # ablehnt, löst keinen Abruf aus.
+            guard = getattr(self.streamer, "guard", None)
+            if self.wiki.keyword_finder and not input_refused(guard, user_input):
                 wiki_hints, contexts = self.wiki.snippets(
-                    user_input, self.bot or "", getattr(self.streamer, "guard", None)
+                    user_input, self.bot or "", guard
                 )
 
                 self.last_wiki_snippets = list(contexts)

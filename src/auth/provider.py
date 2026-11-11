@@ -212,7 +212,13 @@ def build_auth_provider(web_cfg: dict | None) -> AuthProvider:
     if provider == "header":
         return HeaderAuth(str(auth_cfg.get("header_name") or "X-Forwarded-User"))
     if provider not in ("disabled", ""):
-        logging.warning(
-            "[AUTH] Unbekannter provider '%s' — es bleibt bei 'disabled'.", provider
+        # Abbruch statt Rückfall (#89). Vorher startete ein Tippfehler wie
+        # `provider: lokal` die App ohne Anmeldung, mit einer Warnung im Log —
+        # genau dort offen, wo jemand ausdrücklich eine Anmeldung wollte.
+        # Dieselbe Abwägung wie in `LocalUsersAuth.gradio_auth`.
+        raise AuthConfigError(
+            f"ui.web.auth.provider ist '{provider}' — bekannt sind 'disabled', "
+            "'local' und 'header'. Zum bewussten Betrieb ohne Anmeldung "
+            "provider auf 'disabled' setzen."
         )
     return DisabledAuth()

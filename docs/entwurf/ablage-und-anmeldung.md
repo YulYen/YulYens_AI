@@ -270,6 +270,7 @@ ihn von außen entfernt.
 | Lage | Reaktion |
 |---|---|
 | `provider: local`, aber **kein Nutzer auflösbar** (meist ein nicht durchgereichtes `env:`) | **Abbruch** (`AuthConfigError`, Exit 4) |
+| `provider` ist ein **unbekannter Wert** (Tippfehler wie `lokal`) | **Abbruch**, derselbe Weg (#89) — vorher Rückfall auf `disabled` mit einer Warnung |
 | App horcht auf nicht-Loopback **ohne** konfigurierte Anmeldung | laute Warnung, Start läuft weiter |
 | WebUI **ohne** Anmeldung, `storage.enabled: true` | Ablage bleibt aus, Verlauf-Karte weg (#72); `storage.shared_without_login: true` schaltet sie mit lauter Warnung wieder ein |
 

@@ -13,6 +13,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+from core.streaming_provider import LLM_ERROR_MESSAGE
+
 from evals.checks import CheckFailure, run_checks
 from evals.corpus import (
     BehaviourCorpus,
@@ -160,6 +162,16 @@ def _run_case(
         result.answer = answer_fn(persona, case.question)
     except Exception as exc:  # a broken model must not abort the whole run
         result.error = f"{type(exc).__name__}: {exc}"
+        result.duration_ms = int((time.monotonic() - started) * 1000)
+        return result
+
+    # Ein Backend-Ausfall kommt hier als *Text* an: `stream()` fängt den Fehler
+    # und liefert `LLM_ERROR_MESSAGE` aus. Als Antwort gewertet, fielen die
+    # Checks durch und der Judge vergab eine 1 — ein Aussetzer von Ollama zöge
+    # damit den Ø-Score nach unten, also genau die Zahl, über die verglichen
+    # wird. Er ist ein Fehler des Laufs, kein Urteil über das Modell.
+    if result.answer.lstrip().startswith(LLM_ERROR_MESSAGE):
+        result.error = f"backend error — {LLM_ERROR_MESSAGE}"
         result.duration_ms = int((time.monotonic() - started) * 1000)
         return result
 

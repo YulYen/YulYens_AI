@@ -38,11 +38,24 @@ def test_missing_config_falls_back_to_disabled():
     assert isinstance(build_auth_provider({}), DisabledAuth)
 
 
-def test_unknown_provider_falls_back_to_disabled(caplog):
-    provider = build_auth_provider({"auth": {"provider": "keycloak"}})
+@pytest.mark.parametrize("name", ["keycloak", "lokal", "local users"])
+def test_an_unknown_provider_stops_the_start(name):
+    """Ein Tippfehler darf die App nicht ohne Anmeldung starten (#89).
 
-    assert isinstance(provider, DisabledAuth)
-    assert "keycloak" in caplog.text
+    Vorher fiel ein unbekannter Name mit einer Warnung auf ``disabled`` zurück:
+    wer ``provider: lokal`` schrieb, bekam eine offene App und eine Logzeile.
+    Dieselbe Überlegung wie bei ``local`` ohne auflösbaren Nutzer — „zu" kostet
+    einen Supportfall, „offen" ist unbegrenzt.
+    """
+    with pytest.raises(AuthConfigError, match=name):
+        build_auth_provider({"auth": {"provider": name}})
+
+
+@pytest.mark.parametrize("name", ["disabled", "DISABLED", " local ", "header", ""])
+def test_known_providers_still_build(name):
+    """Die Gegenprobe: Groß-/Kleinschreibung und Leerraum bleiben verziehen."""
+    users = {"yul": "pw"} if name.strip().lower() == "local" else None
+    build_auth_provider({"auth": {"provider": name, "users": users}})
 
 
 # ---- Lokale Nutzer ---------------------------------------------------------
