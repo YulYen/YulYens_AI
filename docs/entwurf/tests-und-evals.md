@@ -25,6 +25,37 @@ Die Kommandos stehen im `Makefile` (und in `CLAUDE.md`), die Fixtures in
 - spaCy-Modelle (`python -m spacy download de_core_news_lg`) schalten die
   Keyword-/Wiki-Tests frei; ohne Modell werden sie sauber geskippt
 
+### Lokaler Gesamtlauf am 2026-11-13 (8-GB-Rechner, Windows, Python 3.12.10)
+
+Stand `main` bei `e69f4a1` (PR #237), also einschließlich der Sandbox-PRs
+#229–#237, die Ollama, spaCy und Windows nie gesehen hatten. Der andere Rechner
+muss das für diesen Stand nicht wiederholen — **außer den zwei Wiki-Fällen
+unten**, die hier nicht prüfbar waren.
+
+- `python -m pytest -q -m "not browser"` mit `YULYEN_TEST_MODEL=ministral-3:8b`:
+  **1397 bestanden, 4 fehlgeschlagen, 8 übersprungen.** `-m browser`: **14 von
+  14 bestanden** (20 s). Das venv entsprach den Requirements ohne Nachinstallation
+- **Auf einer 8-GB-Karte braucht der Lauf `YULYEN_TEST_MODEL=ministral-3:8b`.**
+  Der Default ist `ministral-3:14b`, und die Tests überspringen
+  `config.local.yaml`; ohne die Variable scheitern zehn Ollama-Tests mit 404
+- **Nicht geprüft: `test_api_contract[case1]` und `[case2]`** (Portugal/Merz,
+  Jens Spahn). Sie brauchen Kiwix mit dem ZIM `2026-10` unter dem Pfad aus
+  `config.yaml` (`C:/Develop/…`); hier liegt `2026-01` unter
+  `C:\wikipedia-de-offline`. Ohne Wiki antwortet das Modell aus dem Gedächtnis
+  und fällt durch — die Tests überspringen in dem Fall nicht, anders als
+  `test_wiki.py`
+- `test_peter_antwortet_in_exakt_fuenf_woertern`: mit dem 8B 2 von 5 bestanden
+  (sechs statt fünf Wörter). Modellfrage, kein Rückschritt im Code — gegen das
+  14B hier nicht messbar
+- **Echter Befund: Gradios Telemetrie hält einen abgebrochenen Start fest**
+  (#99). `test_an_unusable_login_stops_the_start_readably[local-ohne-nutzer]`
+  lief hier dreimal in Folge in den 120-s-Timeout. Die Meldung und `sys.exit(4)`
+  kommen nach 3 s; der Prozess endet nicht, weil zwei nicht-daemonische
+  Gradio-Threads (`version_check`, `_do_normal_analytics_request` →
+  `huggingface_hub`-Telemetrie) auf eine Verbindung warten. Auf diesem Rechner
+  ist IPv6 kaputt, jeder Versuch gegen `huggingface.co` läuft in den Timeout.
+  Gegenprobe: mit `GRADIO_ANALYTICS_ENABLED=False` besteht der Test in 3,5 s
+
 ### Der Browser-Rauchtest prüft das, was in-process unsichtbar ist
 `tests/test_web_ui_wiring.py` baut die Oberfläche ohne Server und fängt
 verrutschte Bindungen. **Was das Frontend entscheidet, sieht es nicht:** ob ein
