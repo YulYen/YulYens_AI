@@ -70,6 +70,11 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
+- **The web UI no longer sends Gradio telemetry.** Gradio's version check
+  and its usage analytics (sent to Hugging Face) are switched off, so starting
+  the app makes no outside request of its own. On a machine with a broken
+  network this also fixes a start that printed its error after three seconds
+  but kept the process alive for minutes.
 - **An unknown `ui.web.auth.provider` now stops the start** (exit code 4)
   instead of silently running without login. A typo such as `provider: lokal`
   used to log a warning and open the web UI to everyone who could reach it.

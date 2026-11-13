@@ -319,7 +319,11 @@ def build_ui(
     # wirken. Gemeldet hat das nur der Verdrahtungstest; im Browser wäre es
     # als „Theme wird nach dem Neuladen vergessen" aufgefallen, also spät.
     # Das Skript reicht `WebUI._start_server` an `launch()` weiter.
-    with gr.Blocks() as demo:
+    # `analytics_enabled=False`: sonst startet Gradio einen Versionscheck und
+    # eine Analytics-Meldung an Hugging Face — nicht-daemonische Threads, die
+    # bei gestörtem Netz auch einen abgebrochenen Start minutenlang festhalten
+    # (docs/entwurf/webui.md, „Gradios Telemetrie ist aus").
+    with gr.Blocks(analytics_enabled=False) as demo:
         selected_persona_state = gr.Textbox(value="", visible=False)
 
         gr.HTML("""

@@ -47,14 +47,15 @@ unten**, die hier nicht prüfbar waren.
 - `test_peter_antwortet_in_exakt_fuenf_woertern`: mit dem 8B 2 von 5 bestanden
   (sechs statt fünf Wörter). Modellfrage, kein Rückschritt im Code — gegen das
   14B hier nicht messbar
-- **Echter Befund: Gradios Telemetrie hält einen abgebrochenen Start fest**
-  (#99). `test_an_unusable_login_stops_the_start_readably[local-ohne-nutzer]`
+- **Echter Befund: Gradios Telemetrie hält einen abgebrochenen Start fest.** `test_an_unusable_login_stops_the_start_readably[local-ohne-nutzer]`
   lief hier dreimal in Folge in den 120-s-Timeout. Die Meldung und `sys.exit(4)`
   kommen nach 3 s; der Prozess endet nicht, weil zwei nicht-daemonische
   Gradio-Threads (`version_check`, `_do_normal_analytics_request` →
   `huggingface_hub`-Telemetrie) auf eine Verbindung warten. Auf diesem Rechner
   ist IPv6 kaputt, jeder Versuch gegen `huggingface.co` läuft in den Timeout.
   Gegenprobe: mit `GRADIO_ANALYTICS_ENABLED=False` besteht der Test in 3,5 s
+  **Behoben am selben Tag:** `gr.Blocks(analytics_enabled=False)` in
+  `ui/webui_layout.py`, siehe [webui.md](webui.md)
 
 ### Der Browser-Rauchtest prüft das, was in-process unsichtbar ist
 `tests/test_web_ui_wiring.py` baut die Oberfläche ohne Server und fängt

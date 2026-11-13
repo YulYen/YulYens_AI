@@ -228,3 +228,22 @@ Zeit eine andere Persona, schrieb der alte Stream Frage und Teilantwort in
 deren frisch angelegtes Gespräch. Der Streamer wird deshalb einmal gebunden
 und bis zum Schluss benutzt; dieselbe Überlegung wie beim Kill-Switch, der
 über Identität geprüft wird.
+
+### Gradios Telemetrie ist aus (2026-11-13)
+
+`build_ui` baut `gr.Blocks(analytics_enabled=False)`. Ohne das startet Gradio
+6.31 zwei **nicht-daemonische** Threads: einen Versionscheck gegen
+`api.gradio.app` und eine Analytics-Meldung über die
+`huggingface_hub`-Telemetrie. Zwei Gründe, das abzuschalten:
+
+- Ein lokal laufendes System ohne Cloud-Zwang meldet sich nicht bei jedem
+  Start nach außen.
+- Die Threads halten den Prozess am Leben. Auf einem Rechner mit kaputtem IPv6
+  stand die Meldung „Anmeldung nicht benutzbar" nach 3 s da, der Prozess endete
+  aber erst nach über zwei Minuten —
+  `test_an_unusable_login_stops_the_start_readably[local-ohne-nutzer]` lief in
+  den Timeout. In der Sandbox und in der CI fällt das nicht auf, dort antwortet
+  das Netz oder lehnt sofort ab.
+
+Am Konstruktor und nicht über `GRADIO_ANALYTICS_ENABLED`, damit es nicht von
+der Umgebung des Prozesses abhängt. `tests/test_web_ui_wiring.py` hält es fest.

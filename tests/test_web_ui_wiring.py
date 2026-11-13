@@ -115,6 +115,12 @@ def _named_events(wired):
         yield getattr(fn.fn, "__name__", repr(fn.fn)), fn
 
 
+def test_gradio_telemetry_is_off(wired):
+    """Ein lokales System meldet sich nicht bei Gradio/Hugging Face — und ein
+    abgebrochener Start wartet nicht auf deren Antwort (2026-11-13)."""
+    assert wired.demo.analytics_enabled is False
+
+
 def test_every_event_targets_components_of_this_app(wired):
     """Ein Input/Output aus einem fremden Blocks-Kontext ist ein Laufzeitfehler."""
     known = set(wired.demo.blocks)
