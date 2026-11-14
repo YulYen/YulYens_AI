@@ -14,8 +14,12 @@ fastapi==0.162.0
 # verlangen. Ab 1.8 braucht starlette Python 3.11 — seit #79 kein Hindernis.
 starlette==1.10.0
 uvicorn[standard]==0.54.0
-gradio==6.31.0
-gradio_client==2.7.2     # gehoert zu gradio 6.31, zusammen heben
+gradio==6.32.0
+gradio_client==2.7.2     # gehoert zu gradio 6.32 (wie schon zu 6.31), zusammen heben
+# Sicherheitsuntergrenze wie bei starlette: Gradio verlangt nur `pillow>=8.0`,
+# und `pip install -r` hebt ein vorhandenes 12.x nicht von selbst. Unter 13.0
+# stehen ueber 40 bekannte Befunde; bis 6.31 deckelte Gradio `pillow<13.0`.
+pillow>=13.0.0,<14.0
 pydantic==2.14.2
 ollama>=0.1,<1.0         # Python-Client fuer Ollama
 requests>=2.31,<3.0

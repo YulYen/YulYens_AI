@@ -144,6 +144,16 @@ ohne Codeänderung heißt deshalb zuerst: was deckelt hier? Und wer die
 Untergrenze hebt, hebt sie bis dorthin, wo numpy & Co. schon sind — nicht eine
 Stufe, sonst ist derselbe Job ein Jahr später wieder rot.
 
+**Und zuerst nachsehen, ob der Deckel noch steht (2026-11-14).** Die
+pillow-Gruppe war in zwei Wochen auf 40 Einträge gewachsen, jeder mit
+derselben richtigen Begründung (Gradio 6.31 deckelt `pillow<13.0`). Als zwei
+weitere Meldungen kamen, war am Vorabend Gradio 6.32 mit `pillow<14.0`
+erschienen — ein 41. und 42. Eintrag wäre begründet gewesen und trotzdem
+falsch. Vor jedem neuen Eintrag in eine bestehende Gruppe also:
+`pip index versions <deckelndes paket>` und dessen `requires_dist` ansehen.
+Die Untergrenze `pillow>=13.0.0` steht seitdem selbst in `requirements.txt`,
+weil `pip install -r` ein vorhandenes 12.x sonst nicht hebt.
+
 #### ⚠️ Zweite Fassung derselben Falle: ein Werkzeug als Laufzeit-Abhängigkeit
 `gradio` führt **`ruff` als eigene Abhängigkeit** und fordert `>=0.9.3`. Der Pin
 `ruff==0.4.10` war damit unerfüllbar — und `pip install` sagt das nicht
