@@ -40,6 +40,33 @@ class RecordingClient:
         return self.return_value
 
 
+class ShowingClient(RecordingClient):
+    """Wie oben, beantwortet aber zusätzlich ``show`` — wie ein echter Server."""
+
+    capabilities: dict[str, list[str]] = {
+        "qwen3.8:27b": ["completion", "tools", "thinking"],
+        "ministral-3:14b": ["completion", "tools", "vision"],
+    }
+
+    def __init__(self, *, host: str) -> None:
+        super().__init__(host=host)
+        self.shown: list[str] = []
+        self.down = False
+
+    def show(self, model: str):
+        self.shown.append(model)
+        if self.down:
+            raise ConnectionError("Ollama ist nicht da")
+        return types.SimpleNamespace(capabilities=self.capabilities[model])
+
+
+@pytest.fixture()
+def showing_core(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("core.ollama_llm_core.Client", ShowingClient)
+    core = OllamaLLMCore(base_url="http://example")
+    return core, core._client
+
+
 @pytest.fixture()
 def fake_client_factory(
     monkeypatch: pytest.MonkeyPatch,
@@ -132,3 +159,52 @@ def test_stream_chat_forwards_all_arguments(
     }
     assert call_kwargs["messages"] is messages
     assert call_kwargs["options"] is options
+
+
+# ---- think=False (#78) -----------------------------------------------------
+#
+# Der Streamer liest nur `message.content`. Ein Reasoning-Modell, das denken
+# darf, liefert dort lange nichts — also wird das Denken abgestellt, aber nur
+# bei Modellen, die es können: alle anderen behalten ihre Anfrage unverändert.
+
+
+def test_a_thinking_model_is_asked_not_to_think(showing_core) -> None:
+    core, client = showing_core
+
+    core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
+    core.warm_up("qwen3.8:27b")
+
+    assert [call["think"] for call in client.calls] == [False, False]
+
+
+def test_a_model_without_thinking_gets_the_unchanged_request(showing_core) -> None:
+    core, client = showing_core
+
+    core.stream_chat("ministral-3:14b", [{"role": "user", "content": "hi"}])
+    core.warm_up("ministral-3:14b")
+
+    assert all("think" not in call for call in client.calls)
+
+
+def test_the_model_is_asked_once_not_per_request(showing_core) -> None:
+    core, client = showing_core
+
+    for _ in range(3):
+        core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
+
+    assert client.shown == ["qwen3.8:27b"]
+
+
+def test_an_unreachable_server_is_asked_again_and_never_blocks_the_chat(
+    showing_core,
+) -> None:
+    """Ein Ausfall beim Nachfragen ist keine Antwort — er wird nicht gemerkt."""
+    core, client = showing_core
+    client.down = True
+
+    core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
+    assert "think" not in client.calls[-1]
+
+    client.down = False
+    core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
+    assert client.calls[-1]["think"] is False

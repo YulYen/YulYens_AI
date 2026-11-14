@@ -32,6 +32,11 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **`run_evals.py --model <name>`** runs the eval suite against another model
+  without editing the config, as `run_bench.py --model` already did. Pass
+  `--judge-model` too when comparing models — by default the judge is the chat
+  model, so two runs would be graded by two different judges.
+
 - **A persona can have its own model for one-on-one chats.** Add an optional
   `model:` to a persona in `personas_base.yaml` (for example
   `model: "qwen3:15b"` for PETER). That persona then answers with this model
@@ -69,6 +74,13 @@ in them turns out to be wrong, it gets corrected in a later entry.
   not written to the conversation store.
 
 ### Changed
+
+- **Reasoning models answer without their thinking phase.** For a model that
+  reports the `thinking` capability to Ollama (Qwen 3.x and similar), requests
+  are now sent with thinking switched off. The app only ever displayed the
+  answer, never the reasoning, so such a model used to stay silent for a long
+  time before the first character. Models without that capability
+  (`ministral-3` among them) are sent exactly the same request as before.
 
 - **The web UI no longer sends Gradio telemetry.** Gradio's version check
   and its usage analytics (sent to Hugging Face) are switched off, so starting

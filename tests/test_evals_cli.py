@@ -29,6 +29,15 @@ def test_guard_only_run_writes_reports_and_exits_zero(tmp_path):
     assert csv_text.strip().count("\n") == 0
 
 
+def test_model_option_overrides_the_configured_model(tmp_path):
+    """`--model` wie bei der Stoppuhr: ein Modellvergleich ohne Config-Edit."""
+    out = tmp_path / "evals"
+    main(["-e", "classic", "--guard-only", "--model", "qwen3.8:27b", "--out", str(out)])
+
+    assert Config().core["model_name"] == "qwen3.8:27b"
+    assert "qwen3.8:27b" in (out / "report.md").read_text(encoding="utf-8")
+
+
 # ---- Wiki-Proxy (#41a) ----------------------------------------------------
 #
 # Ein voller Lauf ohne Proxy misst die Personas ohne Wikipedia. Das darf
