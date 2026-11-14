@@ -31,57 +31,15 @@
 # entgegen (der einzige Upload ist die Gesprächs-JSON); die Begründung der
 # Gruppe trägt also auch ihn.
 #
-# Stand: 2026-11-11, Gradio 6.31, Audit unter Python 3.12.
+# **2026-11-14: die Liste ist wieder leer.** Am 13.11. kamen zwei weitere
+# pillow-Befunde (CVE-2026-128066/-128067), wieder ohne Codeänderung — aber
+# am Vorabend war Gradio 6.32 erschienen, das `pillow<14.0` erlaubt. Statt die
+# Gruppe auf 42 Einträge wachsen zu lassen, ist Gradio gehoben und pillow in
+# `requirements.txt` auf `>=13.0.0` festgehalten; der Abgleich hat alle 40
+# Einträge selbst als stehengeblieben gemeldet. Die Begründung der Gruppe
+# („die App nimmt keine Bilder entgegen") gilt weiter, wird aber nicht mehr
+# gebraucht — wer ein Bild-Upload einbaut, hat hier keinen Freibrief mehr.
+#
+# Stand: 2026-11-14, Gradio 6.32, Audit unter Python 3.12.
 
-groups:
-  - package: pillow
-    reason: >-
-      Behoben in 13.0.0 — aber **Gradio deckelt `pillow<13.0`** (6.22 wie
-      6.31). Ein eigener Pin machte die Auflösung nur unlösbar. pillow ist reine
-      Transitiv-Abhängigkeit: die App öffnet damit nur die mitgelieferten
-      Persona-Porträts, alle `gr.Image` sind Anzeige ohne Upload. Das gilt
-      auch für den einzigen HIGH-Befund (GHSA-78g4, libopenjp2 über
-      `Image.open`). Löst sich, sobald Gradio den Deckel hebt (die
-      Python-Seite ist seit #79 erfüllt) — wer ein Bild-Upload einbaut, muss
-      diese Gruppe vorher neu bewerten.
-    ids:
-      - CVE-2026-96638
-      - CVE-2026-96640
-      - CVE-2026-96778
-      - CVE-2026-112390
-      - CVE-2026-112391
-      - CVE-2026-112393
-      - CVE-2026-112395
-      - CVE-2026-112399
-      - CVE-2026-112400
-      - CVE-2026-112401
-      - CVE-2026-112404
-      - CVE-2026-112406
-      - CVE-2026-112891
-      - CVE-2026-112892
-      - CVE-2026-112893
-      - CVE-2026-112894
-      - CVE-2026-112895
-      - CVE-2026-112897
-      - CVE-2026-112899
-      - CVE-2026-112900
-      - GHSA-78g4-xqwv-q3g8 # HIGH, nur über Image.open erreichbar
-      - PYSEC-2026-4326
-      - PYSEC-2026-4327
-      - PYSEC-2026-4328
-      - PYSEC-2026-4329
-      - PYSEC-2026-4330
-      - PYSEC-2026-4331
-      - PYSEC-2026-4332
-      - PYSEC-2026-4333
-      - PYSEC-2026-4334
-      - PYSEC-2026-4335
-      - PYSEC-2026-4336
-      - PYSEC-2026-4337
-      - PYSEC-2026-4338
-      - PYSEC-2026-4339
-      - PYSEC-2026-4340
-      - PYSEC-2026-4341
-      - PYSEC-2026-4342
-      - PYSEC-2026-4343
-      - PYSEC-2026-4363
+groups: []
