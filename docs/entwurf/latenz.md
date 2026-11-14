@@ -2,6 +2,23 @@
 
 Die Stoppuhr (#42) und ihr erster Lauf (#42a), der Guard-Holdback (#51) mit allen Messtabellen, der Freigabe-Index über den rohen Text.
 
+## Ein Modell, das denken kann, denkt hier nicht (#78)
+
+Reasoning-Modelle (Qwen 3.x) schicken ihre Überlegung in `message.thinking`
+voraus, der Streamer liest nur `message.content`. Das erste ausgelieferte
+Zeichen käme also erst nach dem Nachdenken, und nichts davon wäre zu sehen.
+`OllamaLLMCore` fragt deshalb je Modell einmal `show().capabilities` und
+schickt `think=False` — **nur** bei Modellen mit der Fähigkeit `thinking`.
+Alle anderen behalten ihre Anfrage unverändert: `think=True` weist Ollama bei
+einem Modell ohne die Fähigkeit ab, und ob jede Server-Fassung `think=False`
+dort durchwinkt, ist nicht gemessen. Einen Schalter gibt es bewusst nicht —
+wer das Denken zeigen will, muss zuerst den Streamer `thinking` lesen lassen.
+
+**Nicht gemessen (2026-11-14):** das Ganze lief nur gegen eine Attrappe, in
+der Sandbox gibt es kein Ollama. Erste Probe auf der Kiste: `ollama show
+qwen3.8:27b` muss `thinking` unter den Capabilities führen, und die Stoppuhr
+darf beim ersten Zeichen nicht mehr um Größenordnungen hinter dem 14B liegen.
+
 ## Die Stoppuhr (#42)
 
 Die messbare Antwort auf „ist es schneller geworden?" — und das Gegenstück zur

@@ -148,8 +148,16 @@ für #7 (LoRA). Details in [evals/ReadMe.md](../../evals/ReadMe.md).
 ```bash
 python scripts/run_evals.py -e classic               # voll (braucht Ollama)
 python scripts/run_evals.py -e classic --guard-only  # Guard-Teil, braucht kein Modell
+python scripts/run_evals.py -e classic --model <anderes> --judge-model <fest>  # Modellvergleich
 make evals                                           # Kurzform für --guard-only
 ```
+
+**`--model` ohne `--judge-model` vergleicht zwei Judges, nicht zwei Modelle.**
+`evals.judge_model` steht auf `same_as_chat`; wer nur das Chat-Modell tauscht,
+tauscht den Richter mit. Dass das den Ø-Score kippt, ist gemessen (2026-11-08:
+8B- und 14B-Judge widersprachen sich über dieselben Antworten). Für einen
+Vergleich also einen Judge festhalten und bei jedem Lauf mitgeben. Eine
+Persona mit eigenem `model:` im Ensemble behält es auch unter `--model`.
 
 - Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
 - `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),

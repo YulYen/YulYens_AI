@@ -17,6 +17,10 @@ python scripts/run_evals.py -e classic --guard-only
 
 # Ohne Judge (nur deterministische Checks), einzelne Persona
 python scripts/run_evals.py -e classic --no-judge --personas PETER
+
+# Anderes Modell, ohne die Config anzufassen — den Judge dabei festhalten,
+# sonst bewertet jedes Modell sich selbst und die Läufe sind nicht vergleichbar
+python scripts/run_evals.py -e classic --model gemma4:26b --judge-model ministral-3:14b --out logs/evals/gemma4_26b
 ```
 
 Report landet als `report.md` (lesen) und `report.csv` (zwei Läufe

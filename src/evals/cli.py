@@ -41,6 +41,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Comma-separated persona filter, e.g. 'DORIS,PETER'.",
     )
     parser.add_argument(
+        "--model",
+        help=(
+            "Overrides core.model_name for this run, like run_bench.py --model. "
+            "A persona with its own `model:` in the ensemble keeps it. Pass "
+            "--judge-model as well when comparing models: without it the judge "
+            "is the chat model, and two runs are then graded by two judges."
+        ),
+    )
+    parser.add_argument(
         "--guard-only",
         action="store_true",
         help="Run only the guard red-team corpus (needs no model at all).",
@@ -191,6 +200,9 @@ def main(argv: list[str] | None = None) -> int:
             "Missing required parameter: --ensemble / -e "
             "(e.g. 'python scripts/run_evals.py -e classic')."
         )
+
+    if args.model:
+        cfg.override("core", {"model_name": args.model})
 
     evals_cfg = dict(getattr(cfg, "evals", {}) or {})
     out_dir = Path(args.out or evals_cfg.get("out_dir") or "logs/evals")
