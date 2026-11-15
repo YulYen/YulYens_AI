@@ -542,6 +542,41 @@ def test_proxy_delivers_text_link_source_and_original_length(proxy, monkeypatch)
     assert "PETER" in payload["wiki_hint"]
 
 
+def test_proxy_keeps_umlauts_of_the_infobox_without_a_charset_header(
+    proxy, monkeypatch
+):
+    """Kiwix schickt `text/html` ohne charset; `requests` rät dann ISO-8859-1.
+
+    Bewusst eine echte `requests.Response` statt `_KiwixResponse` — die
+    Attrappe liefert `text` schon richtig dekodiert und hat den Fehler
+    verdeckt: Die Infobox kam als „Stefan MÃ¶ller" beim Modell an, Gemma 4
+    schrieb daraufhin „LuÃ­s Montenegro" (2026-11-15).
+    """
+    import requests
+
+    html = (
+        "<html><head><meta charset='utf-8'></head><body><div id='content'>"
+        "<table class='infobox'><tr><th>Vorsitzende</th>"
+        "<td>Stefan Möller</td></tr></table>"
+        "<p>Die Partei wurde in Thüringen gegründet.</p></div></body></html>"
+    )
+    response = requests.models.Response()
+    response.status_code = 200
+    response.headers["Content-Type"] = "text/html"
+    response._content = html.encode("utf-8")
+    # So setzt es der HTTP-Adapter von requests bei jeder echten Antwort:
+    response.encoding = requests.utils.get_encoding_from_headers(response.headers)
+    assert response.encoding == "ISO-8859-1"  # die Voraussetzung des Fehlers
+    monkeypatch.setattr(proxy, "_fetch_kiwix", lambda term: (200, response))
+
+    result = proxy.handle_lookup("/Partei?json=1")
+
+    text = result.payload["text"]
+    assert "Stefan Möller" in text
+    assert "Thüringen" in text
+    assert "Ã" not in text
+
+
 def test_proxy_truncates_at_the_requested_limit_and_reports_the_full_length(
     proxy, monkeypatch
 ):

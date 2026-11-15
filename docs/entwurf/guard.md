@@ -298,3 +298,19 @@ jeden Abruf in den Tests ab (die „stille Richtung" aus `tests/doubles.py`).
 
 **Wer einen neuen Weg baut, der vor dem Stream etwas für die Eingabe tut,
 fragt zuerst `input_refused`.**
+
+### Kiwix-HTML wird als Bytes gelesen, nie über `resp.text` (2026-11-15)
+
+Kiwix schickt Artikel als `text/html` **ohne** `charset`. `requests` rät in
+dem Fall ISO-8859-1, `resp.text` ist dann für jedes Nicht-ASCII-Zeichen
+falsch („Stefan MÃ¶ller"). Der Fließtext lief schon über `resp.content` —
+BeautifulSoup liest das `<meta charset>` des Artikels —, die Infobox aber über
+`resp.text`. Weil der Fließtext stimmte, fiel es nicht auf; erst
+Gemma 4 übernahm „LuÃ­s Montenegro" wörtlich in die Antwort, während die
+anderen Modelle den Namen aus dem Gedächtnis richtig schrieben.
+
+Die Test-Attrappe `_KiwixResponse` in `tests/test_wiki.py` liefert `text`
+schon richtig dekodiert und kann den Fehler deshalb nicht zeigen. Der
+Regressionstest nimmt eine echte `requests.Response` mit dem Header, den
+Kiwix wirklich schickt. **Wer im Proxy neu aus der Antwort liest, nimmt
+`resp.content`.**
