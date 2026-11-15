@@ -438,6 +438,10 @@ Gemmas zwei Fehler waren keine Modellschwäche:
   richtig, der Test verlangte „Příbor". Er lässt jetzt auch den historischen Namen
   samt Region gelten; das 8B fällt weiter durch (es schrieb nie „Mähren").
 
+**Nachkalibriert mit Gemma** (je 20 Läufe): Ostersonntag 20/20, Freud 20/20 (einmal
+„Freiberg in Moravia", seitdem zugelassen), kaufmännisch runden 15/20, Geburtsorte
+heute 0/20. Die beiden geparkten Tests bleiben damit geparkt (Regel: 19 von 20).
+
 **Googles QAT-Fassung** (`hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf`, 15 GB)
 meldet Ollama keine Denkfähigkeit, denkt aber: 618 Tokens für fünf Wörter. Seit
 diesem Tag geht `think=False` an jedes Modell

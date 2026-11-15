@@ -47,7 +47,11 @@ import pytest
 #   ostersonntag:  ministral-3:8b 0/20, ministral-3:14b 20/20
 #   freud:         ministral-3:8b 0/20, ministral-3:14b 20/20  (mit Datum im Prompt;
 #                  ohne Zeitstempel-Block schafft auch das 8B 20/20)
-# Aufgenommen wird eine Aufgabe nur, wenn das 14B mindestens 19 von 20 schafft.
+# Nachkalibriert 2026-11-15 mit dem neuen Default gemma4:26b, je 20 Läufe:
+#   ostersonntag 20/20, freud 20/20 (19/20 + einmal „Freiberg in Moravia", seitdem
+#   zugelassen), kaufmännisch runden 15/20, Geburtsorte heute 0/20.
+# Aufgenommen wird eine Aufgabe nur, wenn das Default-Modell mindestens 19 von 20
+# schafft — die zwei geparkten bleiben deshalb geparkt.
 _KALIBRIERT = "2026-11-08"
 
 
@@ -146,7 +150,8 @@ _FREUD_FRAGE = (
 # „Freiberg in Mähren", „Freiberg (Mähren)": der historische Name samt Region ist
 # kein erfundener Ort. Nur „Freiberg" allein reicht nicht — das 8B schreibt
 # „Freiberg an der Jischl" und erfindet „České Velenice" dazu.
-_FREUD_HISTORISCH = re.compile(r"freiberg\W+(?:in\W+)?mahren")
+# „Moravia": Gemma 4 schrieb in einem von 20 Läufen den englischen Namen.
+_FREUD_HISTORISCH = re.compile(r"freiberg\W+(?:in\W+)?(?:mahren|moravia)")
 
 
 @pytest.mark.slow
@@ -180,8 +185,10 @@ def test_peter_kennt_freuds_geburtsort(client_with_date):
 #
 # Die beiden ursprünglichen 14B-Tests. Am 2026-11-08 schafften sie weder
 # ministral-3:8b noch ministral-3:14b (je 0/20; das Runden mit dem Klärungssatz
-# zum Dezimalpunkt je 0/5). Sie bleiben als Messlatte für ein
-# künftiges Modell, das noch auf 16 GB passt, und sind deshalb aus:
+# zum Dezimalpunkt je 0/5). gemma4:26b kam am 2026-11-15 auf 15/20 beim Runden
+# (die Fehlläufe runden über float: „1.005" → „1.00") und 0/20 bei den
+# Geburtsorten. Sie bleiben als Messlatte für ein künftiges Modell, das noch
+# auf 16 GB passt, und sind deshalb aus:
 #
 #     $env:YULYEN_ZUKUNFT_TESTS = "1"
 #     $env:YULYEN_TEST_MODEL = "<neues Modell>"   # optional
