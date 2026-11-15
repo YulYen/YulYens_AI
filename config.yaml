@@ -31,9 +31,10 @@ core:
     # Note: release tag is 2512 (Dec 2025) — release date != data cutoff.
     "ministral-3:8b": "2023-10"
     "ministral-3:14b": "2023-10"
-    # gemma4:26b is deliberately missing until its cutoff is checked against
-    # Google's model card (backlog #99): a guessed date would be presented to
-    # the personas as fact.
+    # Source: Google's Gemma 4 model card (ai.google.dev/gemma/docs/core/model_card_4
+    # and huggingface.co/google/gemma-4-26B-A4B-it): pre-training data "with a
+    # cutoff date of January 2025". Release April 2026 — again release != cutoff.
+    "gemma4:26b": "2025-01"
 
 # --- UI settings ---------------------------------------------------------------
 ui:
