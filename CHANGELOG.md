@@ -32,6 +32,15 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **`scripts/warmup_ping.py` loads the chat model ahead of time.** A model
+  that does not fully fit into VRAM (the new default `gemma4:26b` on a 16 GB
+  card) takes well over a minute to load from disk on its first use. Run the
+  script at Windows startup or when opening VS Code, and the app finds a warm
+  model. It keeps the model loaded for an hour (`--keep-alive`, `-1` =
+  forever) and uses the same context size as the app, so Ollama does not
+  reload it on the first question. It never fails loudly: if Ollama is not
+  running, it logs that and exits normally.
+
 - **`run_evals.py --model <name>`** runs the eval suite against another model
   without editing the config, as `run_bench.py --model` already did. Pass
   `--judge-model` too when comparing models — by default the judge is the chat

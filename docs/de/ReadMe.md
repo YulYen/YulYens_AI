@@ -71,6 +71,11 @@ siehe auch: [Features.md](Features.md)
   zusammen mit dem darauf abgestimmten Ensemble `examples/classic_ministral14b`. Mit
   8 GB VRAM `ministral-3:8b`. Das gewählte Modell pullen und in `config.local.yaml`
   unter `core.model_name` eintragen.
+  **Vorwärmen:** `python scripts/warmup_ping.py` lädt das Modell vorab und hält es eine
+  Stunde (`--keep-alive <Sekunden>`, `-1` = immer). Gut für den Windows-Autostart
+  (Verknüpfung in `shell:startup` auf `<venv>\Scripts\pythonw.exe
+  <repo>\scripts\warmup_ping.py`) oder als VS-Code-Task mit
+  `"runOptions": {"runOn": "folderOpen"}`.
   (Das Default-Modell steht in `config.yaml` unter `core.model_name`; eine Bewertung
   verschiedener Modelle findet sich in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md)
   für 16 GB VRAM und in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) für 8 GB.)

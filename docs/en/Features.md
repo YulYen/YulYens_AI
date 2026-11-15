@@ -239,6 +239,7 @@ The “Create guest 🎭” card lets you assemble your own persona from a name,
 - **A start page you can read at a glance:** The four persona cards carry their portraits, the function cards (“AI Dialog”, “Guest persona”, “History”, “Ask all”) a plain icon. Who you can talk to and what is merely a function is distinguishable without reading.
 - **Copy an answer:** Every chat message carries a copy icon.
 - **Status line:** After each answer, the line below the chat shows how full the context window is (`Context █░░░ 424 / 8,192 tokens (5 %)`) and how fast the model was (`24.0 tok/s · first token after 1.9 s`). Past 75 % it is highlighted — that is exactly where the application starts trimming the conversation history.
+- **Warm up the model:** `python scripts/warmup_ping.py` loads the chat model before the app starts, for example at Windows startup or when VS Code opens. Large models such as `gemma4:26b` take well over a minute to load the first time; afterwards even the first question is answered right away. The model stays loaded for an hour (`--keep-alive`).
 
 ## News as a source (RSS)
 

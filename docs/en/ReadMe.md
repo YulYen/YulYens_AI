@@ -73,6 +73,11 @@ See also: [Features.md](Features.md)
   (~9 GB) fits — ideally together with the ensemble tuned for it,
   `examples/classic_ministral14b`. With 8 GB of VRAM, use `ministral-3:8b`. Pull
   the model you choose and set it as `core.model_name` in `config.local.yaml`.
+  **Warming up:** `python scripts/warmup_ping.py` loads the model ahead of time and
+  keeps it for an hour (`--keep-alive <seconds>`, `-1` = forever). Handy for the
+  Windows autostart (a shortcut in `shell:startup` to `<venv>\Scripts\pythonw.exe
+  <repo>\scripts\warmup_ping.py`) or as a VS Code task with
+  `"runOptions": {"runOn": "folderOpen"}`.
   (The default model is set in `config.yaml` under `core.model_name`; a comparison of
   candidate models can be found in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md) for 16 GB VRAM
   and in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) for 8 GB, both German only.)

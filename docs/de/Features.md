@@ -240,6 +240,7 @@ Der Nutzername wird zu jedem Gespräch in der Ablage vermerkt und steht in jeder
 - **Startseite auf einen Blick:** Die vier Persona-Karten tragen ihre Porträts, die Funktionskarten („AI Dialog", „Gast-Persona", „Verlauf", „Frage an alle") ein schlichtes Icon. Wer wen anspricht und was nur eine Funktion ist, ist damit ohne Lesen unterscheidbar.
 - **Antwort kopieren:** Jede Nachricht im Chat hat ein Kopier-Symbol.
 - **Statuszeile:** Unter dem Chat steht nach jeder Antwort, wie voll das Kontextfenster ist (`Kontext █░░░ 424 / 8.192 Token (5 %)`) und wie schnell das Modell war (`24,0 Tok/s · erster Token nach 1,9 s`). Ab 75 % Füllstand wird die Zeile hervorgehoben — genau dort beginnt die Anwendung, den Gesprächsverlauf zu kürzen.
+- **Modell vorwärmen:** `python scripts/warmup_ping.py` lädt das Chat-Modell schon vor dem App-Start, etwa beim Windows-Autostart oder beim Öffnen von VS Code. Große Modelle wie `gemma4:26b` brauchen beim ersten Laden gut eine Minute; danach antwortet schon die erste Frage sofort. Das Modell bleibt eine Stunde geladen (`--keep-alive`).
 
 ## Nachrichten als Quelle (RSS)
 
