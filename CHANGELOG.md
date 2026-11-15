@@ -75,12 +75,14 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
-- **Reasoning models answer without their thinking phase.** For a model that
-  reports the `thinking` capability to Ollama (Qwen 3.x and similar), requests
-  are now sent with thinking switched off. The app only ever displayed the
-  answer, never the reasoning, so such a model used to stay silent for a long
-  time before the first character. Models without that capability
-  (`ministral-3` among them) are sent exactly the same request as before.
+- **Reasoning models answer without their thinking phase.** Every request to
+  Ollama is now sent with thinking switched off (Qwen 3.x, Gemma 4 and
+  similar). The app only ever displayed the answer, never the reasoning, so
+  such a model used to stay silent for a long time before the first character.
+  This applies to every model, including those that do not report the
+  `thinking` capability: Google's QAT build of Gemma 4 does not report it but
+  thinks anyway, and returned empty answers. Models that cannot think
+  (`ministral-3` among them) accept the switch and answer as before.
 
 - **The web UI no longer sends Gradio telemetry.** Gradio's version check
   and its usage analytics (sent to Hugging Face) are switched off, so starting
@@ -168,6 +170,11 @@ in them turns out to be wrong, it gets corrected in a later entry.
   article's infobox — party leaders, founding dates, names — arrived garbled
   ("Stefan MÃ¶ller" instead of "Stefan Möller"); the article text itself was
   fine. Models copied the garbled spelling into their answers.
+- **The eval judge knows today's date.** Without it, the judge treated every
+  correct answer to "What is today's date?" as wrong (its own knowledge ends
+  years earlier), so `ts_knows_today` scored 1 for every model. Averages from
+  earlier runs are therefore slightly too low and not directly comparable with
+  new ones.
 - **An Ollama outage during an eval run no longer lowers the score.** The
   backend's error text was treated as the model's answer: checks failed, the
   judge gave it a 1, and the average — the number runs are compared by —
