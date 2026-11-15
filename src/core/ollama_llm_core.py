@@ -1,21 +1,22 @@
 """Thin wrapper around the Ollama client.
 
-Eine Regel wohnt hier: **ein Modell, das denken kann, denkt bei uns nicht**
-(#78). Qwen 3.x und andere Reasoning-Modelle schicken ihre Überlegung in
-`message.thinking` voraus; der Streamer liest nur `message.content`. Ohne
-`think=False` bleibt die Antwort deshalb lange leer — die Stoppuhr mäße das
-Nachdenken als Latenz, und der Judge bekäme es bezahlt, ohne es zu sehen.
+Eine Regel wohnt hier: **kein Modell denkt bei uns** (#78). Qwen 3.x, Gemma 4
+und andere Reasoning-Modelle schicken ihre Überlegung in `message.thinking`
+voraus; der Streamer liest nur `message.content`. Ohne `think=False` bleibt die
+Antwort deshalb lange leer — die Stoppuhr mäße das Nachdenken als Latenz, und
+der Judge bekäme es bezahlt, ohne es zu sehen.
 
-Gefragt wird das Modell selbst (`show().capabilities`), nicht eine Namensliste:
-ein Modell ohne die Fähigkeit bekommt den Parameter gar nicht erst, seine
-Anfrage bleibt Byte für Byte die alte. Das ist Absicht — `think=True` weist
-Ollama bei solchen Modellen ab, und ob jede Server-Fassung `think=False`
-durchwinkt, ist hier nicht gemessen.
+`think=False` geht an **jedes** Modell, nicht nur an die, die per
+`show().capabilities` „thinking" melden. So war es bis 2026-11-15, und dabei
+fiel Googles QAT-Fassung von Gemma 4 durch: Sie meldet die Fähigkeit nicht,
+denkt aber trotzdem — 618 Tokens Überlegung für eine Fünf-Wort-Antwort, im
+Live-Test zweimal eine leere Antwort. Ollama 0.40.16 nimmt `think=False` bei
+allen sieben getesteten Modellen an, auch bei denen ohne die Fähigkeit;
+abgewiesen wird nur `think=True`.
 """
 
 from __future__ import annotations
 
-import logging
 from typing import Any
 
 from ollama import Client
@@ -34,25 +35,6 @@ class OllamaLLMCore(LLMCore):
         :param base_url: URL of the Ollama server (e.g. http://localhost:11434)
         """
         self._client = Client(host=base_url)
-        self._can_think: dict[str, bool] = {}
-
-    def _think_kwargs(self, model_name: str) -> dict[str, Any]:
-        """`{"think": False}` für ein Modell, das denken kann, sonst nichts.
-
-        Die Antwort wird je Modell gemerkt — aber nur eine *erhaltene*. Ist
-        Ollama gerade nicht erreichbar, fragt der nächste Aufruf erneut, statt
-        ein Reasoning-Modell für den Rest des Prozesses denken zu lassen.
-        """
-        can_think = self._can_think.get(model_name)
-        if can_think is None:
-            try:
-                capabilities = self._client.show(model_name).capabilities or []
-            except Exception as exc:  # die Nachfrage darf keinen Chat verhindern
-                logging.debug(f"[OLLAMA] show({model_name!r}) failed: {exc}")
-                return {}
-            can_think = "thinking" in capabilities
-            self._can_think[model_name] = can_think
-        return {"think": False} if can_think else {}
 
     def warm_up(
         self,
@@ -73,7 +55,7 @@ class OllamaLLMCore(LLMCore):
             keep_alive=keep_alive,
             messages=[{"role": "user", "content": "..."}],
             options=options or {},
-            **self._think_kwargs(model_name),
+            think=False,
         )
 
     def stream_chat(
@@ -98,5 +80,5 @@ class OllamaLLMCore(LLMCore):
             messages=messages,
             options=options or {},
             stream=True,
-            **self._think_kwargs(model_name),
+            think=False,
         )
