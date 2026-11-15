@@ -113,14 +113,18 @@ in them turns out to be wrong, it gets corrected in a later entry.
   Every persona of the ensemble appears in both. In the terminal menu the
   numbers stay the same (`1`–`4`); the Ask-All entry now reads `[4] Ask-All`.
 
-- **The default model is now `ministral-3:14b`** (previously
-  `ministral-3:8b`). It needs about 9 GB and is meant for a 16 GB graphics
-  card. **Before updating, run `ollama pull ministral-3:14b`.** Without it,
-  `--doctor` reports the model as missing and the personas cannot answer.
-  **On an 8 GB card**, keep the old model by setting
-  `core.model_name: "ministral-3:8b"` in `config.local.yaml`. Both models
-  share the same knowledge cutoff (2023-10), so the date the personas are
-  told about their knowledge stays the same.
+- **The default model is now `gemma4:26b`** (previously `ministral-3:8b`).
+  It is 18 GB and meant for a 16 GB graphics card plus system RAM: part of the
+  model sits in RAM, so the first answer after a start (or after `keep_alive`
+  ran out) takes about 25 seconds; after that it writes nearly twice as fast
+  as `ministral-3:14b`. **Before updating, run `ollama pull gemma4:26b`.**
+  Without it, `--doctor` reports the model as missing and the personas cannot
+  answer. **On a 12–16 GB card** use `ministral-3:14b` together with the new
+  ensemble `examples/classic_ministral14b`, which keeps the persona settings
+  tuned for that model; **on an 8 GB card** keep `ministral-3:8b`. Either way,
+  set `core.model_name` in `config.local.yaml`. The personas are told that
+  Gemma's knowledge cutoff is unknown until it has been verified; with the
+  Ministral models it stays 2023-10.
 
 - **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
   reached its end of life in October 2026, and the libraries this project

@@ -1,6 +1,8 @@
 """Live-Tests, die ein Modell der 14B-Klasse besteht und das 8B nicht (#78).
 
-Seit 2026-11-07 ist `ministral-3:14b` der Default. Diese beiden Tests halten fest,
+Vom 2026-11-07 bis 2026-11-15 war `ministral-3:14b` der Default, seitdem ist es
+`gemma4:26b` (Ostersonntag bestanden, Freud mit der weicheren Regel; je ein
+Lauf). Diese beiden Tests halten fest,
 was es dem 8B voraus hat — kalibriert am 2026-11-08 auf Yuls Kiste, je 20 Läufe
 mit PETERs Einstellungen aus dem Ensemble (siehe ``_KALIBRIERT``). Wer per
 ``config.local.yaml`` beim 8B bleibt, sieht sie also rot; das ist ihr Zweck.

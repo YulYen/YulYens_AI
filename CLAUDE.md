@@ -148,8 +148,10 @@ Eine Datei-für-Datei-Liste gibt es bewusst nicht mehr (sie veraltete, #92).
 ## Personas
 
 LEAH (Standard), DORIS, PETER, POPCORN — Ensemble `classic`. Prompts,
-Temperaturen und `num_ctx` stehen in `ensembles/classic/`; seit #78 sind sie
-auf `ministral-3:14b` abgestimmt.
+Temperaturen und `num_ctx` stehen in `ensembles/classic/`. Default-Modell ist
+seit 2026-11-15 `gemma4:26b`; die Werte sind noch die des 14B und werden in
+#99 nachgestimmt. Der 14B-Stand liegt unverändert in
+`ensembles/examples/classic_ministral14b/`.
 
 ## Wichtige Architektur-Muster
 

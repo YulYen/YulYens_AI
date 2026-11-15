@@ -20,6 +20,10 @@ Alle Zahlen sind Recherche, **nicht auf Yuls Kiste gemessen**. Das Testen ist Ba
 > **Nachtrag 2026-11-08:** Das 14B ist jetzt auf der Kiste gemessen, gegen das 8B,
 > siehe [Messung auf Yuls Kiste](#messung-auf-yuls-kiste-2026-11-08). Die übrigen
 > vier Kandidaten sind weiter nur Recherche.
+>
+> **Nachtrag 2026-11-15:** Alle fünf Kandidaten sind gemessen, **`gemma4:26b` ist
+> neuer Default**, siehe [Modellvergleich 2026-11-15](#modellvergleich-2026-11-15).
+> Die Recherche-Zahlen unten bleiben als Stand vom 2026-11-01 stehen.
 
 ---
 
@@ -355,6 +359,110 @@ Was die neue Abstimmung nicht löst:
   ein.
 
 Folgeticket: #86.
+
+---
+
+## Modellvergleich 2026-11-15
+
+Alle fünf Kandidaten gegen `ministral-3:14b`, auf Yuls Kiste (RTX 5060 Ti 16 GB,
+32 GB RAM, Ollama 0.40.16), mit der classic-Abstimmung vom 2026-11-08. Ergebnis:
+**`gemma4:26b` wird Default**, die Feinabstimmung folgt in #99. Die
+14B-Abstimmung bleibt als Ensemble `examples/classic_ministral14b`.
+
+### Evals
+
+Judge für alle: `ministral-3:8b`, selbst kein Kandidat. Je zwei Läufe, 17
+bewertete Fälle. **Noch ohne den Datums-Fix (#81):** `ts_knows_today` bekam
+überall 1,0, die Ø-Werte sind deshalb mit späteren nicht mischbar.
+
+| Modell | Lauf 1 | Lauf 2 | Ø |
+|---|---|---|---|
+| `gemma4:26b` | 4,15 | 4,24 | **4,20** |
+| `qwen3.8:27b` | 4,11 | 4,01 | 4,06 |
+| `qwen3.6:35b` | 4,00 | 4,03 | 4,02 |
+| `devstral-small-2:24b` | 3,89 | 3,77 | 3,83 |
+| `ministral-3:14b` | 3,60 | 3,58 | 3,59 |
+
+Die Abstände sind groß gegen die Streuung (das 14B schwankt um 0,02). Wo Gemma
+gewinnt, steht in den Einzelfällen: POPCORN nennt eine Größenordnung statt einer
+erfundenen Zahl (`popcorn_names_uncertainty` 4,0 gegen 1,25), Karl hält die
+Vorgaben („antworte auf Englisch, keine Bullet-Listen", `karl_keeps_constraint`
+5,0 gegen 2,0). Bei DORIS liegen alle Modelle niedrig — der 8B-Judge wertete
+„Paris, wow, was für eine bahnbrechende Erkenntnis …" als „Sarkasmus fehlt".
+
+### Stoppuhr
+
+`run_bench.py --model …`, PETER, 5 Fragen × 3 Runden, Median aus 15 Messungen.
+
+| Modell | erstes Zeichen | Zeichen/s | Kaltstart | GPU-Anteil* |
+|---|---|---|---|---|
+| `ministral-3:14b` | 0,33 s | 168 | 4 s | 100 % |
+| `gemma4:26b` | 0,46 s | 309 | 25 s | 80 % |
+| `qwen3.6:35b` | 0,74 s | 332 | 27 s | 62 % |
+| `devstral-small-2:24b` | 0,94 s | 54 | 21 s | 90 % |
+| `qwen3.8:27b` | 1,53 s | 57 | 20 s | 75 % |
+
+\* `ollama ps` bei Kontext 4096 abgelesen; mit `num_ctx` 16384 liegt eher mehr im RAM.
+
+**Die MoE-Modelle sind der Hebel**, wie in der Recherche vermutet: Gemma und
+Qwen3.6 schreiben fast doppelt so schnell wie das 14B, obwohl sie nicht ganz in
+den VRAM passen. Die dichten devstral und qwen3.8 dagegen bremsen der RAM-Anteil
+auf ein Drittel. Gemma und Qwen3.6 antworten außerdem etwa halb so lang wie das
+14B (rund 400 statt 700 Zeichen bei der freien Frage).
+
+### Live-Tests
+
+`pytest -m ollama` (die zehn Tests, die das 14B besteht) und die zwei geparkten
+(`YULYEN_ZUKUNFT_TESTS=1`), je **ein** Lauf — ein Eindruck, keine Kalibrierung.
+
+| Modell | aktive Suite | kaufmännisch runden | Geburtsorte heute |
+|---|---|---|---|
+| `qwen3.6:35b` | 10/10 | knapp daneben („3." statt „3") | daneben |
+| `devstral-small-2:24b` | 10/10 | daneben (`float` + `round()`) | daneben |
+| `qwen3.8:27b` | 9/10 (vier statt fünf Wörter) | **bestanden** | daneben |
+| `gemma4:26b` | 8/10 | **bestanden** | 2 von 3 |
+| `gemma4` QAT | 8/10 (zwei leere Antworten) | **bestanden** | 2 von 3 |
+
+Gemmas zwei Fehler waren keine Modellschwäche:
+
+- **Portugal-Fall:** Gemma schrieb „LuÃ­s Montenegro" wörtlich aus dem
+  Wiki-Ausschnitt ab. Die Infobox kam bei *jedem* Modell kaputt an (Kiwix schickt
+  kein charset), nur schrieben die anderen den Namen aus dem Gedächtnis richtig.
+  Behoben in PR #240; danach besteht Gemma den Fall.
+- **Freud:** „Freiberg in Mähren liegt heute in der Tschechischen Republik" ist
+  richtig, der Test verlangte „Příbor". Er lässt jetzt auch den historischen Namen
+  samt Region gelten; das 8B fällt weiter durch (es schrieb nie „Mähren").
+
+**Googles QAT-Fassung** (`hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf`, 15 GB)
+meldet Ollama keine Denkfähigkeit, denkt aber: 618 Tokens für fünf Wörter. Seit
+diesem Tag geht `think=False` an jedes Modell
+([latenz.md](entwurf/latenz.md#kein-modell-denkt-hier-78)).
+
+### Blindverkostung 14B gegen Gemma
+
+14 Proben über `/v1/chat/completions` mit Wiki: POPCORN fachfremd (Steuer, TCP),
+DORIS knapp und unter Rollenspiel-Druck, LEAH über vier Züge und über DORIS,
+PETER bei Wiki-Fakten (Merz zweimal, Hamburg) und Code (Palindrom), dieselbe
+Pizza-Frage an alle vier. Seiten 7 zu 7 verteilt.
+
+**Yuls Urteil (blind): Gemma 6, 14B 5, gleich 3.** „Gemma hat in der Regel
+erwachsener und professioneller gewirkt, aber bei POPCORN und LEAH fehlten mir
+manchmal ein wenig Witz und Charme." Zu erkennen, welches Modell welches war,
+war leicht — Gemma antwortet kürzer.
+
+Ohne Geschmack fällt auf:
+
+- **Gemma bleibt beim falschen Wiki-Artikel ehrlich.** „Wer ist Bundeskanzler
+  und seit wann?" (#84): Das 14B schreibt weiter „seit 8. Dezember 2021", Gemma
+  „Ein genaues Datum geht aus dem vorliegenden Text nicht hervor".
+- **Das 14B erfindet Quellen**, Gemma kaum: POPCORN hängt eine erfundene
+  Wikipedia-URL samt `oldid` an, PETER belegt Pizzasorten mit „Quelle: Wikipedia"
+  (#86).
+- **Gemma-DORIS sprach einmal für LEAH mit** („LEAH: … DORIS: …").
+- **Beide PETER wählten als Palindrom-Beispiel** den bekannten Satz mit einem
+  rassistischen Wort.
+
+Die letzten beiden und Yuls Eindruck zu POPCORN und LEAH stehen in #99.
 
 ---
 

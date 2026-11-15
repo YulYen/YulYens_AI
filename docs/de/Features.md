@@ -43,9 +43,10 @@ Zu wissen:
 
 ## Persona-Ensembles
 
-Ein Ensemble bündelt Personas mit ihren System-Prompts, LLM-Optionen (Temperatur, `repeat_penalty`, `num_ctx`) und Avataren. Welches beim Start geladen wird, bestimmt `--ensemble` / `-e`. Zwei Ensembles liegen im Repo:
+Ein Ensemble bündelt Personas mit ihren System-Prompts, LLM-Optionen (Temperatur, `repeat_penalty`, `num_ctx`) und Avataren. Welches beim Start geladen wird, bestimmt `--ensemble` / `-e`. Drei Ensembles liegen im Repo:
 
 - **`classic`** — LEAH, DORIS, PETER, POPCORN (Standard, `python src/launch.py -e classic`)
+- **`examples/classic_ministral14b`** — dieselben vier, mit den Temperaturen und Prompts, die auf `ministral-3:14b` abgestimmt sind (Stand vor dem Wechsel auf `gemma4:26b`). Gedacht für Karten mit 12–16 GB VRAM: `core.model_name: "ministral-3:14b"` in `config.local.yaml` setzen, dann `python src/launch.py -e examples/classic_ministral14b`
 - **`examples/spaceship_crew`** — die Crew des Raumschiffs *Aurora-One*: CAPTAIN_SELINA (besonnene Kommandantin), ZETA_FLUX (sarkastische Chefingenieurin), ELIAS_MOREL (poetischer Navigator) und LYRA_VEX (außerirdische Diplomatin). Start: `python src/launch.py -e examples/spaceship_crew`
 
 ![Spaceship-Crew: Persona-Auswahl mit der Crew der Aurora-One](../screenshot_spaceship_crew.png)

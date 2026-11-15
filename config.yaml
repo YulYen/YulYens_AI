@@ -6,9 +6,13 @@ core:
   # Backend selection: use "ollama" for real LLMs, "dummy" for quick echo tests
   backend: "ollama"
   # Default model name at startup
-  # ministral-3:14b needs ~9 GB of VRAM (16 GB card). On an 8 GB card set
-  # "ministral-3:8b" in config.local.yaml instead.
-  model_name: "ministral-3:14b" # e.g. "ministral-3:8b", "gptoss20b-q4ks", "mistral7b-local"
+  # gemma4:26b (MoE, 4B active) is 18 GB: on a 16 GB card part of it sits in
+  # system RAM, which costs ~25 s on a cold start but little speed afterwards.
+  # Smaller cards: "ministral-3:14b" (~9 GB, 12-16 GB VRAM) or
+  # "ministral-3:8b" (8 GB VRAM), set in config.local.yaml. The classic
+  # personas were tuned on ministral-3:14b; that tuning is kept as the
+  # ensemble examples/classic_ministral14b.
+  model_name: "gemma4:26b" # e.g. "ministral-3:14b", "ministral-3:8b"
   # Preload the model in a background thread at startup so the first question
   # hits a warm model. The app starts fine even if Ollama is not running.
   warm_up: true
@@ -27,6 +31,9 @@ core:
     # Note: release tag is 2512 (Dec 2025) — release date != data cutoff.
     "ministral-3:8b": "2023-10"
     "ministral-3:14b": "2023-10"
+    # gemma4:26b is deliberately missing until its cutoff is checked against
+    # Google's model card (backlog #99): a guessed date would be presented to
+    # the personas as fact.
 
 # --- UI settings ---------------------------------------------------------------
 ui:
