@@ -13,38 +13,6 @@ _now = datetime.now(tz=BERLIN)
 current_year = str(_now.year)
 current_year_short = current_year[-2:]  # "25" when the year is 2025
 
-_MONTHS_DE = [
-    "januar",
-    "februar",
-    "märz",
-    "april",
-    "mai",
-    "juni",
-    "juli",
-    "august",
-    "september",
-    "oktober",
-    "november",
-    "dezember",
-]
-_MONTHS_EN = [
-    "january",
-    "february",
-    "march",
-    "april",
-    "may",
-    "june",
-    "july",
-    "august",
-    "september",
-    "october",
-    "november",
-    "december",
-]
-current_month_de = _MONTHS_DE[_now.month - 1]
-current_month_en = _MONTHS_EN[_now.month - 1]
-today_iso = _now.strftime("%Y-%m-%d")
-
 
 def test_empty_question_rejected(client):
     response = client.post("/ask", json={"question": "", "persona": "PETER"})
@@ -219,51 +187,12 @@ def test_api_contract(case, client_with_date_and_wiki):
         pytest.fail("\n".join(fail_lines))
 
 
-@pytest.mark.slow
-@pytest.mark.ollama
-def test_persona_reports_injected_today_date(client_with_date_and_wiki):
-    """With include_date on, the real today's date is injected into the system
-    prompt (Backlog #19). Asking for it should surface the *current* month and
-    year — not a date from the model's training era. This is the behavioural
-    counterpart to the deterministic prompt-assembly tests in
-    tests/test_three_timestamps.py.
-    """
-    ans_raw = ask(
-        "Welches Datum haben wir heute? Bitte nenne Tag, Monat und Jahr.",
-        "LEAH",
-        client_with_date_and_wiki,
-    )
-    ans = _normalize(ans_raw)
-
-    assert current_year in ans, f"Current year {current_year} missing in: {ans_raw!r}"
-
-    # Accept the localized month name, the ISO date, or the numeric month in an
-    # ISO-style fragment (e.g. "-06-") so phrasing differences don't make it flaky.
-    month_candidates = [
-        current_month_de,
-        current_month_en,
-        today_iso,
-        f"-{_now.month:02d}-",
-    ]
-    assert _contains_any(
-        ans, month_candidates
-    ), f"Current month not found (candidates={month_candidates}) in: {ans_raw!r}"
-
-
-@pytest.mark.slow
-@pytest.mark.ollama
-def test_peter_antwortet_nur_sonne_oder_mond(client):
-    ans_raw = ask("Antworte nur mit einem Wort: Sonne oder Mond?", "PETER", client)
-    ans_norm = _normalize(ans_raw)
-    words = _extract_words(ans_norm)
-
-    assert (
-        len(words) == 1
-    ), f"Expected exactly one word, got {words!r} from: {ans_raw!r}"
-    assert words[0] in {
-        "sonne",
-        "mond",
-    }, f"Expected 'Sonne' or 'Mond', got {words[0]!r} from: {ans_raw!r}"
+# Entfernt am 2026-11-15 (#78): `test_peter_antwortet_nur_sonne_oder_mond` —
+# alle sechs gemessenen Modelle bestanden ihn, er trennte nichts; die
+# Fünf-Wörter-Probe unten prüft dieselbe Fähigkeit strenger. Und
+# `test_persona_reports_injected_today_date` — doppelt zu
+# `test_api_contract[case0]` (Jahr) und zur Eval `ts_knows_today`, die seit
+# dem Datum im Judge-Prompt (#81) das genaue Datum prüft.
 
 
 @pytest.mark.slow

@@ -43,9 +43,10 @@ Zu wissen:
 
 ## Persona-Ensembles
 
-Ein Ensemble bündelt Personas mit ihren System-Prompts, LLM-Optionen (Temperatur, `repeat_penalty`, `num_ctx`) und Avataren. Welches beim Start geladen wird, bestimmt `--ensemble` / `-e`. Zwei Ensembles liegen im Repo:
+Ein Ensemble bündelt Personas mit ihren System-Prompts, LLM-Optionen (Temperatur, `repeat_penalty`, `num_ctx`) und Avataren. Welches beim Start geladen wird, bestimmt `--ensemble` / `-e`. Drei Ensembles liegen im Repo:
 
 - **`classic`** — LEAH, DORIS, PETER, POPCORN (Standard, `python src/launch.py -e classic`)
+- **`examples/classic_ministral14b`** — dieselben vier, mit den Temperaturen und Prompts, die auf `ministral-3:14b` abgestimmt sind (Stand vor dem Wechsel auf `gemma4:26b`). Gedacht für Karten mit 12–16 GB VRAM: `core.model_name: "ministral-3:14b"` in `config.local.yaml` setzen, dann `python src/launch.py -e examples/classic_ministral14b`
 - **`examples/spaceship_crew`** — die Crew des Raumschiffs *Aurora-One*: CAPTAIN_SELINA (besonnene Kommandantin), ZETA_FLUX (sarkastische Chefingenieurin), ELIAS_MOREL (poetischer Navigator) und LYRA_VEX (außerirdische Diplomatin). Start: `python src/launch.py -e examples/spaceship_crew`
 
 ![Spaceship-Crew: Persona-Auswahl mit der Crew der Aurora-One](../screenshot_spaceship_crew.png)
@@ -239,6 +240,7 @@ Der Nutzername wird zu jedem Gespräch in der Ablage vermerkt und steht in jeder
 - **Startseite auf einen Blick:** Die vier Persona-Karten tragen ihre Porträts, die Funktionskarten („AI Dialog", „Gast-Persona", „Verlauf", „Frage an alle") ein schlichtes Icon. Wer wen anspricht und was nur eine Funktion ist, ist damit ohne Lesen unterscheidbar.
 - **Antwort kopieren:** Jede Nachricht im Chat hat ein Kopier-Symbol.
 - **Statuszeile:** Unter dem Chat steht nach jeder Antwort, wie voll das Kontextfenster ist (`Kontext █░░░ 424 / 8.192 Token (5 %)`) und wie schnell das Modell war (`24,0 Tok/s · erster Token nach 1,9 s`). Ab 75 % Füllstand wird die Zeile hervorgehoben — genau dort beginnt die Anwendung, den Gesprächsverlauf zu kürzen.
+- **Modell vorwärmen:** `python scripts/warmup_ping.py` lädt das Chat-Modell schon vor dem App-Start, etwa beim Windows-Autostart oder beim Öffnen von VS Code. Große Modelle wie `gemma4:26b` brauchen beim ersten Laden gut eine Minute; danach antwortet schon die erste Frage sofort. Das Modell bleibt eine Stunde geladen (`--keep-alive`).
 
 ## Nachrichten als Quelle (RSS)
 

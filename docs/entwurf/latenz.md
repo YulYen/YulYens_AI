@@ -2,22 +2,30 @@
 
 Die Stoppuhr (#42) und ihr erster Lauf (#42a), der Guard-Holdback (#51) mit allen Messtabellen, der Freigabe-Index über den rohen Text.
 
-## Ein Modell, das denken kann, denkt hier nicht (#78)
+## Kein Modell denkt hier (#78)
 
-Reasoning-Modelle (Qwen 3.x) schicken ihre Überlegung in `message.thinking`
-voraus, der Streamer liest nur `message.content`. Das erste ausgelieferte
-Zeichen käme also erst nach dem Nachdenken, und nichts davon wäre zu sehen.
-`OllamaLLMCore` fragt deshalb je Modell einmal `show().capabilities` und
-schickt `think=False` — **nur** bei Modellen mit der Fähigkeit `thinking`.
-Alle anderen behalten ihre Anfrage unverändert: `think=True` weist Ollama bei
-einem Modell ohne die Fähigkeit ab, und ob jede Server-Fassung `think=False`
-dort durchwinkt, ist nicht gemessen. Einen Schalter gibt es bewusst nicht —
-wer das Denken zeigen will, muss zuerst den Streamer `thinking` lesen lassen.
+Reasoning-Modelle (Qwen 3.x, Gemma 4) schicken ihre Überlegung in
+`message.thinking` voraus, der Streamer liest nur `message.content`. Das erste
+ausgelieferte Zeichen käme also erst nach dem Nachdenken, und nichts davon wäre
+zu sehen. `OllamaLLMCore` schickt deshalb bei **jeder** Anfrage `think=False`.
+Einen Schalter gibt es bewusst nicht — wer das Denken zeigen will, muss zuerst
+den Streamer `thinking` lesen lassen.
 
-**Nicht gemessen (2026-11-14):** das Ganze lief nur gegen eine Attrappe, in
-der Sandbox gibt es kein Ollama. Erste Probe auf der Kiste: `ollama show
-qwen3.8:27b` muss `thinking` unter den Capabilities führen, und die Stoppuhr
-darf beim ersten Zeichen nicht mehr um Größenordnungen hinter dem 14B liegen.
+**Warum an jedes Modell, nicht nur an die mit der Fähigkeit (2026-11-15).**
+Bis dahin fragte der Kern je Modell `show().capabilities` und schickte
+`think=False` nur bei `thinking` — aus Vorsicht, weil ungemessen war, ob jede
+Server-Fassung den Parameter bei anderen Modellen annimmt. Daran scheiterte
+Googles QAT-Fassung von Gemma 4
+(`hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf`): Sie meldet die Fähigkeit
+nicht, denkt aber — 618 Tokens Überlegung für fünf Wörter, im Live-Test zwei
+leere Antworten und dreifache Laufzeit. Auf Ollama 0.40.16 nehmen alle sieben
+Modelle auf der Kiste `think=False` an, auch die ohne Fähigkeit (`ministral-3`,
+`devstral-small-2`); abgewiesen wird nur `think=True`. **Was ein Modell über
+sich meldet, ist kein Beleg dafür, was es tut.**
+
+Gemessen auf der Kiste (2026-11-15): qwen3.8:27b und qwen3.6:35b liegen beim
+ersten Zeichen bei 1,5 bzw. 0,7 s, also in derselben Größenordnung wie das 14B
+(0,33 s) — das Denken ist aus.
 
 ## Die Stoppuhr (#42)
 

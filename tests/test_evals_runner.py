@@ -196,6 +196,22 @@ def test_judge_uses_temperature_zero_and_the_configured_model():
     assert core.calls[0]["options"]["temperature"] == 0.0
 
 
+def test_build_prompt_names_today_so_the_judge_can_check_dates():
+    """Ohne Datum hielt der Judge jedes richtige „heute" für falsch (#78)."""
+    messages = build_prompt(
+        "Welches Datum?", "Heute ist der 15.11.2026.", ("t",), today=date(2026, 11, 15)
+    )
+    user = messages[1]["content"]
+    assert "2026-11-15" in user and "15.11.2026" in user
+    assert user.index("2026-11-15") < user.index("FRAGE AN DEN CHATBOT")
+
+
+def test_judge_puts_the_date_of_its_clock_into_the_prompt():
+    core = _FakeCore()
+    Judge(core, "m", today=lambda: date(2030, 1, 2)).score("q", "a", ("trait",))
+    assert "2030-01-02" in core.calls[0]["messages"][1]["content"]
+
+
 def test_judge_without_traits_does_not_call_the_model():
     core = _FakeCore()
     verdict = Judge(core, "m").score("q", "a", ())

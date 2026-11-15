@@ -45,9 +45,10 @@ Good to know:
 
 ## Persona ensembles
 
-An ensemble bundles personas together with their system prompts, LLM options (temperature, `repeat_penalty`, `num_ctx`) and avatars. Which one is loaded at start-up is decided by `--ensemble` / `-e`. Two ensembles ship with the repo:
+An ensemble bundles personas together with their system prompts, LLM options (temperature, `repeat_penalty`, `num_ctx`) and avatars. Which one is loaded at start-up is decided by `--ensemble` / `-e`. Three ensembles ship with the repo:
 
 - **`classic`** — LEAH, DORIS, PETER, POPCORN (default, `python src/launch.py -e classic`)
+- **`examples/classic_ministral14b`** — the same four, with the temperatures and prompts tuned for `ministral-3:14b` (the state before the switch to `gemma4:26b`). Meant for cards with 12–16 GB of VRAM: set `core.model_name: "ministral-3:14b"` in `config.local.yaml`, then run `python src/launch.py -e examples/classic_ministral14b`
 - **`examples/spaceship_crew`** — the crew of the starship *Aurora-One*: CAPTAIN_SELINA (composed commander), ZETA_FLUX (sarcastic chief engineer), ELIAS_MOREL (poetic navigator) and LYRA_VEX (alien diplomat). Start with `python src/launch.py -e examples/spaceship_crew`
 
 ![Spaceship crew: persona selection showing the crew of the Aurora-One](../screenshot_spaceship_crew.png)
@@ -238,6 +239,7 @@ The “Create guest 🎭” card lets you assemble your own persona from a name,
 - **A start page you can read at a glance:** The four persona cards carry their portraits, the function cards (“AI Dialog”, “Guest persona”, “History”, “Ask all”) a plain icon. Who you can talk to and what is merely a function is distinguishable without reading.
 - **Copy an answer:** Every chat message carries a copy icon.
 - **Status line:** After each answer, the line below the chat shows how full the context window is (`Context █░░░ 424 / 8,192 tokens (5 %)`) and how fast the model was (`24.0 tok/s · first token after 1.9 s`). Past 75 % it is highlighted — that is exactly where the application starts trimming the conversation history.
+- **Warm up the model:** `python scripts/warmup_ping.py` loads the chat model before the app starts, for example at Windows startup or when VS Code opens. Large models such as `gemma4:26b` take well over a minute to load the first time; afterwards even the first question is answered right away. The model stays loaded for an hour (`--keep-alive`).
 
 ## News as a source (RSS)
 

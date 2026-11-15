@@ -1,5 +1,8 @@
 personas:
-  # Abgestimmt auf ministral-3:14b mit 16 GB VRAM (#78, 2026-11-08).
+  # Abgestimmt auf ministral-3:14b mit 16 GB VRAM (#78, 2026-11-08). Seit
+  # 2026-11-15 ist gemma4:26b der Default; die Werte unten sind noch die des
+  # 14B und werden in #99 auf Gemma nachgestimmt. Der 14B-Stand bleibt als
+  # Ensemble examples/classic_ministral14b erhalten.
   #
   # repeat_penalty steht bewusst nicht mehr hier: Dann gilt der Ollama-Default
   # (1.1). Die früheren 1.15 stammten aus der 8B-Zeit; am 2026-11-08 machten

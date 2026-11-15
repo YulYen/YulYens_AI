@@ -54,7 +54,7 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
                                  │
                                  ▼
                  ┌─────────────────────────────────┐
-                 │ Modelle (z. B. ministral-3:14b) │
+                 │ Modelle (z. B. gemma4:26b)      │
                  └─────────────────────────────────┘
 
 ---
@@ -67,7 +67,7 @@ cd YulYens_AI
 python -m venv .venv && .venv\Scripts\activate   # Windows (Linux/macOS: source .venv/bin/activate)
 pip install -r requirements.txt
 python -m spacy download de_core_news_lg
-ollama pull ministral-3:14b      # 8-GB-Karte: ministral-3:8b, siehe unten
+ollama pull gemma4:26b           # kleinere Karte: ministral-3:14b oder :8b, siehe unten
 
 python src/launch.py --doctor        # Preflight-Check: läuft alles?
 python src/launch.py -e classic     # Start (Web-UI auf http://127.0.0.1:7860)
@@ -78,11 +78,12 @@ python src/launch.py -e classic     # Start (Web-UI auf http://127.0.0.1:7860)
 ## 🎭 Mitgelieferte Ensembles
 
 Ein *Ensemble* ist ein Satz Personas mit eigenen Prompts, LLM-Optionen und Avataren.
-Welches gestartet wird, entscheidet `-e`. Zwei Ensembles liegen im Repo:
+Welches gestartet wird, entscheidet `-e`. Drei Ensembles liegen im Repo:
 
 | Name für `-e` | Personas | Charakter |
 |---|---|---|
 | `classic` | LEAH, DORIS, PETER, POPCORN | Standard-Besetzung: warmherzig, bodenständig, sachlich, verspielt |
+| `examples/classic_ministral14b` | LEAH, DORIS, PETER, POPCORN | dieselbe Besetzung, abgestimmt auf `ministral-3:14b` — für Karten mit 12–16 GB, zusammen mit `core.model_name: "ministral-3:14b"` |
 | `examples/spaceship_crew` | CAPTAIN_SELINA, ZETA_FLUX, ELIAS_MOREL, LYRA_VEX | Crew des Raumschiffs *Aurora-One* — Kommandantin, Chefingenieurin, Navigator, Diplomatin |
 
 ```bash
@@ -127,8 +128,10 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 
 - **Python 3.12+** (die CI prüft 3.12 und 3.14)
 - **Ollama** (lokal installiert)
-- mindestens ein lokales Modell: Default ist **ministral-3:14b** (~9 GB, für 16 GB VRAM).
-  Mit 8 GB VRAM **ministral-3:8b** pullen und in `config.local.yaml` unter
+- mindestens ein lokales Modell: Default ist **gemma4:26b** (18 GB, für 16 GB VRAM
+  plus Arbeitsspeicher; der erste Start dauert etwa 25 s). Mit 12–16 GB VRAM passt
+  **ministral-3:14b** (~9 GB, am besten mit dem Ensemble `examples/classic_ministral14b`),
+  mit 8 GB VRAM **ministral-3:8b** — jeweils pullen und in `config.local.yaml` unter
   `core.model_name` eintragen. Zur Modellwahl siehe [Modellwechsel-Analyse November 2026](docs/modellwechsel_november_2026.md)
   für 16 GB VRAM, die [Juni-Analyse](docs/modellwechsel_juni_2026.md) gilt für 8 GB.
 

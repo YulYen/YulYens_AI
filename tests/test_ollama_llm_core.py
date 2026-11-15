@@ -51,13 +51,10 @@ class ShowingClient(RecordingClient):
     def __init__(self, *, host: str) -> None:
         super().__init__(host=host)
         self.shown: list[str] = []
-        self.down = False
 
     def show(self, model: str):
         self.shown.append(model)
-        if self.down:
-            raise ConnectionError("Ollama ist nicht da")
-        return types.SimpleNamespace(capabilities=self.capabilities[model])
+        return types.SimpleNamespace(capabilities=self.capabilities.get(model, []))
 
 
 @pytest.fixture()
@@ -105,6 +102,7 @@ def test_warm_up_uses_dummy_prompt(
         "keep_alive": 600,
         "messages": [{"role": "user", "content": "..."}],
         "options": {},
+        "think": False,
     }
     assert "stream" not in call_kwargs
 
@@ -125,6 +123,7 @@ def test_warm_up_forwards_options_and_keep_alive(
         "keep_alive": -1,
         "messages": [{"role": "user", "content": "..."}],
         "options": options,
+        "think": False,
     }
 
 
@@ -156,6 +155,7 @@ def test_stream_chat_forwards_all_arguments(
         "messages": messages,
         "options": options,
         "stream": True,
+        "think": False,
     }
     assert call_kwargs["messages"] is messages
     assert call_kwargs["options"] is options
@@ -164,47 +164,33 @@ def test_stream_chat_forwards_all_arguments(
 # ---- think=False (#78) -----------------------------------------------------
 #
 # Der Streamer liest nur `message.content`. Ein Reasoning-Modell, das denken
-# darf, liefert dort lange nichts — also wird das Denken abgestellt, aber nur
-# bei Modellen, die es können: alle anderen behalten ihre Anfrage unverändert.
+# darf, liefert dort lange nichts — also wird das Denken abgestellt, und zwar
+# bei jedem Modell: Was ein Modell über sich meldet, stimmt nicht immer.
 
 
-def test_a_thinking_model_is_asked_not_to_think(showing_core) -> None:
+@pytest.mark.parametrize(
+    "model",
+    [
+        "qwen3.8:27b",  # meldet „thinking"
+        "ministral-3:14b",  # kann nicht denken — der Parameter schadet nicht
+        # Meldet „thinking" nicht, denkt aber: der Fall, an dem die alte
+        # Abfrage per show() scheiterte (2026-11-15).
+        "hf.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf:latest",
+    ],
+)
+def test_every_model_is_asked_not_to_think(showing_core, model) -> None:
     core, client = showing_core
 
-    core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
-    core.warm_up("qwen3.8:27b")
+    core.stream_chat(model, [{"role": "user", "content": "hi"}])
+    core.warm_up(model)
 
     assert [call["think"] for call in client.calls] == [False, False]
 
 
-def test_a_model_without_thinking_gets_the_unchanged_request(showing_core) -> None:
+def test_the_server_is_not_asked_what_the_model_can(showing_core) -> None:
+    """Keine Nachfrage per show(): sie kostete eine Anfrage und log beim QAT-Gemma."""
     core, client = showing_core
-
-    core.stream_chat("ministral-3:14b", [{"role": "user", "content": "hi"}])
-    core.warm_up("ministral-3:14b")
-
-    assert all("think" not in call for call in client.calls)
-
-
-def test_the_model_is_asked_once_not_per_request(showing_core) -> None:
-    core, client = showing_core
-
-    for _ in range(3):
-        core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
-
-    assert client.shown == ["qwen3.8:27b"]
-
-
-def test_an_unreachable_server_is_asked_again_and_never_blocks_the_chat(
-    showing_core,
-) -> None:
-    """Ein Ausfall beim Nachfragen ist keine Antwort — er wird nicht gemerkt."""
-    core, client = showing_core
-    client.down = True
 
     core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
-    assert "think" not in client.calls[-1]
 
-    client.down = False
-    core.stream_chat("qwen3.8:27b", [{"role": "user", "content": "hi"}])
-    assert client.calls[-1]["think"] is False
+    assert client.shown == []

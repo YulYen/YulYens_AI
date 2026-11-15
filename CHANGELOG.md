@@ -32,6 +32,15 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **`scripts/warmup_ping.py` loads the chat model ahead of time.** A model
+  that does not fully fit into VRAM (the new default `gemma4:26b` on a 16 GB
+  card) takes well over a minute to load from disk on its first use. Run the
+  script at Windows startup or when opening VS Code, and the app finds a warm
+  model. It keeps the model loaded for an hour (`--keep-alive`, `-1` =
+  forever) and uses the same context size as the app, so Ollama does not
+  reload it on the first question. It never fails loudly: if Ollama is not
+  running, it logs that and exits normally.
+
 - **`run_evals.py --model <name>`** runs the eval suite against another model
   without editing the config, as `run_bench.py --model` already did. Pass
   `--judge-model` too when comparing models — by default the judge is the chat
@@ -75,12 +84,14 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
-- **Reasoning models answer without their thinking phase.** For a model that
-  reports the `thinking` capability to Ollama (Qwen 3.x and similar), requests
-  are now sent with thinking switched off. The app only ever displayed the
-  answer, never the reasoning, so such a model used to stay silent for a long
-  time before the first character. Models without that capability
-  (`ministral-3` among them) are sent exactly the same request as before.
+- **Reasoning models answer without their thinking phase.** Every request to
+  Ollama is now sent with thinking switched off (Qwen 3.x, Gemma 4 and
+  similar). The app only ever displayed the answer, never the reasoning, so
+  such a model used to stay silent for a long time before the first character.
+  This applies to every model, including those that do not report the
+  `thinking` capability: Google's QAT build of Gemma 4 does not report it but
+  thinks anyway, and returned empty answers. Models that cannot think
+  (`ministral-3` among them) accept the switch and answer as before.
 
 - **The web UI no longer sends Gradio telemetry.** Gradio's version check
   and its usage analytics (sent to Hugging Face) are switched off, so starting
@@ -111,14 +122,18 @@ in them turns out to be wrong, it gets corrected in a later entry.
   Every persona of the ensemble appears in both. In the terminal menu the
   numbers stay the same (`1`–`4`); the Ask-All entry now reads `[4] Ask-All`.
 
-- **The default model is now `ministral-3:14b`** (previously
-  `ministral-3:8b`). It needs about 9 GB and is meant for a 16 GB graphics
-  card. **Before updating, run `ollama pull ministral-3:14b`.** Without it,
-  `--doctor` reports the model as missing and the personas cannot answer.
-  **On an 8 GB card**, keep the old model by setting
-  `core.model_name: "ministral-3:8b"` in `config.local.yaml`. Both models
-  share the same knowledge cutoff (2023-10), so the date the personas are
-  told about their knowledge stays the same.
+- **The default model is now `gemma4:26b`** (previously `ministral-3:8b`).
+  It is 18 GB and meant for a 16 GB graphics card plus system RAM: part of the
+  model sits in RAM, so the first answer after a start (or after `keep_alive`
+  ran out) takes about 25 seconds; after that it writes nearly twice as fast
+  as `ministral-3:14b`. **Before updating, run `ollama pull gemma4:26b`.**
+  Without it, `--doctor` reports the model as missing and the personas cannot
+  answer. **On a 12–16 GB card** use `ministral-3:14b` together with the new
+  ensemble `examples/classic_ministral14b`, which keeps the persona settings
+  tuned for that model; **on an 8 GB card** keep `ministral-3:8b`. Either way,
+  set `core.model_name` in `config.local.yaml`. The personas are told that
+  Gemma's knowledge cutoff is unknown until it has been verified; with the
+  Ministral models it stays 2023-10.
 
 - **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
   reached its end of life in October 2026, and the libraries this project
@@ -168,6 +183,11 @@ in them turns out to be wrong, it gets corrected in a later entry.
   article's infobox — party leaders, founding dates, names — arrived garbled
   ("Stefan MÃ¶ller" instead of "Stefan Möller"); the article text itself was
   fine. Models copied the garbled spelling into their answers.
+- **The eval judge knows today's date.** Without it, the judge treated every
+  correct answer to "What is today's date?" as wrong (its own knowledge ends
+  years earlier), so `ts_knows_today` scored 1 for every model. Averages from
+  earlier runs are therefore slightly too low and not directly comparable with
+  new ones.
 - **An Ollama outage during an eval run no longer lowers the score.** The
   backend's error text was treated as the model's answer: checks failed, the
   judge gave it a 1, and the average — the number runs are compared by —

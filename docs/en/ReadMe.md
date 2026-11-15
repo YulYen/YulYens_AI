@@ -65,11 +65,19 @@ See also: [Features.md](Features.md)
 - **Python 3.12+** — CI checks 3.12 and 3.14
 - **Ollama** (or another compatible backend) with an installed model, for example:
   ```bash
-  ollama pull ministral-3:14b
+  ollama pull gemma4:26b
   ```
-  The default model `ministral-3:14b` needs ~9 GB and is meant for 16 GB of VRAM.
-  With 8 GB of VRAM, pull `ministral-3:8b` and set it as `core.model_name` in
-  `config.local.yaml`.
+  The default model `gemma4:26b` is 18 GB and meant for 16 GB of VRAM; part of it
+  then sits in system RAM, which stretches the first start to about 25 s but
+  barely slows it down afterwards. With 12–16 GB of VRAM, `ministral-3:14b`
+  (~9 GB) fits — ideally together with the ensemble tuned for it,
+  `examples/classic_ministral14b`. With 8 GB of VRAM, use `ministral-3:8b`. Pull
+  the model you choose and set it as `core.model_name` in `config.local.yaml`.
+  **Warming up:** `python scripts/warmup_ping.py` loads the model ahead of time and
+  keeps it for an hour (`--keep-alive <seconds>`, `-1` = forever). Handy for the
+  Windows autostart (a shortcut in `shell:startup` to `<venv>\Scripts\pythonw.exe
+  <repo>\scripts\warmup_ping.py`) or as a VS Code task with
+  `"runOptions": {"runOn": "folderOpen"}`.
   (The default model is set in `config.yaml` under `core.model_name`; a comparison of
   candidate models can be found in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md) for 16 GB VRAM
   and in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) for 8 GB, both German only.)
@@ -148,7 +156,7 @@ core:
   # Choose backend: "ollama" (default) or "dummy" (echo backend for tests)
   backend: "ollama"
   # Default model for Ollama
-  model_name: "ministral-3:14b"
+  model_name: "gemma4:26b"
   # URL of the locally running Ollama server (protocol + host + port).
   # This value must be set explicitly – there is no silent default.
   ollama_url: "http://127.0.0.1:11434"

@@ -46,10 +46,12 @@ The eval corpora under `evals/` are covered from two sides:
 
 ## Tests that separate 14B from 8B (#78)
 
-`test_ai_via_api_14b.py` holds two live tests (`slow`, `ollama`) that the
-default `ministral-3:14b` passes and `ministral-3:8b` fails: writing a working
+`test_ai_via_api_14b.py` holds two live tests (`slow`, `ollama`) that
+`ministral-3:14b` passes and `ministral-3:8b` fails: writing a working
 Easter Sunday function, and naming Sigmund Freud's birthplace by its current
-name (Příbor). Both were calibrated with 20 runs per model on 2026-11-08; the
+name (Příbor) or as "Freiberg in Mähren" in today's Czech Republic. The
+default `gemma4:26b` passed Easter Sunday on 2026-11-15 (one run); its Freud
+answer passes under the softer rule (checked against the stored answer). Both were calibrated with 20 runs per model on 2026-11-08; the
 numbers are in the module. If you stay on the 8B via `config.local.yaml`, these
 two are expected to fail.
 
