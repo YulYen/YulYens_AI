@@ -132,8 +132,8 @@ in them turns out to be wrong, it gets corrected in a later entry.
   ensemble `examples/classic_ministral14b`, which keeps the persona settings
   tuned for that model; **on an 8 GB card** keep `ministral-3:8b`. Either way,
   set `core.model_name` in `config.local.yaml`. The personas are told that
-  Gemma's knowledge cutoff is unknown until it has been verified; with the
-  Ministral models it stays 2023-10.
+  their knowledge reaches January 2025 (Gemma, per Google's model card) or
+  October 2023 (Ministral).
 
 - **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
   reached its end of life in October 2026, and the libraries this project
