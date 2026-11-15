@@ -305,7 +305,7 @@ Kiwix schickt Artikel als `text/html` **ohne** `charset`. `requests` rät in
 dem Fall ISO-8859-1, `resp.text` ist dann für jedes Nicht-ASCII-Zeichen
 falsch („Stefan MÃ¶ller"). Der Fließtext lief schon über `resp.content` —
 BeautifulSoup liest das `<meta charset>` des Artikels —, die Infobox aber über
-`resp.text`. Weil der Fließtext stimmte, fiel es monatelang nicht auf; erst
+`resp.text`. Weil der Fließtext stimmte, fiel es nicht auf; erst
 Gemma 4 übernahm „LuÃ­s Montenegro" wörtlich in die Antwort, während die
 anderen Modelle den Namen aus dem Gedächtnis richtig schrieben.
 
