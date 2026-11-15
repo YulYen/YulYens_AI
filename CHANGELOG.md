@@ -163,6 +163,11 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **Umlauts and accents from a Wikipedia infobox reach the model intact.**
+  With the offline Wikipedia (Kiwix), every non-ASCII character in an
+  article's infobox — party leaders, founding dates, names — arrived garbled
+  ("Stefan MÃ¶ller" instead of "Stefan Möller"); the article text itself was
+  fine. Models copied the garbled spelling into their answers.
 - **An Ollama outage during an eval run no longer lowers the score.** The
   backend's error text was treated as the model's answer: checks failed, the
   judge gave it a 1, and the average — the number runs are compared by —

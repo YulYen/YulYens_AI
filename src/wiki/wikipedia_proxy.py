@@ -128,7 +128,7 @@ def _find_infobox_table(soup):
     return None
 
 
-def _extract_infobox_kv(html: str, max_items: int = 30):
+def _extract_infobox_kv(html: str | bytes, max_items: int = 30):
     soup = BeautifulSoup(html, "html.parser")
 
     table = _find_infobox_table(soup)
@@ -356,9 +356,13 @@ def handle_lookup(path: str, host_header: str = "localhost") -> ProxyResponse:
         clean_text = _clean_whitespace_and_remove_refs(resp.text)
         kv_line = ""  # Online summaries do not include an HTML infobox
     else:
+        # Immer die Bytes, nie `resp.text`: Kiwix schickt `text/html` ohne
+        # charset, `requests` rät dann ISO-8859-1, und jeder Umlaut der
+        # Infobox kam als „MÃ¶ller" beim Modell an. BeautifulSoup liest das
+        # charset aus dem <meta> des Artikels.
         soup = BeautifulSoup(resp.content, "html.parser")
         # 1) Extract key/value pairs from the original HTML
-        kv_pairs = _extract_infobox_kv(resp.text)
+        kv_pairs = _extract_infobox_kv(resp.content)
         kv_line = _format_kv_line(kv_pairs)
 
         # 2) Remove the infobox from the DOM so it does NOT appear in the body text
