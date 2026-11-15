@@ -389,6 +389,11 @@ erfundenen Zahl (`popcorn_names_uncertainty` 4,0 gegen 1,25), Karl hält die
 Vorgaben („antworte auf Englisch, keine Bullet-Listen", `karl_keeps_constraint`
 5,0 gegen 2,0). Bei DORIS liegen alle Modelle niedrig — der 8B-Judge wertete
 „Paris, wow, was für eine bahnbrechende Erkenntnis …" als „Sarkasmus fehlt".
+Ein stärkerer Judge ist #100.
+
+**Nach dem Datums-Fix** (ein Lauf, gleicher Judge): Gemma Ø 4,48 statt 4,20,
+`ts_knows_today` 5,0 statt 1,0 — der Fix wirkt, und der Fall misst jetzt
+etwas.
 
 ### Stoppuhr
 
