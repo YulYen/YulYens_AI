@@ -11,7 +11,9 @@ one is available locally.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 
 _SYSTEM_PROMPT = (
     "Du bist ein strenger, nüchterner Prüfer für Chatbot-Antworten. "
@@ -88,9 +90,22 @@ class JudgeVerdict:
         return tuple(v.trait for v in self.verdicts if v.score is None)
 
 
-def build_prompt(question: str, answer: str, traits: tuple[str, ...]) -> list[dict]:
+def build_prompt(
+    question: str, answer: str, traits: tuple[str, ...], today: date | None = None
+) -> list[dict]:
     numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(traits))
+    # Ohne Datum hielt der Judge jede richtige Antwort auf „Welches Datum ist
+    # heute?" für falsch: Sein Wissensstand endet Jahre vorher. Bewertet wurde
+    # `ts_knows_today` deshalb bei allen Modellen mit 1,0 (2026-11-15).
+    dated = (
+        f"HEUTIGES DATUM (Systemuhr, verbindlich): {today.isoformat()} "
+        f"= {today.day:02d}.{today.month:02d}.{today.year}. Beurteile Aussagen "
+        "über das heutige Datum hieran, nicht an deinem eigenen Wissensstand.\n\n"
+        if today is not None
+        else ""
+    )
     user = (
+        f"{dated}"
         f"FRAGE AN DEN CHATBOT:\n{question}\n\n"
         f"ANTWORT DES CHATBOTS:\n{answer}\n\n"
         f"ERWARTUNGEN:\n{numbered}\n\n"
@@ -132,10 +147,17 @@ def parse_verdict(raw: str, traits: tuple[str, ...]) -> JudgeVerdict:
 class Judge:
     """Scores traits with an LLM. Any LLMCore implementation works."""
 
-    def __init__(self, llm_core, model_name: str, keep_alive: int = 600) -> None:
+    def __init__(
+        self,
+        llm_core,
+        model_name: str,
+        keep_alive: int = 600,
+        today: Callable[[], date] = date.today,
+    ) -> None:
         self._llm_core = llm_core
         self._model_name = model_name
         self._keep_alive = keep_alive
+        self._today = today
 
     @property
     def model_name(self) -> str:
@@ -149,7 +171,7 @@ class Judge:
 
         stream = self._llm_core.stream_chat(
             model_name=self._model_name,
-            messages=build_prompt(question, answer, traits),
+            messages=build_prompt(question, answer, traits, today=self._today()),
             options=dict(JUDGE_OPTIONS),
             keep_alive=self._keep_alive,
         )
