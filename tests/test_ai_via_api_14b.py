@@ -141,6 +141,11 @@ _FREUD_FRAGE = (
     " liegt er? Antworte in einem kurzen Satz."
 )
 
+# „Freiberg in Mähren", „Freiberg (Mähren)": der historische Name samt Region ist
+# kein erfundener Ort. Nur „Freiberg" allein reicht nicht — das 8B schreibt
+# „Freiberg an der Jischl" und erfindet „České Velenice" dazu.
+_FREUD_HISTORISCH = re.compile(r"freiberg\W+(?:in\W+)?mahren")
+
 
 @pytest.mark.slow
 @pytest.mark.ollama
@@ -155,10 +160,17 @@ def test_peter_kennt_freuds_geburtsort(client_with_date):
     Mit Zeitstempel-Block (`client_with_date`), wie die App läuft: **Ohne** ihn
     weiß das 8B den Ort (20/20), mit ihm erfindet es ihn. Ohne Wiki: Das Wissen
     muss im Modell stecken.
+
+    Seit 2026-11-15 genügt statt „Příbor" auch „Freiberg in Mähren": Gemma 4
+    antwortete „Freiberg in Mähren liegt heute in der Tschechischen Republik" —
+    richtig, nur ohne den heutigen Namen. Die Kalibrierung trennt weiter: Das 8B
+    schrieb in keinem der 19 Läufe „Mähren".
     """
     antwort = _frage(client_with_date, _FREUD_FRAGE)
     norm = _normalize(antwort)
-    assert "pribor" in norm, f"Erwartet Příbor als heutigen Ortsnamen:\n{antwort}"
+    assert "pribor" in norm or _FREUD_HISTORISCH.search(
+        norm
+    ), f"Erwartet Příbor oder Freiberg in Mähren:\n{antwort}"
     assert "tschech" in norm, f"Erwartet Tschechien als Staat:\n{antwort}"
 
 
