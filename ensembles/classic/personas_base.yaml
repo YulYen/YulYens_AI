@@ -3,10 +3,10 @@ personas:
   # auf der 14B-Abstimmung (#78, 2026-11-08). Der 14B-Stand bleibt als
   # Ensemble examples/classic_ministral14b erhalten.
   #
-  # LEAH und POPCORN wärmer als unter dem 14B: Gemmas eigener Default ist
-  # temperature 1.0 (top_k 64, top_p 0.95), der von ministral-3 0.15 — die
-  # 14B-Werte waren für Gemma kühl, „nüchtern" war der Eindruck der
-  # Blindverkostung vom 2026-11-15.
+  # LEAH wärmer als unter dem 14B (0.8 statt 0.55): Gemmas eigener Default
+  # ist temperature 1.0, der von ministral-3 0.15. POPCORN mit 1.0 verlor die
+  # Blindverkostung 0:3 und bleibt bei 0.7 — mehr Katze ist eine Frage des
+  # Prompts, nicht der Temperatur (#99a).
   #
   # repeat_penalty steht bewusst nicht mehr hier: Dann gilt der Ollama-Default
   # (1.1). Die früheren 1.15 stammten aus der 8B-Zeit; am 2026-11-08 machten
@@ -37,5 +37,5 @@ personas:
       num_ctx: 16384
   - name: POPCORN
     llm_options:
-      temperature: 1.0
+      temperature: 0.7
       num_ctx: 16384

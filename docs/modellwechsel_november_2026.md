@@ -502,8 +502,9 @@ abgeschnitten.
 `ollama show gemma4:26b --parameters`: `temperature 1`, `top_k 64`,
 `top_p 0.95`; `ministral-3:14b`: `temperature 0.15`. Die 14B-Werte (LEAH 0,55,
 POPCORN 0,7) waren für das 14B warm, für Gemma kühl — passend zu Yuls
-Eindruck „bei POPCORN und LEAH fehlten manchmal Witz und Charme". Neu: LEAH
-0,8, POPCORN 1,0. DORIS (0,5) und PETER (0,1) unverändert.
+Eindruck „bei POPCORN und LEAH fehlten manchmal Witz und Charme". Verkostet:
+LEAH 0,8, POPCORN 1,0. **Nach der Verkostung bleibt nur LEAH 0,8**, POPCORN
+steht wieder auf 0,7 (siehe unten). DORIS (0,5) und PETER (0,1) unverändert.
 
 ### DORIS: das Verbot rief das Muster hervor
 
@@ -545,7 +546,31 @@ Genommen ist die letzte: Sie wirkt und nennt das Wort nicht.
 
 Dieselben 14 Proben wie am 2026-11-15 (Skript nachgebaut, Fragen dort
 beschrieben), über den One-Shot-Provider mit Wiki, alt = `main`, neu = Branch,
-Seiten 7 zu 7 verteilt. **Yuls Urteil: steht aus.**
+Seiten 7 zu 7 verteilt. Die neue Seite lief mit den endgültigen DORIS- und
+PETER-Sätzen.
+
+**Yuls Urteil (blind): neu 4, alt 4, gleich 6.**
+
+| Persona | Proben | neu | alt | gleich | geändert |
+|---|---|---|---|---|---|
+| POPCORN | Steuer, TCP, Pizza | 0 | 3 | 0 | Temperatur 0,7 → 1,0 |
+| LEAH | vier Züge, über DORIS, Pizza | 2 | 1 | 0 | Temperatur 0,55 → 0,8 |
+| DORIS | Himmel, Rolle, Pizza | 1 | 0 | 2 | „in deiner eigenen Stimme" |
+| PETER | Merz ×2, Hamburg, Palindrom, Pizza | 1 | 0 | 4 | Palindrom-Satz |
+
+- **POPCORN 1,0 verliert dreimal** — auch bei TCP, wo Yul die *alte* Seite
+  katziger fand. Die höhere Temperatur macht sie nicht katziger, eher
+  beliebiger. Zurück auf 0,7. Yuls Kommentar „beide könnten katziger sein"
+  zeigt auf den Prompt: Er bremst ausdrücklich („*dezente* Katzen-Anspielung",
+  „ein- bis zweimal", „Würze, nicht Hauptgericht"), ein Erbe des 14B, das zu
+  viel Katze machte — Gemma hält sich wörtlich daran.
+- **LEAH 0,8 gewinnt knapp** und bleibt. Bei den vier Zügen gewann die alte
+  Seite („etwas empathischer"); „gerne dürften beide mehr Empathie" — auch
+  das eine Frage des Prompts.
+- **DORIS und PETER** schmecken nicht schlechter, und ihre Fixes sind
+  nachgezählt. Beim Palindrom ging die Probe wegen des Beispiels an neu.
+- Eine Antwort je Probe — schwache Signale, aber sie passen zu Yuls
+  Kommentaren. Der Prompt-Teil von #99 (a) bleibt offen.
 
 ---
 
