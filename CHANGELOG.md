@@ -178,6 +178,13 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Fixed
 
+- **`--doctor` and `/healthz` no longer warn about the default model on a
+  16 GB card.** `model_vram` now recognises mixture-of-experts models such as
+  `gemma4:26b`: if one does not fit entirely into free VRAM, that is reported
+  as information, since part of it may sit in system RAM (slower first start,
+  barely slower afterwards). Dense models still get the warning. The check
+  also no longer warns against itself when the model is already loaded: the
+  VRAM that model occupies counts as free.
 - **Umlauts and accents from a Wikipedia infobox reach the model intact.**
   With the offline Wikipedia (Kiwix), every non-ASCII character in an
   article's infobox — party leaders, founding dates, names — arrived garbled
