@@ -226,6 +226,52 @@ def check_config_schema(cfg) -> CheckResult:
     return CheckResult("config", False, WARNING, head)
 
 
+def _is_moe(base: str, model_name: str, timeout: float = 2.0) -> bool:
+    """Ist das Modell ein Mixture-of-Experts? Auskunft gibt ``/api/show`` (#99f).
+
+    Erkennbar an einem ``<familie>.expert_count`` in ``model_info``
+    (``gemma4.expert_count`` 128, ``qwen35moe.expert_count`` 256); dichte
+    Modelle wie ministral-3 haben den Schlüssel nicht. Im Zweifel ``False`` —
+    dann bleibt es bei der Warnung wie bisher.
+    """
+    try:
+        resp = requests.post(
+            f"{base}/api/show", json={"model": model_name}, timeout=timeout
+        )
+        resp.raise_for_status()
+        info = (resp.json() or {}).get("model_info") or {}
+    except (requests.RequestException, ValueError, AttributeError):
+        return False
+    for key, value in info.items():
+        if str(key).endswith(".expert_count"):
+            try:
+                return int(value) > 1
+            except (TypeError, ValueError):
+                return False
+    return False
+
+
+def _loaded_vram_mib(base: str, model_name: str, timeout: float = 2.0) -> int:
+    """VRAM, den das Modell schon belegt, weil Ollama es geladen hat (#99f).
+
+    Ohne diese Zahl warnt der Check gegen sich selbst: Das geladene Modell
+    zählt in nvidia-smi als belegt, also fehlt sein eigener Platz im „frei".
+    """
+    try:
+        resp = requests.get(f"{base}/api/ps", timeout=timeout)
+        resp.raise_for_status()
+        running = (resp.json() or {}).get("models", [])
+    except (requests.RequestException, ValueError, AttributeError):
+        return 0
+    for entry in running:
+        if model_name in (entry.get("name"), entry.get("model")):
+            try:
+                return int(entry.get("size_vram") or 0) // 1024**2
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
 def check_model_fits_vram(
     ollama_url: str, model_name: str, timeout: float = 2.0
 ) -> CheckResult:
@@ -233,6 +279,11 @@ def check_model_fits_vram(
 
     Rein additiv: ohne erreichbares Ollama oder ohne NVIDIA-GPU bleibt es bei
     einem INFO — der Check soll niemandem den Start vermiesen.
+
+    Seit #99f zwei Ausnahmen: Ein schon geladenes Modell bekommt seinen
+    eigenen VRAM als frei gutgeschrieben, und ein MoE-Modell, das nicht ganz
+    passt, ist nur ein INFO — bei ihm darf ein Teil im Arbeitsspeicher liegen
+    (gemma4:26b auf 16 GB: langsamer Kaltstart, danach kaum spürbar).
     """
     try:
         base = _ollama_base(ollama_url)
@@ -254,9 +305,18 @@ def check_model_fits_vram(
         return CheckResult(
             "model_vram", True, INFO, f"{model_name} needs ~{needed_gb:.1f} GB"
         )
-    free_gb = free / 1024
+    free_gb = (free + _loaded_vram_mib(base, model_name, timeout)) / 1024
     detail = f"{model_name} needs ~{needed_gb:.1f} GB, {free_gb:.1f} GB free"
-    return CheckResult("model_vram", free_gb >= needed_gb, WARNING, detail)
+    if free_gb >= needed_gb:
+        return CheckResult("model_vram", True, WARNING, detail)
+    if _is_moe(base, model_name, timeout):
+        return CheckResult(
+            "model_vram",
+            True,
+            INFO,
+            f"{detail} — MoE, part of it may sit in system RAM (slower cold start)",
+        )
+    return CheckResult("model_vram", False, WARNING, detail)
 
 
 def _solo_models(default_model: str) -> dict[str, str]:

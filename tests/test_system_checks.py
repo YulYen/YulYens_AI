@@ -292,11 +292,82 @@ def test_model_vram_warns_when_the_model_does_not_fit(monkeypatch):
         lambda *a, **k: _tags_response([{"name": "big:8b", "size": 8 * 1024**3}]),
     )
     monkeypatch.setattr(sc, "_free_vram_mib", lambda timeout=5.0: 4 * 1024)
+    monkeypatch.setattr(sc, "_is_moe", lambda *a, **k: False)
 
     result = sc.check_model_fits_vram("http://x", "big:8b")
 
     assert result.ok is False
+    assert result.severity == sc.WARNING
     assert "8.0 GB" in result.detail and "4.0 GB" in result.detail
+
+
+def test_model_vram_is_only_info_for_a_moe_model_that_does_not_fit(monkeypatch):
+    """#99f: gemma4:26b (18 GB) läuft auf 16 GB gut, ein Teil liegt im RAM."""
+    monkeypatch.setattr(
+        sc.requests,
+        "get",
+        lambda *a, **k: _tags_response([{"name": "moe:26b", "size": 18 * 1024**3}]),
+    )
+    monkeypatch.setattr(sc, "_free_vram_mib", lambda timeout=5.0: 15 * 1024)
+    monkeypatch.setattr(sc, "_is_moe", lambda *a, **k: True)
+
+    result = sc.check_model_fits_vram("http://x", "moe:26b")
+
+    assert result.ok is True
+    assert result.severity == sc.INFO
+    assert "MoE" in result.detail
+
+
+def test_model_vram_counts_the_already_loaded_model_as_free(monkeypatch):
+    """#99f: Ist das Modell geladen, warnte der Check gegen sich selbst."""
+
+    def _get(url, **_k):
+        if url.endswith("/api/ps"):
+            return _tags_response(
+                [{"name": "big:8b", "model": "big:8b", "size_vram": 7 * 1024**3}]
+            )
+        return _tags_response([{"name": "big:8b", "size": 8 * 1024**3}])
+
+    monkeypatch.setattr(sc.requests, "get", _get)
+    monkeypatch.setattr(sc, "_free_vram_mib", lambda timeout=5.0: 2 * 1024)
+    monkeypatch.setattr(sc, "_is_moe", lambda *a, **k: False)
+
+    result = sc.check_model_fits_vram("http://x", "big:8b")
+
+    assert result.ok is True
+    assert "9.0 GB free" in result.detail
+
+
+def _show_response(model_info):
+    return SimpleNamespace(
+        raise_for_status=lambda: None, json=lambda: {"model_info": model_info}
+    )
+
+
+def test_is_moe_reads_the_expert_count_from_api_show(monkeypatch):
+    # Schlüssel so, wie Ollama sie am 2026-11-21 lieferte.
+    monkeypatch.setattr(
+        sc.requests,
+        "post",
+        lambda *a, **k: _show_response({"gemma4.expert_count": 128}),
+    )
+    assert sc._is_moe("http://x", "gemma4:26b") is True
+
+    monkeypatch.setattr(
+        sc.requests,
+        "post",
+        lambda *a, **k: _show_response({"mistral3.block_count": 40}),
+    )
+    assert sc._is_moe("http://x", "ministral-3:14b") is False
+
+
+def test_is_moe_is_false_when_ollama_does_not_answer(monkeypatch):
+    def _boom(*_a, **_k):
+        raise sc.requests.RequestException("down")
+
+    monkeypatch.setattr(sc.requests, "post", _boom)
+
+    assert sc._is_moe("http://x", "m:1b") is False
 
 
 def test_model_vram_is_fine_with_enough_headroom(monkeypatch):
