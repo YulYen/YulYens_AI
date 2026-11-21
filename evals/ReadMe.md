@@ -174,6 +174,52 @@ Zwei Sonderfälle im Report:
   (z. B. `security.pii_protection: false`). Kein Guard-Fehler, aber eine
   ehrliche Aussage über das laufende Setup: diese Angriffe kämen durch.
 
+## Blindverkostung (#99)
+
+Die Eval-Suite misst, ob eine Antwort *stimmt*. Ob eine Persona Witz und
+Wärme hat, misst sie nicht — das entscheidet seit #78 eine Blindverkostung:
+zwei Stände, dieselben Proben, ein Blatt ohne Namen.
+
+```bash
+# Branch gegen main, beide mit dem Modell aus config.yaml
+python scripts/blind_tasting.py run classic@main classic -o logs/tasting/2026-11-22
+# blatt.md öffnen, hinter jedes „Urteil:" 1, 2 oder = schreiben, dann:
+python scripts/blind_tasting.py tally logs/tasting/2026-11-22
+
+# Zwei Modelle mit demselben Ensemble
+python scripts/blind_tasting.py run classic classic -o logs/tasting/modelle \
+    --model-a ministral-3:14b --model-b gemma4:26b
+```
+
+Eine Seite ist `ENSEMBLE` (Arbeitsstand) oder `ENSEMBLE@REF` (aus Git, etwa
+`classic@main` oder `classic@v2.0.0`). Jede Seite antwortet in einem eigenen
+Prozess, über den One-Shot-Provider mit Guard und Wiki, ohne Ablage — wie die
+Eval-Suite. Im Ordner liegen danach `seite_a.json`/`seite_b.json` (die
+Antworten), `blatt.md` (blind) und `schluessel.json` (die Auflösung — erst
+nach dem Urteil öffnen); `tally` schreibt `auswertung.md` daneben.
+
+- **Verschieden ist nur das Ensemble und das Modell.** `config.yaml`, die
+  Texte in `locales/` (Wiki-Begleittext, Zeitstempel-Block) und der Code kommen
+  auf beiden Seiten aus dem Arbeitsstand. Wer eine Änderung an `locales/`
+  verkosten will, fährt `answer` je Seite im passenden Checkout und danach
+  `sheet`.
+- **Die Seiten sind genau zur Hälfte vertauscht**, sonst verrät die Position
+  die Seite.
+- **Beide Seiten bekommen denselben `seed`** (Default 0, `--seed none` schaltet
+  ihn ab). Eine Verkostung wird damit wiederholbar; vergleichbar Probe für Probe
+  macht das die Seiten nicht, ein anderer Prompt zieht aus demselben Seed
+  anders.
+- **Eine Probe mit Fehler fehlt auf dem Blatt** (Ollama-Ausfall zählt als
+  Fehler, nicht als Antwort, wie in #95) und steht unter `skipped` im Schlüssel.
+- **Die Proben liegen in `tasting_probes.yaml`.** Das ist ein Nachbau der 14
+  Proben vom November 2026, deren Themen in
+  `docs/modellwechsel_november_2026.md` stehen, der Wortlaut aber nicht.
+  Umformulieren gibt die Vergleichbarkeit auf. Eine neue Probe bekommt eine
+  neue `id`.
+
+Eine Antwort je Probe ist ein schwaches Signal. Es taugt als Geschmacksurteil
+neben den Zahlen, nicht als deren Ersatz.
+
 ## Grenzen
 
 - Der Judge braucht ein erreichbares Modell; ohne Ollama läuft nur

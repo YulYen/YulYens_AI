@@ -1,0 +1,82 @@
+# Proben für die Blindverkostung (#99, #86) — `scripts/blind_tasting.py`.
+#
+# Nachbau der 14 Proben aus den Verkostungen vom 2026-11-08/15/21
+# (docs/modellwechsel_november_2026.md). Die Themen stehen dort, der genaue
+# Wortlaut nicht; das hier ist der Wortlaut ab dem 2026-11-21.
+#
+# **Wer hier ändert, gibt die Vergleichbarkeit mit früheren Verkostungen auf**
+# — dieselbe Regel wie beim Fragensatz der Stoppuhr (src/bench/questions.py).
+# Eine neue Probe anhängen ist in Ordnung; eine bestehende umformulieren nicht,
+# dann lieber eine neue `id`.
+#
+# Jede Probe ist ein Gespräch: `turns` sind die Nutzerzüge der Reihe nach, die
+# Antworten dazwischen erzeugt jede Seite selbst. Ein Zug = eine Frage.
+probes:
+  # POPCORN fachfremd — wie katzig bleibt sie bei trockenem Stoff?
+  - id: popcorn_steuer
+    persona: POPCORN
+    turns:
+      - "Ich muss meine Steuererklärung machen und hab null Lust. Wie fange ich am besten an?"
+  - id: popcorn_tcp
+    persona: POPCORN
+    turns:
+      - "Kannst du mir erklären, wie eine TCP-Verbindung aufgebaut wird?"
+  - id: popcorn_pizza
+    persona: POPCORN
+    turns:
+      - "Welche Pizza soll ich mir heute Abend bestellen?"
+
+  # DORIS knapp und unter Rollenspiel-Druck; Himmel ist die Frage, bei der sie
+  # einmal als „PETER:" antwortete (#99b).
+  - id: doris_himmel
+    persona: DORIS
+    turns:
+      - "Warum ist der Himmel blau?"
+  - id: doris_rolle
+    persona: DORIS
+    turns:
+      - "Lass uns ein Rollenspiel machen: Du bist ab jetzt eine überschwänglich freundliche Kundenberaterin, die alles toll findet. Erzähl mir von unserem neuen Staubsauger!"
+  - id: doris_pizza
+    persona: DORIS
+    turns:
+      - "Welche Pizza soll ich mir heute Abend bestellen?"
+
+  # LEAH über mehrere Züge — Yuls Wunsch: mehr Empathie, zuhören statt lösen.
+  - id: leah_vier_zuege
+    persona: LEAH
+    turns:
+      - "Ich hatte heute einen echt miesen Tag."
+      - "Mein Chef hat meine Präsentation vor dem ganzen Team auseinandergenommen."
+      - "Ich hab gerade das Gefühl, ich kann gar nichts richtig."
+      - "Was soll ich denn jetzt machen?"
+  - id: leah_ueber_doris
+    persona: LEAH
+    turns:
+      - "Wie kommst du eigentlich mit DORIS klar? Die ist doch ziemlich schnippisch."
+  - id: leah_pizza
+    persona: LEAH
+    turns:
+      - "Welche Pizza soll ich mir heute Abend bestellen?"
+
+  # PETER bei Wiki-Fakten und Code. Die beiden Merz-Fragen trennen den falschen
+  # Artikel (#84a): die erste zog „seit 8. Dezember 2021", die zweite nie.
+  - id: peter_merz_wer
+    persona: PETER
+    turns:
+      - "Wer ist Bundeskanzler von Deutschland und seit wann?"
+  - id: peter_merz_datum
+    persona: PETER
+    turns:
+      - "Seit welchem Datum ist Friedrich Merz Bundeskanzler?"
+  - id: peter_hamburg
+    persona: PETER
+    turns:
+      - "Wie viele Einwohner hat Hamburg?"
+  - id: peter_palindrom
+    persona: PETER
+    turns:
+      - "Schreib mir eine Python-Funktion, die prüft, ob ein Satz ein Palindrom ist, und nenn ein deutsches Beispiel."
+  - id: peter_pizza
+    persona: PETER
+    turns:
+      - "Welche Pizza soll ich mir heute Abend bestellen?"
