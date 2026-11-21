@@ -5,7 +5,7 @@ import re
 import time
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -83,14 +83,25 @@ def _send_json(handler: BaseHTTPRequestHandler, status: int, obj: dict):
 
 
 # ---------- Helpers for request processing -------------------------------------
+def _segment(term: str) -> str:
+    """Der Suchbegriff als *ein* URL-Pfadsegment (#90).
+
+    `handle_lookup` dekodiert den Begriff; roh in die URL gesetzt, schnitt ein
+    `#` den Rest ab und ein `?` begann eine Query — „Wer_wird_Millionär?"
+    lieferte am echten Kiwix 404, kodiert den Artikel. `/` wird mitkodiert:
+    Kiwix findet „AC%2FDC" wie „AC/DC", die REST-API online nur kodiert.
+    """
+    return quote(term, safe="")
+
+
 def _build_kiwix_url(term: str) -> str:
     s = _get_settings()
-    return f"http://{s.kiwix_host}:{s.kiwix_port}/{s.zim_prefix}/{term}"
+    return f"http://{s.kiwix_host}:{s.kiwix_port}/{s.zim_prefix}/{_segment(term)}"
 
 
 def _build_online_url(term: str) -> str:
     # Wikipedia accepts underscores as spaces
-    return f"{_get_settings().online_base_url}/wiki/{term}"
+    return f"{_get_settings().online_base_url}/wiki/{_segment(term)}"
 
 
 def _clean_whitespace_and_remove_refs(text: str) -> str:
@@ -211,7 +222,7 @@ def _build_user_visible_link(host_header: str, term: str, online: bool) -> str:
         return _build_online_url(term)
     # Local Kiwix link (same host as the user request, but port 8080)
     s = _get_settings()
-    return f"http://{hostname}:{s.kiwix_port}/{s.zim_prefix}/{term}"
+    return f"http://{hostname}:{s.kiwix_port}/{s.zim_prefix}/{_segment(term)}"
 
 
 def _build_wiki_hint(cfg, online: bool, persona_name: str, link: str) -> str:
@@ -288,7 +299,7 @@ def _fetch_kiwix(term: str):
 def _fetch_online(term: str):
     """Fetches a short text from the configured live Wikipedia (REST Summary API)."""
     s = _get_settings()
-    url = f"{s.online_base_url}/api/rest_v1/page/summary/{term}"
+    url = f"{s.online_base_url}/api/rest_v1/page/summary/{_segment(term)}"
     logger.info(f"[FetchOnline] {url}")
     try:
         r = requests.get(

@@ -736,3 +736,60 @@ def test_proxy_handler_has_a_read_timeout(proxy):
     """Ohne Timeout hält eine unvollständige Anfrage ihren Thread für immer."""
     assert proxy.WikiRequestHandler.timeout is not None
     assert 0 < proxy.WikiRequestHandler.timeout <= 30
+
+
+# ---- Der Suchbegriff wird für die URL neu kodiert (#90) --------------------
+
+
+@pytest.mark.parametrize(
+    ("term", "segment"),
+    [
+        # Am echten Kiwix (2026-11-21): roh 404, kodiert der Artikel.
+        ("Wer_wird_Millionär?", "Wer_wird_Million%C3%A4r%3F"),
+        ("C#", "C%23"),
+        ("AC/DC", "AC%2FDC"),
+        # Unterstriche bleiben, sonst träfe kein mehrteiliger Titel mehr.
+        ("Albert_Einstein", "Albert_Einstein"),
+    ],
+)
+def test_every_url_the_proxy_builds_carries_the_term_as_one_segment(
+    proxy, term, segment
+):
+    assert proxy._build_kiwix_url(term).endswith(f"/wikipedia_de/{segment}")
+    assert proxy._build_online_url(term).endswith(f"/wiki/{segment}")
+    assert proxy._build_user_visible_link("host:8042", term, online=False).endswith(
+        f"/{segment}"
+    )
+
+
+def test_a_question_mark_in_the_title_reaches_kiwix_instead_of_the_query(
+    proxy, monkeypatch
+):
+    seen = []
+
+    def _get(url, **_kwargs):
+        seen.append(url)
+        raise proxy.requests.RequestException("nur die URL interessiert")
+
+    monkeypatch.setattr(proxy.requests, "get", _get)
+
+    proxy.handle_lookup("/Wer_wird_Million%C3%A4r%3F?json=1")
+
+    assert seen == ["http://127.0.0.1:8080/wikipedia_de/Wer_wird_Million%C3%A4r%3F"]
+
+
+def test_the_online_summary_api_gets_an_encoded_slash(proxy, monkeypatch):
+    seen = []
+
+    def _get(url, **_kwargs):
+        seen.append(url)
+        raise proxy.requests.RequestException("nur die URL interessiert")
+
+    monkeypatch.setattr(proxy.requests, "get", _get)
+
+    try:
+        proxy._fetch_online("AC/DC")
+    except proxy.requests.RequestException:
+        pass
+
+    assert seen == ["https://de.wikipedia.org/api/rest_v1/page/summary/AC%2FDC"]
