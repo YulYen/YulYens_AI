@@ -32,6 +32,13 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **`scripts/blind_tasting.py` runs a blind tasting.** Two states of an
+  ensemble (`classic@main` from git against `classic` in the working tree) or
+  two models answer the same 14 probes from `evals/tasting_probes.yaml`. The
+  script writes `blatt.md` without names and `schluessel.json` with the key;
+  `tally` counts your verdicts per persona. Both sides get the same `seed`,
+  so a tasting can be repeated. It needs Ollama.
+
 - **`scripts/warmup_ping.py` loads the chat model ahead of time.** A model
   that does not fully fit into VRAM (the new default `gemma4:26b` on a 16 GB
   card) takes well over a minute to load from disk on its first use. Run the

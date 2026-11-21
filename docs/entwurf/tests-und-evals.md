@@ -151,6 +151,7 @@ python scripts/run_evals.py -e classic --guard-only  # Guard-Teil, braucht kein 
 python scripts/run_evals.py -e classic --model <anderes> --judge-model <fest>  # Modellvergleich
 python scripts/run_evals.py -e classic --rejudge <out>/answers.json --judge-model <anderer>  # Judge-Vergleich
 make evals                                           # Kurzform für --guard-only
+python scripts/blind_tasting.py run classic@main classic -o <ordner>  # Blindverkostung (#99)
 ```
 
 **`--model` ohne `--judge-model` vergleicht zwei Judges, nicht zwei Modelle.**
