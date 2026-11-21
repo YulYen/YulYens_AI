@@ -199,6 +199,37 @@ umdreht und die dann teuer sind:
 Nicht behoben und deshalb ticketiert (#14a): der IMAP-Ordnertrenner wird
 geraten statt per `LIST` erfragt. Regel 2 nimmt dem Fehler die Katastrophe.
 
+### MCP-Server: drei Entscheidungen (#39)
+
+`src/mcp_adapter/server.py` ist eine dünne Schicht: `PersonaTools` hält die
+Werkzeuge als gewöhnliche Methoden und kennt kein MCP, `build_server` bindet
+sie an das `MCPServer` des SDK (2.x, nicht mehr `FastMCP`).
+
+1. **Der Prozess setzt `ui.type` auf `None` (`configure_process`).** In der
+   geteilten `config.yaml` steht meist `web`, und damit greift in der Factory
+   die Regel der Web-UI „ohne Anmeldung keine Aufzeichnung" (#72). Die gilt,
+   weil jeder Besucher derselbe Nutzer wäre — ein MCP-Client über stdio ist
+   *ein* lokaler Nutzer wie Terminal und API. Ohne die Zeile zeichnete der
+   Server auf einer Standardinstallation still nichts auf; eine Mutationsprobe
+   in `tests/test_mcp_server.py` fängt das.
+2. **Nur die erwartete Absage geht mit Text an den Client.** `PersonaTools`
+   wirft ihre eigene `ToolError` (unbekannte Persona samt Namensliste, leere
+   Frage, Broadcast aus); die Bindung übersetzt sie in die `ToolError` des SDK.
+   Alles andere zeigt das SDK als „Error executing tool …" ohne die Meldung —
+   ein Stacktrace mit Pfaden gehört nicht in das Gespräch eines Clients.
+3. **Die Antwort läuft in einem Thread** (`anyio.to_thread`): sie blockiert
+   Sekunden bis Minuten, und der Server soll derweil Pings beantworten.
+
+**stdout gehört dem Protokoll.** Das SDK biegt Dateideskriptor 1 während des
+Betriebs selbst auf stderr um; ein `print` im App-Pfad zerschießt also keine
+Nachricht. Geloggt wird trotzdem nur in die Datei: was ein Client von stderr
+mitliest, landet je nach Client im Log seines Nutzers.
+
+**Nicht gebaut: ein Wiki-Werkzeug.** `WikiLookup.snippets` sucht Stichworte in
+einer *Frage* (spaCy); ein Client würde einen *Titel* übergeben. Das wäre ein
+zweiter Abrufweg mit eigener Guard-Prüfung vor dem Netz und eigener Filterung —
+ein eigenes Ticket, kein Teil des Wrappers.
+
 ## API
 
 ### OpenAI-Kompatibilität: worauf zu achten ist

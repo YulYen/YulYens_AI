@@ -130,6 +130,14 @@ def get_all_persona_names() -> list[str]:
     return [p["name"] for p in _load_system_prompts()]
 
 
+def get_description(name: str) -> str:
+    """Returns a persona's one-line description from the locale file."""
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return str(persona.get("description") or "")
+    raise ValueError(f"Persona '{name}' not found.")
+
+
 def get_drink(name: str) -> str:
     """Returns a persona's favorite drink."""
     for persona in _load_system_prompts():

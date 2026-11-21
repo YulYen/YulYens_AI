@@ -32,6 +32,15 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **MCP server: the personas as tools for Claude Code and other MCP
+  clients.** Opt-in: `pip install 'mcp>=2.3,<3'`, then for example
+  `claude mcp add yulyen -- python <path>/scripts/mcp_server.py -e classic`.
+  Three tools: `list_personas`, `ask_persona(persona, question)` and
+  `ask_all(question)`. Answers go through the same guard and wiki as `/ask`.
+  `ask_persona` is recorded in the conversation store under the channel `mcp`,
+  also on an installation without login, like the terminal and the API;
+  `ask_all` is not recorded, like every ask-all round.
+
 - **`scripts/warmup_ping.py` loads the chat model ahead of time.** A model
   that does not fully fit into VRAM (the new default `gemma4:26b` on a 16 GB
   card) takes well over a minute to load from disk on its first use. Run the

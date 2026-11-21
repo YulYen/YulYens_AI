@@ -189,6 +189,16 @@ Optionally, a lightweight **email adapter** can be enabled (`email_adapter.enabl
 
 The MVP handles plain-text emails; HTML is pragmatically reduced to text, attachments are ignored. **Replies go to the `From` address** — a `Reply-To` is deliberately ignored, otherwise a stranger could make the instance write to third parties. **Only senders on `email_adapter.allowed_senders` get an answer** (full addresses or whole domains such as `@my-domain.example`); the list is mandatory once the adapter is enabled, and without it the adapter refuses to start. Automated mail (out-of-office replies, newsletters, mailing lists) is detected and left alone, and the adapter's own replies are marked as automatic (RFC 3834) — otherwise two robots escalate against each other. The adopted mail text is capped at `max_body_chars`. To avoid mail loops and duplicate replies, the adapter ignores its own system/persona addresses and moves processed messages into the configured `processed_mailbox` folder — **marking happens before sending**, so a mail is not answered again on every poll if the move fails. Credentials do not belong in the code: `config.yaml` provides placeholders like `env:YULYEN_MAIL_IMAP_PASSWORD` that are resolved from environment variables at runtime.
 
+## The personas as MCP tools
+
+An **MCP server** offers the personas as tools to an MCP client such as Claude Code. It is opt-in: first `pip install 'mcp>=2.3,<3'`, then for example `claude mcp add yulyen -- python <path>/scripts/mcp_server.py -e classic`. The client starts the server itself and talks to it over stdin/stdout. There are three tools:
+
+- **`list_personas`** names each persona with its short description.
+- **`ask_persona(persona, question)`** asks one persona and returns its answer, along the same path as `/ask`: guard on question and answer, wiki context, the persona's own solo model. Every call is a new conversation without memory of earlier calls. The conversation store lists it under the channel `mcp`.
+- **`ask_all(question)`** asks every persona the same question and returns name → answer. The wiki is looked up once for all of them. Like every ask-all round it is not recorded, and `ui.experimental.broadcast_mode: false` turns it off here too.
+
+The server records even where the web UI would not record without a login. It is a local channel with a single user, like the terminal and the API; its conversations belong to `local`. It logs to the file under `logs/` only, not to the console, because the console belongs to the client.
+
 ## Finding conversations again
 
 Conversations live in a local SQLite file (`storage.path`, `data/conversations.sqlite3` by default) — not in log files. The “Open history 🗂” card lists them for review, lets you **continue** one, export it as Markdown, or delete it. Only your own conversations are listed, and ownership is checked server-side.

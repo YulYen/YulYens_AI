@@ -190,6 +190,16 @@ Optional kann ein schlanker **E-Mail-Adapter** aktiviert werden (`email_adapter.
 
 Das MVP verarbeitet einfache Text-E-Mails; HTML wird pragmatisch zu Text reduziert, Attachments werden ignoriert. **Antworten gehen an die `From`-Adresse** — ein `Reply-To` wird bewusst ignoriert, sonst könnte ein fremder Absender die Instanz dazu bringen, an Dritte zu schreiben. **Antworten bekommt nur, wer auf `email_adapter.allowed_senders` steht** (volle Adressen oder ganze Domains wie `@meine-domain.de`); die Liste ist Pflicht, sobald der Adapter eingeschaltet ist, und ohne sie startet er nicht. Automatische Mails (Abwesenheitsassistenten, Newsletter, Listen) werden erkannt und nicht beantwortet, und die eigenen Antworten sind als solche markiert (RFC 3834) — sonst schaukeln sich zwei Automaten gegenseitig hoch. Der übernommene Mailtext ist auf `max_body_chars` begrenzt. Um Mail-Loops und doppelte Antworten zu vermeiden, ignoriert der Adapter eigene System-/Persona-Adressen und verschiebt bearbeitete Nachrichten in den konfigurierten `processed_mailbox`-Ordner — **markiert wird vor dem Senden**, damit eine Mail nicht bei jedem Durchlauf erneut beantwortet wird, falls das Verschieben scheitert. Zugangsdaten gehören nicht in den Code: In `config.yaml` sind Platzhalter wie `env:YULYEN_MAIL_IMAP_PASSWORD` vorgesehen, die zur Laufzeit aus Umgebungsvariablen gelesen werden.
 
+## Die Personas als MCP-Werkzeuge
+
+Ein **MCP-Server** stellt die Personas einem MCP-Client wie Claude Code als Werkzeuge zur Verfügung. Er ist opt-in: zuerst `pip install 'mcp>=2.3,<3'`, dann zum Beispiel `claude mcp add yulyen -- python <pfad>/scripts/mcp_server.py -e classic`. Der Client startet den Server selbst und spricht mit ihm über stdin/stdout. Es gibt drei Werkzeuge:
+
+- **`list_personas`** nennt jede Persona mit ihrer Kurzbeschreibung.
+- **`ask_persona(persona, question)`** fragt eine Persona und liefert ihre Antwort, über denselben Weg wie `/ask`: Guard auf Frage und Antwort, Wiki-Kontext, das eigene Solo-Modell der Persona. Jeder Aufruf ist ein neues Gespräch ohne Erinnerung an frühere Aufrufe. In der Gesprächs-Ablage steht es unter dem Kanal `mcp`.
+- **`ask_all(question)`** fragt alle Personas dasselbe und liefert Name → Antwort. Das Wiki wird einmal für alle abgefragt. Wie jede Ask-All-Runde wird das nicht aufgezeichnet, und `ui.experimental.broadcast_mode: false` schaltet es auch hier ab.
+
+Der Server zeichnet auch dann auf, wenn die Web-UI ohne Anmeldung nichts aufzeichnen würde. Er ist ein lokaler Kanal mit einem Nutzer, wie Terminal und API; seine Gespräche gehören `local`. Protokolliert wird nur in die Datei unter `logs/`, nicht auf die Konsole, denn die gehört dem Client.
+
 ## Gespräche wiederfinden
 
 Gespräche liegen in einer lokalen SQLite-Datei (`storage.path`, standardmäßig `data/conversations.sqlite3`) — nicht in Logdateien. Über die Karte „Verlauf öffnen 🗂" lassen sie sich auflisten, ansehen, **fortsetzen**, als Markdown exportieren und löschen. Angezeigt werden nur die eigenen Gespräche, geprüft wird der Eigentümer serverseitig.

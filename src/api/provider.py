@@ -100,8 +100,12 @@ class AiApiProvider:
             [*history, {"role": "assistant", "content": reply}]
         )
 
-    def answer(self, question: str, persona: str) -> str:
-        """Handles a question for the given persona and returns the answer as text."""
+    def answer(self, question: str, persona: str, *, app: str = "api") -> str:
+        """Handles a question for the given persona and returns the answer as text.
+
+        ``app`` names the channel in the conversation store — the MCP server
+        (#39) answers through this same path and records as ``mcp``.
+        """
 
         frage = (question or "").strip()
 
@@ -114,7 +118,7 @@ class AiApiProvider:
         # Ein Gespräch pro Anfrage (#54): die API kennt keine Sitzung, jede
         # Anfrage steht für sich.
         streamer.set_conversation(
-            self.factory.open_conversation(canonical_persona, "api")
+            self.factory.open_conversation(canonical_persona, app)
         )
 
         return streamer.respond_one_shot(
