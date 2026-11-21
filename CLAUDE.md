@@ -148,10 +148,14 @@ Eine Datei-für-Datei-Liste gibt es bewusst nicht mehr (sie veraltete, #92).
 ## Personas
 
 LEAH (Standard), DORIS, PETER, POPCORN — Ensemble `classic`. Prompts,
-Temperaturen und `num_ctx` stehen in `ensembles/classic/`. Default-Modell ist
-seit 2026-11-15 `gemma4:26b`; die Werte sind noch die des 14B und werden in
-#99 nachgestimmt. Der 14B-Stand liegt unverändert in
+Temperaturen und `num_ctx` stehen in `ensembles/classic/`, abgestimmt auf
+`gemma4:26b` (#99). Der 14B-Stand liegt unverändert in
 `ensembles/examples/classic_ministral14b/`.
+
+- **Ein Verbot im Prompt nennt das Verbotene nicht.** „Nie im Namen von LEAH,
+  PETER …" ließ DORIS in 19 von 20 Fällen als „PETER:" antworten, „in deiner
+  eigenen Stimme" in 0 von 20. Jede Prompt-Änderung mit festen Seeds
+  nachzählen, nicht mit einer Probe ([modellwechsel_november_2026.md](docs/modellwechsel_november_2026.md#feinabstimmung-auf-gemma-2026-11-21)).
 
 ## Wichtige Architektur-Muster
 
