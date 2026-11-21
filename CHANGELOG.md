@@ -92,6 +92,14 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Changed
 
+- **The classic personas are tuned for `gemma4:26b`.** LEAH runs warmer
+  (temperature 0.8, previously 0.55): Gemma's own default is 1.0, so the value
+  carried over from `ministral-3:14b` made her sound flat. DORIS no longer answers as one of her siblings ("PETER: …"),
+  and PETER no longer picks the well-known German palindrome that contains a
+  racial slur as his example. The context window stays at 16384 tokens —
+  8192 was measured and is not faster with Gemma. The previous settings for
+  `ministral-3:14b` remain available as `examples/classic_ministral14b`.
+
 - **Reasoning models answer without their thinking phase.** Every request to
   Ollama is now sent with thinking switched off (Qwen 3.x, Gemma 4 and
   similar). The app only ever displayed the answer, never the reasoning, so

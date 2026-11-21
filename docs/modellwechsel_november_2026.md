@@ -475,6 +475,105 @@ Die letzten beiden und Yuls Eindruck zu POPCORN und LEAH stehen in #99.
 
 ---
 
+## Feinabstimmung auf Gemma 2026-11-21
+
+#99 auf Yuls Kiste (RTX 5060 Ti 16 GB, `gemma4:26b`). Eine Änderung pro
+Persona, jede an festen Seeds nachgezählt, dann Blindverkostung gegen den
+Stand von `main`. Rohdaten: `logs/gemma_tuning_2026-11-21/` (gitignored).
+
+### `num_ctx`: 16384 bleibt
+
+`run_bench.py`, PETER, 5 Fragen × 3 Runden, je zweimal im Wechsel, vor jedem
+Block `ollama stop`.
+
+| `num_ctx` | Kaltstart | erstes Zeichen | Zeichen/s | CPU/GPU |
+|---|---|---|---|---|
+| 16384 | 25,3 s (Platte) / 12,3 s | 0,47 s | 307–308 | 21/79 |
+| 8192 | 12,5 s / 11,3 s | 0,46–0,47 s | 310–312 | 21/79 |
+
+Der scheinbare Gewinn im ersten Paar (25 gegen 12 s) war der Datei-Cache:
+16384 lud beim zweiten Mal ebenso schnell. 8192 spart nichts, kürzt aber lange
+Gespräche früher. Die Wiki-Ausschnitte (2 × 2400 Zeichen) passen mit RSS,
+System-Prompt und Zeitstempel in rund 3000 Tokens, auch 8192 hätte sie nicht
+abgeschnitten.
+
+### Temperaturen: Gemmas Default ist 1,0
+
+`ollama show gemma4:26b --parameters`: `temperature 1`, `top_k 64`,
+`top_p 0.95`; `ministral-3:14b`: `temperature 0.15`. Die 14B-Werte (LEAH 0,55,
+POPCORN 0,7) waren für das 14B warm, für Gemma kühl — passend zu Yuls
+Eindruck „bei POPCORN und LEAH fehlten manchmal Witz und Charme". Verkostet:
+LEAH 0,8, POPCORN 1,0. **Nach der Verkostung bleibt nur LEAH 0,8**, POPCORN
+steht wieder auf 0,7 (siehe unten). DORIS (0,5) und PETER (0,1) unverändert.
+
+### DORIS: das Verbot rief das Muster hervor
+
+Gemma-DORIS hatte am 2026-11-15 einmal „LEAH: … DORIS: …" geschrieben. Direkt
+gegen Ollama, DORIS-Prompt, Temperatur 0,5, Seeds 0–19, Sprecherzeile am
+Zeilenanfang gezählt:
+
+| Fassung | „Warum ist der Himmel blau?" | Mond-Entfernung |
+|---|---|---|
+| `main` | 1/20 | 0/20 |
+| „nie im Namen von LEAH, PETER oder POPCORN und ohne Sprecherzeilen wie ‚LEAH:'" | **19/20** | 0/20 |
+| „in deiner eigenen Stimme, als reiner Text ohne vorangestellten Namen" | 16/20 | 0/20 |
+| **„Du antwortest immer in deiner eigenen Stimme."** | **0/20** | 0/20 |
+
+Die erste Fassung war der Branch-Stand der ersten Verkostungsrunde; mit ihr
+antwortete DORIS als „PETER: Das liegt an der Rayleigh-Streuung …". **Wer das
+Verbotene beschreibt, legt es nahe** — die Regel steht seitdem in `CLAUDE.md`.
+Dass es nur bei der Himmel-Frage auftritt, ist ungeklärt; die Frage ist die
+klassische PETER-Frage, und DORIS' Prompt verweist für Wissensfragen auf
+PETER.
+
+### PETER: das Palindrom
+
+Beide Modelle nehmen als Beispiel für ein deutsches Palindrom den bekannten
+Satz mit dem N-Wort. Er kommt aus dem Modellgedächtnis, nicht aus dem
+Wiki-Ausschnitt (der Artikel „Palindrom" enthält ihn nicht). Temperatur 0,1,
+Seeds 0–4:
+
+| Fassung | N-Wort |
+|---|---|
+| `main` | 5/5 |
+| allgemein: „nichts mit abwertenden oder diskriminierenden Wörtern, auch wenn es das bekannteste Beispiel ist" | 5/5 |
+| konkret: „… das bekannte Palindrom mit dem N-Wort ist tabu, nimm etwa ‚Ein Esel lese nie'" | 0/5 |
+| **„Ist das bekannteste Beispiel für etwas rassistisch oder abwertend (etwa ein verbreitetes deutsches Palindrom), ersetzt du es durch ein unverfängliches wie ‚Ein Esel lese nie' oder ‚Reliefpfeiler'."** | **0/5** |
+
+Genommen ist die letzte: Sie wirkt und nennt das Wort nicht.
+
+### Blindverkostung
+
+Dieselben 14 Proben wie am 2026-11-15 (Skript nachgebaut, Fragen dort
+beschrieben), über den One-Shot-Provider mit Wiki, alt = `main`, neu = Branch,
+Seiten 7 zu 7 verteilt. Die neue Seite lief mit den endgültigen DORIS- und
+PETER-Sätzen.
+
+**Yuls Urteil (blind): neu 4, alt 4, gleich 6.**
+
+| Persona | Proben | neu | alt | gleich | geändert |
+|---|---|---|---|---|---|
+| POPCORN | Steuer, TCP, Pizza | 0 | 3 | 0 | Temperatur 0,7 → 1,0 |
+| LEAH | vier Züge, über DORIS, Pizza | 2 | 1 | 0 | Temperatur 0,55 → 0,8 |
+| DORIS | Himmel, Rolle, Pizza | 1 | 0 | 2 | „in deiner eigenen Stimme" |
+| PETER | Merz ×2, Hamburg, Palindrom, Pizza | 1 | 0 | 4 | Palindrom-Satz |
+
+- **POPCORN 1,0 verliert dreimal** — auch bei TCP, wo Yul die *alte* Seite
+  katziger fand. Die höhere Temperatur macht sie nicht katziger, eher
+  beliebiger. Zurück auf 0,7. Yuls Kommentar „beide könnten katziger sein"
+  zeigt auf den Prompt: Er bremst ausdrücklich („*dezente* Katzen-Anspielung",
+  „ein- bis zweimal", „Würze, nicht Hauptgericht"), ein Erbe des 14B, das zu
+  viel Katze machte — Gemma hält sich wörtlich daran.
+- **LEAH 0,8 gewinnt knapp** und bleibt. Bei den vier Zügen gewann die alte
+  Seite („etwas empathischer"); „gerne dürften beide mehr Empathie" — auch
+  das eine Frage des Prompts.
+- **DORIS und PETER** schmecken nicht schlechter, und ihre Fixes sind
+  nachgezählt. Beim Palindrom ging die Probe wegen des Beispiels an neu.
+- Eine Antwort je Probe — schwache Signale, aber sie passen zu Yuls
+  Kommentaren. Der Prompt-Teil von #99 (a) bleibt offen.
+
+---
+
 ## Quellen
 
 - [Ministral 3 14B Model Card](https://huggingface.co/mistralai/Ministral-3-14B-Instruct-2512)
