@@ -193,6 +193,11 @@ in them turns out to be wrong, it gets corrected in a later entry.
   barely slower afterwards). Dense models still get the warning. The check
   also no longer warns against itself when the model is already loaded: the
   VRAM that model occupies counts as free.
+- **A search term with `#` no longer fetches the wrong Wikipedia article.**
+  The wiki proxy put the term into the Kiwix URL unencoded, so everything
+  after a `#` was dropped: a question about C# brought the article about the
+  letter C into the prompt. Terms are now URL-encoded (`#`, `?`, `/`,
+  umlauts) for Kiwix and for online Wikipedia.
 - **Umlauts and accents from a Wikipedia infobox reach the model intact.**
   With the offline Wikipedia (Kiwix), every non-ASCII character in an
   article's infobox — party leaders, founding dates, names — arrived garbled
