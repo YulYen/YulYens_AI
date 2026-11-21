@@ -21,10 +21,24 @@ python scripts/run_evals.py -e classic --no-judge --personas PETER
 # Anderes Modell, ohne die Config anzufassen — den Judge dabei festhalten,
 # sonst bewertet jedes Modell sich selbst und die Läufe sind nicht vergleichbar
 python scripts/run_evals.py -e classic --model gemma4:26b --judge-model ministral-3:14b --out logs/evals/gemma4_26b
+
+# Dieselben Antworten von einem anderen Judge bewerten lassen — das Modell
+# antwortet dabei nicht noch einmal
+python scripts/run_evals.py -e classic --rejudge logs/evals/gemma4_26b/answers.json --judge-model qwen3.8:27b --out logs/evals/gemma4_26b_qwen
 ```
 
 Report landet als `report.md` (lesen) und `report.csv` (zwei Läufe
-vergleichen) in `logs/evals/`, konfigurierbar über `evals.out_dir`.
+vergleichen) in `logs/evals/`, konfigurierbar über `evals.out_dir`. Daneben
+liegt `answers.json`: die Antworten des Laufs ohne Urteil, Futter für
+`--rejudge`.
+
+**Erst alle Antworten, dann alle Urteile (#100).** Passen Chat-Modell und Judge
+nicht zusammen in den VRAM (ein 27B-Judge neben `gemma4:26b` auf 16 GB), lädt
+Ollama sonst bei jedem Fall zweimal um. `answers.json` wird geschrieben, bevor
+der Judge anfängt — bricht er ab, holt `--rejudge` das Urteil nach. Die Checks
+kommen dabei aus der Datei, nicht aus einem neuen Lauf: ein Datums-Check am
+nächsten Tag schlüge sonst aus dem falschen Grund an. Die Spalte `duration_ms`
+misst seitdem nur die Antwort, nicht mehr Antwort plus Urteil.
 Exit-Code 1, wenn etwas fehlgeschlagen ist — damit taugt der Lauf als Gate.
 
 `make evals` ist die Kurzform für den Guard-Teil.

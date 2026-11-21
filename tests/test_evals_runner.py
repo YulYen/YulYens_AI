@@ -22,10 +22,13 @@ from evals.judge import Judge, build_prompt, parse_verdict
 from evals.report import CSV_COLUMNS, render_csv, render_markdown
 from evals.runner import (
     EvalRun,
+    judge_results,
+    load_answers,
     run_behaviour_corpora,
     run_guard_corpus,
     run_karl_corpus,
     run_persona_corpora,
+    save_answers,
 )
 
 from tests.doubles import permissive_guard_double
@@ -556,3 +559,118 @@ def test_a_backend_error_text_is_an_error_not_a_scored_answer():
     assert judge_core.calls == [], "ein Ausfall wird nicht bewertet"
     assert run.errors == 1
     assert run.average_score is None
+
+
+# ---- Zwei Phasen: erst alle Antworten, dann alle Urteile (#100) ------------
+
+
+def test_every_answer_comes_before_the_first_verdict():
+    """Sonst lädt Ollama Chat-Modell und Judge bei jedem Fall zweimal um."""
+    order: list[str] = []
+
+    class _RecordingJudge:
+        def score(self, question, answer, traits):
+            order.append(f"judge:{answer}")
+            return parse_verdict("1: 5 | ja", traits)
+
+    corpora = [_persona_corpus(id="a"), _persona_corpus(id="b")]
+    answers = iter(["eins", "zwei"])
+
+    def _answer(persona, question):
+        answer = next(answers)
+        order.append(f"answer:{answer}")
+        return answer
+
+    run_persona_corpora(corpora, _answer, _RecordingJudge())
+
+    assert order == ["answer:eins", "answer:zwei", "judge:eins", "judge:zwei"]
+
+
+def test_judge_results_leaves_failed_answers_unjudged():
+    def _boom(persona, question):
+        raise RuntimeError("ollama down")
+
+    results = run_persona_corpora([_persona_corpus()], _boom)
+    judged = []
+
+    class _Judge:
+        def score(self, *args):
+            judged.append(args)
+            return parse_verdict("1: 5 | ja", ("x",))
+
+    judge_results(results, _Judge())
+
+    assert judged == []
+    assert results[0].verdict is None
+
+
+def test_saved_answers_can_be_judged_again_by_another_judge(tmp_path):
+    corpus = _persona_corpus(checks=Checks(must_match=("paris",)))
+    run = EvalRun(model="chat:26b", judge_model=None)
+    run.results = run_persona_corpora([corpus], lambda p, q: "Berlin.")
+    path = tmp_path / "answers.json"
+    save_answers(run, path)
+
+    again = load_answers(path)
+    judge_results(again.results, Judge(_FakeCore("1: 4 | ok"), "judge:27b"))
+
+    assert again.model == "chat:26b"
+    (result,) = again.results
+    assert result.answer == "Berlin."
+    # Die Checks kommen aus der Datei, nicht aus einem neuen Lauf.
+    assert [f.kind for f in result.check_failures] == ["must_match"]
+    assert result.verdict is not None and result.verdict.average == 4
+
+
+def test_a_failed_judge_is_not_saved_as_an_answer_error(tmp_path):
+    class _BrokenJudge:
+        def score(self, *_args):
+            raise RuntimeError("judge exploded")
+
+    run = EvalRun(model="m", judge_model=None)
+    run.results = run_persona_corpora(
+        [_persona_corpus()], lambda p, q: "x", _BrokenJudge()
+    )
+    assert "judge exploded" in run.results[0].error
+    path = tmp_path / "answers.json"
+    save_answers(run, path)
+
+    assert load_answers(path).results[0].error is None
+
+
+def test_karl_cases_keep_their_judge_question_across_a_save(tmp_path):
+    corpus = KarlCorpus(
+        name="karl_summary",
+        description="",
+        cases=(
+            KarlCase(
+                id="k1",
+                history=({"role": "user", "content": "Ich bin Yul."},),
+                expect_traits=("nennt Yul",),
+                checks=Checks(),
+                source="k.yaml",
+            ),
+        ),
+        source="k.yaml",
+    )
+    run = EvalRun(model="m", judge_model=None)
+    run.results = run_karl_corpus(corpus, lambda history: "Yul.")
+    path = tmp_path / "answers.json"
+    save_answers(run, path)
+    seen = []
+
+    class _Judge:
+        def score(self, question, answer, traits):
+            seen.append((question, traits))
+            return parse_verdict("1: 5 | ja", traits)
+
+    judge_results(load_answers(path).results, _Judge())
+
+    assert seen == [("Fasse den Gesprächsverlauf zusammen.", ("nennt Yul",))]
+
+
+def test_an_unknown_answers_format_is_refused(tmp_path):
+    path = tmp_path / "answers.json"
+    path.write_text('{"format": 99, "results": []}', encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_answers(path)

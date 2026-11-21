@@ -41,6 +41,14 @@ in them turns out to be wrong, it gets corrected in a later entry.
   reload it on the first question. It never fails loudly: if Ollama is not
   running, it logs that and exits normally.
 
+- **`run_evals.py --rejudge <answers.json>`** grades the answers of an
+  earlier run again, with another `--judge-model`, without asking the chat
+  model a second time. Every run now writes its answers to `answers.json`
+  next to the report. The suite also answers every case first and judges
+  afterwards: with a judge that does not fit into VRAM next to the chat model,
+  Ollama no longer reloads both for every case. `duration_ms` in
+  `report.csv` now covers the answer only, no longer answer plus verdict.
+
 - **`run_evals.py --model <name>`** runs the eval suite against another model
   without editing the config, as `run_bench.py --model` already did. Pass
   `--judge-model` too when comparing models — by default the judge is the chat

@@ -20,11 +20,16 @@ from evals.report import render_csv, render_markdown
 from evals.runner import (
     EvalRun,
     build_answer_fn,
+    judge_results,
+    load_answers,
     run_behaviour_corpora,
     run_guard_corpus,
     run_karl_corpus,
     run_persona_corpora,
+    save_answers,
 )
+
+ANSWERS_FILE = "answers.json"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -69,8 +74,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Skip the Karl summary corpus (one extra LLM run per case).",
     )
     parser.add_argument(
+        "--rejudge",
+        metavar="ANSWERS_JSON",
+        help=(
+            f"Skip answering and judge the answers of an earlier run again "
+            f"(its {ANSWERS_FILE}). The fair way to compare two judges: same "
+            f"answers, different --judge-model."
+        ),
+    )
+    parser.add_argument(
         "--out",
-        help="Output directory for report.md / report.csv (default: logs/evals).",
+        help=(
+            f"Output directory for report.md / report.csv / {ANSWERS_FILE} "
+            f"(default: logs/evals)."
+        ),
     )
     return parser
 
@@ -212,10 +229,37 @@ def main(argv: list[str] | None = None) -> int:
     guard_outcomes = run_guard_corpus(guard_corpus, guard_factory, disabled_protections)
 
     model_name = str(cfg.core.get("model_name", "unknown"))
-    run = EvalRun(model=model_name, judge_model=None)
+    if args.rejudge:
+        if args.no_judge:
+            parser.error("--rejudge without a judge does nothing; drop --no-judge.")
+        try:
+            run = load_answers(Path(args.rejudge))
+        except (OSError, ValueError, KeyError) as exc:
+            parser.error(f"cannot read {args.rejudge}: {exc}")
+        # Bewertet wird, was damals geantwortet hat — nicht das Modell, das
+        # heute in der Config steht.
+        model_name = run.model
+    else:
+        run = EvalRun(model=model_name, judge_model=None)
     run.guard_outcomes = list(guard_outcomes)
 
-    if not args.guard_only:
+    if args.rejudge:
+        from core.factory import AppFactory
+
+        storage_cfg = {**(getattr(cfg, "storage", None) or {}), "enabled": False}
+        setattr(cfg, "storage", storage_cfg)
+        factory = AppFactory()
+        judge_model = resolve_model_name(
+            args.judge_model or evals_cfg.get("judge_model"), model_name
+        )
+        judge = Judge(
+            llm_core=factory.get_llm_core(),
+            model_name=judge_model,
+            keep_alive=int(cfg.core.get("keep_alive", 600)),
+        )
+        run.judge_model = judge_model
+        judge_results(run.results, judge)
+    elif not args.guard_only:
         # Vor dem ersten Modelllauf: der Proxy muss stehen, bevor die erste
         # Frage durch WikiLookup geht. Ein --guard-only-Lauf braucht ihn nicht
         # und soll weiterhin ohne alles laufen — das ist sein Zweck.
@@ -257,18 +301,24 @@ def main(argv: list[str] | None = None) -> int:
             if not persona_corpora:
                 parser.error(f"No persona corpus matches {sorted(wanted)}.")
 
-        run.results.extend(run_persona_corpora(persona_corpora, answer_fn, judge))
+        # Erst alle Antworten, dann alle Urteile (#100): Passen Chat-Modell und
+        # Judge nicht zusammen in den VRAM, lädt Ollama sonst bei jedem Fall
+        # zweimal um. Die Antworten landen vor dem Urteil auf der Platte —
+        # ein abgebrochener Judge-Lauf lässt sich mit --rejudge nachholen.
+        run.results.extend(run_persona_corpora(persona_corpora, answer_fn))
         run.results.extend(
-            run_behaviour_corpora(corpus_mod.load_behaviour_corpora(), answer_fn, judge)
+            run_behaviour_corpora(corpus_mod.load_behaviour_corpora(), answer_fn)
         )
         if not args.skip_karl:
             run.results.extend(
                 run_karl_corpus(
                     corpus_mod.load_karl_corpus(),
                     _build_summarize_fn(factory, cfg),
-                    judge,
                 )
             )
+        out_dir.mkdir(parents=True, exist_ok=True)
+        save_answers(run, out_dir / ANSWERS_FILE)
+        judge_results(run.results, judge)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     (out_dir / "report.md").write_text(render_markdown(run), encoding="utf-8")

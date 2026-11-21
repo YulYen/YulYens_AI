@@ -4,14 +4,24 @@ The answer source is injected as a callable so the runner is fully testable
 without Ollama. In production ``build_answer_fn`` wires it to the same one-shot
 provider the API uses — guard, wiki and logging included, so an eval run
 exercises the real path instead of a shortcut.
+
+Two phases since #100: first every answer, then every verdict
+(``judge_results``). Judging each case right after its answer made Ollama swap
+chat model and judge twice per case as soon as the two no longer fit into VRAM
+side by side — with a 27B judge next to a 26B chat model, that is most of the
+run. The answers can be saved (``save_answers``) and judged again later by a
+different judge (``load_answers``): the only fair way to compare two judges is
+on the very same answers.
 """
 
 from __future__ import annotations
 
+import json
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from pathlib import Path
 
 from core.streaming_provider import LLM_ERROR_MESSAGE
 
@@ -53,7 +63,11 @@ class CaseResult:
     check_failures: tuple[CheckFailure, ...] = ()
     verdict: JudgeVerdict | None = None
     error: str | None = None
-    duration_ms: int = 0
+    duration_ms: int = 0  # the answer only; judging is a separate phase
+    # What the judge needs later on. The question it sees is not always the
+    # case question: Karl's cases show it a summary instruction instead.
+    expect_traits: tuple[str, ...] = ()
+    judge_question: str = ""
 
     @property
     def checks_passed(self) -> bool:
@@ -146,16 +160,20 @@ def build_answer_fn(factory) -> AnswerFn:
     return _answer
 
 
-def _run_case(
+def _answer_case(
     group: str,
     persona: str,
     case: PersonaCase,
     answer_fn: AnswerFn,
-    judge: Judge | None,
     today: date | None,
 ) -> CaseResult:
     result = CaseResult(
-        group=group, persona=persona, case_id=case.id, question=case.question
+        group=group,
+        persona=persona,
+        case_id=case.id,
+        question=case.question,
+        expect_traits=tuple(case.expect_traits),
+        judge_question=case.question,
     )
     started = time.monotonic()
     try:
@@ -176,17 +194,27 @@ def _run_case(
         return result
 
     result.check_failures = run_checks(result.answer, case.checks, today=today)
-
-    if judge is not None and case.expect_traits:
-        try:
-            result.verdict = judge.score(
-                case.question, result.answer, case.expect_traits
-            )
-        except Exception as exc:
-            result.error = f"judge failed — {type(exc).__name__}: {exc}"
-
     result.duration_ms = int((time.monotonic() - started) * 1000)
     return result
+
+
+def judge_results(results: Iterable[CaseResult], judge: Judge | None) -> None:
+    """Second phase: score every answered case that has traits, in place.
+
+    Cases that already failed (exception, backend error) stay unjudged — a
+    verdict on an error text would only drag the average down (#95).
+    """
+    if judge is None:
+        return
+    for result in results:
+        if result.error is not None or not result.expect_traits:
+            continue
+        try:
+            result.verdict = judge.score(
+                result.judge_question, result.answer, result.expect_traits
+            )
+        except Exception as exc:
+            result.error = f"{_JUDGE_ERROR_PREFIX} — {type(exc).__name__}: {exc}"
 
 
 def run_persona_corpora(
@@ -195,19 +223,14 @@ def run_persona_corpora(
     judge: Judge | None = None,
     today: date | None = None,
 ) -> list[CaseResult]:
-    results: list[CaseResult] = []
-    for corpus in corpora:
-        for case in corpus.cases:
-            results.append(
-                _run_case(
-                    f"persona:{corpus.persona}",
-                    corpus.persona,
-                    case,
-                    answer_fn,
-                    judge,
-                    today,
-                )
-            )
+    results = [
+        _answer_case(
+            f"persona:{corpus.persona}", corpus.persona, case, answer_fn, today
+        )
+        for corpus in corpora
+        for case in corpus.cases
+    ]
+    judge_results(results, judge)
     return results
 
 
@@ -217,19 +240,12 @@ def run_behaviour_corpora(
     judge: Judge | None = None,
     today: date | None = None,
 ) -> list[CaseResult]:
-    results: list[CaseResult] = []
-    for corpus in corpora:
-        for case in corpus.cases:
-            results.append(
-                _run_case(
-                    f"behaviour:{corpus.name}",
-                    corpus.persona,
-                    case,
-                    answer_fn,
-                    judge,
-                    today,
-                )
-            )
+    results = [
+        _answer_case(f"behaviour:{corpus.name}", corpus.persona, case, answer_fn, today)
+        for corpus in corpora
+        for case in corpus.cases
+    ]
+    judge_results(results, judge)
     return results
 
 
@@ -249,6 +265,8 @@ def run_karl_corpus(
             persona="KARL",
             case_id=case.id,
             question=f"{len(case.history)} Nachrichten zusammenfassen",
+            expect_traits=tuple(case.expect_traits),
+            judge_question="Fasse den Gesprächsverlauf zusammen.",
         )
         started = time.monotonic()
         try:
@@ -260,18 +278,86 @@ def run_karl_corpus(
             continue
 
         result.check_failures = run_checks(result.answer, case.checks)
-        if judge is not None and case.expect_traits:
-            try:
-                result.verdict = judge.score(
-                    "Fasse den Gesprächsverlauf zusammen.",
-                    result.answer,
-                    case.expect_traits,
-                )
-            except Exception as exc:
-                result.error = f"judge failed — {type(exc).__name__}: {exc}"
         result.duration_ms = int((time.monotonic() - started) * 1000)
         results.append(result)
+    judge_results(results, judge)
     return results
+
+
+# ---- Antworten aufheben und neu bewerten (#100) -------------------------------
+
+ANSWERS_FORMAT = 1
+_JUDGE_ERROR_PREFIX = "judge failed"
+
+
+def save_answers(run: EvalRun, path: Path) -> None:
+    """Write the answers of a run, without verdicts, for a later judge."""
+    payload = {
+        "format": ANSWERS_FORMAT,
+        "model": run.model,
+        "started_at": run.started_at,
+        "warnings": list(run.warnings),
+        "results": [
+            {
+                "group": r.group,
+                "persona": r.persona,
+                "case_id": r.case_id,
+                "question": r.question,
+                "answer": r.answer,
+                "check_failures": [
+                    {"kind": f.kind, "detail": f.detail} for f in r.check_failures
+                ],
+                # Nur Fehler aus der Antwortphase: ein gescheiterter Judge ist
+                # kein Befund über die Antwort, der nächste soll es versuchen.
+                "error": (
+                    None
+                    if r.error and r.error.startswith(_JUDGE_ERROR_PREFIX)
+                    else r.error
+                ),
+                "duration_ms": r.duration_ms,
+                "expect_traits": list(r.expect_traits),
+                "judge_question": r.judge_question,
+            }
+            for r in run.results
+        ],
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_answers(path: Path) -> EvalRun:
+    """Rebuild a run from ``save_answers`` output, ready for ``judge_results``.
+
+    Checks are taken over as they were, not re-run: a date check (``{today_de}``)
+    run on another day would fail for the wrong reason.
+    """
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("format") != ANSWERS_FORMAT:
+        raise ValueError(f"{path}: unknown answers format {payload.get('format')!r}")
+    run = EvalRun(
+        model=str(payload.get("model", "unknown")),
+        judge_model=None,
+        started_at=str(payload.get("started_at", "")),
+        warnings=list(payload.get("warnings", [])),
+    )
+    for raw in payload.get("results", []):
+        run.results.append(
+            CaseResult(
+                group=raw["group"],
+                persona=raw["persona"],
+                case_id=raw["case_id"],
+                question=raw["question"],
+                answer=raw.get("answer", ""),
+                check_failures=tuple(
+                    CheckFailure(kind=f["kind"], detail=f["detail"])
+                    for f in raw.get("check_failures", [])
+                ),
+                error=raw.get("error"),
+                duration_ms=int(raw.get("duration_ms", 0)),
+                expect_traits=tuple(raw.get("expect_traits", [])),
+                judge_question=raw.get("judge_question", ""),
+            )
+        )
+    return run
 
 
 def run_guard_corpus(
