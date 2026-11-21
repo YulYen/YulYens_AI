@@ -331,3 +331,55 @@ def test_an_eval_run_leaves_the_conversation_store_alone(tmp_path):
     main(["-e", "classic", "--no-judge", "--skip-karl", "--out", str(tmp_path / "o")])
 
     assert SqliteStore(db).list_conversations() == []
+
+
+def test_rejudge_scores_saved_answers_without_asking_the_model_again(
+    tmp_path, monkeypatch
+):
+    """#100: zwei Judges vergleicht man an denselben Antworten."""
+    cfg = Config("config.yaml")
+    cfg.ensemble = "classic"
+    cfg.override("core", {"backend": "dummy", "include_date": False})
+    cfg.override("wiki", {"mode": False})
+
+    first = tmp_path / "first"
+    main(
+        ["-e", "classic", "--personas", "DORIS", "--no-judge", "--skip-karl"]
+        + ["--out", str(first)]
+    )
+    answers = first / "answers.json"
+    assert answers.exists()
+
+    def _no_answers(_factory):
+        raise AssertionError("--rejudge must not ask the chat model")
+
+    monkeypatch.setattr("evals.cli.build_answer_fn", _no_answers)
+    scored = []
+
+    class _RecordingJudge:
+        def __init__(self, llm_core, model_name, keep_alive=600):
+            self.model_name = model_name
+
+        def score(self, question, answer, traits):
+            from evals.judge import parse_verdict
+
+            scored.append(answer)
+            return parse_verdict(
+                "\n".join(f"{i}: 4 | ok" for i, _ in enumerate(traits, 1)), traits
+            )
+
+    monkeypatch.setattr("evals.cli.Judge", _RecordingJudge)
+    second = tmp_path / "second"
+    main(
+        ["-e", "classic", "--rejudge", str(answers), "--judge-model", "judge:27b"]
+        + ["--out", str(second)]
+    )
+
+    assert scored and all(a.startswith("ECHO:") for a in scored)
+    markdown = (second / "report.md").read_text(encoding="utf-8")
+    assert "judge:27b" in markdown
+
+
+def test_rejudge_with_no_judge_is_an_error(tmp_path):
+    with pytest.raises(SystemExit):
+        main(["-e", "classic", "--rejudge", str(tmp_path / "a.json"), "--no-judge"])

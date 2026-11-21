@@ -149,6 +149,7 @@ für #7 (LoRA). Details in [evals/ReadMe.md](../../evals/ReadMe.md).
 python scripts/run_evals.py -e classic               # voll (braucht Ollama)
 python scripts/run_evals.py -e classic --guard-only  # Guard-Teil, braucht kein Modell
 python scripts/run_evals.py -e classic --model <anderes> --judge-model <fest>  # Modellvergleich
+python scripts/run_evals.py -e classic --rejudge <out>/answers.json --judge-model <anderer>  # Judge-Vergleich
 make evals                                           # Kurzform für --guard-only
 ```
 
@@ -158,6 +159,16 @@ tauscht den Richter mit. Dass das den Ø-Score kippt, ist gemessen (2026-11-08:
 8B- und 14B-Judge widersprachen sich über dieselben Antworten). Für einen
 Vergleich also einen Judge festhalten und bei jedem Lauf mitgeben. Eine
 Persona mit eigenem `model:` im Ensemble behält es auch unter `--model`.
+
+**Zwei Judges vergleicht man an denselben Antworten (#100).** Der Runner
+antwortet erst auf alle Fälle, schreibt `answers.json` und bewertet danach
+(`judge_results`). Vorher wechselten sich Antwort und Urteil pro Fall ab — mit
+einem Judge, der nicht neben das Chat-Modell in den VRAM passt, lud Ollama dann
+bei jedem Fall zweimal um. `--rejudge` bewertet eine gespeicherte Antwortdatei
+neu, ohne das Chat-Modell zu fragen; zwei frische Läufe mit je einem Judge
+würden zwei Antwortsätze *und* zwei Judges vergleichen. Die Checks übernimmt
+`--rejudge` aus der Datei (Datums-Checks!), ein früherer Judge-Fehler wird
+nicht mitgespeichert, damit der nächste Judge den Fall bekommt.
 
 - Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
 - `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),
