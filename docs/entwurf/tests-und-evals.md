@@ -170,6 +170,32 @@ würden zwei Antwortsätze *und* zwei Judges vergleichen. Die Checks übernimmt
 `--rejudge` aus der Datei (Datums-Checks!), ein früherer Judge-Fehler wird
 nicht mitgespeichert, damit der nächste Judge den Fall bekommt.
 
+**Gemessen am 2026-11-21** (Antworten `gemma4:26b`, Stand `main`, 17 Fälle,
+jeder Judge zweimal über dieselbe `answers.json`):
+
+| Judge | Ø Lauf 1 | Ø Lauf 2 | Fälle mit anderer Note |
+|---|---|---|---|
+| `ministral-3:8b` | 4,53 | 4,41 | 1/17 |
+| `qwen3.8:27b` | 4,74 | 4,74 | 0/17 |
+
+- **Ein Judge streut auf denselben Antworten kaum.** Die 27 % Streuung der
+  Bestehensquote aus #41a kommen also aus den *Antworten*, nicht aus dem
+  Urteil. Wer einen Judge beurteilen will, nimmt `--rejudge`; wer ein Modell
+  beurteilen will, braucht weiter mehrere Antwortläufe.
+- **Keiner der beiden ist klar besser.** Wo sie sich widersprechen, irrt 8b
+  dreimal bei den Personas (1/5 auf eine korrekte Kompilierer-Erklärung, 3/5
+  auf „katzige Würze" bei Fischstäbchen und Schnurren, 3/5 auf „nennt eine
+  Größenordnung" bei „100 bis 400 Milliarden"), Qwen zweimal bei Karl (1/5
+  auf „hält die Englisch-Vorgabe fest" bei einer Zusammenfassung, die sie
+  wörtlich enthält, dafür 5/5 auf die fehlende Bullet-Vorgabe; 2/5 auf
+  „nennt Projekt und vier Personas", obwohl beides drinsteht). Der im Backlog
+  genannte Fehlgriff („Paris, wow …" als fehlender Sarkasmus) trat bei 8b an
+  diesen Antworten nicht auf.
+- **Qwen gibt 14 von 17 Fällen die volle Punktzahl.** Eine Verbesserung kann
+  er damit kaum noch anzeigen — für einen Vergleich Baseline gegen Adapter
+  (#7) ist ein Judge mit Luft nach oben wertvoller als einer, der öfter recht
+  hat.
+
 - Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
 - `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),
   `expect_traits` = LLM-as-judge 1–5 (4+ besteht, 3 nicht)
