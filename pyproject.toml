@@ -82,7 +82,8 @@ ignore_missing_imports = true
 [tool.importlinter]
 root_packages = [
     "core", "config", "security", "storage", "auth",
-    "wiki", "rss", "tts", "stt", "ui", "api", "email_adapter", "evals", "bench",
+    "wiki", "rss", "tts", "stt", "ui", "api", "email_adapter", "mcp_adapter",
+    "evals", "bench",
 ]
 
 [[tool.importlinter.contracts]]
@@ -99,7 +100,7 @@ source_modules = ["security"]
 # und deshalb steht sie hier statt in jemandes Kopf.
 forbidden_modules = [
     "core", "storage", "auth", "wiki", "rss",
-    "tts", "stt", "ui", "api", "email_adapter", "evals", "bench",
+    "tts", "stt", "ui", "api", "email_adapter", "mcp_adapter", "evals", "bench",
 ]
 
 [[tool.importlinter.contracts]]
@@ -110,7 +111,7 @@ source_modules = ["config"]
 # Frage der Import-Reihenfolge.
 forbidden_modules = [
     "core", "security", "storage", "auth", "wiki", "rss",
-    "tts", "stt", "ui", "api", "email_adapter", "evals", "bench",
+    "tts", "stt", "ui", "api", "email_adapter", "mcp_adapter", "evals", "bench",
 ]
 
 [[tool.importlinter.contracts]]
@@ -120,7 +121,7 @@ source_modules = [
     "core", "config", "security", "storage", "auth",
     "wiki", "rss", "tts", "stt",
 ]
-forbidden_modules = ["ui", "api", "email_adapter"]
+forbidden_modules = ["ui", "api", "email_adapter", "mcp_adapter"]
 # Die drei bewussten Ausnahmen: die AppFactory baut die Oberflächen und den
 # One-Shot-Provider, das ist ihr Zweck. Sie stehen hier namentlich, damit eine
 # *vierte* solche Abhängigkeit auffällt, statt sich stillschweigend

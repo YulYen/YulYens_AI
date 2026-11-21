@@ -134,7 +134,7 @@ faster-whisper (STT). Versionen und Pins: `requirements.txt`,
 | `src/security/tinyguard.py` | BasicGuard: benannte Regeln für Eingang, Kontext und Ausgang |
 | `src/wiki/`, `src/rss/` | die zwei Kontextquellen |
 | `src/storage/`, `src/auth/` | Gesprächs-Ablage (SQLite) und Identitäts-Naht |
-| `src/email_adapter/`, `src/tts/`, `src/stt/` | opt-in Kanäle |
+| `src/email_adapter/`, `src/mcp_adapter/`, `src/tts/`, `src/stt/` | opt-in Kanäle |
 | `src/evals/`, `src/bench/` | Eval-Suite und Stoppuhr; Einstiege in `scripts/` |
 | `src/version.py` | die einzige Quelle der Version |
 | `evals/` | Eval-Korpora als YAML (Guard-Red-Team, Personas, Karl) |
@@ -307,6 +307,9 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Mail-Adapter:** Antwort an `From`, nie `Reply-To`; **erst markieren, dann
   senden** — und den IMAP-Status prüfen, `imaplib` wirft bei `NO` nicht; ohne
   `allowed_senders` kein Start; einmal beim Lesen kürzen.
+- **MCP-Server:** der Prozess setzt `ui.type` auf `None`, sonst greift die
+  Web-Regel „ohne Anmeldung keine Aufzeichnung" (#72); nur die eigene
+  `ToolError` geht mit Text an den Client.
 - **API:** `model` = Persona; `api_key` gilt für **alle Endpunkte außer
   `/health`** (`check_api_access`), auch für `/healthz`; OpenAI-Fehler mit `{"error": …}` auf oberster Ebene;
   Sampling-Parameter werden ignoriert.

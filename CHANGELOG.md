@@ -32,6 +32,15 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ### Added
 
+- **MCP server: the personas as tools for Claude Code and other MCP
+  clients.** Opt-in: `pip install 'mcp>=2.3,<3'`, then for example
+  `claude mcp add yulyen -- python <path>/scripts/mcp_server.py -e classic`.
+  Three tools: `list_personas`, `ask_persona(persona, question)` and
+  `ask_all(question)`. Answers go through the same guard and wiki as `/ask`.
+  `ask_persona` is recorded in the conversation store under the channel `mcp`,
+  also on an installation without login, like the terminal and the API;
+  `ask_all` is not recorded, like every ask-all round.
+
 - **`scripts/blind_tasting.py` runs a blind tasting.** Two states of an
   ensemble (`classic@main` from git against `classic` in the working tree) or
   two models answer the same 14 probes from `evals/tasting_probes.yaml`. The

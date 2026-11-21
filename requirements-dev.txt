@@ -18,3 +18,7 @@ types-PyYAML
 pytest>=9.2,<10.0
 pytest-cov>=7.0,<8.0
 pre-commit>=4.7,<5.0
+# Das MCP-SDK (#39) ist im Betrieb opt-in wie piper-tts und faster-whisper
+# (`pip install 'mcp>=2.3,<3'`), hier gepinnt, damit CI und mypy den Server
+# wirklich prüfen statt ihn zu überspringen. 2.x: `MCPServer` statt `FastMCP`.
+mcp==2.3.0
