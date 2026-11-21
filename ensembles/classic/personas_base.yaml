@@ -21,7 +21,7 @@ personas:
   # überall core.model_name.
   - name: LEAH
     llm_options:
-      temperature: 0.55
+      temperature: 0.8
       num_ctx: 16384
     defaults:
       featured: true
@@ -35,5 +35,5 @@ personas:
       num_ctx: 16384
   - name: POPCORN
     llm_options:
-      temperature: 0.7
+      temperature: 1.0
       num_ctx: 16384
