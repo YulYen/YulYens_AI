@@ -30,6 +30,69 @@ in them turns out to be wrong, it gets corrected in a later entry.
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-24
+
+**Read "Breaking" before you update.** This release needs Python 3.12 and a
+new default model, and an installation that relied on a few lenient defaults
+may no longer start. Each entry below says what to do.
+
+What is new for the person using it: Gemma 4 (`gemma4:26b`) as the default
+model with the classic personas tuned for it, full-text search across your own
+conversations, a verdict that closes an Ask-All round, an optional own model
+per persona for one-on-one chats, and an MCP server that makes the personas
+available as tools in Claude Code and other MCP clients. Retrieved Wikipedia
+and news text is checked against more injection patterns, and a number of
+fixes concern what ends up in the conversation store.
+
+### Breaking
+
+- **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
+  reached its end of life in October 2026, and the libraries this project
+  depends on no longer ship fixes for it — security fixes for two of them
+  could not even be installed there. On 3.10 or 3.11, `pip install -r
+  requirements.txt` now fails with "no matching distribution"; create a new
+  virtual environment with 3.12+ and install the requirements again. Tested
+  in CI on 3.12 (Linux and Windows) and 3.14. 3.15 is not supported yet,
+  because the speech output (Piper) has no build for it.
+
+- **The default model is now `gemma4:26b`** (previously `ministral-3:8b`).
+  It is 18 GB and meant for a 16 GB graphics card plus system RAM: part of the
+  model sits in RAM, so the first answer after a start (or after `keep_alive`
+  ran out) takes about 25 seconds; after that it writes nearly twice as fast
+  as `ministral-3:14b`. **Before updating, run `ollama pull gemma4:26b`.**
+  Without it, `--doctor` reports the model as missing and the personas cannot
+  answer. **On a 12–16 GB card** use `ministral-3:14b` together with the new
+  ensemble `examples/classic_ministral14b`, which keeps the persona settings
+  tuned for that model; **on an 8 GB card** keep `ministral-3:8b`. Either way,
+  set `core.model_name` in `config.local.yaml`. The personas are told that
+  their knowledge reaches January 2025 (Gemma, per Google's model card) or
+  October 2023 (Ministral).
+
+- **The default Kiwix location in `config.yaml` moved** from
+  `C:\wikipedia-de-offline\` to `C:\Develop\wikipedia-de-offline\`
+  (`wiki.offline.kiwix_exe` and `wiki.offline.zim_path`). **If your Kiwix
+  folder is still in the old place**, either move it or set both paths in
+  `config.local.yaml`. Otherwise kiwix-serve does not start, `--doctor`
+  reports Kiwix as unreachable, and answers come without Wikipedia snippets.
+  Everything else keeps working. The default dump is now
+  `wikipedia_de_all_nopic_2026-10` (previously `2026-01`). If you keep the
+  older file, set `wiki.offline.zim_prefix` and `zim_path` to it as well —
+  the personas are told the dump date from `zim_prefix`.
+
+- **An unknown `ui.web.auth.provider` now stops the start** (exit code 4)
+  instead of silently running without login. A typo such as `provider: lokal`
+  used to log a warning and open the web UI to everyone who could reach it.
+  **If your installation starts with a warning about an unknown provider
+  today, it will no longer start** — correct the value to `local`, `header`
+  or `disabled`.
+
+- **`/healthz` requires the API key once one is configured.** The deep check
+  names models, paths and configuration problems and queries Ollama and Kiwix
+  on every call, so it now sits behind `api.openai_compatible.api_key` and the
+  rate limit, like `/ask` and `/v1`. **If a monitor polls `/healthz` and you
+  have set a key**, give it the `Authorization: Bearer …` header or point it at
+  `/health`, which stays open. Without a configured key nothing changes.
+
 ### Added
 
 - **MCP server: the personas as tools for Claude Code and other MCP
@@ -130,51 +193,19 @@ in them turns out to be wrong, it gets corrected in a later entry.
   the app makes no outside request of its own. On a machine with a broken
   network this also fixes a start that printed its error after three seconds
   but kept the process alive for minutes.
-- **An unknown `ui.web.auth.provider` now stops the start** (exit code 4)
-  instead of silently running without login. A typo such as `provider: lokal`
-  used to log a warning and open the web UI to everyone who could reach it.
-  **If your installation starts with a warning about an unknown provider
-  today, it will no longer start** — correct the value to `local`, `header`
-  or `disabled`.
+
 - **kiwix-serve is started on the configured address only.** With
   `wiki.offline.autostart`, the server used to listen on every network
   interface, so the offline Wikipedia was readable from the whole LAN although
   `wiki.offline.host` said `127.0.0.1`. It is now started with `--address`.
   If `host` is a name rather than an IP address (e.g. `localhost`), the
   argument is left out and a warning says so.
-- **`/healthz` requires the API key once one is configured.** The deep check
-  names models, paths and configuration problems and queries Ollama and Kiwix
-  on every call, so it now sits behind `api.openai_compatible.api_key` and the
-  rate limit, like `/ask` and `/v1`. **If a monitor polls `/healthz` and you
-  have set a key**, give it the `Authorization: Bearer …` header or point it at
-  `/health`, which stays open. Without a configured key nothing changes.
+
 - **The start page is split into two sections**, in the web UI and the
   terminal: **Solo** (chat with one persona, plus the guest persona) and
   **Orchestra** (AI dialog and Ask-All, plus the history card in the web UI).
   Every persona of the ensemble appears in both. In the terminal menu the
   numbers stay the same (`1`–`4`); the Ask-All entry now reads `[4] Ask-All`.
-
-- **The default model is now `gemma4:26b`** (previously `ministral-3:8b`).
-  It is 18 GB and meant for a 16 GB graphics card plus system RAM: part of the
-  model sits in RAM, so the first answer after a start (or after `keep_alive`
-  ran out) takes about 25 seconds; after that it writes nearly twice as fast
-  as `ministral-3:14b`. **Before updating, run `ollama pull gemma4:26b`.**
-  Without it, `--doctor` reports the model as missing and the personas cannot
-  answer. **On a 12–16 GB card** use `ministral-3:14b` together with the new
-  ensemble `examples/classic_ministral14b`, which keeps the persona settings
-  tuned for that model; **on an 8 GB card** keep `ministral-3:8b`. Either way,
-  set `core.model_name` in `config.local.yaml`. The personas are told that
-  their knowledge reaches January 2025 (Gemma, per Google's model card) or
-  October 2023 (Ministral).
-
-- **Python 3.12 or newer is now required** (previously 3.10). Python 3.10
-  reached its end of life in October 2026, and the libraries this project
-  depends on no longer ship fixes for it — security fixes for two of them
-  could not even be installed there. On 3.10 or 3.11, `pip install -r
-  requirements.txt` now fails with "no matching distribution"; create a new
-  virtual environment with 3.12+ and install the requirements again. Tested
-  in CI on 3.12 (Linux and Windows) and 3.14. 3.15 is not supported yet,
-  because the speech output (Piper) has no build for it.
 
 - The feedback vote log moved from `logs/feedback_votes.jsonl` to
   `data/feedback_votes.jsonl`, next to the conversation store it refers to.
@@ -185,23 +216,13 @@ in them turns out to be wrong, it gets corrected in a later entry.
   The location follows the directory of `storage.path`, so moving the store
   moves the votes with it.
 
-- The default Kiwix location in `config.yaml` moved from
-  `C:\wikipedia-de-offline\` to `C:\Develop\wikipedia-de-offline\`
-  (`wiki.offline.kiwix_exe` and `wiki.offline.zim_path`). **If your Kiwix
-  folder is still in the old place**, either move it or set both paths in
-  `config.local.yaml`. Otherwise kiwix-serve does not start, `--doctor`
-  reports Kiwix as unreachable, and answers come without Wikipedia snippets.
-  Everything else keeps working. The default dump is now
-  `wikipedia_de_all_nopic_2026-10` (previously `2026-01`). If you keep the
-  older file, set `wiki.offline.zim_prefix` and `zim_path` to it as well —
-  the personas are told the dump date from `zim_prefix`.
-
-- **The classic personas are tuned for `ministral-3:14b`.** They answer
-  shorter and calmer, mention their siblings only when it fits, and are told
+- **`examples/classic_ministral14b`: the personas tuned for `ministral-3:14b`.**
+  Before the switch to Gemma this was the tuning of `classic`; it now lives on
+  unchanged in this example ensemble. The personas answer shorter and calmer, mention their siblings only when it fits, and are told
   not to invent numbers or sources. In detail: lower temperatures (LEAH 0.55,
   DORIS 0.5, POPCORN 0.7; PETER stays at 0.1), no `repeat_penalty` of their
-  own any more (Ollama's default applies), a context window of 16384 tokens
-  instead of 8192, and Wikipedia snippets of up to 2400 characters instead of
+  own any more (Ollama's default applies), and a context window of 16384
+  tokens instead of 8192. **For every ensemble:** Wikipedia snippets of up to 2400 characters instead of
   1200 (`wiki.snippet_limit`). The conversation summary now keeps the user's
   instructions about language and format. **On an 8 GB card with the 8B
   model**, set `num_ctx` back to 8192 in `ensembles/classic/personas_base.yaml`
@@ -327,5 +348,6 @@ this file starts recording from this release onwards.
 For what the project is and does, see the [README](README.md); for the
 features in detail, [`docs/en/Features.md`](docs/en/Features.md).
 
-[Unreleased]: https://github.com/YulYen/YulYens_AI/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/YulYen/YulYens_AI/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/YulYen/YulYens_AI/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/YulYen/YulYens_AI/compare/v1.1.0...v2.0.0
