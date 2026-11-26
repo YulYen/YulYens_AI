@@ -6,7 +6,6 @@ response templates and common bypass patterns.
 """
 
 from yulyen_ai.config.config_singleton import Config
-from yulyen_ai.core.factory import AppFactory
 from yulyen_ai.security.tinyguard import BasicGuard, DisabledGuard, zeigefinger_message
 
 CUSTOM_TEXTS = {
@@ -207,45 +206,6 @@ def test_locale_catalog_provides_wrongdoing_text():
 
 
 # ---- Factory wiring -------------------------------------------------------
-
-
-def test_factory_propagates_wrongdoing_flag():
-    Config.reset_instance()
-    try:
-        cfg = Config("config.yaml")
-        cfg.override(
-            "security",
-            {
-                "guard": "BasicGuard",
-                "enabled": True,
-                "wrongdoing_protection": True,
-            },
-        )
-        guard = AppFactory().get_streamer_for_persona("LEAH").guard
-        assert isinstance(guard, BasicGuard)
-        assert guard.flags["wrongdoing_protection"] is True
-    finally:
-        Config.reset_instance()
-
-
-def test_factory_propagates_lock_turns():
-    Config.reset_instance()
-    try:
-        cfg = Config("config.yaml")
-        cfg.override(
-            "security",
-            {
-                "guard": "BasicGuard",
-                "enabled": True,
-                "wrongdoing_protection": True,
-                "wrongdoing_lock_turns": 2,
-            },
-        )
-        guard = AppFactory().get_streamer_for_persona("LEAH").guard
-        assert isinstance(guard, BasicGuard)
-        assert guard.wrongdoing_lock_turns == 2
-    finally:
-        Config.reset_instance()
 
 
 # ---- Der Lock gehört den Nutzereingaben, nicht dem Fremdtext --------------

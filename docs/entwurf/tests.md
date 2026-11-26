@@ -74,6 +74,27 @@ dass irgendein Job das gemeldet hätte. Wer die Gradio-Version hebt, fährt
 auf 4.44 grün, bevor migriert wurde — sonst ist später nicht zu unterscheiden,
 ob die Migration bricht oder das Testskript.
 
+### Gradio-Ausgaben werden per Name geprüft, nie per Position (#103)
+
+Eine Persona-Aktion liefert ein Tupel in der Reihenfolge von
+`PERSONA_OUTPUT_KEYS`. Ältere Tests griffen mit Zahlen zu (`updates[28]` für
+das Mikro). Rutscht im Layout eine Komponente dazwischen, prüft so eine Zahl
+**still die falsche Ausgabe** — der Test bleibt grün oder wird aus dem
+falschen Grund rot. `_named(updates)` in `tests/test_web_ui.py` macht daraus
+ein dict nach Namen und meldet mit `strict=True` auch eine falsche Länge.
+
+**Ein Aufruf, ein Test.** Acht Tests prüften je ein Teilstück desselben
+`_reset_ui_updates()`; zusammengelegt prüft einer alles, mit dem Namen der
+Ausgabe in jeder Fehlermeldung. Per Mutation nachgewiesen, dass er genauso
+anschlägt (Mikro nicht ausgeblendet → `AssertionError: mic_audio`).
+
+**Coverage ist kein Löschkriterium.** Beim Durchsehen deckten 553 von 763
+Testfunktionen keine einzige Zeile ab, die nicht auch ein anderer Test
+berührt — weil Coverage misst, was *läuft*, nicht was *geprüft* wird. Ein
+Randfall-Test läuft durch dieselben Zeilen wie der Normalfall. Gelöscht wird
+nur, was nachweislich dasselbe prüft; die Gegenprobe ist eine unveränderte
+Gesamtabdeckung.
+
 ### Test-Doubles kommen aus `tests/doubles.py` (#67)
 Streamer, Guard und Factory werden **nicht** von Hand nachgebaut, sondern über
 `streamer_double()`, `permissive_guard_double()` und `factory_double()` bezogen.
