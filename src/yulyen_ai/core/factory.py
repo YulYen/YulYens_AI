@@ -24,9 +24,9 @@ if TYPE_CHECKING:  # zur Laufzeit bewusst nicht importiert (optionale Abhängigk
 
 from yulyen_ai.core.utils import (
     LOCAL_USER,
-    _system_prompt_with_date,
-    _wiki_mode_enabled,
     is_ollama_module_not_found,
+    system_prompt_with_date,
+    wiki_mode_enabled,
     with_timestamps,
 )
 
@@ -168,7 +168,7 @@ class AppFactory:
 
     def get_keyword_finder(self) -> SpacyKeywordFinder | None:
         if self._keyword_finder is None:
-            if _wiki_mode_enabled(self._cfg.wiki["mode"]):
+            if wiki_mode_enabled(self._cfg.wiki["mode"]):
                 variant = resolve_spacy_model(self._cfg)
                 try:
                     self._keyword_finder = SpacyKeywordFinder(variant)
@@ -279,7 +279,7 @@ class AppFactory:
         # Kontext-Check über None stolpern (von mypy gefunden, #52).
         return self._build_streamer(
             persona_name,
-            _system_prompt_with_date(persona_name, self._cfg, model_name),
+            system_prompt_with_date(persona_name, self._cfg, model_name),
             personas.get_options(persona_name) or {},
             model_name,
         )

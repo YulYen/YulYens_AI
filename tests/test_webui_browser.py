@@ -13,7 +13,7 @@ bewusst ein Rauchtest: wenige, dafür belegbare Aussagen über Verhalten, das wi
 nicht verlieren wollen.
 
 Ausführen: ``pytest -m browser``. Ohne Playwright oder ohne Chromium wird
-sauber übersprungen — dieselbe Konvention wie ``@pytest.mark.ollama``.
+sauber übersprungen, statt rot zu werden.
 """
 
 from __future__ import annotations

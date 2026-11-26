@@ -1,4 +1,4 @@
-.PHONY: setup format lint lint-imports types fix test test-ci test-all test-browser coverage clean run audit check evals evals-full bench
+.PHONY: setup format lint lint-imports types fix test test-ci test-browser coverage clean run audit check
 
 # Editierbar: das Paket zeigt auf diesen Checkout (src/yulyen_ai/paths.py).
 # Die Laufzeit-Pins kommen über pyproject.toml aus requirements.txt.
@@ -37,14 +37,11 @@ fix:
 	python -m ruff check --fix .
 
 test:
-	python -m pytest -q -m "not slow and not ollama and not browser"
+	python -m pytest -q -m "not slow and not browser"
 
 # Same scope as CI (includes slow tests, plus coverage report)
 test-ci:
-	python -m pytest -q -m "not ollama and not browser" --cov=yulyen_ai --cov-report=term-missing
-
-test-all:
-	python -m pytest -q -m "not browser"
+	python -m pytest -q -m "not browser" --cov=yulyen_ai --cov-report=term-missing
 
 # Rauchtest im echten Browser. Bewusst aus allen anderen Zielen ausgenommen:
 # er braucht Playwright *und* einen Chromium-Build und dauert ~100 s.
@@ -53,7 +50,7 @@ test-browser:
 	python -m pytest -q -m browser
 
 coverage:
-	python -m pytest -q -m "not slow and not ollama and not browser" --cov=yulyen_ai --cov-report=term-missing
+	python -m pytest -q -m "not slow and not browser" --cov=yulyen_ai --cov-report=term-missing
 
 # Schwachstellen in den Abhängigkeiten gegen audit_allowlist.yaml halten (#61).
 # Braucht Netz (OSV/PyPI). `pip install pip-audit` vorausgesetzt.
@@ -66,18 +63,6 @@ audit:
 # Browser-Build); beide laufen getrennt.
 check: lint lint-imports types test
 	@echo "✓ Format, Schichten, Typen und Tests sind grün."
-
-# Eval-Suite (#41). 'evals' braucht kein Modell, 'evals-full' braucht Ollama.
-evals:
-	python scripts/run_evals.py -e classic --guard-only
-
-evals-full:
-	python scripts/run_evals.py -e classic
-
-# Stoppuhr (#42): Zeit bis zum ersten *ausgelieferten* Zeichen und Durchsatz.
-# Braucht Ollama. `--backend dummy` prueft nur, dass der Harness laeuft.
-bench:
-	python scripts/run_bench.py -e classic
 
 # Python statt find: das Projekt läuft Windows-primär, dort gibt es kein find.
 clean:

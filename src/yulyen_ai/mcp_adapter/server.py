@@ -163,7 +163,7 @@ def main(argv: list[str] | None = None) -> int:
     from datetime import datetime
 
     from yulyen_ai.config.logging_setup import init_logging
-    from yulyen_ai.core.utils import _wiki_mode_enabled, ensure_dir_exists
+    from yulyen_ai.core.utils import ensure_dir_exists, wiki_mode_enabled
 
     parser = argparse.ArgumentParser(
         prog="mcp_server.py", description="The personas as MCP tools (#39)."
@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         to_console=False,
     )
-    if _wiki_mode_enabled((getattr(cfg, "wiki", {}) or {}).get("mode")):
+    if wiki_mode_enabled((getattr(cfg, "wiki", {}) or {}).get("mode")):
         try:
             from yulyen_ai.launch import start_wiki_proxy_thread
 

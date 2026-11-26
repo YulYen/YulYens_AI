@@ -1,6 +1,11 @@
-# Latenz: Stoppuhr, Holdback, Moderator
+# Latenz: Holdback, Moderator
 
-Die Stoppuhr (#42) und ihr erster Lauf (#42a), der Guard-Holdback (#51) mit allen Messtabellen, der Freigabe-Index über den rohen Text.
+Warum kein Modell denkt, der Guard-Holdback (#51) mit seinen Messtabellen, der Freigabe-Index über den rohen Text.
+
+Die **Stoppuhr** (#42), mit der das gemessen wird, und ihre Läufe leben seit
+2026-11-26 im Lab (`python -m yulyen_lab bench`, `docs/stoppuhr.md` dort).
+Ihre Regel gilt weiter: verglichen werden erstes ausgeliefertes Zeichen und
+Zeichen/s, nie die Gesamtdauer.
 
 ## Kein Modell denkt hier (#78)
 
@@ -27,149 +32,6 @@ Gemessen auf der Kiste (2026-11-15): qwen3.8:27b und qwen3.6:35b liegen beim
 ersten Zeichen bei 1,5 bzw. 0,7 s, also in derselben Größenordnung wie das 14B
 (0,33 s) — das Denken ist aus.
 
-## Die Stoppuhr (#42)
-
-Die messbare Antwort auf „ist es schneller geworden?" — und das Gegenstück zur
-Eval-Suite: dort Qualität, hier Zeit.
-
-```bash
-python scripts/run_bench.py -e classic                    # braucht Ollama
-python scripts/run_bench.py -e classic --model <anderes>  # Modellwechsel vergleichen
-python scripts/run_bench.py -e classic --holdback 0       # die Tabelle aus #51 nachfahren
-python scripts/run_bench.py -e classic --backend dummy    # nur: läuft der Harness?
-make bench                                                # Kurzform der ersten Zeile
-```
-
-Der Lauf schreibt `logs/bench/report.md` und `report.csv`; das CSV ist das
-Artefakt, weil sich zwei Läufe dort zeilenweise gegenüberstellen lassen.
-
-**Gemessen wird das erste *ausgelieferte* Zeichen, nicht das erste Token des
-Modells.** Das ist der ganze Grund, warum das Werkzeug existiert und nicht
-einfach `StreamStats` ausgelesen wird: dazwischen liegt der Guard-Holdback, und
-der ist im Projekt der größte Einzelposten der wahrgenommenen Antwortzeit. Wo
-beide Zahlen zu haben sind, steht die Differenz als eigene Spalte —
-`t_model_first_ms` kommt aus `StreamStats`, das der Provider seit #36 ohnehin
-ablegt.
-
-**Zwei Leitkennzahlen, und die dritte Zahl ist ausdrücklich keine:** erstes
-Zeichen und Zeichen/s vergleichen zwei Läufe, die **Gesamtdauer nicht** — sie
-hängt vor allem daran, wie viel das Modell zu schreiben beschließt. Dieselbe
-Lehre wie bei #41a, nur an anderer Stelle: wer die instabile Zahl oben
-hinschreibt, vergleicht später Münzwürfe.
-
-Sechs Entwurfsentscheidungen, die man beim Anfassen leicht umdreht:
-
-1. **Rundenweise messen, nicht fragenweise.** Runde 1 stellt alle Fragen, dann
-   Runde 2 — nicht dreimal Frage 1, dann dreimal Frage 2. Zwei unabhängige
-   Gründe: eine Maschine, die im Lauf warm wird, benachteiligt sonst genau die
-   Frage, die hinten steht; und dieselbe Frage direkt hintereinander trifft den
-   **Prompt-Cache** des Backends, was die zweite Runde grundlos schneller macht.
-   Bei nur *einer* Frage greift der zweite Schutz nicht — dann warnt der Lauf.
-2. **Aufwärmrunden werden ausgewiesen, nicht weggeworfen.** Der erste Aufruf
-   lädt das Modell in den VRAM und ist um Größenordnungen langsamer. Das ist
-   eine eigene, interessante Zahl — sie darf nur nicht in den Median rutschen.
-3. **Median, nicht Mittelwert.** Bei einer Handvoll Läufe kippt ein einzelner
-   Ausreißer den Mittelwert: 100/110/5000 ms ergibt Ø 1736 und Median 110.
-4. **Eine Fehlermeldung ist keine Bestzeit.** `stream()` *fängt* Backend-Fehler
-   ab und liefert sie als Text aus — ein nicht erreichbares Ollama wäre sonst
-   die schnellste Messung des Laufs. Der Harness hält den Antwortanfang gegen
-   `LLM_ERROR_MESSAGE` (dafür ist die Konstante da) und bricht ab, wenn schon
-   die *erste* Messung fehlschlägt: das ist ein Aufbaufehler, kein Ergebnis.
-   Ein Aussetzer mittendrin wird dagegen aufgezeichnet und der Lauf läuft
-   weiter.
-5. **Die Kopfzeile trägt alles, was zwei Läufe unvergleichbar macht** — Modell,
-   Backend, Messpfad, `num_ctx`, `keep_alive`, Version und vor allem der
-   Holdback samt der Frage, ob er überhaupt **wirkt**: ohne aktive
-   Ausgangsprüfung setzt der Moderator ihn selbst auf 0, und zwei Läufe mit
-   derselben Zahl in der Config unterscheiden sich dann drastisch, ohne dass
-   die Zahl es verriete.
-6. **Der Default-Persona wird abgeleitet, nicht verdrahtet:** die mit der
-   niedrigsten Temperatur (in `classic` also PETER). Sie liefert über mehrere
-   Runden die ähnlichsten Antworten, und die Antwortlänge ist der größte
-   Einzeleinfluss auf die Gesamtdauer. Abgeleitet, damit der Default auch für
-   ein fremdes Ensemble stimmt.
-
-**Zwei Messpfade, die nicht dasselbe messen.** In-process (Default) misst
-Persona-Prompt, Guard, Holdback und Modell — Wiki und RSS bleiben bewusst
-draußen, weil ihr Abruf je Frage um Sekunden schwankt und die Zahl dominieren
-würde. `--api-url` misst den vollen Pfad über den laufenden Server, inklusive
-FastAPI/SSE und allem, was dort konfiguriert ist; dafür fehlen die
-Modellzeiten, die es nur in-process gibt. Der Modus steht deshalb in jeder
-Kopfzeile.
-
-**Der Fragensatz liegt in `src/yulyen_ai/bench/questions.py`, nicht in der Config.** Er
-ist ein Maßstab: eine Frage zu ändern gibt die Vergleichbarkeit mit allen
-früheren Läufen auf, und das soll ein Commit sein, keine Config-Zeile. Eigene
-Sätze gehen über `--questions datei.txt`. Die letzte Frage ist absichtlich ein
-langer Prompt mit kurzer Antwort — sie ist die einzige, die die *Prefill*-Zeit
-sichtbar macht; der Wirtstext ist echter Fließtext und keine Wiederholung
-desselben Satzes, weil wiederholter Text billiger zu verarbeiten ist und den
-Prefill schneller aussehen ließe, als er ist.
-
-### Was der erste Lauf ergeben hat (2026-08-30, #42a)
-
-Gemessen auf Yuls Kiste, ausgelieferte `config.yaml`, PETER, 5 Fragen × 3
-Runden, GPU sonst frei.
-
-| | `ministral-3:8b` (Q4) | `leo-hessianai-13b-chat.Q5` |
-|---|---|---|
-| erstes Zeichen (Median) | **0,46 s** | 2,18 s |
-| Durchsatz (Median) | **107 Zeichen/s** | 29,3 Zeichen/s |
-| davon Guard-Holdback | 299 ms (**65 %**) | 1.221 ms (56 %) |
-| Kaltstart (Modell in den VRAM) | 30,7 s | 30,5 s |
-
-**Das ist die Baseline für jeden künftigen Modellwechsel** — und zugleich die
-Latenz-Verifikation, die #17 offen ließ. Ihr Ergebnis ist unbequem: das
-Backend ist gar nicht das Problem. Das erste Token des Modells liegt nach rund
-150 ms vor, ausgeliefert wird es nach 460 ms. **Zwei Drittel der
-wahrgenommenen Antwortzeit entstehen nach dem Modell, nicht in ihm.** Wer die
-gefühlte Geschwindigkeit verbessern will, dreht am Holdback, nicht am
-Warm-up — jede weitere Backend-Optimierung verschwindet hinter diesen 300 ms.
-
-#### Die Holdback-Tabelle, diesmal am echten Modell
-
-Die Tabelle aus #51 entstand gegen das getaktete Dummy-Backend. Das war
-methodisch richtig (lastunabhängig), ließ aber offen, ob die Rechnung neben
-echter Generierung noch gilt. Sie gilt:
-
-| `holdback` | erstes Zeichen | Aufschlag | rechnerisch (`holdback` ÷ 107 Z/s) |
-|---|---|---|---|
-| 0 | 0,15 s | — | — |
-| **32 (Default)** | **0,46 s** | +0,31 s | +0,30 s |
-| 96 | 1,12 s | +0,97 s | +0,90 s |
-
-Der Holdback kostet also auch am echten Modell genau das, was er rechnerisch
-kostet — der Default 32 bleibt richtig gewählt.
-
-**Ein Nebenbefund, der bei der Dummy-Messung nicht auffallen konnte:** bei
-`holdback: 96` war für `q1_kurz` (85 Zeichen Antwort) `t_first` **gleich**
-`t_total`. Die Antwort ist kürzer als der Holdback, also wird sie erst beim
-`flush()` freigegeben — es streamt **gar nichts**, die Antwort erscheint am
-Stück. Wer den Holdback hochdreht, schaltet für kurze Antworten das Streaming
-ab, ohne dass irgendetwas davon berichtet.
-
-#### Was das für #7 heißt
-
-`leo-hessianai-13b-chat.Q5` ist **3,7-mal langsamer im Durchsatz und 4,7-mal
-langsamer bis zum ersten Zeichen**. Das ist kein Randdetail für die
-LoRA-Strecke, sondern ein Preisschild: ein Adapter auf LeoLM 13B muss die
-Antwort*qualität* deutlich heben, um eine Vervierfachung der Wartezeit
-aufzuwiegen. Nebenbei kostet der Holdback dort 1,22 s statt 0,30 s — er zählt
-*Zeichen*, und ein langsamer schreibendes Modell braucht für dieselben 32
-Zeichen viermal so lange. Wer auf 13B wechselt, senkt also sinnvollerweise
-`security.stream_holdback_chars` mit.
-
-**Der Kaltstart ist bei beiden Modellen rund 30 s** und hängt damit
-offensichtlich nicht an der Modellgröße — bei 8 GB VRAM und 5–6 GB
-Modellgewicht dominiert das Laden von der Platte. Er ist der Grund, warum
-`core.warm_up` existiert.
-
-**Der Skriptname ist `run_bench.py`, nicht `bench.py`** — wie `run_evals.py`
-neben dem Paket `evals`. Ein `scripts/bench.py` heißt beim Import schlicht
-`bench` und verdeckt das gleichnamige Paket unter `src/`; aufgefallen, weil
-`tests/test_audit_deps.py` `scripts/` in den `sys.path` hängt und die
-Testsammlung danach im Skript statt im Paket landete.
-
 ### ⚠️ Der Guard-Holdback bestimmt die wahrgenommene Antwortzeit (#51)
 `_StreamModerator` (`core/streaming_provider.py`) hält die letzten
 `_STREAM_HOLDBACK_CHARS` Zeichen zurück, damit ein PII-/Secret-Muster nicht über
@@ -185,7 +47,7 @@ eine Token-Grenze hinweg durchrutscht. Konsequenz: **vor `holdback` Zeichen geht
 
 **Am echten Modell nachgemessen (2026-08-30, #42a) — die Rechnung gilt auch
 dort.** Die Tabellen hier entstanden gegen das getaktete Dummy-Backend; die
-Zahlen mit `ministral-3:8b` stehen im Abschnitt „Die Stoppuhr". Kurz: 0,15 /
+Zahlen mit `ministral-3:8b` stehen im Lab (`docs/stoppuhr.md`). Kurz: 0,15 /
 0,46 / 1,12 s für Holdback 0 / 32 / 96, also der rechnerische Aufschlag. Neu
 dort und hier nicht sichtbar: ist die Antwort **kürzer** als der Holdback,
 streamt sie gar nicht mehr, sondern erscheint am Stück.
@@ -245,7 +107,7 @@ entfällt der Holdback automatisch, weil es dann nichts zu prüfen gibt.
 
 Wichtig für #17/#42: eine backendseitige Messung von „Zeit bis zum ersten Token"
 sieht diesen Anteil **nicht** — das Modell liefert längst, die Anzeige wartet.
-Genau deshalb misst die Stoppuhr (siehe oben) das erste *ausgelieferte*
+Genau deshalb misst die Stoppuhr (im Lab) das erste *ausgelieferte*
 Zeichen und stellt die Modellzeit daneben; die Differenz ist diese Tabelle.
 
 **Der Holdback ist nur die eine Hälfte.** #51 hat die Zeit bis zum *ersten*

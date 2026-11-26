@@ -91,7 +91,7 @@ def test_wiki_disabled_returns_none(cfg):
 def test_include_date_off_returns_base_only(cfg, monkeypatch):
     cfg.override("core", {"include_date": False})
     monkeypatch.setattr(u, "get_prompt_by_name", lambda n: "BASE")
-    assert u._system_prompt_with_date("LEAH", cfg) == "BASE"
+    assert u.system_prompt_with_date("LEAH", cfg) == "BASE"
 
 
 def test_full_block_has_three_distinct_stamps(cfg, monkeypatch):
@@ -112,7 +112,7 @@ def test_full_block_has_three_distinct_stamps(cfg, monkeypatch):
     )
     monkeypatch.setattr(u, "get_prompt_by_name", lambda n: "BASE")
 
-    out = u._system_prompt_with_date("LEAH", cfg)
+    out = u.system_prompt_with_date("LEAH", cfg)
     assert out.startswith("BASE | ")
     assert datetime.now().strftime("%Y-%m-%d") in out  # today
     assert "2024-06" in out  # model cutoff
@@ -132,7 +132,7 @@ def test_wiki_disabled_omits_wiki_line_but_keeps_cutoff(cfg, monkeypatch):
     cfg.override("wiki", {"mode": False})
     monkeypatch.setattr(u, "get_prompt_by_name", lambda n: "BASE")
 
-    out = u._system_prompt_with_date("LEAH", cfg)
+    out = u.system_prompt_with_date("LEAH", cfg)
     assert "Kiwix" not in out and "Wikipedia" not in out
     assert "2024-06" in out
 

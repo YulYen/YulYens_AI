@@ -35,7 +35,6 @@ class Config:
     context_management: dict[str, Any]
     core: dict[str, Any]
     email_adapter: dict[str, Any]
-    evals: dict[str, Any]
     logging: dict[str, Any]
     security: dict[str, Any]
     stt: dict[str, Any]

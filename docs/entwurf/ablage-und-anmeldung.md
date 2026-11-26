@@ -296,8 +296,7 @@ horcht.
 ## Logging
 
 **Gespräche liegen nicht hier**, sondern seit #54 in `data/conversations.sqlite3`
-(siehe „Ablage der Gespräche"). In `logs/` steht nur noch Betriebs-Diagnostik
-(Eval-Reports in `logs/evals/`):
+(siehe „Ablage der Gespräche"). In `logs/` steht nur noch Betriebs-Diagnostik:
 - `yulyen_ai_YYYY-MM-DD_HH-MM.log` — Systemlog
 - `conversation_[TIMESTAMP].json` — roher Turn-Mitschnitt als JSONL, **opt-in**
   über `logging.conversation_jsonl` (Default aus). Debug-Artefakt, keine Ablage

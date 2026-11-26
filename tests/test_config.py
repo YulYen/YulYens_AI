@@ -63,8 +63,8 @@ from yulyen_ai.core.factory import AppFactory
 from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
 from yulyen_ai.core.utils import (
     _greeting_text,
-    _system_prompt_with_date,
-    _wiki_mode_enabled,
+    system_prompt_with_date,
+    wiki_mode_enabled,
 )
 
 
@@ -160,7 +160,7 @@ def _prepare_factory(
 
     monkeypatch.setattr(
         utils,
-        "_system_prompt_with_date",
+        "system_prompt_with_date",
         lambda name, include: f"SYSTEM::{name}",
     )
 
@@ -268,7 +268,7 @@ def test_wiki_mode_enabled(mode, expected):
     Current behavior: KeywordFinder active only for 'offline' and 'online'.
     Everything else (false/None) → off.
     """
-    assert _wiki_mode_enabled(mode) is expected
+    assert wiki_mode_enabled(mode) is expected
 
 
 def test_system_prompt_includes_three_timestamps(monkeypatch):
@@ -300,7 +300,7 @@ def test_system_prompt_includes_three_timestamps(monkeypatch):
     monkeypatch.setattr(utils_module, "datetime", _FixedDatetime)
 
     try:
-        result = _system_prompt_with_date(persona_name, cfg)
+        result = system_prompt_with_date(persona_name, cfg)
         expected_suffix = " ".join(
             [
                 cfg.t("persona_ts_today", date="2024-01-02"),

@@ -50,11 +50,11 @@ sagt kein `assert` — nur, ob ein Kommando noch existiert. Die englische Fassun
 ist außerdem eine Übersetzung: ändert sich die deutsche, ändert sich beide.
 
 **Datierte Berichte werden nicht nachgezogen.**
-`docs/modellwechsel_juni_2026.md` hält fest, was *damals* mit welcher
-Begründung entschieden wurde — warum `ministral-3:8b` und nicht LeoLM 13B, was
-8 GB VRAM zulassen. Den Inhalt anzupassen fälscht die Aufzeichnung; ist eine
-Aussage überholt, kommt ein datierter Hinweis davor. Der Test lässt die Datei
-deshalb ausdrücklich aus (`LIVING_DOCS`).
+Ein Archiv-Eintrag hält fest, was *damals* mit welcher Begründung entschieden
+wurde — der Modellwechsel-Bericht vom Juni 2026 (seit 2026-11-26 im Lab) etwa,
+warum `ministral-3:8b` und nicht LeoLM 13B, was 8 GB VRAM zulassen. Den Inhalt anzupassen fälscht die Aufzeichnung; ist eine
+Aussage überholt, kommt ein datierter Hinweis davor. Der Konsistenztest lässt
+solche Aufzeichnungen deshalb ausdrücklich aus (`LIVING_DOCS`).
 
 **Aber ein Bericht ist nicht automatisch erhaltenswert.** Nebenan lag
 `framework_update_juni_2026.md` und protokollierte einen Routine-Bump zweier
@@ -151,10 +151,10 @@ Absicht, kein Defekt: Gradio 6 verlangt `huggingface_hub>=1.0`, `transformers`
 4.43 verlangt `<1.0`. Wer den ImportError „repariert", zieht `hf_hub` unter
 Gradio weg und legt damit die Anwendung lahm.
 
-Die LoRA-Strecke lebt in einem **eigenen Repository** (`YY_AI_Trainingground`,
-privat) mit eigenem venv und eigenen Pins. Hier gehört nur her, was den
-*Vergleich* betrifft: die Eval-Suite (#41) und der Baseline-Wert in
-[tests-und-evals.md](tests-und-evals.md).
+Die LoRA-Strecke lebt in einem **eigenen Repository** (`YulYen/YulYens_AI_Training`,
+privat) mit eigenem venv und eigenen Pins. Der *Vergleich* — Eval-Suite (#41)
+und Baseline — liegt seit 2026-11-26 im Lab (`YulYen/YulYen_Lab`); hier steht
+davon nichts mehr.
 
 Der Satz steht hier, weil er sich zweimal aufdrängt — einmal als scheinbar
 kaputte Abhängigkeit, einmal als Versuchung, „schnell ein Trainings-venv

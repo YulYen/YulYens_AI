@@ -1,185 +1,75 @@
-# Tests for Yul Yen’s AI Orchestra
+# Tests for Yul Yen's AI Orchestra
 
-This README explains the available pytest fixtures, markers, invocation patterns, environment requirements, and troubleshooting hints for the test suite.
+The suite never asks a real model. Every test runs against the echo backend
+(`core.backend: dummy`), injected fakes or the doubles in `tests/doubles.py`,
+so a failure means the code changed — not that a model had a bad day.
+
+Measurements against a real model (eval suite with judge, response times,
+blind tasting, injection probe, the live API questions) moved to the project's
+lab repository on 2026-11-26. They measure model and prompt, not this code.
 
 ---
 
 ## Fixtures
 
 ### `client`
-- Builds a **FastAPI TestClient** using your `AppFactory` with the **real provider**.
-- Loads the **actual application** including configuration.
-- **LLM usage:** Enabled when a real model is configured in `config.yaml`. Select a dummy model in the configuration if you want a stubbed setup.
-- **Wiki/date:** `core.include_date` is disabled and the wiki proxy is **not** started.
-- **Typical usage:** Structural or contract tests that do not require wiki facts.
+- A **FastAPI TestClient** built from the real `AppFactory`, with the echo
+  backend, `core.include_date` off and the wiki off.
+- **Typical usage:** structural and contract tests of `/ask` and `/v1`.
 
-### `client_with_date_and_wiki`
-- Extends the `client` fixture and additionally:
-  - Starts `start_wiki_proxy_thread()` and `ensure_kiwix_running_if_offlinemode_and_autostart(cfg)`.
-  - Enables date/time output according to the configuration.
-- **LLM usage:** Yes (real model) plus **wiki context** (offline or online depending on the configuration).
-- **Typical usage:** Tests that exercise the end-to-end path API → provider → LLM → optional wiki.
-
-### `ollama_config`
-- Loads the configuration wired to a **real Ollama** and skips the test when the marker is missing or the server is unreachable.
-- No HTTP client — for tests that talk to the factory directly, such as the eval suite (`tests/test_evals_live.py`).
-- **Typical usage:** `@pytest.mark.ollama` tests outside the API surface.
+The autouse fixtures in `tests/conftest.py` keep a developer's
+`config.local.yaml`, the real conversation store and the internet out of every
+test run; their docstrings say why each one exists.
 
 ---
 
-## Eval suite tests (#41)
+## The guard red-team corpus
 
-The eval corpora under `evals/` are covered from two sides:
+`test_guard_redteam.py` turns **every case of `tests/guard_redteam.yaml`** into
+a parametrized test (loader and evaluator: `tests/guard_corpus.py`). New attack
+patterns belong in the YAML, not in the test file. Cases flagged
+`known_gap: true` are asserted from the other side — the test fails once a
+documented gap is closed, as a reminder to drop the flag — and
+`KNOWN_GAP_IDS` pins which gaps exist at all.
 
-- `test_guard_redteam.py` turns **every case of `evals/guard_redteam.yaml`** into a
-  parametrized test. No LLM involved, so it runs everywhere including CI. New attack
-  patterns belong in the YAML, not in the test file. Cases flagged `known_gap: true`
-  are asserted from the other side — the test fails once a documented gap is closed,
-  as a reminder to drop the flag.
-- `test_evals_corpus.py` / `test_evals_runner.py` / `test_evals_cli.py` cover the loader,
-  the deterministic checks, judge parsing, the runner and the report with injected fakes
-  and the dummy backend — no model needed.
-- `test_evals_live.py` is the only part that needs Ollama (`@pytest.mark.ollama`): it
-  verifies that a real model answers the judge prompt in a parsable format.
-
----
-
-## Tests that separate 14B from 8B (#78)
-
-`test_ai_via_api_14b.py` holds two live tests (`slow`, `ollama`) that
-`ministral-3:14b` passes and `ministral-3:8b` fails: writing a working
-Easter Sunday function, and naming Sigmund Freud's birthplace by its current
-name (Příbor) or as "Freiberg in Mähren" in today's Czech Republic. The
-default `gemma4:26b` passed Easter Sunday on 2026-11-15 (one run); its Freud
-answer passes under the softer rule (checked against the stored answer). Both were calibrated with 20 runs per model on 2026-11-08; the
-numbers are in the module. If you stay on the 8B via `config.local.yaml`, these
-two are expected to fail.
-
-The two earlier tests (commercial rounding, three historical birthplaces) are
-still in the module, **skipped unless `YULYEN_ZUKUNFT_TESTS=1`**: neither model
-passed them once in 20 runs, so they wait as a yardstick for a smarter model
-that still fits 16 GB.
-
-`YULYEN_TEST_MODEL` picks another model without touching the config (any
-`@pytest.mark.ollama` test honours it, see `tests/conftest.py`). The module
-docstring has the exact PowerShell lines.
+Whether the *model* follows a payload that gets through is the lab's question,
+not this suite's.
 
 ---
 
 ## Markers
 
-We intentionally keep the marker set simple—only two markers are available:
-
-- `@pytest.mark.slow`
-  - Labels tests with noticeable runtime, such as real LLM responses or wiki calls.
-- `@pytest.mark.ollama`
-  - Labels tests that require a running and reachable **Ollama/LLM backend**.
-
-> **Combination rule:** A test that uses both a real LLM **and** the wiki generally receives **both** markers: `@pytest.mark.slow` **and** `@pytest.mark.ollama`.
-
----
-
-## Running selected tests
-
-Use pytest’s `-m` flag to include or exclude the markers above:
+- `@pytest.mark.slow` — noticeable runtime, e.g. wiki lookups against a local
+  proxy. Included in `make test-ci`, left out of `make test`.
+- `@pytest.mark.browser` — drives the running WebUI in a real Chromium
+  (`make test-browser`, needs Playwright). Excluded from every other target
+  and from CI.
 
 ```bash
-pytest -m "not ollama"
+python -m pytest -q -m "not slow and not browser"   # make test
+python -m pytest -q -m "not browser"                # make test-ci, without coverage
+python -m pytest -q -m browser                      # make test-browser
 ```
-Run only tests that do **not** require a real LLM (e.g., string, utility, or routing tests).
-
-```bash
-pytest -m "ollama"
-```
-Run only “heavy” LLM tests (real model required), regardless of whether they touch the wiki.
-
-```bash
-pytest -m "slow and ollama"
-```
-Run only tests marked as long-running **and** LLM-bound.
-
-```bash
-pytest
-```
-Run the entire test suite.
 
 ---
 
 ## Coverage
 
-`pytest-cov` is part of `requirements-dev.txt`. Run locally via:
+`pytest-cov` is part of `requirements-dev.txt`:
 
 ```bash
 make coverage        # fast lane with coverage report
 make test-ci         # same scope as CI (includes 'slow', with coverage)
 ```
 
-CI prints a `--cov=src` report on every run. Baseline (fast lane,
-without spaCy-model-dependent tests) as of 2026-07: **~60 % total**.
-There is deliberately no hard threshold gate yet — measure first.
-Lowest-covered areas: `webui_layout` (Gradio layout), `kiwix_autostart`,
-`logging_setup`, `conversation_io_terminal`.
-
----
-
-## Environment preparation
-
-### LLM backend (Ollama)
-- Ensure the model is loaded and reachable (e.g., start with `ollama serve` and `ollama run <model>`).
-- Set the **exact model name** and the Ollama URL explicitly in `config.yaml`; the tests do not rely on hidden defaults.
-
-### Wiki proxy / Kiwix
-- `client_with_date_and_wiki` starts the wiki proxy through your project utilities.
-- **Offline mode:** Provide Kiwix and the required ZIM file when `wiki.mode: offline` is configured.
-- If the proxy exposes a health route, double-check the configuration (port and mode). Startup issues appear in `logs/wiki_proxy_*.log` or your general log output.
+There is deliberately no hard threshold gate (see #64e in the backlog).
 
 ---
 
 ## Best practices
 
-- **Deterministic assertions:** Normalise values in assertions (e.g., lowercase, Unicode NFKD) to neutralise accents and whitespace.
-- **Fix the time zone:** Use `zoneinfo.ZoneInfo("Europe/Berlin")` for date tests to avoid midnight-related flakes.
-- **Prefer explicit configuration:** When a test must run without the wiki, configure that explicitly in the fixture or test; when it needs the wiki, use `client_with_date_and_wiki`.
-- **Mark responsibly:**
-  - If the test succeeds without an LLM → leave off `ollama`.
-  - If it needs a real model → add `@pytest.mark.ollama`.
-  - If it takes noticeably longer → add `@pytest.mark.slow` as well.
-
----
-
-## Example excerpt
-
-```python
-# tests/test_api_contract.py (illustrative example)
-
-import pytest
-
-@pytest.mark.slow
-@pytest.mark.ollama
-def test_portugal_prime_minister(client_with_date_and_wiki):
-    r = client_with_date_and_wiki.post("/ask", json={
-        "question": "Answer briefly: Who is Portugal's head of government in 2025?",
-        "persona": "PETER"
-    })
-    data = r.json()
-    txt = data.get("answer", "").lower()
-    assert "montenegro" in txt
-```
-
----
-
-## Troubleshooting
-
-- **Connection refused (Wiki/8042):**
-  - Verify that the test uses `client_with_date_and_wiki` (it starts the proxy).
-  - Check `wiki.mode`, Kiwix access, and availability of the required ZIM file.
-  - Confirm firewall prompts (e.g., Windows Defender) during the first launch.
-
-- **LLM unreachable:**
-  - Ensure `ollama serve` is running.
-  - Confirm that `config.yaml` → `core.ollama_url` is correct.
-  - Pull the required model locally (`ollama pull …`).
-
-- **Flaky date answers:**
-  - Ensure the `Europe/Berlin` time zone is applied.
-  - Allow date assertions to accept both `YYYY` and `YY` formats to tolerate format variations.
+- **Deterministic assertions:** normalise values (lowercase, Unicode NFKD)
+  before comparing.
+- **Fix the time zone** for date tests: `zoneinfo.ZoneInfo("Europe/Berlin")`.
+- **Doubles from `tests/doubles.py`** (`create_autospec`), never a bare `Mock()`
+  — a bare mock is truthy for every attribute.

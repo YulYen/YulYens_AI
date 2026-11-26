@@ -18,7 +18,7 @@ from pathlib import Path
 
 import requests
 
-from yulyen_ai.core.utils import _wiki_mode_enabled
+from yulyen_ai.core.utils import wiki_mode_enabled
 
 CRITICAL = "critical"
 WARNING = "warning"
@@ -142,7 +142,6 @@ _CONFIG_SECTIONS = (
     "briefing",
     "email_adapter",
     "context_management",
-    "evals",
 )
 
 
@@ -376,7 +375,7 @@ def run_checks(cfg, *, include_vram: bool = True) -> list[CheckResult]:
         )
 
     wiki = getattr(cfg, "wiki", {}) or {}
-    if _wiki_mode_enabled(wiki.get("mode")):
+    if wiki_mode_enabled(wiki.get("mode")):
         try:
             from yulyen_ai.wiki.spacy_keyword_finder import resolve_spacy_model
 

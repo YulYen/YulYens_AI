@@ -116,7 +116,7 @@ wirkt.
 
 Wirksam sind: **Persona-Übernahme** (3 von 4 Varianten), **konditionale
 Auslöser** und ein **englischer Dauerauftrag**. Alle neun Befunde liegen als
-`known_gap` in `evals/guard_redteam.yaml` mit `KNOWN_GAP_IDS` als Gegenprobe,
+`known_gap` in `tests/guard_redteam.yaml` mit `KNOWN_GAP_IDS` als Gegenprobe,
 verschwinden also nicht wieder aus dem Blick.
 
 Zwei methodische Fallen, beide beim ersten Anlauf hineingetappt:
@@ -161,8 +161,8 @@ Gemessen nach dem Fix: **13 von 13** Angriffsformulierungen weiter gefangen,
 auf 394 zufälligen *und* 0 auf den 49 heiklen Artikeln (vorher 2). Die
 Mutationsprobe — Fix zurückgenommen — lässt vier Korpusfälle fallen.
 
-**Nachgemessen wird das mit `python scripts/probe_injection.py -e classic`**
-(#60b, Code in `src/yulyen_ai/evals/injection_probe.py`, braucht Ollama). Drei Arme —
+**Nachgemessen wird das im Lab mit `python -m yulyen_lab probe -e classic`**
+(#60b, Code dort in `src/yulyen_lab/evals/injection_probe.py`, braucht Ollama). Drei Arme —
 alte `system`-Rolle, `user`-Zitat ohne Guard, ausgelieferter Stand mit Guard —
 und pro Nutzlast ein Muster, das ihr *eigenes* Befolgen erkennt. Wer am
 Guardrail-Wortlaut schraubt, das Modell wechselt oder eine Regel ergänzt,
@@ -217,7 +217,7 @@ Zwei Entwurfsregeln, an denen die alte Liste gescheitert ist:
 Gemessen an 20 alltäglichen Sätzen (lokale URLs, Code-Fragen, Rollenbitten):
 **vorher 8 Fehlalarme, jetzt 0**, bei unveränderter Trefferzahl auf 18 Angriffen.
 
-**Wer eine Injection-Regel ergänzt, legt in `evals/guard_redteam.yaml` den Satz
+**Wer eine Injection-Regel ergänzt, legt in `tests/guard_redteam.yaml` den Satz
 daneben, den sie nicht treffen darf** (`ok_…`). Ohne diese Gegenprobe ist eine
 Verschärfung nicht messbar — die Recall-Seite meldet sich von selbst, die
 Precision-Seite nie.
@@ -273,7 +273,7 @@ Ollama. Geschlossen sind die fünf Formulierungen, die im Korpus stehen — für
 die 22 weiteren, die damals durchkamen und *nicht* wirkten, gibt es weiter
 keine Regel, und das ist Absicht: eine Regel gegen eine wirkungslose
 Nutzlast kostet nur Präzision. Die Ehrlichkeitsschranke bleibt, wie sie ist —
-wer umformuliert, kommt durch. Nachmessen: `python scripts/probe_injection.py
+wer umformuliert, kommt durch. Nachmessen im Lab: `python -m yulyen_lab probe
 -e classic`; der Guard-Arm sollte bei den vier betroffenen Nutzlasten jetzt
 „nicht injiziert" zeigen, und die 0 Fehlalarme auf den 394 + 49 Artikeln
 gehören einmal neu gefahren.

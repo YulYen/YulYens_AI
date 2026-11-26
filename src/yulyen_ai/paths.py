@@ -1,6 +1,6 @@
 """Wo das Projekt auf der Platte liegt — eine Stelle statt `parents[n]` überall.
 
-Config, Locales, Ensembles und Eval-Korpora liegen **neben** `src/`, nicht im
+Config, Locales und Ensembles liegen **neben** `src/`, nicht im
 Paket. Das Paket wird deshalb nur editierbar installiert (`pip install -e .`)
 und nie als Wheel verteilt: `__file__` zeigt dann in den Checkout, und
 `PROJECT_ROOT` ist dessen Wurzel.
@@ -43,4 +43,3 @@ def checkout_root(package_file: str | Path) -> Path:
 PROJECT_ROOT = checkout_root(__file__)
 ENSEMBLES_DIR = PROJECT_ROOT / "ensembles"
 LOCALES_DIR = PROJECT_ROOT / "locales"
-EVALS_DIR = PROJECT_ROOT / "evals"

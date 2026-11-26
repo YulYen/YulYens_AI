@@ -21,8 +21,9 @@ antwortet je nach Bereich mit einem anderen Modell. Was dabei leicht umfällt:
    `get_streamer_for_persona` ist das Solo (eigenes Modell),
    `get_streamer_for_orchestra` das Orchester (`core.model_name`). Orchester
    sind `core/orchestrator.py` (beide Broadcast-Varianten), `ui/self_talk.py`
-   und die Stoppuhr (`bench/drivers.py` — sie schreibt `core.model_name` in den
-   Bericht, ein Solo-Modell würde die Zeile Lügen strafen). Das Fazit läuft
+   und die Stoppuhr im Lab (`bench/drivers.py` dort — sie schreibt
+   `core.model_name` in den Bericht, ein Solo-Modell würde die Zeile Lügen
+   strafen). Das Fazit läuft
    über `get_streamer_for_guest` und damit ohnehin auf dem Default. **Wer einen
    neuen Weg baut, der mehrere Personas zusammenspielen lässt, nimmt den
    Orchester-Streamer** — sonst lädt Ollama zwischen den Antworten Modelle um.
@@ -141,7 +142,7 @@ an zwei Stellen, die man erst beim Lesen ihres Prompts sieht:
   Zuständigkeitsliste des Ensembles („für Wärme und Empathie an LEAH, für
   verspielte Katzenenergie an POPCORN, für trockenen Sarkasmus an DORIS").
   Das ist eine Bewertung *vor* der Runde, unabhängig davon, was diesmal
-  tatsächlich dastand. Dazu käme über `_system_prompt_with_date` der
+  tatsächlich dastand. Dazu käme über `system_prompt_with_date` der
   Zeitstempel- und Guardrail-Block, der fürs Beantworten von Nutzerfragen
   geschrieben ist — und die Zeile „vermeide Meta-Erklärungen über dein
   Vorgehen", während Moderieren genau das ist.
@@ -157,7 +158,7 @@ hätte aussehen sollen. In `classic` ändert der Filter nichts: dort stehen nur
 vier gleich. Es läuft also weiter auf „Ensemble-Optionen plus niedrigste
 Temperatur" hinaus, und genau das ist gewollt: sachlich statt kreativ. Abgeleitet statt
 verdrahtet, damit es auch für ein fremdes Ensemble stimmt; die Regel liegt in
-`config.personas.quietest_persona_name`, weil die Stoppuhr (#42) dieselbe Wahl
+`config.personas.quietest_persona_name`, weil die Stoppuhr (#42, im Lab) dieselbe Wahl
 aus einem anderen Grund trifft und zwei Fassungen derselben Regel
 auseinanderlaufen.
 

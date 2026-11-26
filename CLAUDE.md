@@ -13,8 +13,9 @@ hier verweist darauf.
 | Guard, Wiki-/RSS-Kontext, einem neuen Kontext-Kanal | [docs/entwurf/guard.md](docs/entwurf/guard.md) |
 | WebUI, Gradio-Events, Sitzungszustand | [docs/entwurf/webui.md](docs/entwurf/webui.md) |
 | Ablage, Verlauf, Suche, Anmeldung, Votes, Logs | [docs/entwurf/ablage-und-anmeldung.md](docs/entwurf/ablage-und-anmeldung.md) |
-| Antwortzeit, Holdback, Stoppuhr | [docs/entwurf/latenz.md](docs/entwurf/latenz.md) |
-| Tests, Test-Doubles, Browser-Test, Eval-Suite | [docs/entwurf/tests-und-evals.md](docs/entwurf/tests-und-evals.md) |
+| Antwortzeit, Holdback | [docs/entwurf/latenz.md](docs/entwurf/latenz.md) |
+| Tests, Test-Doubles, Browser-Test, Guard-Korpus | [docs/entwurf/tests.md](docs/entwurf/tests.md) |
+| Messen am Modell (Evals, Stoppuhr, Verkostung) | das Lab, siehe unten |
 | RSS, Ask-All/Fazit, Mail-Adapter, API, Feature-Modi | [docs/entwurf/funktionen.md](docs/entwurf/funktionen.md) |
 | `config.yaml`, Schema-Prüfung | [docs/entwurf/konfiguration.md](docs/entwurf/konfiguration.md) |
 | Linter, mypy, CI, Pins, Audit | [docs/entwurf/werkzeuge.md](docs/entwurf/werkzeuge.md) |
@@ -49,8 +50,8 @@ Archiv, Changelog) findet sich mit `grep -rn "X" docs/entwurf`.
   `tests/test_docs_consistency.py` prüft nur den mechanischen Teil (Kommandos
   gegen den Makefile). Ob ein Absatz noch stimmt, prüft kein Test. Ändert
   sich die deutsche Fassung, ändert sich die englische mit.
-- **Datierte Berichte werden nicht nachgezogen** (`docs/modellwechsel_juni_2026.md`,
-  veröffentlichte Changelog-Einträge, Archiv-Einträge). Ist eine Aussage
+- **Datierte Berichte werden nicht nachgezogen** (veröffentlichte
+  Changelog-Einträge, Archiv-Einträge). Ist eine Aussage
   überholt, kommt ein datierter Hinweis davor. Ein Protokoll, das keine
   Entscheidung festhält und auf das nichts verlinkt, darf dagegen weg.
 
@@ -93,7 +94,7 @@ Details: [versionierung.md](docs/entwurf/versionierung.md).
 |---|---|---|
 | Abhängigkeiten | kommen **leer** an (Hook installiert) | eingerichtetes venv |
 | Clone | **flach** — `git tag` schweigt, `git log --reverse` lügt (Hook vertieft) | vollständig |
-| Ollama, Modell | nicht da → `@pytest.mark.ollama` wird übersprungen | da |
+| Ollama, Modell | nicht da — kein Test braucht es (Messungen: Lab) | da |
 | spaCy `de_core_news_lg` | nicht da → Keyword-/Wiki-Tests übersprungen | da |
 | Playwright | Hook installiert das Paket passend zum Chromium unter `/opt/pw-browsers` → **`make test-browser` läuft** | nach Bedarf |
 | Kiwix/ZIM, Piper, faster-whisper, echter Mailserver, Windows | nichts davon | teils |
@@ -135,9 +136,8 @@ faster-whisper (STT). Versionen und Pins: `requirements.txt`,
 | `src/yulyen_ai/wiki/`, `src/yulyen_ai/rss/` | die zwei Kontextquellen |
 | `src/yulyen_ai/storage/`, `src/yulyen_ai/auth/` | Gesprächs-Ablage (SQLite) und Identitäts-Naht |
 | `src/yulyen_ai/email_adapter/`, `src/yulyen_ai/mcp_adapter/`, `src/yulyen_ai/tts/`, `src/yulyen_ai/stt/` | opt-in Kanäle |
-| `src/yulyen_ai/evals/`, `src/yulyen_ai/bench/` | Eval-Suite und Stoppuhr; Einstiege in `scripts/` |
 | `src/yulyen_ai/version.py` | die einzige Quelle der Version |
-| `evals/` | Eval-Korpora als YAML (Guard-Red-Team, Personas, Karl) |
+| `tests/guard_redteam.yaml` | Guard-Red-Team-Korpus (Lader: `tests/guard_corpus.py`) |
 | `ensembles/<name>/` | `personas_base.yaml` + `locales/{de,en}/personas.yaml` |
 | `locales/{de,en}.yaml` | UI-Texte, Parität per Test |
 | `backlog.md` / `backlog_archiv.md` | offene Tickets / Erledigtes samt Begründung |
@@ -155,7 +155,8 @@ Temperaturen und `num_ctx` stehen in `ensembles/classic/`, abgestimmt auf
 - **Ein Verbot im Prompt nennt das Verbotene nicht.** „Nie im Namen von LEAH,
   PETER …" ließ DORIS in 19 von 20 Fällen als „PETER:" antworten, „in deiner
   eigenen Stimme" in 0 von 20. Jede Prompt-Änderung mit festen Seeds
-  nachzählen, nicht mit einer Probe ([modellwechsel_november_2026.md](docs/modellwechsel_november_2026.md#feinabstimmung-auf-gemma-2026-11-21)).
+  nachzählen, nicht mit einer Probe — im Lab (`python -m yulyen_lab tasting`;
+  Messung im Bericht „Modellwechsel November 2026" dort).
 
 ## Wichtige Architektur-Muster
 
@@ -225,11 +226,11 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - **Neue Regel: erst fragen, ob der Nutzer das darf.** Wenn ja (Persona
   umdefinieren, Antwortformat vorgeben), gehört sie in `check_context_only`.
 - **Neue Injection-Regel = Gegenprobe daneben** (`ok_…` in
-  `evals/guard_redteam.yaml`) und `expect.rule`. Keine Themenwörter, kurze
+  `tests/guard_redteam.yaml`) und `expect.rule`. Keine Themenwörter, kurze
   Brücken ohne Teilsatzgrenze (`[^,.!?\n]`), keine Vergangenheitsformen in
   Absichtsmarkern. `known_gap`/`KNOWN_GAP_IDS` schlagen in beide Richtungen an.
-- Nachmessen am echten Modell: `python scripts/probe_injection.py -e classic`.
-  Eine konditionale Nutzlast braucht ihre eigene Frage (`Payload.frage`).
+- Ob das Modell einer durchgelassenen Nutzlast *folgt*, misst das Lab
+  (`python -m yulyen_lab probe -e classic`) — der Korpus hier prüft nur den Guard.
 
 ### Latenz → [latenz.md](docs/entwurf/latenz.md)
 
@@ -242,10 +243,6 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   was der Moderator freigibt, nicht der Rohtoken.
 - Der Moderator prüft nur ein Fenster um die Freigabegrenze — nie wieder alles
   Bisherige pro Token (war quadratisch).
-- **Stoppuhr: erstes ausgeliefertes Zeichen und Zeichen/s vergleichen, nie die
-  Gesamtdauer.** Rundenweise messen, Median, Fehlermeldung ist keine Bestzeit.
-  Der Fragensatz liegt in `src/yulyen_ai/bench/questions.py` (ändern = Vergleichbarkeit
-  aufgeben). Das Skript heißt `run_bench.py`, weil `bench.py` das Paket verdeckt.
 
 ### Ablage der Gespräche → [ablage-und-anmeldung.md](docs/entwurf/ablage-und-anmeldung.md)
 
@@ -327,22 +324,21 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
 - Tests setzen `YULYEN_SKIP_LOCAL_CONFIG=1` und `storage.enabled: false`
   (autouse in `tests/conftest.py`); ein Config-Objekt baut man nicht von Hand.
 
-## Tests und Kommandos → [tests-und-evals.md](docs/entwurf/tests-und-evals.md)
+## Tests und Kommandos → [tests.md](docs/entwurf/tests.md)
 
 ```bash
 make check          # lint → lint-imports → types → test; vor jedem Push
-make test           # Suite ohne slow/ollama/browser
+make test           # Suite ohne slow/browser
 make test-browser   # laufende WebUI im echten Chromium (~20 s in der Sandbox)
-make evals          # Guard-Red-Team ohne Modell
-make bench          # Stoppuhr, braucht Ollama
 ```
+
+- **Kein Test fragt ein echtes Modell** — die Suite ist deterministisch. Ein
+  Test, der ein Modell braucht, misst Modell und Prompt und gehört ins Lab.
 
 - **Test-Doubles aus `tests/doubles.py`** (`create_autospec`), nie `Mock()` oder
   `SimpleNamespace` — ein nacktes Mock ist für jedes Attribut wahr.
 - **Nach einem Gradio-Bump `make test-browser` von Hand** — kein anderes Gate
   schaut dorthin. Rollen-Selektoren, Locale festnageln, nie `networkidle`.
-- **Evals: den Ø-Judge-Score vergleichen, nicht die Bestehensquote** (27 %
-  gegen 1,9 % Streuung). Baseline für #7: Ø 3,73.
 
 ## Werkzeuge → [werkzeuge.md](docs/entwurf/werkzeuge.md)
 
@@ -369,13 +365,21 @@ Interpreter.
   Eintrag ohne Begründung ist ein Stummschalter.
 - Wer einen CI-Job ändert, stellt auch seine Installationsmenge nach.
 
-## Das Training läuft nicht in diesem Repo (#7)
+## Messen und Trainieren laufen nicht in diesem Repo
 
-`transformers` ist hier **absichtlich** nicht importierbar: Gradio 6 verlangt
-`huggingface_hub>=1.0`, `transformers` 4.43 `<1.0`. Den ImportError nicht
-„reparieren" und kein Trainings-venv daneben anlegen — die LoRA-Strecke lebt im
-privaten Repo `YY_AI_Trainingground`. Hierher gehört nur der Vergleich
-(Eval-Suite, Baseline).
+- **Das Lab** (`YulYen/YulYen_Lab`, privat) misst das Orchester von außen:
+  Eval-Suite mit Judge, Stoppuhr, Blindverkostung, Injection-Sonde, Live-Tests
+  am Modell. Es installiert dieses Repo editierbar und importiert es an einer
+  Stelle (`orchestra.py` dort). Dieses Repo weiß nichts davon; wer
+  `config.personas`, `AppFactory`, `core.utils.system_prompt_with_date` oder
+  den Wiki-Proxy in `launch` umbaut, sieht es in der Lab-CI (wöchentlich).
+- **Das Lab misst, das Orchester entscheidet:** ändert eine Messung einen
+  Default, steht die Entscheidung hier (Changelog, Archiv) und muss ohne den
+  privaten Bericht verständlich sein.
+- **Das Training** (#7, LoRA) lebt in `YulYen/YulYens_AI_Training`.
+  `transformers` ist hier **absichtlich** nicht importierbar: Gradio 6 verlangt
+  `huggingface_hub>=1.0`, `transformers` 4.43 `<1.0`. Den ImportError nicht
+  „reparieren" und kein Trainings-venv daneben anlegen.
 
 ## Backlog
 
