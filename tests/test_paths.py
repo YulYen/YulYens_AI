@@ -8,7 +8,6 @@ dann still ins Leere. Diese Tests halten fest, dass das beim Import auffällt.
 from __future__ import annotations
 
 import pytest
-
 from yulyen_ai.paths import (
     ENSEMBLES_DIR,
     LOCALES_DIR,

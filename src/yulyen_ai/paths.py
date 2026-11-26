@@ -18,7 +18,6 @@ from __future__ import annotations
 from pathlib import Path
 
 
-
 class NotACheckoutError(RuntimeError):
     """Das Paket liegt nicht in einem Checkout — meist ein `pip install .`."""
 
