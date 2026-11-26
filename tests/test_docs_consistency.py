@@ -30,10 +30,9 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MAKEFILE = REPO_ROOT / "Makefile"
 
-# Die Dateien, die den *aktuellen* Stand beschreiben. Der datierte Bericht
-# `docs/modellwechsel_juni_2026.md` gehört bewusst nicht dazu: er hält fest,
-# was damals galt, und seine Angaben mitzuziehen würde die Aufzeichnung
-# fälschen.
+# Die Dateien, die den *aktuellen* Stand beschreiben. Datierte Aufzeichnungen
+# (`CHANGELOG.md`, `backlog_archiv.md`) gehören bewusst nicht dazu: sie halten
+# fest, was damals galt, und ihre Angaben mitzuziehen würde sie fälschen.
 LIVING_DOCS = (
     "README.md",
     "CONTRIBUTING.md",
@@ -41,7 +40,7 @@ LIVING_DOCS = (
     "docs/en/ReadMe.md",
     "docs/de/Features.md",
     "docs/en/Features.md",
-    "evals/ReadMe.md",
+    "tests/tests_README.md",
 )
 
 # Ziele, die bewusst nicht in der Doku stehen. Ein Eintrag ist eine

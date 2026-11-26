@@ -295,13 +295,6 @@ class EmailAdapterSection(BaseModel):
     quote: MailQuoteSection | None = None
 
 
-class EvalsSection(BaseModel):
-    model_config = _ALLOW_EXTRA
-
-    out_dir: str | None = None
-    judge_model: str | None = None
-
-
 class ConfigSchema(BaseModel):
     """Nur die Sektionen, in denen ein falscher Wert wirklich weh tut."""
 
@@ -324,7 +317,6 @@ class ConfigSchema(BaseModel):
     # modelliert, damit eine Bestandsdatei keine "unbekannte Sektion" meldet.
     briefing: RssSection | None = None
     email_adapter: EmailAdapterSection | None = None
-    evals: EvalsSection | None = None
 
 
 # `KNOWN_TOP_LEVEL_KEYS` gab es hier einmal — eine Liste der Sektionsnamen

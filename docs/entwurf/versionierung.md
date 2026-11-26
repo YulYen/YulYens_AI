@@ -128,7 +128,7 @@ zweisprachig macht, schreibt jeden Eintrag doppelt, für immer, ohne dass ein
 Test die Fassungen zusammenhält.
 
 **Veröffentlichte Einträge werden nicht nachgezogen** — dieselbe Regel wie bei
-`docs/modellwechsel_juni_2026.md`. Ein Eintrag hält fest, was in *dieser*
+den Einträgen in `backlog_archiv.md`. Ein Eintrag hält fest, was in *dieser*
 Version galt; ihn anzupassen fälscht die Aufzeichnung. Ist eine Aussage
 überholt, steht das im nächsten Eintrag. Deshalb steht `CHANGELOG.md` auch
 nicht in `LIVING_DOCS` von `tests/test_docs_consistency.py`.

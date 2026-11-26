@@ -23,7 +23,7 @@ def module_available(name: str) -> bool:
         return False
 
 
-def _wiki_mode_enabled(mode_val) -> bool:
+def wiki_mode_enabled(mode_val) -> bool:
     if isinstance(mode_val, bool):
         return mode_val
     s = str(mode_val).strip().lower()
@@ -96,7 +96,7 @@ def with_timestamps(base: str, cfg, model: str | None = None) -> str:
     return f"{base} | {' '.join(parts)}"
 
 
-def _system_prompt_with_date(name: str, cfg, model: str | None = None) -> str:
+def system_prompt_with_date(name: str, cfg, model: str | None = None) -> str:
     """Same block for a persona from the ensemble YAML."""
     return with_timestamps(get_prompt_by_name(name), cfg, model)
 

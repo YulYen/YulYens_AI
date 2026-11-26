@@ -43,7 +43,22 @@ in them turns out to be wrong, it gets corrected in a later entry.
   installed package now — an MCP client registered with
   `python <path>/scripts/mcp_server.py` keeps working once it is installed.
   Only editable installs are supported: `config.yaml`, `ensembles/`, `locales/`
-  and `static/` stay next to the code.
+  and `static/` stay next to the code. A non-editable `pip install .` now stops
+  at import with a message naming the right command.
+
+- **The measuring tools have left this repository.** `scripts/run_evals.py`,
+  `scripts/run_bench.py`, `scripts/blind_tasting.py` and
+  `scripts/probe_injection.py`, the eval corpora under `evals/`, the
+  `make evals`, `make evals-full`, `make bench` and `make test-all` targets
+  and the `ollama` test marker are gone; they live on in the project's
+  separate lab repository. What you run — the app, the API, the mail adapter,
+  the MCP server, `warmup_ping.py` — is unchanged. **If your
+  `config.local.yaml` has an `evals:` section, delete it:** the key is no
+  longer known, so the start logs a warning and `--doctor` and `/healthz`
+  report it as a configuration problem. The model reports that the README
+  linked for choosing a model are in release
+  [`v3.0.0`](https://github.com/YulYen/YulYens_AI/tree/v3.0.0/docs); the
+  README now carries the short answer as a table (VRAM → model → ensemble).
 
 ## [3.0.0] - 2026-11-24
 

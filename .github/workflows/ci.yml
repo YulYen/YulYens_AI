@@ -140,7 +140,7 @@ jobs:
         # Deliberately includes the 'slow' marker (locally 'make test' skips it).
         # spaCy- and Ollama-dependent tests skip themselves when the
         # model or server is unavailable (see tests/conftest.py).
-        run: python -m pytest -q -m "not ollama and not browser" --cov=yulyen_ai --cov-report=term-missing --cov-report=json
+        run: python -m pytest -q -m "not browser" --cov=yulyen_ai --cov-report=term-missing --cov-report=json
       - name: Coverage in die Job-Summary schreiben
         # Statt eines externen Badge-Dienstes (bräuchte Account und Token): die
         # Zahl steht direkt im Run. Siehe Backlog #45.
@@ -209,4 +209,4 @@ jobs:
       - name: Keyword- und Wiki-Tests
         # Gezielt die Tests, die das Modell brauchen — der Rest läuft im
         # test-Job und muss hier nicht doppelt laufen.
-        run: python -m pytest -q -m "not ollama and not browser" tests/test_spacy_keywords.py tests/test_wiki.py
+        run: python -m pytest -q -m "not browser" tests/test_spacy_keywords.py tests/test_wiki.py

@@ -20,7 +20,7 @@ from yulyen_ai.config.config_singleton import Config
 
 # Logging setup
 from yulyen_ai.config.logging_setup import init_logging
-from yulyen_ai.core.utils import _wiki_mode_enabled, ensure_dir_exists
+from yulyen_ai.core.utils import ensure_dir_exists, wiki_mode_enabled
 from yulyen_ai.paths import ENSEMBLES_DIR
 from yulyen_ai.version import __version__
 from yulyen_ai.wiki.kiwix_autostart import (
@@ -135,7 +135,7 @@ def main():
 
     # 2) Start the wiki proxy only if the mode is active
     wiki_mode = cfg.wiki["mode"]
-    if _wiki_mode_enabled(wiki_mode):
+    if wiki_mode_enabled(wiki_mode):
         start_wiki_proxy_thread()
         # New: start the offline wiki if requested
         try:

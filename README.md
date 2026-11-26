@@ -28,7 +28,6 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 - **Security-Guard**: Prompt-Injection-Schutz, PII-Filter, Wrongdoing-Guardrail mit Session-Lock
 - **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python -m yulyen_ai --list-ensembles`
 - **Antwort-Feedback**: 👍/👎 pro Antwort, gesammelt in `data/feedback_votes.jsonl` (neben der Ablage, nicht in `logs/`) als Datenbasis für Auswertung und Finetuning
-- **Eval-Suite**: goldene Fragen pro Persona und ein Guard-Red-Team-Korpus als YAML — beantwortet messbar, ob eine Änderung das Modell besser gemacht hat (`python scripts/run_evals.py -e classic`)
 - **Setup-Doktor**: `python -m yulyen_ai --doctor` prüft Ollama, Modell, spaCy, Kiwix und VRAM mit konkreten Fix-Hinweisen
 
 ---
@@ -106,7 +105,6 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 - 👉 Anleitung zum
    [Eigenen Ensemble (DE)](docs/de/Ensemble_hinzufuegen.md) /
    [Custom ensemble (EN)](docs/en/Adding_an_ensemble.md)
-- 👉 [Eval-Suite: Korpora & Judge](evals/ReadMe.md)
 - 👉 [Changelog](CHANGELOG.md) — was sich für Betreiber ändert (englisch)
 - 👉 [Feature-Backlog](backlog.md)
 
@@ -116,8 +114,7 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 
 - `src/` – Anwendungscode (Web-UI, Terminal-UI, API, Core-Logik, E-Mail-Adapter, TTS, Security)
 - `ensembles/` – Konfiguration der Personas (Prompts, LLM-Optionen, Avatare)
-- `evals/` – Eval-Korpora als YAML (goldene Fragen, Guard-Red-Team)
-- `scripts/` – Hilfsskripte (u. a. `run_evals.py`)
+- `scripts/` – Hilfsskripte (Modell vorwärmen, MCP-Server, Mail-Probe, Abhängigkeits-Audit)
 - `locales/` – UI-Texte (DE/EN)
 - `docs/` – Dokumentation & Screenshots
 - `logs/`, `tests/` – Laufzeitdaten & Pytest-Suite
@@ -128,12 +125,17 @@ siehe [Eigenes Ensemble anlegen](docs/de/Ensemble_hinzufuegen.md).
 
 - **Python 3.12+** (die CI prüft 3.12 und 3.14)
 - **Ollama** (lokal installiert)
-- mindestens ein lokales Modell: Default ist **gemma4:26b** (18 GB, für 16 GB VRAM
-  plus Arbeitsspeicher; der erste Start dauert etwa 25 s). Mit 12–16 GB VRAM passt
-  **ministral-3:14b** (~9 GB, am besten mit dem Ensemble `examples/classic_ministral14b`),
-  mit 8 GB VRAM **ministral-3:8b** — jeweils pullen und in `config.local.yaml` unter
-  `core.model_name` eintragen. Zur Modellwahl siehe [Modellwechsel-Analyse November 2026](docs/modellwechsel_november_2026.md)
-  für 16 GB VRAM, die [Juni-Analyse](docs/modellwechsel_juni_2026.md) gilt für 8 GB.
+- mindestens ein lokales Modell, passend zur Grafikkarte — pullen und, wenn es
+  nicht der Default ist, in `config.local.yaml` unter `core.model_name` eintragen:
+
+  | VRAM | Modell | Ensemble | Anmerkung |
+  |---|---|---|---|
+  | 16 GB (+ RAM) | **`gemma4:26b`** (Default, 18 GB) | `classic` | liegt teils im RAM: erster Start ~25 s, danach am schnellsten |
+  | 12–16 GB | `ministral-3:14b` (~9 GB) | `examples/classic_ministral14b` | liegt ganz auf der GPU |
+  | 8 GB | `ministral-3:8b` | `classic` | in `ensembles/classic/personas_base.yaml` `num_ctx: 8192`, in `config.local.yaml` `wiki.snippet_limit: 1200` |
+
+  Gemessen und verkostet wurde das auf genau diesen drei Karten; die Berichte
+  dazu liegen im Stand [`v3.0.0`](https://github.com/YulYen/YulYens_AI/tree/v3.0.0/docs).
 
 ---
 

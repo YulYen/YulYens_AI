@@ -76,9 +76,11 @@ siehe auch: [Features.md](Features.md)
   (Verknüpfung in `shell:startup` auf `<venv>\Scripts\pythonw.exe
   <repo>\scripts\warmup_ping.py`) oder als VS-Code-Task mit
   `"runOptions": {"runOn": "folderOpen"}`.
-  (Das Default-Modell steht in `config.yaml` unter `core.model_name`; eine Bewertung
-  verschiedener Modelle findet sich in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md)
-  für 16 GB VRAM und in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) für 8 GB.)
+  Auf 8 GB zusätzlich `num_ctx: 8192` in `ensembles/classic/personas_base.yaml`
+  und `wiki.snippet_limit: 1200` in `config.local.yaml`, sonst passt das Modell
+  nicht neben den Desktop. (Das Default-Modell steht in `config.yaml` unter
+  `core.model_name`; die Messberichte zur Modellwahl liegen im Stand
+  [`v3.0.0`](https://github.com/YulYen/YulYens_AI/tree/v3.0.0/docs).)
 - Für Tests ohne Ollama kann `core.backend: "dummy"` gesetzt werden – das Echo-Backend kommt ohne
   zusätzliche Downloads aus und eignet sich für CI oder schnelles Prototyping.
 - Optional für Offline-Wiki:
@@ -337,21 +339,25 @@ trotzdem korrekt und nennt seine Quelle:
 
 Schneller lokaler Durchlauf (Dummy-Backend, ohne langsame Tests):
 ```bash
-pytest -q -m "not slow and not ollama and not browser"    # entspricht: make test
+python -m pytest -q -m "not slow and not browser"    # entspricht: make test
 ```
 
 Vor dem Push genügt **ein** Kommando: `make check` — es fährt Linter,
 Schichtenprüfung, Typen und Tests nacheinander und stoppt beim ersten Fehler.
 
-Weitere Varianten (siehe `Makefile`): `make test-all` (komplette Suite),
-`make test-ci` (derselbe Umfang wie die CI, mit Coverage), `make coverage`,
+Weitere Varianten (siehe `Makefile`): `make test-ci` (derselbe Umfang wie die
+CI, mit den langsamen Tests und Coverage), `make coverage`,
 `make lint` / `make format` (Ruff/Black), `make types` (mypy über das ganze
 `src`, zweimal — der zweite Lauf nimmt Windows an), `make lint-imports`
 (Schichtenverträge, siehe unten), `make audit` (bekannte
-Schwachstellen der Abhängigkeiten gegen `audit_allowlist.yaml` halten — braucht Netz) und
-`make evals` / `make evals-full` (Eval-Suite, siehe `evals/ReadMe.md`; nur die
-volle Variante braucht ein Modell) und `make bench` (Antwortzeiten, siehe
-unten).
+Schwachstellen der Abhängigkeiten gegen `audit_allowlist.yaml` halten — braucht Netz).
+
+**Kein Test fragt ein echtes Modell.** Die Suite läuft komplett gegen das
+Echo-Backend und ist damit deterministisch. Messungen am Modell — Eval-Suite
+mit Judge, Antwortzeiten, Blindverkostung, Injection-Sonde — leben seit
+Version 4 in einem eigenen Repository des Projekts; der Guard-Red-Team-Korpus
+blieb hier (`tests/guard_redteam.yaml`), weil er den Guard prüft, nicht ein
+Modell.
 
 **Der Browser-Rauchtest steht bewusst daneben**, nicht dabei:
 ```bash
@@ -364,33 +370,6 @@ Datei beim Browser ankommt. Dafür braucht er Playwright **und** einen
 Browser-Build (`pip install playwright && playwright install chromium`), und
 genau deshalb ist er aus `make test` und aus der CI ausgenommen. Fehlt
 Playwright, wird sauber übersprungen.
-
-### Antwortzeiten messen: `make bench`
-
-```bash
-make bench                                    # entspricht: python scripts/run_bench.py -e classic
-python scripts/run_bench.py -e classic --model leo-hessianai-13b-chat.Q5
-python scripts/run_bench.py -e classic --holdback 0
-```
-
-Die Stoppuhr des Projekts (`scripts/run_bench.py`). Sie stellt einen festen
-Fragensatz mehrfach und schreibt `logs/bench/report.md` samt `report.csv` —
-Letzteres ist das eigentliche Artefakt, weil sich zwei Läufe dort zeilenweise
-gegeneinanderhalten lassen. Braucht Ollama; `--backend dummy` prüft nur, dass
-der Harness läuft, und sagt das im Report auch.
-
-**Gemessen wird die Zeit bis zum ersten *ausgelieferten* Zeichen**, nicht bis
-zum ersten Token des Modells. Zwischen beiden liegt der Guard-Holdback, und der
-ist der größte Einzelposten der wahrgenommenen Antwortzeit; der Report weist
-ihn als eigene Zahl aus. Zwei Leitkennzahlen zählen: **erstes Zeichen** und
-**Zeichen/s**. Die Gesamtdauer eines Laufs ist ausdrücklich *keine*
-Vergleichszahl — sie hängt vor allem daran, wie viel das Modell schreibt.
-
-Der Standardweg misst in-process (Persona-Prompt, Guard, Holdback, Modell) und
-lässt Wiki und RSS bewusst außen vor, weil deren Abruf je Frage um Sekunden
-schwankt. Wer den vollen Pfad will, misst mit `--api-url
-http://127.0.0.1:8013/v1` gegen den laufenden Server; dann fehlen dafür die
-Modellzeiten, die es nur in-process gibt.
 
 ---
 

@@ -22,17 +22,21 @@ dependencies = { file = ["requirements.txt"] }
 where = ["src"]
 include = ["yulyen_ai*"]
 
+# Das Lab importiert das Orchester als Bibliothek und prüft es mit mypy;
+# ohne Marker sähe es dahinter nur `Any`.
+[tool.setuptools.package-data]
+yulyen_ai = ["py.typed"]
+
 [tool.black]
 line-length = 88
 target-version = ["py312"]
 
 [tool.ruff]
-# Bewusst nur `.`: die Pakete unter `src/` werden top-level importiert, ruff
-# sortiert sie deshalb wie Fremdpakete ein — so liegen die Importblöcke im
-# ganzen Repo. `src = [".", "src"]` wäre die ehrlichere Klassifizierung
-# (es ist unser Code), verlangt aber eine Umsortierung in rund fünfzig
-# Dateien; das gehört in einen eigenen Umbau und nicht in einen
-# Abhängigkeits-Sprung.
+# Nur `.`: ruff findet `yulyen_ai` unter `src/` nicht und sortiert es deshalb
+# wie ein Fremdpaket ein — so liegen die Importblöcke im ganzen Repo.
+# `src = ["src", "."]` wäre die ehrlichere Klassifizierung (es ist unser
+# Code), sortiert aber jede Datei um; das gehört in einen eigenen Commit, nicht
+# zwischen inhaltliche Änderungen.
 src = ["."]
 target-version = "py312"
 
@@ -50,7 +54,6 @@ addopts = "-ra"
 testpaths = ["tests"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "ollama: marks tests that perform real Ollama calls",
     "browser: drives the running WebUI in a real browser (needs Playwright)",
 ]
 filterwarnings = [
@@ -119,7 +122,7 @@ source_modules = ["yulyen_ai.security"]
 # und deshalb steht sie hier statt in jemandes Kopf.
 forbidden_modules = [
     "yulyen_ai.core", "yulyen_ai.storage", "yulyen_ai.auth", "yulyen_ai.wiki", "yulyen_ai.rss",
-    "yulyen_ai.tts", "yulyen_ai.stt", "yulyen_ai.ui", "yulyen_ai.api", "yulyen_ai.email_adapter", "yulyen_ai.mcp_adapter", "yulyen_ai.evals", "yulyen_ai.bench",
+    "yulyen_ai.tts", "yulyen_ai.stt", "yulyen_ai.ui", "yulyen_ai.api", "yulyen_ai.email_adapter", "yulyen_ai.mcp_adapter",
 ]
 
 [[tool.importlinter.contracts]]
@@ -130,7 +133,7 @@ source_modules = ["yulyen_ai.config"]
 # Frage der Import-Reihenfolge.
 forbidden_modules = [
     "yulyen_ai.core", "yulyen_ai.security", "yulyen_ai.storage", "yulyen_ai.auth", "yulyen_ai.wiki", "yulyen_ai.rss",
-    "yulyen_ai.tts", "yulyen_ai.stt", "yulyen_ai.ui", "yulyen_ai.api", "yulyen_ai.email_adapter", "yulyen_ai.mcp_adapter", "yulyen_ai.evals", "yulyen_ai.bench",
+    "yulyen_ai.tts", "yulyen_ai.stt", "yulyen_ai.ui", "yulyen_ai.api", "yulyen_ai.email_adapter", "yulyen_ai.mcp_adapter",
 ]
 
 [[tool.importlinter.contracts]]

@@ -78,9 +78,11 @@ See also: [Features.md](Features.md)
   Windows autostart (a shortcut in `shell:startup` to `<venv>\Scripts\pythonw.exe
   <repo>\scripts\warmup_ping.py`) or as a VS Code task with
   `"runOptions": {"runOn": "folderOpen"}`.
-  (The default model is set in `config.yaml` under `core.model_name`; a comparison of
-  candidate models can be found in [modellwechsel_november_2026.md](../modellwechsel_november_2026.md) for 16 GB VRAM
-  and in [modellwechsel_juni_2026.md](../modellwechsel_juni_2026.md) for 8 GB, both German only.)
+  On 8 GB, also set `num_ctx: 8192` in `ensembles/classic/personas_base.yaml` and
+  `wiki.snippet_limit: 1200` in `config.local.yaml`, or the model will not fit next
+  to the desktop. (The default model is set in `config.yaml` under
+  `core.model_name`; the measurement reports behind this choice are in release
+  [`v3.0.0`](https://github.com/YulYen/YulYens_AI/tree/v3.0.0/docs), German only.)
 - For tests without Ollama you can set `core.backend: "dummy"` – the echo backend requires no additional downloads and is suitable for CI or quick prototyping.
 - Optional for offline wiki usage:
   - [Kiwix](https://kiwix.org/) + German ZIM archive — install & update guide: [Kiwix_Setup.md](Kiwix_Setup.md)
@@ -327,21 +329,25 @@ the question correctly and cites his source:
 
 Fast local run (dummy backend, without slow tests):
 ```bash
-pytest -q -m "not slow and not ollama and not browser"    # same as: make test
+python -m pytest -q -m "not slow and not browser"    # same as: make test
 ```
 
 Before pushing, **one** command is enough: `make check` — it runs the linters,
 the layer contracts, the type checks and the tests in turn, stopping at the
 first failure.
 
-More variants (see `Makefile`): `make test-all` (full suite), `make test-ci`
-(same scope as CI, with coverage), `make coverage`, `make lint` / `make format`
+More variants (see `Makefile`): `make test-ci` (same scope as CI, including the
+slow tests, with coverage), `make coverage`, `make lint` / `make format`
 (Ruff/Black), `make types` (mypy over all of `src`, twice — the second run
 assumes Windows), `make lint-imports` (layer contracts, see below),
 `make audit` (check the dependencies' known vulnerabilities against
-`audit_allowlist.yaml` — needs network access) and `make evals` /
-`make evals-full` (eval suite, see `evals/ReadMe.md`; only the full variant
-needs a model) and `make bench` (response times, see below).
+`audit_allowlist.yaml` — needs network access).
+
+**No test asks a real model.** The whole suite runs against the echo backend
+and is deterministic. Measurements against a model — eval suite with judge,
+response times, blind tasting, injection probe — moved to a separate
+repository of the project with version 4; the guard red-team corpus stayed here
+(`tests/guard_redteam.yaml`) because it checks the guard, not a model.
 
 **The browser smoke test sits beside these, not among them:**
 ```bash
@@ -354,33 +360,6 @@ whether a file actually reaches the browser. That needs Playwright **and** a
 browser build (`pip install playwright && playwright install chromium`), which
 is exactly why it is excluded from `make test` and from CI. Without Playwright
 it skips cleanly.
-
-### Measuring response times: `make bench`
-
-```bash
-make bench                                    # same as: python scripts/run_bench.py -e classic
-python scripts/run_bench.py -e classic --model leo-hessianai-13b-chat.Q5
-python scripts/run_bench.py -e classic --holdback 0
-```
-
-The project's stopwatch (`scripts/run_bench.py`). It asks a fixed set of questions
-several times over and writes `logs/bench/report.md` plus `report.csv` — the
-CSV is the artefact that matters, because two runs can be compared there row by
-row. Needs Ollama; `--backend dummy` only proves the harness runs, and the
-report says so.
-
-**What is timed is the first character actually delivered**, not the model's
-first token. Between the two sits the guard holdback, the single largest
-contributor to perceived response time; the report shows it as its own figure.
-Two numbers lead: **time to first character** and **characters per second**.
-The total duration of a run is explicitly *not* a comparison metric — it mostly
-depends on how much the model chose to write.
-
-The default path measures in-process (persona prompt, guard, holdback, model)
-and deliberately leaves wiki and RSS out, because their lookup varies by
-seconds from question to question. For the full path, measure against the
-running server with `--api-url http://127.0.0.1:8013/v1`; in exchange you lose
-the model-side timings, which only exist in-process.
 
 ---
 

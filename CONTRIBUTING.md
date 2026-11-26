@@ -58,16 +58,11 @@ Browser-Build); beide laufen getrennt.
 ## Tests
 - Schneller lokaler Durchlauf (wie `make test`):
   ```bash
-  pytest -q -m "not slow and not ollama and not browser"
+  python -m pytest -q -m "not slow and not browser"
   ```
-- Vollständige Suite (Run the full test suite with):
-  ```bash
-  pytest -q -m "not browser"
-  ```
-- Tests mit Marker `ollama` laufen nur, wenn lokal ein Ollama-Server erreichbar ist.
-- Umfang wie in der CI, mit Coverage: `make test-ci`.
-- Eval-Suite: `make evals` (Guard-Teil, braucht kein Modell) bzw. `make evals-full`
-  (voll, braucht Ollama) — Details in `evals/ReadMe.md`.
+- Umfang wie in der CI, mit den langsamen Tests und Coverage: `make test-ci`.
+- Kein Test fragt ein echtes Modell. Messungen am Modell (Eval-Suite, Stoppuhr,
+  Blindverkostung) leben seit Version 4 im Lab-Repository des Projekts.
 - Marker `browser` fährt die laufende WebUI im echten Chromium (`make test-browser`).
   Er ist aus allen anderen Zielen und aus der CI ausgenommen, weil er Playwright
   **und** einen Browser-Build braucht; ohne Playwright wird sauber übersprungen.
