@@ -1,0 +1,306 @@
+# --------- Utilities for checking and trimming the LLM context (no external side effects) ---------
+import logging
+import math
+import re
+from collections.abc import Sequence
+from typing import Any
+
+from yulyen_ai.core.context_injection import (
+    compressed_copy,
+    is_compressed,
+    prompt_only,
+    recorded_turns,
+)
+from yulyen_ai.core.context_summarizer import KarlSummarizationError, KarlSummarizer
+
+Message = dict[str, Any]
+
+chars_per_token: float = 3.25  # ~3.25 characters per token (heuristic, conservative)
+
+threshold: float = 0.75  # Fill the context to only 75%
+
+headroom_tokens: int = 500  # Keep at least 500 tokens of headroom
+headroom_ratio: float = 0.5  # Or leave 50% headroom when trimming anyway
+
+
+def _token_stats(messages: Sequence[Message]) -> tuple[int, int, int]:
+    """Return (message_count, total_chars, content_tokens)."""
+
+    total_chars = 0
+    message_count = 0
+
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        # Komprimierte Turns stehen noch im Verlauf, gehen aber nicht mehr an
+        # das Modell — sie zählen deshalb nicht zum Füllstand. Sonst gälte der
+        # Kontext nach jeder Kompression weiter als voll.
+        if is_compressed(message):
+            continue
+        content = message.get("content")
+        if not content:
+            continue
+        normalized = re.sub(r"\s+", " ", str(content)).strip()
+        if not normalized:
+            continue
+        message_count += 1
+        total_chars += len(normalized)
+
+    if total_chars:
+        content_tokens = math.ceil(total_chars / max(chars_per_token, 0.1))
+    else:
+        content_tokens = 0
+
+    return message_count, total_chars, content_tokens
+
+
+def karl_prepare_quick_and_dirty(
+    messages: Sequence[Message],
+    num_ctx: int,
+    *,
+    min_keep_tail: int = 2,
+) -> list[Message]:
+    """Trim conversation history to leave space for the upcoming response."""
+
+    items = list(messages)
+    if not items or num_ctx <= 0:
+        return items
+
+    target = max(0, num_ctx - max(headroom_tokens, int(num_ctx * headroom_ratio)))
+    used_before = _token_stats(items)[2]
+
+    if used_before <= target:
+        return items
+
+    head = items[:1] if items[0].get("role") == "system" else []
+    keep_tail = max(0, min(min_keep_tail, len(items) - len(head)))
+    tail = items[-keep_tail:] if keep_tail else []
+    core = items[len(head) : len(items) - keep_tail]
+
+    dropped = 0
+    while core and _token_stats(head + core + tail)[2] > target:
+        core.pop(0)
+        dropped += 1
+    result = head + core + tail
+    used_after = _token_stats(result)[2]
+    logging.info(
+        "[karl_prepare] used=%s→%s, target=%s, dropped=%s (replace Karl with a better fit later)",
+        used_before,
+        used_after,
+        target,
+        dropped,
+    )
+    return result
+
+
+def approx_token_count(
+    messages: Sequence[Message],
+    *,
+    per_message_overhead: int = 3,  # Format/role overhead per message
+    per_request_overhead: int = 400,  # One-time surcharge for system prompt/meta
+) -> int:
+    """Roughly estimates the token count for chat messages without an external tokenizer."""
+
+    message_count, total_chars, content_tokens = _token_stats(messages)
+    overhead_tokens = per_request_overhead + message_count * per_message_overhead
+    estimate = max(content_tokens + overhead_tokens, 0)
+
+    # DEBUG, nicht INFO: seit der OpenAI-kompatiblen API (#37) läuft das zweimal
+    # pro Request für die usage-Angabe. Auf INFO wäre das reiner Logspam in einem
+    # ganz normalen Betrieb.
+    logging.debug(
+        "[approx_token_count] chars_per_token=%s, n_msgs=%s, total_chars=%s, "
+        "content_tokens≈%s, overhead=%s, estimate=%s",
+        chars_per_token,
+        message_count,
+        total_chars,
+        content_tokens,
+        overhead_tokens,
+        estimate,
+    )
+
+    return estimate
+
+
+def context_near_limit(
+    history: Sequence[Message],
+    persona_options: dict[str, Any],
+) -> bool:
+    """Return True if the conversation is close to the persona's context limit."""
+
+    if not persona_options:
+        return False
+
+    limit = int(persona_options.get("num_ctx") or 0)
+    if not limit:
+        return False
+
+    used = approx_token_count(history)
+    return used >= limit * threshold
+
+
+# --------- Shared context-management flow (used by terminal and web UI) ---------
+
+
+def require_context_management_config(cfg) -> dict:
+    """Validate and return the 'context_management' section of the config."""
+
+    context_management = getattr(cfg, "context_management", None)
+    if not isinstance(context_management, dict):
+        raise ValueError("Missing required 'context_management' configuration section.")
+
+    strategy = context_management.get("strategy")
+    if strategy not in {"heuristic", "karl"}:
+        raise ValueError(
+            "context_management.strategy must be either 'heuristic' or 'karl'."
+        )
+
+    if strategy == "karl":
+        karl_cfg = context_management.get("karl")
+        if not isinstance(karl_cfg, dict):
+            raise ValueError("Missing required 'context_management.karl' section.")
+        required_keys = {
+            "model",
+            "summary_max_tokens",
+            "keep_last_messages",
+            "log_dir",
+        }
+        missing = [key for key in required_keys if key not in karl_cfg]
+        if missing:
+            raise ValueError(
+                "Missing required context_management.karl keys: "
+                + ", ".join(sorted(missing))
+            )
+
+    return context_management
+
+
+def apply_heuristic_context_trim(
+    history: Sequence[Message],
+    persona_options: dict[str, Any],
+    *,
+    persona_name: str | None = None,
+) -> list[Message]:
+    """Trim the history token-based; returns it unchanged when num_ctx is unusable."""
+
+    num_ctx_value = persona_options.get("num_ctx")
+
+    ctx_limit = None
+    if num_ctx_value is not None:
+        try:
+            ctx_limit = int(num_ctx_value)
+        except (TypeError, ValueError):
+            logging.warning(
+                "Invalid 'num_ctx' value for persona %r: %r",
+                persona_name,
+                num_ctx_value,
+            )
+
+    if ctx_limit and ctx_limit > 0:
+        return karl_prepare_quick_and_dirty(history, ctx_limit)
+
+    logging.warning(
+        "Skipping 'karl_prepare_quick_and_dirty' for persona %r: num_ctx=%r",
+        persona_name,
+        num_ctx_value,
+    )
+    return list(history)
+
+
+def apply_karl_context_summary(
+    history: Sequence[Message],
+    karl_cfg: dict[str, Any],
+    persona_options: dict[str, Any],
+    *,
+    llm_core,
+    chat_model_name: str,
+    persona_name: str | None = None,
+    keep_alive: int = 600,
+) -> list[Message]:
+    """Compress the history via Karl; falls back to the heuristic trim if configured."""
+
+    summarizer = KarlSummarizer(
+        llm_core=llm_core,
+        config=karl_cfg,
+        chat_model_name=chat_model_name,
+        keep_alive=keep_alive,
+    )
+    try:
+        return summarizer.summarize(history)
+    except KarlSummarizationError:
+        if karl_cfg.get("fallback_strategy") == "heuristic":
+            return apply_heuristic_context_trim(
+                history, persona_options, persona_name=persona_name
+            )
+        logging.exception("Karl summarization failed and no fallback is configured.")
+        raise
+
+
+def shrink_history_for_context(
+    history: Sequence[Message],
+    cfg,
+    persona_options: dict[str, Any],
+    *,
+    llm_core,
+    chat_model_name: str,
+    persona_name: str | None = None,
+) -> list[Message]:
+    """Apply the configured context-management strategy and return the new history.
+
+    **Gekürzt wird der Prompt, nicht das Gespräch.** Die Strategien entfernen
+    Nachrichten; was davon ein Turn des Gesprächs war, kommt hier markiert
+    (``COMPRESSED_KEY``) wieder an den Anfang der Liste. Der Verlauf ist das,
+    was die Oberflächen in die Ablage spiegeln — ohne diesen Schritt verlor ein
+    gespeichertes Gespräch mit der ersten Kompression seinen Anfang.
+    """
+
+    context_management = require_context_management_config(cfg)
+    items = list(history)
+    active = prompt_only(items)
+
+    if context_management["strategy"] == "karl":
+        core_cfg = getattr(cfg, "core", None) or {}
+        shrunk = apply_karl_context_summary(
+            active,
+            context_management["karl"],
+            persona_options,
+            llm_core=llm_core,
+            chat_model_name=chat_model_name,
+            persona_name=persona_name,
+            keep_alive=int(core_cfg.get("keep_alive", 600)),
+        )
+    else:
+        shrunk = apply_heuristic_context_trim(
+            active, persona_options, persona_name=persona_name
+        )
+
+    already_compressed = [message for message in items if is_compressed(message)]
+    return [*already_compressed, *_compressed_turns(active, shrunk), *shrunk]
+
+
+def _compressed_turns(active: list[Message], shrunk: list[Message]) -> list[Message]:
+    """Die Gesprächs-Turns, die eine Strategie aus ``active`` genommen hat.
+
+    Beide Strategien liefern „Kopf + das Ende des bisherigen Verlaufs": Karl
+    eine Zusammenfassung vor den letzten n Nachrichten, der Trim (allenfalls)
+    die erste Systemnachricht vor dem Rest. Wie viel vom Ende geblieben ist,
+    zeigt der gemeinsame Schluss beider Listen — verglichen über den Inhalt,
+    weil Karl mit Kopien arbeitet. Alles davor ist herausgefallen, bis auf
+    das, was als Kopf wieder drinsteht.
+
+    Markiert zurück kommt nur, was in der Ablage steht (``recorded_turns``):
+    Systemnachrichten und injizierter Fremdkontext sind Prompt-Material und
+    dürfen wirklich weg.
+    """
+    kept = 0
+    while (
+        kept < min(len(active), len(shrunk)) and active[-1 - kept] == shrunk[-1 - kept]
+    ):
+        kept += 1
+    head = shrunk[: len(shrunk) - kept]
+    dropped = [
+        message
+        for message in active[: len(active) - kept]
+        if not any(message is survivor for survivor in head)
+    ]
+    return [compressed_copy(message) for message in recorded_turns(dropped)]

@@ -5,7 +5,7 @@ half its expectations, so the loader must reject it loudly.
 """
 
 import pytest
-from evals.corpus import (
+from yulyen_ai.evals.corpus import (
     CorpusError,
     load_behaviour_corpora,
     load_guard_corpus,

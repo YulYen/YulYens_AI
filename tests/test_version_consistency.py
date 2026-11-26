@@ -1,6 +1,6 @@
 """Die Version steht an zwei Stellen — hier werden sie aneinander gebunden (#74).
 
-`src/version.py` trägt die Zahl für die Laufzeit (`--version`, `--doctor`,
+`src/yulyen_ai/version.py` trägt die Zahl für die Laufzeit (`--version`, `--doctor`,
 `/health`), `CHANGELOG.md` trägt sie als oberste Versionsüberschrift. Beide
 werden von Hand gepflegt, und zwei Quellen für dieselbe Wahrheit laufen
 auseinander, sobald nichts sie zusammenhält — die Lehre aus
@@ -29,7 +29,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from version import __version__
+from yulyen_ai.version import __version__
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
@@ -60,7 +60,7 @@ def test_the_newest_changelog_entry_matches_the_version_constant():
         "'## [1.2.3] - JJJJ-MM-TT'."
     )
     assert versions[0] == __version__, (
-        f"CHANGELOG.md führt zuletzt {versions[0]}, src/version.py sagt "
+        f"CHANGELOG.md führt zuletzt {versions[0]}, src/yulyen_ai/version.py sagt "
         f"{__version__}. Beim Anheben werden beide angefasst — sonst meldet "
         "/health eine Version, unter der im Changelog nichts steht."
     )

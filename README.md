@@ -26,10 +26,10 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 - **Spracheingabe** in der Web-UI: Mikrofon neben dem Eingabefeld, Transkript per faster-whisper (opt-in)
 - **E-Mail-Adapter** (opt-in): Personas per IMAP/SMTP anschreiben
 - **Security-Guard**: Prompt-Injection-Schutz, PII-Filter, Wrongdoing-Guardrail mit Session-Lock
-- **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python src/launch.py --list-ensembles`
+- **Austauschbare Ensembles**: das Standard-Ensemble `classic` und die Beispiel-Crew `examples/spaceship_crew` liegen bei — Übersicht per `python -m yulyen_ai --list-ensembles`
 - **Antwort-Feedback**: 👍/👎 pro Antwort, gesammelt in `data/feedback_votes.jsonl` (neben der Ablage, nicht in `logs/`) als Datenbasis für Auswertung und Finetuning
 - **Eval-Suite**: goldene Fragen pro Persona und ein Guard-Red-Team-Korpus als YAML — beantwortet messbar, ob eine Änderung das Modell besser gemacht hat (`python scripts/run_evals.py -e classic`)
-- **Setup-Doktor**: `python src/launch.py --doctor` prüft Ollama, Modell, spaCy, Kiwix und VRAM mit konkreten Fix-Hinweisen
+- **Setup-Doktor**: `python -m yulyen_ai --doctor` prüft Ollama, Modell, spaCy, Kiwix und VRAM mit konkreten Fix-Hinweisen
 
 ---
 
@@ -65,12 +65,12 @@ Vier deutschsprachige Personas (LEAH, DORIS, PETER und POPCORN) mit eigenen Char
 git clone https://github.com/YulYen/YulYens_AI.git
 cd YulYens_AI
 python -m venv .venv && .venv\Scripts\activate   # Windows (Linux/macOS: source .venv/bin/activate)
-pip install -r requirements.txt
+pip install -e .                 # editierbar: das Paket zeigt auf diesen Checkout
 python -m spacy download de_core_news_lg
 ollama pull gemma4:26b           # kleinere Karte: ministral-3:14b oder :8b, siehe unten
 
-python src/launch.py --doctor        # Preflight-Check: läuft alles?
-python src/launch.py -e classic     # Start (Web-UI auf http://127.0.0.1:7860)
+python -m yulyen_ai --doctor        # Preflight-Check: läuft alles?
+python -m yulyen_ai -e classic     # Start (Web-UI auf http://127.0.0.1:7860)
 ```
 
 ---
@@ -87,8 +87,8 @@ Welches gestartet wird, entscheidet `-e`. Drei Ensembles liegen im Repo:
 | `examples/spaceship_crew` | CAPTAIN_SELINA, ZETA_FLUX, ELIAS_MOREL, LYRA_VEX | Crew des Raumschiffs *Aurora-One* — Kommandantin, Chefingenieurin, Navigator, Diplomatin |
 
 ```bash
-python src/launch.py --list-ensembles              # welche gibt es?
-python src/launch.py -e examples/spaceship_crew    # Beispiel-Crew starten
+python -m yulyen_ai --list-ensembles              # welche gibt es?
+python -m yulyen_ai -e examples/spaceship_crew    # Beispiel-Crew starten
 ```
 
 ![Spaceship-Crew: Persona-Auswahl mit der Crew der Aurora-One](docs/screenshot_spaceship_crew.png)

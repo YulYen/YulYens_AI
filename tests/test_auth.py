@@ -9,7 +9,7 @@ import logging
 from types import SimpleNamespace
 
 import pytest
-from auth import (
+from yulyen_ai.auth import (
     AuthConfigError,
     DisabledAuth,
     HeaderAuth,
@@ -200,7 +200,7 @@ def test_exposure_warning_only_when_it_matters(host, has_auth, expect_warning, c
     Betriebsmodus. Abgebrochen wird nur, wenn eine Anmeldung konfiguriert, aber
     kaputt ist — dort wollte jemand ausdrücklich Schutz.
     """
-    from ui.web_ui import _warn_if_exposed_without_login
+    from yulyen_ai.ui.web_ui import _warn_if_exposed_without_login
 
     with caplog.at_level(logging.WARNING):
         _warn_if_exposed_without_login(

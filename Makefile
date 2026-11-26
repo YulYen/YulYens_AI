@@ -1,7 +1,9 @@
 .PHONY: setup format lint lint-imports types fix test test-ci test-all test-browser coverage clean run audit check evals evals-full bench
 
+# Editierbar: das Paket zeigt auf diesen Checkout (src/yulyen_ai/paths.py).
+# Die Laufzeit-Pins kommen über pyproject.toml aus requirements.txt.
 setup:
-	pip install -r requirements.txt -r requirements-dev.txt
+	python -m pip install -e . -r requirements-dev.txt
 	python -m spacy download de_core_news_lg
 	pre-commit install
 
@@ -17,10 +19,9 @@ format:
 lint:
 	python -m ruff check .
 
-# Schichten als Vertrag (import-linter). PYTHONPATH, weil die Pakete unter src/
-# top-level importiert werden — genau wie zur Laufzeit.
+# Schichten als Vertrag (import-linter). Braucht das installierte Paket.
 lint-imports:
-	PYTHONPATH=src lint-imports
+	lint-imports
 
 # Typprüfung über das ganze src (#52); Pfade stehen in pyproject.toml.
 # Der zweite Lauf nimmt Windows an: mypy wertet `sys.platform` statisch aus,
@@ -37,7 +38,7 @@ test:
 
 # Same scope as CI (includes slow tests, plus coverage report)
 test-ci:
-	python -m pytest -q -m "not ollama and not browser" --cov=src --cov-report=term-missing
+	python -m pytest -q -m "not ollama and not browser" --cov=yulyen_ai --cov-report=term-missing
 
 test-all:
 	python -m pytest -q -m "not browser"
@@ -49,7 +50,7 @@ test-browser:
 	python -m pytest -q -m browser
 
 coverage:
-	python -m pytest -q -m "not slow and not ollama and not browser" --cov=src --cov-report=term-missing
+	python -m pytest -q -m "not slow and not ollama and not browser" --cov=yulyen_ai --cov-report=term-missing
 
 # Schwachstellen in den Abhängigkeiten gegen audit_allowlist.yaml halten (#61).
 # Braucht Netz (OSV/PyPI). `pip install pip-audit` vorausgesetzt.
@@ -83,4 +84,4 @@ clean:
 	[p.unlink(missing_ok=True) for p in pathlib.Path('.').rglob('*.pyc')]"
 
 run:
-	python src/launch.py -e classic
+	python -m yulyen_ai -e classic

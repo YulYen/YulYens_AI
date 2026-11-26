@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from ui.conversation_io_terminal import load_conversation, save_conversation
+from yulyen_ai.ui.conversation_io_terminal import load_conversation, save_conversation
 
 META = {
     "created_at": "2026-07-02T10:00:00",

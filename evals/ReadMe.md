@@ -3,7 +3,7 @@
 Messbare Antwort auf die Frage „ist das Modell besser geworden?" — gebraucht
 für #7 (LoRA), wo Baseline und Adapter verglichen werden müssen.
 
-Die Korpora liegen hier als YAML, der Code in `src/evals/`. Neue Fälle werden
+Die Korpora liegen hier als YAML, der Code in `src/yulyen_ai/evals/`. Neue Fälle werden
 durch Bearbeiten der YAML-Dateien ergänzt, nicht durch neuen Testcode.
 
 ## Starten

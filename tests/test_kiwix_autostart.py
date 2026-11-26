@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
-from wiki import kiwix_autostart
+from yulyen_ai.wiki import kiwix_autostart
 
 
 def _cfg(host):

@@ -2,8 +2,8 @@
 
 import logging
 
-from core.context_utils import approx_token_count
-from core.utils import SAME_AS_CHAT, resolve_model_name
+from yulyen_ai.core.context_utils import approx_token_count
+from yulyen_ai.core.utils import SAME_AS_CHAT, resolve_model_name
 
 # ---- same_as_chat-Sentinel ---------------------------------------------------
 # Karl (#12) und der Eval-Judge (#41) benutzen denselben Sentinel. Die Auflösung
@@ -51,7 +51,7 @@ def test_token_estimate_logs_on_debug_not_info(caplog):
 def test_file_exchange_defaults_to_on_and_can_be_switched_off():
     from types import SimpleNamespace
 
-    from core.utils import is_file_exchange_enabled
+    from yulyen_ai.core.utils import is_file_exchange_enabled
 
     # Ohne Sektion und ohne Schlüssel: an — der Austausch war immer da.
     assert is_file_exchange_enabled(SimpleNamespace()) is True
@@ -72,7 +72,7 @@ def test_module_available_survives_a_stub_without_spec():
     import sys
     import types
 
-    from core.utils import module_available
+    from yulyen_ai.core.utils import module_available
 
     name = "yulyen_stub_ohne_spec"
     sys.modules[name] = types.ModuleType(name)

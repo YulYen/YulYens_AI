@@ -7,7 +7,7 @@ und ob Rollentrennung (#60) oder Guard (#60a) das verhindern. Braucht Ollama.
     python scripts/probe_injection.py -e classic
     python scripts/probe_injection.py -e classic --repeats 3 --persona DORIS
 
-Hintergrund und Deutung der Arme: src/evals/injection_probe.py.
+Hintergrund und Deutung der Arme: src/yulyen_ai/evals/injection_probe.py.
 """
 
 from __future__ import annotations
@@ -17,9 +17,7 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from evals.injection_probe import render, run_probe  # noqa: E402
+from yulyen_ai.evals.injection_probe import render, run_probe
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -36,8 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", help="Ergebnis zusätzlich in diese Datei schreiben.")
     args = parser.parse_args(argv)
 
-    from config.config_singleton import Config
-    from core.factory import AppFactory
+    from yulyen_ai.config.config_singleton import Config
+    from yulyen_ai.core.factory import AppFactory
 
     cfg = Config(path=os.path.abspath(args.config or "config.yaml"))
     cfg.ensemble = args.ensemble or getattr(cfg, "ensemble", None)

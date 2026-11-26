@@ -22,7 +22,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _start(tmp_path, auth: dict) -> subprocess.CompletedProcess:
-    """`python src/launch.py` mit der ausgelieferten Config, nur ohne Außenwelt."""
+    """`python -m yulyen_ai` mit der ausgelieferten Config, nur ohne Außenwelt."""
     cfg = yaml.safe_load((REPO_ROOT / "config.yaml").read_text(encoding="utf-8"))
     cfg["core"].update(backend="dummy", warm_up=False)
     cfg["wiki"]["mode"] = False
@@ -35,7 +35,7 @@ def _start(tmp_path, auth: dict) -> subprocess.CompletedProcess:
     config_path.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
 
     return subprocess.run(
-        [sys.executable, "src/launch.py", "-e", "classic", "-c", str(config_path)],
+        [sys.executable, "-m", "yulyen_ai", "-e", "classic", "-c", str(config_path)],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

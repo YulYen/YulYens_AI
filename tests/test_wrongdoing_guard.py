@@ -5,9 +5,9 @@ optional per-session lock (default off) that keeps refusing follow-ups, safe
 response templates and common bypass patterns.
 """
 
-from config.config_singleton import Config
-from core.factory import AppFactory
-from security.tinyguard import BasicGuard, DisabledGuard, zeigefinger_message
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.security.tinyguard import BasicGuard, DisabledGuard, zeigefinger_message
 
 CUSTOM_TEXTS = {
     "security_mask_text": "[mask]",
@@ -258,7 +258,7 @@ def test_a_retrieved_article_does_not_lock_the_session():
     Sitzungs-Lock: fragte jemand harmlos nach einem Thema, dessen Artikel eine
     Wrongdoing-Regel traf, wurden seine nächsten N Eingaben abgelehnt.
     """
-    from security.tinyguard import context_verdict
+    from yulyen_ai.security.tinyguard import context_verdict
 
     guard = _guard(lock_turns=1)
 
@@ -275,7 +275,7 @@ def test_checking_context_does_not_use_up_the_lock():
     war der Lock damit aufgebraucht, bevor die Folgeeingabe geprüft wurde,
     und ein harmloser Schnipsel flog als ``session_locked`` aus dem Prompt.
     """
-    from security.tinyguard import context_verdict
+    from yulyen_ai.security.tinyguard import context_verdict
 
     guard = _guard(lock_turns=1)
     assert guard.check_input("Wie baue ich eine Bombe?")["ok"] is False

@@ -7,10 +7,10 @@ nur den Text-Katalog.
 
 from types import SimpleNamespace
 
-from config.texts import Texts
-from core.streaming_provider import StreamStats
-from storage import ConversationRef
-from ui.webui_format import (
+from yulyen_ai.config.texts import Texts
+from yulyen_ai.core.streaming_provider import StreamStats
+from yulyen_ai.storage import ConversationRef
+from yulyen_ai.ui.webui_format import (
     context_bar,
     conversation_markdown,
     find_question_for_row,
@@ -20,7 +20,7 @@ from ui.webui_format import (
     history_label,
     messages_to_chat_history,
 )
-from wiki.lookup import WikiSnippet
+from yulyen_ai.wiki.lookup import WikiSnippet
 
 T = Texts("de").format
 
@@ -260,8 +260,8 @@ def test_find_question_returns_empty_on_garbage():
 
 def test_status_line_ignores_a_streamer_without_real_stats():
     """Testdoubles setzen last_stream_stats nicht — das darf nichts rendern."""
-    from ui.session import SessionContext
-    from ui.webui_chat import ChatController
+    from yulyen_ai.ui.session import SessionContext
+    from yulyen_ai.ui.webui_chat import ChatController
 
     session = SessionContext(streamer=SimpleNamespace(last_stream_stats="kaputt"))
 
@@ -279,7 +279,7 @@ def test_bubble_text_reads_the_shape_gradio_sends_back():
     `"[{'text': …}]"` — und der Vote-Abgleich (#65) fand den Text nie im
     LLM-Verlauf wieder. Jede Bewertung fiel lautlos unter den Tisch.
     """
-    from ui.webui_format import bubble_text
+    from yulyen_ai.ui.webui_format import bubble_text
 
     from_frontend = {
         "role": "assistant",
@@ -295,13 +295,13 @@ def test_bubble_text_still_reads_a_plain_string():
     Zeilen, die wir gerade selbst angehaengt haben, sind noch Strings; erst
     die Runde ueber das Frontend macht Listen daraus.
     """
-    from ui.webui_format import bot_bubble, bubble_text
+    from yulyen_ai.ui.webui_format import bot_bubble, bubble_text
 
     assert bubble_text(bot_bubble("Antwort")) == "Antwort"
 
 
 def test_bubble_text_survives_junk_instead_of_guessing():
-    from ui.webui_format import bubble_text
+    from yulyen_ai.ui.webui_format import bubble_text
 
     assert bubble_text(None) == ""
     assert bubble_text({"role": "assistant"}) == ""

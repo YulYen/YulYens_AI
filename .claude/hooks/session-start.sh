@@ -42,11 +42,11 @@ fi
 # --- 2. Abhängigkeiten -------------------------------------------------------
 # Die Probe fragt nach dem, was der Alltag zuerst braucht: die Testsuite und
 # die Prüfwerkzeuge. Ist beides importierbar, ist nichts zu tun.
-if python -c "import pytest, gradio, mypy" >/dev/null 2>&1; then
+if python -c "import pytest, gradio, mypy, yulyen_ai" >/dev/null 2>&1; then
   echo "[session-start] Abhängigkeiten sind da."
 else
   echo "[session-start] Installiere Laufzeit- und Entwicklungsabhängigkeiten…"
-  python -m pip install -q -r requirements.txt -r requirements-dev.txt \
+  python -m pip install -q -e . -r requirements-dev.txt \
     || echo "[session-start] pip install fehlgeschlagen — 'make setup' von Hand nachholen."
 fi
 

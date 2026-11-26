@@ -1,0 +1,176 @@
+"""Persona configuration loader."""
+
+from __future__ import annotations
+
+import copy
+from functools import lru_cache
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from ..paths import ENSEMBLES_DIR
+from .config_singleton import Config
+
+_ENSEMBLES_DIR = ENSEMBLES_DIR
+
+
+def _resolve_persona_files() -> tuple[Path, Path]:
+    """Return the base and locale persona files for the active ensemble."""
+
+    cfg = Config()
+    ensemble = getattr(cfg, "ensemble", None)
+    if not ensemble:
+        raise RuntimeError(
+            "No persona ensemble configured. Ensure Config().ensemble is set before loading personas."
+        )
+
+    base_path = _ENSEMBLES_DIR / ensemble / "personas_base.yaml"
+    locale_path = _ENSEMBLES_DIR / ensemble / "locales" / cfg.language / "personas.yaml"
+
+    if not base_path.is_file():
+        raise FileNotFoundError(
+            f"Persona base file '{base_path}' not found for ensemble '{ensemble}'."
+        )
+
+    if not locale_path.is_file():
+        raise FileNotFoundError(
+            f"Persona locale file '{locale_path}' not found for ensemble '{ensemble}' and language '{cfg.language}'."
+        )
+
+    return base_path, locale_path
+
+
+def _load_system_prompts() -> list[dict[str, Any]]:
+    """Loads persona data from the base and locale YAML files (cached per file state)."""
+
+    base_path, locale_path = _resolve_persona_files()
+    personas = _parse_persona_files(
+        str(base_path),
+        str(locale_path),
+        base_path.stat().st_mtime_ns,
+        locale_path.stat().st_mtime_ns,
+    )
+    # Callers own the returned data, so hand out copies of the cached parse.
+    return copy.deepcopy(personas)
+
+
+@lru_cache(maxsize=8)
+def _parse_persona_files(
+    base_file: str,
+    locale_file: str,
+    base_mtime_ns: int,
+    locale_mtime_ns: int,
+) -> list[dict[str, Any]]:
+    base_path = Path(base_file)
+    locale_path = Path(locale_file)
+    base_data = yaml.safe_load(base_path.read_text(encoding="utf-8"))
+    locale_data = yaml.safe_load(locale_path.read_text(encoding="utf-8"))
+
+    personas: list[dict[str, Any]] = []
+    for base_persona in base_data["personas"]:
+        persona_name = base_persona["name"]
+        if persona_name not in locale_data.get("personas", {}):
+            raise KeyError(
+                f"Persona '{persona_name}' is defined in personas_base.yaml but missing "
+                f"from the locale file '{locale_path}'."
+            )
+        localized = locale_data["personas"][persona_name]
+
+        entry: dict[str, Any] = {
+            "name": localized.get("name", persona_name),
+            "prompt": localized["prompt"],
+            "description": localized.get("description", ""),
+            "drink": localized.get("drink", "Coffee"),
+            "llm_options": base_persona.get("llm_options", {}),
+            # Solo-Modell (#85): nur fürs Gespräch zu zweit. Leer = Default.
+            "model": str(base_persona.get("model") or "").strip() or None,
+        }
+
+        defaults = base_persona.get("defaults")
+        if defaults:
+            entry["defaults"] = defaults
+
+        personas.append(entry)
+
+    return personas
+
+
+def get_prompt_by_name(name: str) -> str:
+    """Returns the prompt text for a persona by name."""
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return persona["prompt"]
+    raise ValueError(f"Persona '{name}' not found.")
+
+
+def get_options(name: str) -> dict[str, Any] | None:
+    """Returns the options for a persona by name."""
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return persona.get("llm_options") or None
+    raise ValueError(f"Persona '{name}' not found.")
+
+
+def get_model(name: str) -> str | None:
+    """Das eigene Modell einer Persona für das **Solo** (#85) — oder ``None``.
+
+    ``None`` heißt: die Persona spielt auch solo auf ``core.model_name``. Das
+    Orchester (Ask-All, Fazit, Self-Talk) fragt hier nie nach — dort spielen
+    alle auf dem gemeinsamen Modell. Welches Modell am Ende gilt, entscheidet
+    ``AppFactory.solo_model``, weil nur sie den Default kennt.
+    """
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return persona.get("model")
+    raise ValueError(f"Persona '{name}' not found.")
+
+
+def get_all_persona_names() -> list[str]:
+    """Returns a list of all persona names."""
+    return [p["name"] for p in _load_system_prompts()]
+
+
+def get_description(name: str) -> str:
+    """Returns a persona's one-line description from the locale file."""
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return str(persona.get("description") or "")
+    raise ValueError(f"Persona '{name}' not found.")
+
+
+def get_drink(name: str) -> str:
+    """Returns a persona's favorite drink."""
+    for persona in _load_system_prompts():
+        if persona["name"].lower() == name.lower():
+            return persona.get("drink", "Coffee")
+    raise ValueError(f"Persona '{name}' not found.")
+
+
+def quietest_persona_name(names: list[str] | None = None) -> str:
+    """Die Persona mit der niedrigsten Temperatur.
+
+    Zwei Stellen wählen dieselbe Persona als Default und aus demselben Grund:
+    die Stoppuhr (#42), weil die Antwortlänge dort der größte Einzeleinfluss
+    ist, und der Ask-All-Moderator (#27), weil Zusammenfassen keine kreative
+    Aufgabe ist. Abgeleitet statt verdrahtet, damit der Default auch für ein
+    fremdes Ensemble stimmt — und an *einer* Stelle, weil zwei Fassungen
+    derselben Regel auseinanderlaufen.
+
+    Bei Gleichstand gewinnt die zuerst genannte Persona; ohne ``temperature``
+    zählt 1.0, also verliert eine Persona ohne Angabe gegen jede mit.
+    """
+    candidates = list(names) if names is not None else get_all_persona_names()
+    if not candidates:
+        raise ValueError("Das Ensemble enthält keine Persona.")
+
+    def _temperature(name: str) -> float:
+        options = get_options(name) or {}
+        try:
+            return float(options.get("temperature", 1.0))
+        except (TypeError, ValueError):
+            return 1.0
+
+    return min(
+        candidates, key=lambda name: (_temperature(name), candidates.index(name))
+    )

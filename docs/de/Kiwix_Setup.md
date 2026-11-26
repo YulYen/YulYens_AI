@@ -75,7 +75,7 @@ das Orchestra auch den **Datenstand** für den Drei-Zeitstempel-Block im System-
 ### 4. Verifizieren
 
 ```bash
-python src/launch.py --doctor
+python -m yulyen_ai --doctor
 ```
 
 Der Setup-Doktor prüft u. a., ob kiwix-serve erreichbar ist. Alternativ im Browser:
@@ -100,7 +100,7 @@ veraltetes Wissen (und wird den Personas über den Zeitstempel-Block auch so mit
 5. **Laufenden kiwix-serve beenden** (er hält das alte ZIM offen) und das Orchestra
    neu starten — bei `autostart: true` startet kiwix-serve automatisch mit dem neuen
    Archiv.
-6. **Verifizieren:** `python src/launch.py --doctor` → Kiwix-Check grün.
+6. **Verifizieren:** `python -m yulyen_ai --doctor` → Kiwix-Check grün.
 7. **Altes ZIM löschen**, sobald alles läuft.
 
 ---

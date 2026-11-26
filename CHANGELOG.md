@@ -19,7 +19,7 @@ and it is not duplicated here. (It sat in the archive section of
 there, and that link keeps working: the backlog links on to the archive.)
 
 **What a MAJOR bump means.** The public contract of this project is: the keys
-in `config.yaml`, the command line of `src/launch.py`, the HTTP endpoints
+in `config.yaml`, the command line of `python -m yulyen_ai`, the HTTP endpoints
 (`/ask`, `/v1/…`, `/health`, `/healthz`), and the ensemble YAML format. Break
 any of those and the number on the left goes up. So does a change that
 *silently* alters what an unchanged, running installation does — that is the
@@ -29,6 +29,21 @@ Released entries are a dated record and are not edited afterwards. If something
 in them turns out to be wrong, it gets corrected in a later entry.
 
 ## [Unreleased]
+
+### Breaking
+
+- **The app is now an installable package and starts with
+  `python -m yulyen_ai`.** `python src/launch.py` no longer exists. After
+  pulling, run **`pip install -e .`** once in your virtual environment (it
+  installs the same pinned requirements as before, plus the package itself),
+  then start with `python -m yulyen_ai -e classic`; `--doctor`,
+  `--list-ensembles`, `--version` and `-c` work as before. Update shortcuts,
+  autostart entries and the VS Code task that call `src/launch.py`. The
+  scripts in `scripts/` (`mcp_server.py`, `warmup_ping.py`, …) also need the
+  installed package now — an MCP client registered with
+  `python <path>/scripts/mcp_server.py` keeps working once it is installed.
+  Only editable installs are supported: `config.yaml`, `ensembles/`, `locales/`
+  and `static/` stay next to the code.
 
 ## [3.0.0] - 2026-11-24
 

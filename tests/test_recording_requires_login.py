@@ -14,8 +14,8 @@ Anmeldungsbegriff (Terminal, API) — sonst nicht.
 import logging
 
 import pytest
-from config.config_singleton import Config
-from core.factory import AppFactory
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.factory import AppFactory
 
 
 @pytest.fixture()

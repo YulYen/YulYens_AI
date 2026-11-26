@@ -1,7 +1,7 @@
 from email.message import EmailMessage
 
 import pytest
-from email_adapter.service import EmailAdapterConfig, EmailAdapterService
+from yulyen_ai.email_adapter.service import EmailAdapterConfig, EmailAdapterService
 
 
 class FakeProvider:

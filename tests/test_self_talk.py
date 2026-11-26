@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 
-from ui import self_talk
-from ui.self_talk import SelfTalkRunner, is_end_of_self_talk
+from yulyen_ai.ui import self_talk
+from yulyen_ai.ui.self_talk import SelfTalkRunner, is_end_of_self_talk
 
 from tests.doubles import factory_double, streamer_double
 
@@ -106,9 +106,9 @@ def test_self_talk_leaves_no_trace_in_the_store(tmp_path):
     Er erzeugt ein Artefakt, kein Nutzergespräch: der Nutzer steuert nur den
     Startprompt bei. Wer ihn behalten will, nimmt den Datei-Export.
     """
-    from core.dummy_llm_core import DummyLLMCore
-    from core.streaming_provider import YulYenStreamingProvider
-    from storage import SqliteStore
+    from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+    from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
+    from yulyen_ai.storage import SqliteStore
 
     store = SqliteStore(tmp_path / "conversations.sqlite3")
 

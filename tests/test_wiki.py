@@ -6,14 +6,14 @@ from types import SimpleNamespace
 
 import pytest
 import requests
-from config.config_singleton import Config
-from core.factory import AppFactory
-from launch import (
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.launch import (
     ensure_kiwix_running_if_offlinemode_and_autostart,
     start_wiki_proxy_thread,
 )
-from wiki.lookup import lookup_wiki_snippet
-from wiki.spacy_keyword_finder import SpacyKeywordFinder
+from yulyen_ai.wiki.lookup import lookup_wiki_snippet
+from yulyen_ai.wiki.spacy_keyword_finder import SpacyKeywordFinder
 
 from tests.util import has_spacy_model
 
@@ -36,7 +36,7 @@ def test_lookup_wiki_snippet_handles_network_errors(monkeypatch, caplog):
         raise requests.exceptions.ConnectionError("proxy down")
 
     dummy_finder = _DummyKeywordFinder("Testthema")
-    monkeypatch.setattr("wiki.lookup.requests.get", _raise_connection_error)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.requests.get", _raise_connection_error)
 
     caplog.set_level(logging.ERROR)
 
@@ -63,7 +63,7 @@ def test_lookup_wiki_snippet_handles_unexpected_errors(monkeypatch, caplog):
         raise RuntimeError("kaputt")
 
     dummy_finder = _DummyKeywordFinder("Testthema")
-    monkeypatch.setattr("wiki.lookup.requests.get", _raise_unexpected_error)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.requests.get", _raise_unexpected_error)
 
     caplog.set_level(logging.ERROR)
 
@@ -95,7 +95,7 @@ def test_lookup_wiki_snippet_url_encodes_topic(monkeypatch):
         )
 
     dummy_finder = _DummyKeywordFinder(topic)
-    monkeypatch.setattr("wiki.lookup.requests.get", _fake_get)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.requests.get", _fake_get)
 
     lookup_wiki_snippet(
         question="Was ist C++?",
@@ -126,7 +126,7 @@ def test_lookup_wiki_snippet_url_encodes_the_persona(monkeypatch):
         seen["url"] = url
         return SimpleNamespace(status_code=404)
 
-    monkeypatch.setattr("wiki.lookup.requests.get", _fake_get)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.requests.get", _fake_get)
     finder = SimpleNamespace(find_keywords=lambda _q: ["Berlin"])
 
     lookup_wiki_snippet(
@@ -144,7 +144,7 @@ def test_lookup_wiki_snippet_reflects_language_switch(monkeypatch, tmp_path):
     def _raise_connection_error(*args, **kwargs):
         raise requests.exceptions.ConnectionError("proxy down")
 
-    monkeypatch.setattr("wiki.lookup.requests.get", _raise_connection_error)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.requests.get", _raise_connection_error)
 
     Config.reset_instance()
     Config("config.yaml")
@@ -198,7 +198,7 @@ def test_get_keyword_finder_handles_missing_spacy_model(monkeypatch):
         wiki={"mode": "offline", "spacy_model_variant": "large", "spacy_model_map": {}},
         language="de",
     )
-    monkeypatch.setattr("core.factory.Config", lambda: dummy_cfg)
+    monkeypatch.setattr("yulyen_ai.core.factory.Config", lambda: dummy_cfg)
 
     try:
         factory = AppFactory()
@@ -288,7 +288,7 @@ def _proxy_payload(**overrides):
 
 def _lookup_against(monkeypatch, payload, *, limit=1200):
     monkeypatch.setattr(
-        "wiki.lookup.requests.get",
+        "yulyen_ai.wiki.lookup.requests.get",
         lambda *a, **k: SimpleNamespace(status_code=200, json=lambda: payload),
     )
     return lookup_wiki_snippet(
@@ -333,7 +333,7 @@ def test_lookup_ignores_a_nonsense_full_length(monkeypatch):
 
 
 def test_inject_wiki_context_uses_the_snippet_fields():
-    from wiki.lookup import WikiSnippet, inject_wiki_context
+    from yulyen_ai.wiki.lookup import WikiSnippet, inject_wiki_context
 
     Config.reset_instance()
     try:
@@ -354,7 +354,7 @@ def test_inject_wiki_context_uses_the_snippet_fields():
 
 
 def test_proxy_apply_limit_reports_the_length_before_truncation():
-    from wiki.wikipedia_proxy import _apply_limit
+    from yulyen_ai.wiki.wikipedia_proxy import _apply_limit
 
     article = "Wort " * 400  # 2000 Zeichen
     text, full_length = _apply_limit("", article, 100)
@@ -365,7 +365,7 @@ def test_proxy_apply_limit_reports_the_length_before_truncation():
 
 
 def test_proxy_apply_limit_keeps_short_articles_intact():
-    from wiki.wikipedia_proxy import _apply_limit
+    from yulyen_ai.wiki.wikipedia_proxy import _apply_limit
 
     text, full_length = _apply_limit("", "Kurzer Artikel.", 1200)
 
@@ -375,7 +375,7 @@ def test_proxy_apply_limit_keeps_short_articles_intact():
 
 def test_proxy_apply_limit_counts_the_infobox_block_too():
     """Der Key/Value-Block gehört zum ausgelieferten Text — und zur Länge."""
-    from wiki.wikipedia_proxy import _apply_limit
+    from yulyen_ai.wiki.wikipedia_proxy import _apply_limit
 
     kv_line = "Hauptstadt: Berlin"
     article = "Wort " * 400
@@ -390,7 +390,7 @@ def test_proxy_apply_limit_counts_the_infobox_block_too():
 
 def test_wiki_lookup_passes_every_setting_through(monkeypatch):
     """Die acht Argumente standen an sechs Stellen — jetzt an einer."""
-    from wiki.lookup import WikiLookup
+    from yulyen_ai.wiki.lookup import WikiLookup
 
     captured = {}
 
@@ -407,7 +407,7 @@ def test_wiki_lookup_passes_every_setting_through(monkeypatch):
         )
         return ([], [])
 
-    monkeypatch.setattr("wiki.lookup.lookup_wiki_snippet", _fake)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.lookup_wiki_snippet", _fake)
 
     finder = _DummyKeywordFinder("Thema")
     lookup = WikiLookup(
@@ -435,7 +435,7 @@ def test_wiki_lookup_passes_every_setting_through(monkeypatch):
 def test_wiki_lookup_from_config_reads_the_wiki_section():
     from types import SimpleNamespace
 
-    from wiki.lookup import WikiLookup
+    from yulyen_ai.wiki.lookup import WikiLookup
 
     cfg = SimpleNamespace(
         wiki={
@@ -459,7 +459,7 @@ def test_wiki_lookup_without_a_wiki_section_stays_usable():
     """Eine Config ohne wiki-Sektion darf nicht beim Bauen krachen."""
     from types import SimpleNamespace
 
-    from wiki.lookup import WikiLookup
+    from yulyen_ai.wiki.lookup import WikiLookup
 
     lookup = WikiLookup.from_config(SimpleNamespace(), keyword_finder=None)
 
@@ -472,7 +472,7 @@ def test_wiki_lookup_without_a_wiki_section_stays_usable():
 @pytest.fixture
 def proxy(monkeypatch):
     """Die Anfrage-Auswertung mit festen Einstellungen, ohne Socket und Netz."""
-    from wiki import wikipedia_proxy as module
+    from yulyen_ai.wiki import wikipedia_proxy as module
 
     Config.reset_instance()
     cfg = Config("config.yaml")

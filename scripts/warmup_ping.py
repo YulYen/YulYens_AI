@@ -30,10 +30,8 @@ import logging
 import os
 import sys
 import time
-from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(_ROOT / "src"))
+from yulyen_ai.paths import PROJECT_ROOT
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -56,12 +54,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # Autostart und VS-Code-Task starten in beliebigen Verzeichnissen;
     # config.yaml und das Ensemble liegen relativ zum Repo.
-    os.chdir(_ROOT)
+    os.chdir(PROJECT_ROOT)
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    from config.config_singleton import Config
-    from core.factory import AppFactory
+    from yulyen_ai.config.config_singleton import Config
+    from yulyen_ai.core.factory import AppFactory
 
     cfg = Config("config.yaml")
     cfg.ensemble = args.ensemble

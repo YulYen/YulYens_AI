@@ -11,7 +11,7 @@ auslösen soll, und den, der es nicht darf.
 """
 
 import pytest
-from rss.trigger import feed_aliases, feeds_for_question
+from yulyen_ai.rss.trigger import feed_aliases, feeds_for_question
 
 FEEDS = ["tagesschau", "heise online"]
 

@@ -10,7 +10,7 @@ Alle Ensembles liegen im Verzeichnis [`ensembles/`](../../ensembles). Ein Ensemb
 - `locales/<sprache>/personas.yaml` – Sprachabhängige Beschreibungen, Prompts und Metadaten
 - `static/personas/<NAME>/{thumb.webp,full.webp}` – (optional) Web-UI-Avatare
 
-> 💡 Tipp: Das Beispiel-Ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) zeigt eine vollständige Beispielstruktur mit Lokalisierung (de/en) und Avatar-Bildern. Starten lässt es sich per `python src/launch.py -e examples/spaceship_crew`.
+> 💡 Tipp: Das Beispiel-Ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) zeigt eine vollständige Beispielstruktur mit Lokalisierung (de/en) und Avatar-Bildern. Starten lässt es sich per `python -m yulyen_ai -e examples/spaceship_crew`.
 
 ## Schritt-für-Schritt-Anleitung
 
@@ -50,7 +50,7 @@ Alle Ensembles liegen im Verzeichnis [`ensembles/`](../../ensembles). Ein Ensemb
 5. **Ensemble testen**
    - Starte das Projekt über den CLI-Parameter `-e`:
      ```bash
-     python src/launch.py -e mein_ensemble
+     python -m yulyen_ai -e mein_ensemble
      ```
    - Alternativ kannst du in `config.yaml` den Eintrag `ensemble: "mein_ensemble"` hinzufügen, wenn du das CLI-Flag nicht setzen möchtest. `-e` hat Vorrang, wenn beides gesetzt ist.
    - Prüfe sowohl Terminal- als auch Web-UI (falls aktiviert), ob alle Personas erscheinen und Antworten liefern.

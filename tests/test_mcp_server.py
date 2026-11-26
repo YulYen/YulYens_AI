@@ -12,10 +12,15 @@ from __future__ import annotations
 
 import anyio
 import pytest
-from config.config_singleton import Config
-from core.factory import AppFactory
-from mcp_adapter.server import PersonaTools, ToolError, build_server, configure_process
-from wiki.lookup import WikiLookup, WikiSnippet
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.mcp_adapter.server import (
+    PersonaTools,
+    ToolError,
+    build_server,
+    configure_process,
+)
+from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet
 
 mcp_client = pytest.importorskip("mcp.client")
 
@@ -48,7 +53,7 @@ def lookups(monkeypatch):
         calls.append(question)
         return [], [WikiSnippet("Mond", "Der Mond ist ein Himmelskörper.")]
 
-    monkeypatch.setattr("wiki.lookup.lookup_wiki_snippet", _lookup)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.lookup_wiki_snippet", _lookup)
     return calls
 
 

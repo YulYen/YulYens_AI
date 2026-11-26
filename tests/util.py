@@ -3,7 +3,7 @@
 import importlib.util
 from functools import lru_cache
 
-from config.config_singleton import Config
+from yulyen_ai.config.config_singleton import Config
 
 
 @lru_cache

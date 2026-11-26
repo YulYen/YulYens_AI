@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
-from ui.webui_features import WebFeatures
+from yulyen_ai.ui.webui_features import WebFeatures
 
 
 def _cfg(**sections):
@@ -29,8 +29,8 @@ class _Store:
 
 def _detect(cfg, *, records=True, stt=False, piper=False) -> WebFeatures:
     with (
-        patch("ui.webui_features.is_stt_available", return_value=stt),
-        patch("ui.webui_features.module_available", return_value=piper),
+        patch("yulyen_ai.ui.webui_features.is_stt_available", return_value=stt),
+        patch("yulyen_ai.ui.webui_features.module_available", return_value=piper),
     ):
         return WebFeatures.detect(cfg, _Store(records))
 

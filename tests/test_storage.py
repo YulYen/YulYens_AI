@@ -8,8 +8,8 @@ Objekte, Filtern nach Nutzer, und ein Schema, das sich weiterentwickeln lässt.
 import sqlite3
 
 import pytest
-from storage import NullStore, SqliteStore, build_store
-from storage.store import _MIGRATIONS
+from yulyen_ai.storage import NullStore, SqliteStore, build_store
+from yulyen_ai.storage.store import _MIGRATIONS
 
 
 @pytest.fixture()
@@ -202,7 +202,8 @@ def test_a_failing_migration_step_leaves_the_file_untouched(tmp_path, monkeypatc
     before = _object_names(path)
 
     monkeypatch.setattr(
-        "storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_FAILS_AT_THE_END,)
+        "yulyen_ai.storage.store._MIGRATIONS",
+        _MIGRATIONS + (_STEP_THAT_FAILS_AT_THE_END,),
     )
     with pytest.raises(sqlite3.Error):
         SqliteStore(path)
@@ -221,13 +222,16 @@ def test_a_repaired_migration_step_still_applies_afterwards(tmp_path, monkeypatc
     first.close()
 
     monkeypatch.setattr(
-        "storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_FAILS_AT_THE_END,)
+        "yulyen_ai.storage.store._MIGRATIONS",
+        _MIGRATIONS + (_STEP_THAT_FAILS_AT_THE_END,),
     )
     with pytest.raises(sqlite3.Error):
         SqliteStore(path)
 
     # Umgebung repariert (oder Schritt korrigiert) — jetzt muss er durchlaufen.
-    monkeypatch.setattr("storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_WORKS,))
+    monkeypatch.setattr(
+        "yulyen_ai.storage.store._MIGRATIONS", _MIGRATIONS + (_STEP_THAT_WORKS,)
+    )
     store = SqliteStore(path)
 
     with sqlite3.connect(str(path)) as con:
@@ -274,8 +278,8 @@ def test_build_store_degrades_instead_of_blocking_the_start(tmp_path, caplog):
 
 
 def test_factory_opens_a_conversation_for_any_channel(tmp_path, monkeypatch):
-    from config.config_singleton import Config
-    from core.factory import AppFactory
+    from yulyen_ai.config.config_singleton import Config
+    from yulyen_ai.core.factory import AppFactory
 
     Config.reset_instance()
     try:
@@ -297,8 +301,8 @@ def test_factory_opens_a_conversation_for_any_channel(tmp_path, monkeypatch):
 
 def test_open_conversation_never_breaks_the_caller(tmp_path, monkeypatch, caplog):
     """Ein kaputter Store darf kein Gespräch verhindern, nur keins aufzeichnen."""
-    from config.config_singleton import Config
-    from core.factory import AppFactory
+    from yulyen_ai.config.config_singleton import Config
+    from yulyen_ai.core.factory import AppFactory
 
     class _Broken:
         def start(self, **_kwargs):
@@ -527,7 +531,7 @@ def test_conversations_from_before_the_index_are_searchable(tmp_path, monkeypatc
     Zustand jeder bestehenden Installation vor diesem Update.
     """
     path = tmp_path / "conversations.sqlite3"
-    monkeypatch.setattr("storage.store._MIGRATIONS", _MIGRATIONS[:1])
+    monkeypatch.setattr("yulyen_ai.storage.store._MIGRATIONS", _MIGRATIONS[:1])
     alt = SqliteStore(path)
     _conversation_with(alt, texts=[("assistant", "Kiwix serviert ZIM")])
     alt.close()
@@ -549,7 +553,9 @@ def test_without_fts5_the_store_still_records_and_search_stays_quiet(
     Logzeile: genau die stille Sorte, die #72 so teuer gemacht hat.
     """
     kaputt = "CREATE VIRTUAL TABLE messages_fts USING fts5_gibt_es_nicht(content);"
-    monkeypatch.setattr("storage.store._MIGRATIONS", _MIGRATIONS[:1] + (kaputt,))
+    monkeypatch.setattr(
+        "yulyen_ai.storage.store._MIGRATIONS", _MIGRATIONS[:1] + (kaputt,)
+    )
 
     store = SqliteStore(tmp_path / "conversations.sqlite3")
     cid = _conversation_with(store, texts=[("user", "Kiwix")])

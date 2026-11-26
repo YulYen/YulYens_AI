@@ -15,21 +15,21 @@ sollten.
 from types import SimpleNamespace
 
 import pytest
-from core.context_injection import (
+from yulyen_ai.core.context_injection import (
     conversation_only,
     is_compressed,
     prompt_only,
     recorded_turns,
 )
-from core.context_utils import approx_token_count, shrink_history_for_context
-from core.dummy_llm_core import DummyLLMCore
-from core.streaming_provider import YulYenStreamingProvider
-from rss.feeds import RssCache
-from storage.store import SqliteStore
-from ui.feedback import store_index_of
-from ui.session import SessionContext
-from ui.webui_chat import ChatController
-from wiki.lookup import WikiLookup
+from yulyen_ai.core.context_utils import approx_token_count, shrink_history_for_context
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.rss.feeds import RssCache
+from yulyen_ai.storage.store import SqliteStore
+from yulyen_ai.ui.feedback import store_index_of
+from yulyen_ai.ui.session import SessionContext
+from yulyen_ai.ui.webui_chat import ChatController
+from yulyen_ai.wiki.lookup import WikiLookup
 
 NUM_CTX = 1200
 TURNS = 8
@@ -160,7 +160,7 @@ def test_shrinking_marks_instead_of_dropping():
 
 def test_an_export_does_not_carry_the_marker():
     """Die Datei ist das Gespräch — der Prompt-Zustand gehört nicht hinein."""
-    from core.context_injection import COMPRESSED_KEY
+    from yulyen_ai.core.context_injection import COMPRESSED_KEY
 
     history = [{"role": "user", "content": "alt", COMPRESSED_KEY: True}]
 
@@ -171,15 +171,15 @@ def test_the_terminal_keeps_the_whole_conversation_too(tmp_path, monkeypatch):
     """Derselbe Weg im Terminal: `_ensure_context_headroom`, dann aufzeichnen."""
     from pathlib import Path
 
-    from config.texts import Texts
-    from ui.terminal_ui import TerminalUI
+    from yulyen_ai.config.texts import Texts
+    from yulyen_ai.ui.terminal_ui import TerminalUI
 
     catalog = Texts(
         language="de", locales_dir=Path(__file__).resolve().parents[1] / "locales"
     )
     cfg = _cfg("heuristic", tmp_path)
     cfg.texts, cfg.t, cfg.ui = catalog, catalog.format, {}
-    monkeypatch.setattr("ui.terminal_ui.get_drink", lambda _name: "Tee")
+    monkeypatch.setattr("yulyen_ai.ui.terminal_ui.get_drink", lambda _name: "Tee")
     store = SqliteStore(tmp_path / "t.sqlite3")
     ui = TerminalUI(factory=None, config=cfg, wiki=WikiLookup())
     ui.bot = "LEAH"

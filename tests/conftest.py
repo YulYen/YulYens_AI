@@ -6,12 +6,12 @@ from urllib.parse import urlparse
 
 import pytest
 import requests
-import storage.store as store_module
-from api.app import app, set_provider
-from config.config_singleton import Config
-from core.factory import AppFactory
+import yulyen_ai.storage.store as store_module
 from fastapi.testclient import TestClient
-from launch import (
+from yulyen_ai.api.app import app, set_provider
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.launch import (
     ensure_kiwix_running_if_offlinemode_and_autostart,
     start_wiki_proxy_thread,
 )

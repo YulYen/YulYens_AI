@@ -5,7 +5,7 @@ personas:
   # gemma4:26b wechselte (#78). classic wird seitdem auf Gemma nachgestimmt
   # (#99); dieses Ensemble bleibt beim 14B-Stand. Starten mit
   #     core.model_name: "ministral-3:14b"     # in config.local.yaml
-  #     python src/launch.py -e examples/classic_ministral14b
+  #     python -m yulyen_ai -e examples/classic_ministral14b
   # Gut für Rechner mit 12–16 GB VRAM, auf denen Gemma zu viel in den RAM legt.
   #
   # repeat_penalty steht bewusst nicht mehr hier: Dann gilt der Ollama-Default

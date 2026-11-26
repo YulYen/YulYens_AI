@@ -2,10 +2,10 @@
 
 from types import SimpleNamespace
 
-import core.system_checks as sc
 import pytest
 import requests
-from version import __version__
+import yulyen_ai.core.system_checks as sc
+from yulyen_ai.version import __version__
 
 
 class FakeResp:

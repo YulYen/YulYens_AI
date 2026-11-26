@@ -162,7 +162,7 @@ auf 394 zufälligen *und* 0 auf den 49 heiklen Artikeln (vorher 2). Die
 Mutationsprobe — Fix zurückgenommen — lässt vier Korpusfälle fallen.
 
 **Nachgemessen wird das mit `python scripts/probe_injection.py -e classic`**
-(#60b, Code in `src/evals/injection_probe.py`, braucht Ollama). Drei Arme —
+(#60b, Code in `src/yulyen_ai/evals/injection_probe.py`, braucht Ollama). Drei Arme —
 alte `system`-Rolle, `user`-Zitat ohne Guard, ausgelieferter Stand mit Guard —
 und pro Nutzlast ein Muster, das ihr *eigenes* Befolgen erkennt. Wer am
 Guardrail-Wortlaut schraubt, das Modell wechselt oder eine Regel ergänzt,

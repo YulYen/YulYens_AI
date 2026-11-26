@@ -10,20 +10,14 @@ Misst die Antwortzeiten des Streaming-Pfads: Zeit bis zum ersten
     python scripts/run_bench.py -e classic --holdback 0        # die Tabelle aus #51
     python scripts/run_bench.py -e classic --api-url http://127.0.0.1:8013/v1
 
-Fügt ``src`` zu sys.path hinzu, damit der Lauf aus einem nackten Checkout
-funktioniert — dieselbe Bequemlichkeit wie bei ``python src/launch.py``.
-
-Was gemessen wird und was nicht: src/bench/harness.py.
+Was gemessen wird und was nicht: src/yulyen_ai/bench/harness.py.
 """
 
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-
-from bench.cli import main  # noqa: E402  (Pfad muss zuerst stehen)
+from yulyen_ai.bench.cli import main
 
 if __name__ == "__main__":
     sys.exit(main())

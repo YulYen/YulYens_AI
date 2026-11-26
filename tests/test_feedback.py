@@ -12,7 +12,7 @@ import json
 import logging
 import os
 
-from ui.feedback import (
+from yulyen_ai.ui.feedback import (
     DEFAULT_VOTES_DIR,
     LEGACY_VOTES_DIR,
     FeedbackLog,
@@ -418,7 +418,7 @@ def test_the_default_directory_is_not_the_log_directory():
 
 def _wiki_history():
     """Ein Verlauf, wie ihn ein Turn mit Wiki-Treffer hinterlässt."""
-    from core.context_injection import injected_message
+    from yulyen_ai.core.context_injection import injected_message
 
     return [
         {"role": "system", "content": "Nutze ausschließlich diesen Kontext."},
@@ -455,7 +455,7 @@ def test_a_vote_after_a_wiki_turn_records_the_voted_answer(tmp_path):
     Gegen die echte Ablage geprüft, nicht gegen eine Attrappe — der Fehler lag
     genau im Zusammenspiel von ``sync`` (filtert) und Zählregel (filterte nicht).
     """
-    from storage.store import SqliteStore
+    from yulyen_ai.storage.store import SqliteStore
 
     store = SqliteStore(tmp_path / "c.sqlite3")
     conversation_id = store.start(user="yul", persona="PETER", model="m", app="web")

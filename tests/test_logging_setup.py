@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from config.logging_setup import init_logging
+from yulyen_ai.config.logging_setup import init_logging
 
 
 @pytest.fixture

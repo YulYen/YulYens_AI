@@ -12,11 +12,10 @@ from pathlib import Path
 
 import pytest
 import yaml
-from config import personas
-from config.config_singleton import Config
-from evals.tasting import Probe, Side, TastingError
-
-from evals import tasting
+from yulyen_ai.config import personas
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.evals import tasting
+from yulyen_ai.evals.tasting import Probe, Side, TastingError
 
 
 def _side(label: str, answers: dict[str, str], errors: dict[str, str] | None = None):

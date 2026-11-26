@@ -10,19 +10,14 @@ Aufruf (aus dem Projekt-Root, mit gesetzten YULYEN_MAIL_*-Variablen):
 from __future__ import annotations
 
 import smtplib
-import sys
-from pathlib import Path
 
 import yaml
-
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
-
-from email_adapter.service import EmailAdapterConfig, open_imap  # noqa: E402
+from yulyen_ai.email_adapter.service import EmailAdapterConfig, open_imap
+from yulyen_ai.paths import PROJECT_ROOT
 
 
 def main() -> int:
-    raw = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+    raw = yaml.safe_load((PROJECT_ROOT / "config.yaml").read_text(encoding="utf-8"))
     cfg = EmailAdapterConfig.from_mapping(raw.get("email_adapter", {}))
 
     print("=== Konfiguration (aufgelöst) ===")

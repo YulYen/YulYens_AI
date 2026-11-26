@@ -1,4 +1,4 @@
-from ui.persona_chooser import prompt_persona_choice
+from yulyen_ai.ui.persona_chooser import prompt_persona_choice
 
 TEXTS = {
     "choose_persona": "Wähle eine Persona:",
@@ -13,7 +13,9 @@ PERSONAS = [
 
 
 def _patch_personas(monkeypatch):
-    monkeypatch.setattr("ui.persona_chooser._load_system_prompts", lambda: PERSONAS)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.persona_chooser._load_system_prompts", lambda: PERSONAS
+    )
 
 
 def test_valid_choice_returns_persona_name(monkeypatch, capsys):

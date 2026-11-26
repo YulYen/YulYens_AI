@@ -11,9 +11,9 @@
    python -m venv .venv
    source .venv/bin/activate
    ```
-2. Install dependencies (runtime **and** pinned dev tools):
+2. Install the package editable, plus the pinned dev tools:
    ```bash
-   pip install -r requirements.txt -r requirements-dev.txt
+   pip install -e . -r requirements-dev.txt
    ```
 3. Install the spaCy German model (used by the wiki keyword finder and its tests;
    without it those tests are skipped):
@@ -81,13 +81,13 @@ Browser-Build); beide laufen getrennt.
 - **Interner Umbau gehört nicht hinein.** Umbenannte Module, umgeschriebene
   Interna, neue Tests ändern für den Startenden nichts. Die Entwicklersicht
   steht in `backlog_archiv.md`.
-- Die Version selbst liegt in `src/version.py` und **sonst nirgends**;
+- Die Version selbst liegt in `src/yulyen_ai/version.py` und **sonst nirgends**;
   `tests/test_version_consistency.py` hält sie gegen die oberste Überschrift
   in `CHANGELOG.md`. Getaggt wird (`v1.2.3`) erst, wenn beide übereinstimmen.
 - Welche SemVer-Stelle springt, entscheidet der `Unreleased`-Abschnitt beim
   Taggen. Der öffentliche Vertrag ist `config.yaml`, die Kommandozeile von
-  `src/launch.py`, die HTTP-Endpunkte und das Ensemble-Format.
-- Welche Version gerade läuft, sagen `python src/launch.py --version`,
+  `python -m yulyen_ai`, die HTTP-Endpunkte und das Ensemble-Format.
+- Welche Version gerade läuft, sagen `python -m yulyen_ai --version`,
   die Kopfzeile von `--doctor` und das Feld `version` in `/health`.
 
 ## PR Flow

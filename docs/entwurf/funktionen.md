@@ -201,7 +201,7 @@ geraten statt per `LIST` erfragt. Regel 2 nimmt dem Fehler die Katastrophe.
 
 ### MCP-Server: drei Entscheidungen (#39)
 
-`src/mcp_adapter/server.py` ist eine dünne Schicht: `PersonaTools` hält die
+`src/yulyen_ai/mcp_adapter/server.py` ist eine dünne Schicht: `PersonaTools` hält die
 Werkzeuge als gewöhnliche Methoden und kennt kein MCP, `build_server` bindet
 sie an das `MCPServer` des SDK (2.x, nicht mehr `FastMCP`).
 
@@ -255,4 +255,4 @@ ein eigenes Ticket, kein Teil des Wrappers.
 - Verifikation gegen das echte SDK: `pip install openai`, dann `base_url` auf
   `http://127.0.0.1:8013/v1` zeigen. Bewusst **keine** Dependency im Projekt.
 
-Dieselben Deep-Checks gibt es auch ohne laufenden Server: `python src/launch.py --doctor`.
+Dieselben Deep-Checks gibt es auch ohne laufenden Server: `python -m yulyen_ai --doctor`.

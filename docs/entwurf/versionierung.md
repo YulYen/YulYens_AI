@@ -4,7 +4,7 @@ Wo die Version steht, was ins Changelog gehört, welche Stelle springt, wie geta
 
 ## Versionierung und Changelog (#74)
 
-Die Version steht in **`src/version.py`** und sonst nirgends; `CHANGELOG.md`
+Die Version steht in **`src/yulyen_ai/version.py`** und sonst nirgends; `CHANGELOG.md`
 trägt sie als oberste Überschrift, `tests/test_version_consistency.py` hält
 beide zusammen. Angezeigt wird sie von `--version`, in der Kopfzeile von
 `--doctor` und als Feld in `/health` und `/healthz` — ohne Paket und ohne Tag
@@ -56,7 +56,7 @@ das Changelog lesbar, sondern auch den kurzen Weg offen.
 ### Welche Stelle springt
 
 Der öffentliche Vertrag ist: die Keys in `config.yaml`, die Kommandozeile von
-`src/launch.py`, die HTTP-Endpunkte und das Ensemble-YAML-Format. Das
+`python -m yulyen_ai`, die HTTP-Endpunkte und das Ensemble-YAML-Format. Das
 Store-Schema gehört **nicht** dazu (dafür gibt es Migrationen), Locale-Keys
 auch nicht.
 

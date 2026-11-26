@@ -3,7 +3,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
-from launch import (
+from yulyen_ai.launch import (
     _email_adapter_enabled,
     _list_ensembles,
     _run_doctor,
@@ -36,9 +36,9 @@ def _fake_check(name, ok, severity="critical", detail="Detail"):
 
 def test_run_doctor_reports_ok(monkeypatch, capsys):
     results = [_fake_check("ollama", True), _fake_check("spacy", True)]
-    monkeypatch.setattr("launch._load_config_for_cli", lambda path: SimpleNamespace())
-    monkeypatch.setattr("core.system_checks.run_checks", lambda cfg: results)
-    monkeypatch.setattr("core.system_checks.overall_status", lambda res: "ok")
+    monkeypatch.setattr("yulyen_ai.launch._load_config_for_cli", lambda path: SimpleNamespace())
+    monkeypatch.setattr("yulyen_ai.core.system_checks.run_checks", lambda cfg: results)
+    monkeypatch.setattr("yulyen_ai.core.system_checks.overall_status", lambda res: "ok")
 
     exit_code = _run_doctor(None)
 
@@ -53,9 +53,11 @@ def test_run_doctor_fails_on_critical_error(monkeypatch, capsys):
         _fake_check("ollama", False, severity="critical", detail="nicht erreichbar"),
         _fake_check("vram", False, severity="warning", detail="knapp"),
     ]
-    monkeypatch.setattr("launch._load_config_for_cli", lambda path: SimpleNamespace())
-    monkeypatch.setattr("core.system_checks.run_checks", lambda cfg: results)
-    monkeypatch.setattr("core.system_checks.overall_status", lambda res: "error")
+    monkeypatch.setattr("yulyen_ai.launch._load_config_for_cli", lambda path: SimpleNamespace())
+    monkeypatch.setattr("yulyen_ai.core.system_checks.run_checks", lambda cfg: results)
+    monkeypatch.setattr(
+        "yulyen_ai.core.system_checks.overall_status", lambda res: "error"
+    )
 
     exit_code = _run_doctor(None)
 
@@ -71,7 +73,7 @@ def test_with_localized_quotes_merges_templates(monkeypatch):
         "email_quote_attribution": "Am {date} schrieb {sender}:",
         "email_quote_attribution_no_date": "{sender} schrieb:",
     }
-    monkeypatch.setattr("launch.Config", lambda *a, **k: SimpleNamespace(texts=texts))
+    monkeypatch.setattr("yulyen_ai.launch.Config", lambda *a, **k: SimpleNamespace(texts=texts))
 
     merged = _with_localized_quotes({"enabled": True, "quote": {"prefix": "> "}})
 
@@ -81,7 +83,7 @@ def test_with_localized_quotes_merges_templates(monkeypatch):
 
 
 def test_with_localized_quotes_falls_back_without_texts(monkeypatch):
-    monkeypatch.setattr("launch.Config", lambda *a, **k: SimpleNamespace(texts={}))
+    monkeypatch.setattr("yulyen_ai.launch.Config", lambda *a, **k: SimpleNamespace(texts={}))
 
     original = {"enabled": True}
     assert _with_localized_quotes(original) is original
@@ -125,7 +127,7 @@ def test_list_ensembles_reports_bundled_ensembles(capsys):
 
 
 def test_list_ensembles_handles_empty_dir(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr("launch._ENSEMBLES_DIR", tmp_path)
+    monkeypatch.setattr("yulyen_ai.launch._ENSEMBLES_DIR", tmp_path)
 
     exit_code = _list_ensembles()
 
@@ -146,7 +148,7 @@ def test_list_ensembles_skips_broken_yaml(monkeypatch, tmp_path, capsys):
     broken.mkdir()
     (broken / "personas_base.yaml").write_text("personas: [unclosed", encoding="utf-8")
 
-    monkeypatch.setattr("launch._ENSEMBLES_DIR", tmp_path)
+    monkeypatch.setattr("yulyen_ai.launch._ENSEMBLES_DIR", tmp_path)
 
     exit_code = _list_ensembles()
 

@@ -197,7 +197,7 @@ jeder Judge zweimal über dieselbe `answers.json`):
   (#7) ist ein Judge mit Luft nach oben wertvoller als einer, der öfter recht
   hat.
 
-- Korpora als YAML in `evals/`, Code in `src/evals/` — neue Fälle per YAML, nicht per Testcode
+- Korpora als YAML in `evals/`, Code in `src/yulyen_ai/evals/` — neue Fälle per YAML, nicht per Testcode
 - `checks` = deterministisch (Regex/Länge, Platzhalter `{today_de}` & Co.),
   `expect_traits` = LLM-as-judge 1–5 (4+ besteht, 3 nicht)
 - **Vergleiche den Ø-Score, nicht die Bestehensquote (#41a, gemessen).** Sechs Läufe
@@ -283,7 +283,7 @@ testbar gebaut:
 
 - **Der echte Start.** `launch.main()` ist die Stelle, an der Config, Factory,
   Anmeldung und Oberfläche zusammenkommen, und hatte keinen Test.
-  `tests/test_launch_start.py` startet `python src/launch.py` als Prozess mit
+  `tests/test_launch_start.py` startet `python -m yulyen_ai` als Prozess mit
   der ausgelieferten Config (Dummy-Backend, alles Äußere aus) und prüft die
   beiden Abbruchpfade der Anmeldung: Exit 4, lesbare Meldung, kein Stacktrace.
   Als Subprozess, weil genau das die Aussage ist — so startet der Betreiber.

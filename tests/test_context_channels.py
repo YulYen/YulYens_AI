@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from core.context_channels import (
+from yulyen_ai.core.context_channels import (
     CHANNELS,
     RSS,
     WIKI,
@@ -31,10 +31,10 @@ from core.context_channels import (
     Injection,
     inject_context,
 )
-from core.context_injection import INJECTED_KEY, is_injected
-from security.tinyguard import BasicGuard
+from yulyen_ai.core.context_injection import INJECTED_KEY, is_injected
+from yulyen_ai.security.tinyguard import BasicGuard
 
-SRC = Path(__file__).resolve().parents[1] / "src"
+SRC = Path(__file__).resolve().parents[1] / "src" / "yulyen_ai"
 LOCALES = Path(__file__).resolve().parents[1] / "locales"
 
 # Die Tür selbst *muss* `injected_message` rufen — sie ist der Ort, an dem
@@ -84,7 +84,7 @@ def test_only_the_door_marks_text_as_injected():
     assert culprits == [], (
         "Diese Module markieren Fremdtext selbst und gehen damit am Guard "
         f"vorbei: {culprits}. Kontext gehört durch "
-        "core.context_channels.inject_context — die Tür filtert, klammert und "
+        "yulyen_ai.core.context_channels.inject_context — die Tür filtert, klammert und "
         "markiert in einem Zug (#75)."
     )
 

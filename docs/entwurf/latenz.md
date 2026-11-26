@@ -97,7 +97,7 @@ FastAPI/SSE und allem, was dort konfiguriert ist; dafür fehlen die
 Modellzeiten, die es nur in-process gibt. Der Modus steht deshalb in jeder
 Kopfzeile.
 
-**Der Fragensatz liegt in `src/bench/questions.py`, nicht in der Config.** Er
+**Der Fragensatz liegt in `src/yulyen_ai/bench/questions.py`, nicht in der Config.** Er
 ist ein Maßstab: eine Frage zu ändern gibt die Vergleichbarkeit mit allen
 früheren Läufen auf, und das soll ein Commit sein, keine Config-Zeile. Eigene
 Sätze gehen über `--questions datei.txt`. Die letzte Frage ist absichtlich ein

@@ -14,20 +14,20 @@ from unittest.mock import Mock, patch
 import gradio as gr
 import pytest
 import requests
-from auth import build_auth_provider
-from config.texts import Texts
-from core.context_injection import is_injected, prompt_only
-from core.streaming_provider import StreamStats
-from rss.feeds import RssCache, RssItem
-from storage import NullStore
-from ui.session import SessionContext
-from ui.web_ui import WebUI
-from ui.webui_layout import (
+from yulyen_ai.auth import build_auth_provider
+from yulyen_ai.config.texts import Texts
+from yulyen_ai.core.context_injection import is_injected, prompt_only
+from yulyen_ai.core.streaming_provider import StreamStats
+from yulyen_ai.rss.feeds import RssCache, RssItem
+from yulyen_ai.storage import NullStore
+from yulyen_ai.ui.session import SessionContext
+from yulyen_ai.ui.web_ui import WebUI
+from yulyen_ai.ui.webui_layout import (
     ASK_ALL_OUTPUT_KEYS,
     PERSONA_OUTPUT_KEYS,
     STREAM_OUTPUT_KEYS,
 )
-from wiki.lookup import WikiLookup, WikiSnippet
+from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet
 
 from tests.doubles import factory_double, store_double, streamer_double
 
@@ -122,7 +122,9 @@ def test_stream_reply_throttles_updates():
 
     # 10 ms per token → with the 0.1 s throttle only every ~10th token flushes.
     clock = iter(1000.0 + i * 0.01 for i in range(len(tokens) + 5))
-    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+    with patch(
+        "yulyen_ai.ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)
+    ):
         outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     assert len(outputs) < len(tokens) / 2
@@ -141,7 +143,7 @@ def test_stream_reply_always_flushes_final_state():
     session.streamer = streamer
 
     # Frozen clock: after the first flush no throttle window ever elapses.
-    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+    with patch("yulyen_ai.ui.webui_chat.time.monotonic", return_value=1000.0):
         outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     final_chat = outputs[-1][1]
@@ -162,12 +164,12 @@ def test_respond_streaming_prepares_history_with_valid_num_ctx():
     history_state = []
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.inject_wiki_context"),
-        patch("ui.webui_chat.context_near_limit", return_value=True),
-        patch("ui.webui_chat.get_drink", return_value="☕"),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.inject_wiki_context"),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=True),
+        patch("yulyen_ai.ui.webui_chat.get_drink", return_value="☕"),
         patch(
-            "core.context_utils.karl_prepare_quick_and_dirty",
+            "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty",
             side_effect=lambda history, limit: history,
         ) as mock_prepare,
     ):
@@ -211,14 +213,14 @@ def test_webui_heuristic_strategy_never_instantiates_karl():
     session.streamer = streamer
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.context_near_limit", return_value=True),
-        patch("ui.webui_chat.get_drink", return_value="☕"),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=True),
+        patch("yulyen_ai.ui.webui_chat.get_drink", return_value="☕"),
         patch(
-            "core.context_utils.karl_prepare_quick_and_dirty",
+            "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty",
             side_effect=lambda h, c: h,
         ),
-        patch("core.context_utils.KarlSummarizer") as mock_karl,
+        patch("yulyen_ai.core.context_utils.KarlSummarizer") as mock_karl,
     ):
         list(web_ui.chat.respond_streaming(session, "Hallo", [], []))
 
@@ -238,11 +240,13 @@ def test_webui_karl_strategy_uses_karl_instead_of_heuristic():
     session.streamer = streamer
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.context_near_limit", return_value=True),
-        patch("ui.webui_chat.get_drink", return_value="☕"),
-        patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
-        patch("core.context_utils.KarlSummarizer") as mock_karl,
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=True),
+        patch("yulyen_ai.ui.webui_chat.get_drink", return_value="☕"),
+        patch(
+            "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty"
+        ) as mock_prepare,
+        patch("yulyen_ai.core.context_utils.KarlSummarizer") as mock_karl,
     ):
         instance = mock_karl.return_value
         instance.summarize.return_value = [{"role": "system", "content": "S"}]
@@ -268,11 +272,13 @@ def test_respond_streaming_skips_history_preparation_without_num_ctx(caplog):
     history_state = []
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.inject_wiki_context"),
-        patch("ui.webui_chat.context_near_limit", return_value=True),
-        patch("ui.webui_chat.get_drink", return_value="☕"),
-        patch("core.context_utils.karl_prepare_quick_and_dirty") as mock_prepare,
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.inject_wiki_context"),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=True),
+        patch("yulyen_ai.ui.webui_chat.get_drink", return_value="☕"),
+        patch(
+            "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty"
+        ) as mock_prepare,
     ):
         list(
             web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
@@ -303,8 +309,8 @@ def test_respond_streaming_keeps_session_histories_isolated():
     session_two_state = []
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.context_near_limit", return_value=False),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False),
     ):
         session_one_outputs = list(
             web_ui.chat.respond_streaming(session, "Frage 1", [], session_one_state)
@@ -345,8 +351,8 @@ def test_respond_streaming_returns_chat_and_state_updates():
     history_state: list = []
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.context_near_limit", return_value=False),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False),
     ):
         outputs = list(
             web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
@@ -370,8 +376,8 @@ def test_respond_streaming_appends_final_history_entries():
     session.streamer = streamer
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.context_near_limit", return_value=False),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False),
     ):
         outputs = list(
             web_ui.chat.respond_streaming(session, "Hallo", chat_history, history_state)
@@ -399,14 +405,18 @@ def test_on_submit_ask_all_injects_wiki_context_and_shows_hints():
         history.append({"role": "system", "content": "WIKI"})
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
         patch(
-            "wiki.lookup.lookup_wiki_snippet",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch(
+            "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
         ) as mock_lookup,
-        patch("ui.webui_ask_all.inject_wiki_context", side_effect=fake_inject),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events_parallel",
+            "yulyen_ai.ui.webui_ask_all.inject_wiki_context", side_effect=fake_inject
+        ),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events_parallel",
             side_effect=fake_iter_broadcast_events,
         ),
     ):
@@ -429,7 +439,7 @@ def test_ask_all_does_not_look_up_a_refused_question():
     deshalb frisch aus der Factory. Die Absage selbst liefert danach jede
     Persona aus ihrem eigenen Stream.
     """
-    from security.tinyguard import BasicGuard
+    from yulyen_ai.security.tinyguard import BasicGuard
 
     texts = {
         key: "abgelehnt"
@@ -453,13 +463,15 @@ def test_ask_all_does_not_look_up_a_refused_question():
         yield {"type": "done", "persona": "LEAH", "reply": "abgelehnt"}
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
         patch(
-            "wiki.lookup.lookup_wiki_snippet",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch(
+            "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
         ) as mock_lookup,
         patch(
-            "ui.webui_ask_all.iter_broadcast_events_parallel",
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events_parallel",
             side_effect=fake_broadcast,
         ),
     ):
@@ -486,10 +498,12 @@ def test_on_submit_ask_all_without_wiki_hits_sends_empty_context():
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events_parallel",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events_parallel",
             side_effect=fake_iter_broadcast_events,
         ),
     ):
@@ -524,13 +538,17 @@ def test_on_submit_ask_all_sequential_fallback_via_config():
         yield {"type": "done", "persona": "LEAH", "reply": "Antwort"}
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events",
             side_effect=fake_iter_broadcast_events,
         ) as mock_sequential,
-        patch("ui.webui_ask_all.iter_broadcast_events_parallel") as mock_parallel,
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events_parallel"
+        ) as mock_parallel,
     ):
         outputs = list(web_ui.ask_all.submit(session, "Frage"))
 
@@ -550,14 +568,17 @@ def _run_ask_all(web_ui, session, *, with_verdict, verdict_events=()):
         yield {"type": "done", "persona": "DORIS", "reply": "B"}
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH", "DORIS"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events_parallel",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names",
+            return_value=["LEAH", "DORIS"],
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events_parallel",
             side_effect=fake_broadcast,
         ),
         patch(
-            "ui.webui_ask_all.iter_verdict", return_value=iter(verdict_events)
+            "yulyen_ai.ui.webui_ask_all.iter_verdict", return_value=iter(verdict_events)
         ) as mock_verdict,
     ):
         outputs = list(web_ui.ask_all.submit(session, "Frage", None, with_verdict))
@@ -622,10 +643,13 @@ def test_the_verdict_runs_after_the_real_parallel_broadcast():
     web_ui.factory.get_streamer_for_persona.side_effect = _streamer_for
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH", "DORIS"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.webui_ask_all.iter_verdict",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names",
+            return_value=["LEAH", "DORIS"],
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_verdict",
             return_value=iter([{"type": "done", "reply": "Einigkeit."}]),
         ) as mock_verdict,
     ):
@@ -648,14 +672,17 @@ def test_a_broken_verdict_does_not_take_the_round_with_it():
 
     session = SessionContext()
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH", "DORIS"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events_parallel",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names",
+            return_value=["LEAH", "DORIS"],
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events_parallel",
             side_effect=fake_broadcast,
         ),
         patch(
-            "ui.webui_ask_all.iter_verdict",
+            "yulyen_ai.ui.webui_ask_all.iter_verdict",
             side_effect=KeyError("ask_all_moderator_system"),
         ),
     ):
@@ -761,7 +788,7 @@ def test_available_models_falls_back_to_default_when_ollama_down():
     web_ui.cfg.core = {"backend": "ollama", "ollama_url": "http://x:1"}
 
     with patch(
-        "ui.web_ui.fetch_model_names",
+        "yulyen_ai.ui.web_ui.fetch_model_names",
         side_effect=requests.ConnectionError("refused"),
     ):
         assert web_ui._available_models("standard:1") == ["standard:1"]
@@ -771,7 +798,7 @@ def test_available_models_unions_default_first():
     web_ui = _create_web_ui()
     web_ui.cfg.core = {"backend": "ollama", "ollama_url": "http://x:1"}
 
-    with patch("ui.web_ui.fetch_model_names", return_value=["a:1", "b:2"]):
+    with patch("yulyen_ai.ui.web_ui.fetch_model_names", return_value=["a:1", "b:2"]):
         choices = web_ui._available_models("standard:1")
 
     assert choices == ["standard:1", "a:1", "b:2"]
@@ -781,7 +808,7 @@ def test_available_models_dummy_backend_skips_request():
     web_ui = _create_web_ui()
     web_ui.cfg.core = {"backend": "dummy"}
 
-    with patch("ui.web_ui.fetch_model_names") as mock_fetch:
+    with patch("yulyen_ai.ui.web_ui.fetch_model_names") as mock_fetch:
         assert web_ui._available_models("standard:1") == ["standard:1"]
 
     mock_fetch.assert_not_called()
@@ -866,7 +893,7 @@ def test_on_mic_recorded_without_audio_is_noop():
 def test_on_mic_recorded_appends_transcript_and_clears_mic():
     web_ui = _create_web_ui()
 
-    with patch("ui.web_ui.transcribe_wav", return_value="Hallo Welt"):
+    with patch("yulyen_ai.ui.web_ui.transcribe_wav", return_value="Hallo Welt"):
         input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
 
     assert input_update["value"] == "Schon da Hallo Welt"
@@ -877,8 +904,8 @@ def test_on_mic_recorded_error_warns_and_keeps_text():
     web_ui = _create_web_ui()
 
     with (
-        patch("ui.web_ui.transcribe_wav", side_effect=RuntimeError("kaputt")),
-        patch("ui.web_ui.gr.Warning") as mock_warning,
+        patch("yulyen_ai.ui.web_ui.transcribe_wav", side_effect=RuntimeError("kaputt")),
+        patch("yulyen_ai.ui.web_ui.gr.Warning") as mock_warning,
     ):
         input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
 
@@ -890,7 +917,7 @@ def test_on_mic_recorded_error_warns_and_keeps_text():
 def test_on_mic_recorded_empty_transcript_is_noop_but_clears_mic():
     web_ui = _create_web_ui()
 
-    with patch("ui.web_ui.transcribe_wav", return_value=""):
+    with patch("yulyen_ai.ui.web_ui.transcribe_wav", return_value=""):
         input_update, mic_update = web_ui._on_mic_recorded("/tmp/x.wav", "Schon da")
 
     assert "value" not in input_update
@@ -988,7 +1015,7 @@ def test_respond_briefing_streams_summary_with_injected_context():
     web_ui, session = _briefing_web_ui()
     history_state = [{"role": "user", "content": "früher"}]
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(web_ui.chat.respond_briefing(session, [], history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
@@ -1076,7 +1103,7 @@ def test_on_read_aloud_without_reply_warns_and_stays_hidden():
     session = SessionContext()
     session.bot = "Karl"
 
-    with patch("ui.web_ui.gr.Warning") as mock_warning:
+    with patch("yulyen_ai.ui.web_ui.gr.Warning") as mock_warning:
         update = web_ui._on_read_aloud(session, [{"role": "user", "content": "Hallo"}])
 
     mock_warning.assert_called_once()
@@ -1095,7 +1122,7 @@ def test_on_read_aloud_synthesizes_last_assistant_reply(monkeypatch):
         {"role": "assistant", "content": "Neueste Antwort"},
     ]
 
-    with patch("tts.piper_tts.create_wav") as mock_create:
+    with patch("yulyen_ai.tts.piper_tts.create_wav") as mock_create:
         update = web_ui._on_read_aloud(session, history)
 
     mock_create.assert_called_once()
@@ -1115,10 +1142,10 @@ def test_on_read_aloud_error_warns_and_stays_hidden(monkeypatch):
 
     with (
         patch(
-            "tts.piper_tts.create_wav",
+            "yulyen_ai.tts.piper_tts.create_wav",
             side_effect=FileNotFoundError("voices/stimme.onnx"),
         ),
-        patch("ui.web_ui.gr.Warning") as mock_warning,
+        patch("yulyen_ai.ui.web_ui.gr.Warning") as mock_warning,
     ):
         update = web_ui._on_read_aloud(
             session, [{"role": "assistant", "content": "Hi"}]
@@ -1268,7 +1295,9 @@ def test_stop_button_ends_the_stream_and_keeps_the_partial_answer():
     generator = web_ui.chat.stream_reply(session, [], [])
     # Uhr läuft in 1-s-Schritten, damit jeder Token die 0.1-s-Drossel passiert.
     clock = iter(1000.0 + i for i in range(100))
-    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+    with patch(
+        "yulyen_ai.ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)
+    ):
         outputs.append(next(generator))
         # Stoppen wie der Button es tut, während der Stream noch läuft.
         web_ui.chat.on_stop_stream(session)
@@ -1306,7 +1335,9 @@ def test_a_stopped_stream_records_into_its_own_conversation():
 
     generator = web_ui.chat.stream_reply(session, list(question), [])
     clock = iter(1000.0 + i for i in range(100))
-    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+    with patch(
+        "yulyen_ai.ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)
+    ):
         next(generator)
         # Zurück zum Start, dann sofort eine andere Persona.
         web_ui._on_reset_to_start(session)
@@ -1330,7 +1361,7 @@ def test_stop_clears_the_switch_so_the_next_stream_runs():
     streamer = streamer_double()
     streamer.stream.return_value = iter(["Hallo ", "Welt"])
     session.streamer = streamer
-    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+    with patch("yulyen_ai.ui.webui_chat.time.monotonic", return_value=1000.0):
         outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     assert outputs[-1][1][-1] == {"role": "assistant", "content": "Hallo Welt"}
@@ -1450,7 +1481,7 @@ def test_regenerate_drops_last_answer_and_streams_again():
         {"role": "assistant", "content": "Alte Antwort"},
     ]
 
-    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+    with patch("yulyen_ai.ui.webui_chat.time.monotonic", return_value=1000.0):
         outputs = list(web_ui.chat.regenerate(session, chat_history, history_state))
 
     final_chat, final_state = outputs[-1][1], outputs[-1][2]
@@ -1484,7 +1515,7 @@ def test_regenerate_keeps_wiki_hint_rows():
         {"role": "assistant", "content": "Alte Antwort"},
     ]
 
-    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+    with patch("yulyen_ai.ui.webui_chat.time.monotonic", return_value=1000.0):
         outputs = list(web_ui.chat.regenerate(session, chat_history, history_state))
 
     rows = [row.get("content") for row in outputs[-1][1]]
@@ -1501,7 +1532,7 @@ def test_regenerate_without_an_answer_warns_and_changes_nothing():
     chat_history = [{"role": "user", "content": "Frage"}]
     history_state = [{"role": "user", "content": "Frage"}]
 
-    with patch("ui.web_ui.gr.Warning") as warning:
+    with patch("yulyen_ai.ui.web_ui.gr.Warning") as warning:
         outputs = list(web_ui.chat.regenerate(session, chat_history, history_state))
 
     warning.assert_called_once()
@@ -1566,7 +1597,7 @@ def test_self_talk_stream_stops_between_turns():
     session.self_talk_runner = runner
 
     generator = web_ui._run_self_talk_stream(session, [], [])
-    with patch("ui.webui_chat.time.monotonic", return_value=1000.0):
+    with patch("yulyen_ai.ui.webui_chat.time.monotonic", return_value=1000.0):
         next(generator)  # erster Turn läuft
         web_ui.chat.on_stop_stream(session)
         list(generator)
@@ -1616,11 +1647,11 @@ def test_respond_streaming_publishes_the_sources_before_the_first_token():
     snapshots = []
     with (
         patch(
-            "wiki.lookup.lookup_wiki_snippet",
+            "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [snippet]),
         ),
-        patch("ui.webui_chat.inject_wiki_context"),
-        patch("ui.webui_chat.context_near_limit", return_value=False),
+        patch("yulyen_ai.ui.webui_chat.inject_wiki_context"),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False),
     ):
         for item in web_ui.chat.respond_streaming(session, "Frage", [], []):
             snapshots.append((item[md_index], item[accordion_index], list(item[1])))
@@ -1660,8 +1691,8 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
     session.streamer = streamer
 
     with (
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_chat.context_near_limit", return_value=False),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False),
     ):
         outputs = list(web_ui.chat.respond_streaming(session, "Frage", [], []))
 
@@ -1710,14 +1741,16 @@ def test_ask_all_publishes_the_injected_snippet_text():
     )
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
         patch(
-            "wiki.lookup.lookup_wiki_snippet",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch(
+            "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
             return_value=(["🕵️ Hinweis"], [snippet]),
         ),
-        patch("ui.webui_ask_all.inject_wiki_context"),
+        patch("yulyen_ai.ui.webui_ask_all.inject_wiki_context"),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events",
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events",
             return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),
         ),
     ):
@@ -1742,10 +1775,17 @@ def test_ask_all_keeps_the_sources_in_every_yield():
     ]
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [snippet])),
-        patch("ui.webui_ask_all.inject_wiki_context"),
-        patch("ui.webui_ask_all.iter_broadcast_events", return_value=iter(events)),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch(
+            "yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [snippet])
+        ),
+        patch("yulyen_ai.ui.webui_ask_all.inject_wiki_context"),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events",
+            return_value=iter(events),
+        ),
     ):
         outputs = list(web_ui.ask_all.submit(session, "Frage"))
 
@@ -1760,10 +1800,12 @@ def test_ask_all_hides_the_accordion_without_wiki_hits():
     session = SessionContext()
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
         patch(
-            "ui.webui_ask_all.iter_broadcast_events",
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events",
             return_value=iter([{"type": "done", "persona": "LEAH", "reply": "A"}]),
         ),
     ):
@@ -1814,7 +1856,9 @@ def test_stream_reply_publishes_the_status_only_at_the_end():
     session.streamer = streamer
 
     clock = iter(1000.0 + i for i in range(10))
-    with patch("ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)):
+    with patch(
+        "yulyen_ai.ui.webui_chat.time.monotonic", side_effect=lambda: next(clock)
+    ):
         outputs = list(web_ui.chat.stream_reply(session, [], []))
 
     # Zwischendurch nur der No-op-Marker, am Ende der echte Wert.
@@ -1998,7 +2042,7 @@ def test_show_guest_opens_the_form_and_leaves_the_grid():
 
 
 def _history_web_ui(tmp_path):
-    from storage import SqliteStore
+    from yulyen_ai.storage import SqliteStore
 
     web_ui = _web_ui_with_texts()
     web_ui.cfg.core = {"model_name": "m"}
@@ -2362,7 +2406,7 @@ def test_a_guest_named_like_a_persona_is_not_continued_as_that_persona(tmp_path)
     Ensemble-Eintrag „leah", ohne jeden Hinweis, dass ab da ein anderer
     System-Prompt antwortet.
     """
-    from ui.web_ui import GUEST_APP
+    from yulyen_ai.ui.web_ui import GUEST_APP
 
     web_ui, store = _history_web_ui(tmp_path)
     session = SessionContext()
@@ -2415,7 +2459,7 @@ def test_the_real_persona_is_still_continuable(tmp_path):
 
 
 def test_a_guest_conversation_is_marked_in_the_store(tmp_path):
-    from ui.web_ui import GUEST_APP
+    from yulyen_ai.ui.web_ui import GUEST_APP
 
     web_ui, store = _history_web_ui(tmp_path)
     session = SessionContext()
@@ -2458,7 +2502,7 @@ def test_the_delivery_directory_is_registered_for_cleanup(monkeypatch):
     """Ohne das lägen WAVs und JSONs bis zum Neustart des Rechners herum."""
     import shutil
 
-    import ui.web_ui as module
+    import yulyen_ai.ui.web_ui as module
 
     registered: list = []
     monkeypatch.setattr(module, "_tmp_dir", None)
@@ -2568,7 +2612,7 @@ def test_uploading_a_real_conversation_still_works(tmp_path):
 
 def test_a_downloaded_guest_conversation_keeps_its_marker(tmp_path):
     """Die Markierung muss den Export überleben — sonst greift oben nur der Name."""
-    from ui.web_ui import GUEST_APP
+    from yulyen_ai.ui.web_ui import GUEST_APP
 
     web_ui, _store = _history_web_ui(tmp_path)
     session = SessionContext()
@@ -2606,7 +2650,7 @@ def test_an_uploaded_conversation_is_recorded_when_continued(tmp_path):
     leer — und `SqliteStore.append` steigt bei leerer ID sofort aus. Das
     Terminal machte es nach dem Laden längst richtig.
     """
-    from ui.web_ui import IMPORT_APP
+    from yulyen_ai.ui.web_ui import IMPORT_APP
 
     web_ui, store = _history_web_ui(tmp_path)
     session = SessionContext()
@@ -2693,9 +2737,14 @@ def test_ask_all_builds_the_running_text_from_the_tokens():
     ]
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_ask_all.iter_broadcast_events", return_value=iter(events)),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names", return_value=["LEAH"]
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events",
+            return_value=iter(events),
+        ),
     ):
         outputs = list(web_ui.ask_all.submit(session, "Frage"))
 
@@ -2716,9 +2765,15 @@ def test_ask_all_shows_a_partial_answer_before_the_persona_is_done():
     ]
 
     with (
-        patch("ui.webui_ask_all.get_all_persona_names", return_value=["LEAH", "DORIS"]),
-        patch("wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
-        patch("ui.webui_ask_all.iter_broadcast_events", return_value=iter(events)),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.get_all_persona_names",
+            return_value=["LEAH", "DORIS"],
+        ),
+        patch("yulyen_ai.wiki.lookup.lookup_wiki_snippet", return_value=([], [])),
+        patch(
+            "yulyen_ai.ui.webui_ask_all.iter_broadcast_events",
+            return_value=iter(events),
+        ),
     ):
         outputs = list(web_ui.ask_all.submit(session, "Frage"))
 
@@ -2791,7 +2846,7 @@ def test_a_news_question_pulls_the_feeds_into_the_context():
     """Der Punkt des Tickets: RSS meldet sich, wenn die Frage danach ist."""
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(
             web_ui.chat.respond_streaming(session, "Was gibt's Neues?", [], [])
         )
@@ -2809,7 +2864,7 @@ def test_a_news_question_pulls_the_feeds_into_the_context():
 def test_a_named_source_pulls_only_that_feed():
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(
             web_ui.chat.respond_streaming(session, "Was sagt die Tagesschau?", [], [])
         )
@@ -2823,7 +2878,7 @@ def test_small_talk_does_not_pull_the_news():
     """Der teure Fehlalarm: die Persona finge an, Schlagzeilen aufzusagen."""
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(
             web_ui.chat.respond_streaming(session, "Was gibt's Neues bei dir?", [], [])
         )
@@ -2835,7 +2890,7 @@ def test_the_hint_names_the_feeds_and_the_cache_age():
     """Der Cache ist bis zu einer Stunde alt — das muss man sehen können."""
     web_ui, session = _rss_web_ui()
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(web_ui.chat.respond_streaming(session, "Neuigkeiten?", [], []))
 
     hints = [
@@ -2850,7 +2905,7 @@ def test_an_empty_cache_injects_nothing():
     """Feeds nicht erreichbar → die Frage läuft normal weiter, ohne Kontext."""
     web_ui, session = _rss_web_ui(filled=False)
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(
             web_ui.chat.respond_streaming(session, "Was gibt's Neues?", [], [])
         )
@@ -2867,7 +2922,7 @@ def test_the_source_stays_active_when_only_the_button_is_off():
     web_ui, session = _rss_web_ui()
     web_ui.chat.rss_cfg = {"show_button": False}  # Knopf aus, Quelle bleibt
 
-    with patch("ui.webui_chat.context_near_limit", return_value=False):
+    with patch("yulyen_ai.ui.webui_chat.context_near_limit", return_value=False):
         outputs = list(web_ui.chat.respond_streaming(session, "Neuigkeiten?", [], []))
 
     assert [
@@ -2937,7 +2992,7 @@ def test_a_bare_filename_does_not_produce_an_empty_directory():
 
 
 def _search_hit(conversation_id="c1", persona="LEAH", snippet="… »Kiwix« …"):
-    from storage.store import SearchHit
+    from yulyen_ai.storage.store import SearchHit
 
     return SearchHit(
         conversation_id=conversation_id,

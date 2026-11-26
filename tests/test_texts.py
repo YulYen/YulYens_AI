@@ -4,8 +4,8 @@ import shutil
 from pathlib import Path
 
 import pytest
-from config.config_singleton import Config
-from config.texts import Texts
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.config.texts import Texts
 
 
 def _reset_config() -> None:

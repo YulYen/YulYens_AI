@@ -5,9 +5,9 @@ network, no gradio import. It is the reason the guard corpus can gate CI.
 """
 
 import pytest
-from config.config_singleton import Config
-from evals.cli import ensure_wiki_proxy, main
-from evals.runner import EvalRun
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.evals.cli import ensure_wiki_proxy, main
+from yulyen_ai.evals.runner import EvalRun
 
 
 @pytest.fixture(autouse=True)
@@ -54,7 +54,7 @@ def test_a_guard_only_run_never_starts_the_proxy(monkeypatch, tmp_path):
     """Der Guard-Lauf ist der, der auf jeder Maschine läuft — ohne alles."""
     called = []
     monkeypatch.setattr(
-        "evals.cli.ensure_wiki_proxy", lambda cfg, run: called.append(cfg)
+        "yulyen_ai.evals.cli.ensure_wiki_proxy", lambda cfg, run: called.append(cfg)
     )
     main(["-e", "classic", "--guard-only", "--out", str(tmp_path)])
     assert called == []
@@ -62,7 +62,8 @@ def test_a_guard_only_run_never_starts_the_proxy(monkeypatch, tmp_path):
 
 def test_no_proxy_is_started_when_wiki_is_switched_off(monkeypatch):
     monkeypatch.setattr(
-        "evals.cli._port_open", lambda *a, **k: pytest.fail("darf nicht prüfen")
+        "yulyen_ai.evals.cli._port_open",
+        lambda *a, **k: pytest.fail("darf nicht prüfen"),
     )
     run = EvalRun(model="m", judge_model=None)
     ensure_wiki_proxy(_WikiCfg(False), run)
@@ -70,10 +71,10 @@ def test_no_proxy_is_started_when_wiki_is_switched_off(monkeypatch):
 
 
 def test_an_unreachable_proxy_is_reported_instead_of_measured_around(monkeypatch):
-    monkeypatch.setattr("evals.cli._port_open", lambda *a, **k: False)
+    monkeypatch.setattr("yulyen_ai.evals.cli._port_open", lambda *a, **k: False)
     monkeypatch.setitem(
         __import__("sys").modules,
-        "launch",
+        "yulyen_ai.launch",
         type("M", (), {"start_wiki_proxy_thread": staticmethod(lambda: None)}),
     )
     run = EvalRun(model="m", judge_model=None)
@@ -84,10 +85,10 @@ def test_an_unreachable_proxy_is_reported_instead_of_measured_around(monkeypatch
 
 
 def test_a_reachable_proxy_is_silent(monkeypatch):
-    monkeypatch.setattr("evals.cli._port_open", lambda *a, **k: True)
+    monkeypatch.setattr("yulyen_ai.evals.cli._port_open", lambda *a, **k: True)
     monkeypatch.setitem(
         __import__("sys").modules,
-        "launch",
+        "yulyen_ai.launch",
         type("M", (), {"start_wiki_proxy_thread": staticmethod(lambda: None)}),
     )
     run = EvalRun(model="m", judge_model=None)
@@ -101,10 +102,10 @@ def test_a_broken_proxy_start_does_not_abort_the_run(monkeypatch):
     def _boom():
         raise RuntimeError("kein Port frei")
 
-    monkeypatch.setattr("evals.cli._port_open", lambda *a, **k: False)
+    monkeypatch.setattr("yulyen_ai.evals.cli._port_open", lambda *a, **k: False)
     monkeypatch.setitem(
         __import__("sys").modules,
-        "launch",
+        "yulyen_ai.launch",
         type("M", (), {"start_wiki_proxy_thread": staticmethod(_boom)}),
     )
     run = EvalRun(model="m", judge_model=None)
@@ -151,7 +152,7 @@ def test_repo_corpus_carries_exactly_the_gaps_we_decided_on(tmp_path):
     bewusste Entscheidung, und eine geschlossene verlangt, das Flag zu
     entfernen. „Keine Lücken" hätte den zweiten Fall nie gemeldet.
     """
-    from evals.corpus import load_guard_corpus
+    from yulyen_ai.evals.corpus import load_guard_corpus
 
     gaps = {case.id for case in load_guard_corpus().cases if case.known_gap}
     assert gaps == KNOWN_GAP_IDS
@@ -183,7 +184,7 @@ def test_known_gap_is_reported_but_does_not_fail_the_run(tmp_path, monkeypatch):
         "      reason: prompt_injection\n",
         encoding="utf-8",
     )
-    monkeypatch.setattr("evals.corpus.EVALS_DIR", corpus_dir)
+    monkeypatch.setattr("yulyen_ai.evals.corpus.EVALS_DIR", corpus_dir)
 
     out = tmp_path / "evals"
     # Exit-Code 0: eine dokumentierte Lücke ist gemeldet, aber kein Fehlschlag.
@@ -258,11 +259,11 @@ def test_judge_model_sentinel_resolves_to_the_chat_model(tmp_path, monkeypatch):
             seen["model"] = model_name
 
         def score(self, *_args):
-            from evals.judge import JudgeVerdict
+            from yulyen_ai.evals.judge import JudgeVerdict
 
             return JudgeVerdict(verdicts=(), raw="")
 
-    monkeypatch.setattr("evals.cli.Judge", _RecordingJudge)
+    monkeypatch.setattr("yulyen_ai.evals.cli.Judge", _RecordingJudge)
     main(
         [
             "-e",
@@ -318,7 +319,7 @@ def test_an_eval_run_leaves_the_conversation_store_alone(tmp_path):
     des Nutzers `local` in die Ablage — bei jedem Lauf erneut, im Verlauf und
     in der Suche zwischen den echten Gesprächen.
     """
-    from storage.store import SqliteStore
+    from yulyen_ai.storage.store import SqliteStore
 
     db = tmp_path / "conversations.sqlite3"
     cfg = Config("config.yaml")
@@ -353,7 +354,7 @@ def test_rejudge_scores_saved_answers_without_asking_the_model_again(
     def _no_answers(_factory):
         raise AssertionError("--rejudge must not ask the chat model")
 
-    monkeypatch.setattr("evals.cli.build_answer_fn", _no_answers)
+    monkeypatch.setattr("yulyen_ai.evals.cli.build_answer_fn", _no_answers)
     scored = []
 
     class _RecordingJudge:
@@ -361,14 +362,14 @@ def test_rejudge_scores_saved_answers_without_asking_the_model_again(
             self.model_name = model_name
 
         def score(self, question, answer, traits):
-            from evals.judge import parse_verdict
+            from yulyen_ai.evals.judge import parse_verdict
 
             scored.append(answer)
             return parse_verdict(
                 "\n".join(f"{i}: 4 | ok" for i, _ in enumerate(traits, 1)), traits
             )
 
-    monkeypatch.setattr("evals.cli.Judge", _RecordingJudge)
+    monkeypatch.setattr("yulyen_ai.evals.cli.Judge", _RecordingJudge)
     second = tmp_path / "second"
     main(
         ["-e", "classic", "--rejudge", str(answers), "--judge-model", "judge:27b"]
