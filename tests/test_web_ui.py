@@ -32,6 +32,48 @@ from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet
 from tests.doubles import factory_double, store_double, streamer_double
 
 
+def _named(updates) -> dict:
+    """Die Ausgaben einer Persona-Aktion nach Namen statt nach Position.
+
+    Eine Zahl wie `updates[28]` prüft still die falsche Komponente, sobald im
+    Layout eine dazwischenrutscht; `strict=True` meldet eine falsche Länge.
+    """
+    return dict(zip(PERSONA_OUTPUT_KEYS, updates, strict=True))
+
+
+def test_the_reset_leaves_nothing_of_the_last_session_visible():
+    """Zurück zur Startseite: was eine Sitzung eingeblendet hatte, verschwindet.
+
+    Mikro, Vorlesen und Briefing sind dafür eingeschaltet — sonst prüfte der
+    Test nur, dass Ausgeblendetes ausgeblendet bleibt. Ersetzt acht Tests, die
+    je ein Teilstück desselben Aufrufs prüften.
+    """
+    web_ui = _create_web_ui()
+    web_ui.features = replace(web_ui.features, stt=True, tts_read_aloud=True)
+    web_ui.chat.rss_cache = RssCache(feeds=[{"name": "q", "url": "u"}])
+
+    out = _named(web_ui._reset_ui_updates())
+
+    for key in (
+        "mic_audio",
+        "briefing_btn",
+        "read_aloud_btn",
+        "tts_audio",
+        "stop_btn",
+        "regenerate_btn",
+        "sources_accordion",
+        "ask_all_sources_accordion",
+        "status_md",
+    ):
+        assert out[key]["visible"] is False, key
+    assert out["mic_audio"]["value"] is None
+    assert out["tts_audio"]["value"] is None
+    for key in ("sources_md", "ask_all_sources_md", "status_md"):
+        assert out[key]["value"] == "", key
+    # Ein gesetztes Lösch-Häkchen darf den Weg zur Startseite nicht überleben.
+    assert out["history_confirm"]["value"] is False
+
+
 def test_webui_start_server_uses_configured_host_and_port():
     """`demo.launch` must be called with the configured host/port values."""
 
@@ -757,8 +799,9 @@ def test_on_show_self_talk_returns_expected_output_count_and_enables_setup():
     updates = web_ui._on_show_self_talk(session)
 
     assert len(updates) == len(PERSONA_OUTPUT_KEYS)
-    assert updates[22]["visible"] is True
-    assert updates[27]["interactive"] is True
+    out = _named(updates)
+    assert out["self_talk_group"]["visible"] is True
+    assert out["self_talk_start_btn"]["interactive"] is True
 
 
 def test_load_failure_updates_sets_load_status_slot():
@@ -766,8 +809,9 @@ def test_load_failure_updates_sets_load_status_slot():
 
     updates = web_ui._load_failure_updates("load failed")
 
-    assert updates[21]["value"] == "load failed"
-    assert updates[21]["visible"] is True
+    status = _named(updates)["load_status"]
+    assert status["value"] == "load failed"
+    assert status["visible"] is True
 
 
 def test_on_start_self_talk_clears_stale_runner_on_validation_error():
@@ -865,8 +909,7 @@ def test_persona_selected_updates_reads_current_model_from_cfg():
     )
 
     assert len(updates) == len(PERSONA_OUTPUT_KEYS)
-    greeting_update = updates[5]
-    assert "override:1" in greeting_update["value"]
+    assert "override:1" in _named(updates)["greeting_md"]["value"]
 
 
 # ---- Spracheingabe (STT MVP, #13) -------------------------------------------
@@ -937,17 +980,7 @@ def test_persona_selected_updates_shows_mic_only_when_stt_available():
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
         )
 
-        assert updates[28]["visible"] is expected
-
-
-def test_reset_updates_hides_mic():
-    web_ui = _create_web_ui()
-    web_ui.features = replace(web_ui.features, stt=True)
-
-    updates = web_ui._reset_ui_updates()
-
-    assert updates[28]["visible"] is False
-    assert updates[28]["value"] is None
+        assert _named(updates)["mic_audio"]["visible"] is expected
 
 
 # ---- Briefing (RSS MVP, #15) ------------------------------------------------
@@ -1061,16 +1094,7 @@ def test_persona_selected_updates_toggles_briefing_button():
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
         )
 
-        assert updates[29]["visible"] is enabled
-
-
-def test_reset_updates_hides_briefing_button():
-    web_ui = _create_web_ui()
-    web_ui.chat.rss_cache = RssCache(feeds=[{"name": "q", "url": "u"}])
-
-    updates = web_ui._reset_ui_updates()
-
-    assert updates[29]["visible"] is False
+        assert _named(updates)["briefing_btn"]["visible"] is enabled
 
 
 # ---- Vorlesen (TTS im WebUI, #25) --------------------------------------------
@@ -1168,18 +1192,7 @@ def test_persona_selected_updates_toggles_read_aloud_button():
             "karl", persona, "Hallo {persona_name} — {model_name}", "Tippe hier"
         )
 
-        assert updates[30]["visible"] is enabled
-
-
-def test_reset_updates_hides_read_aloud_button_and_player():
-    web_ui = _create_web_ui()
-    web_ui.features = replace(web_ui.features, tts_read_aloud=True)
-
-    updates = web_ui._reset_ui_updates()
-
-    assert updates[30]["visible"] is False
-    assert updates[31]["visible"] is False
-    assert updates[31]["value"] is None
+        assert _named(updates)["read_aloud_btn"]["visible"] is enabled
 
 
 # --- Feedback votes (#40) ---------------------------------------------------
@@ -1562,17 +1575,6 @@ def test_reset_sets_the_stream_kill_switch():
     assert stop.is_set()
 
 
-def test_reset_updates_hide_stop_and_regenerate():
-    web_ui = _create_web_ui()
-
-    updates = web_ui._reset_ui_updates()
-    stop_index = PERSONA_OUTPUT_KEYS.index("stop_btn")
-    regenerate_index = PERSONA_OUTPUT_KEYS.index("regenerate_btn")
-
-    assert updates[stop_index]["visible"] is False
-    assert updates[regenerate_index]["visible"] is False
-
-
 def test_persona_selection_shows_regenerate_but_not_stop():
     web_ui = _create_web_ui()
     web_ui.cfg.core = {"model_name": "m"}
@@ -1700,13 +1702,6 @@ def test_respond_streaming_clears_stale_sources_on_a_new_question():
     assert outputs[0][accordion_index]["visible"] is False
 
 
-def test_reset_updates_hide_the_sources_accordion():
-    updates = _create_web_ui()._reset_ui_updates()
-
-    assert updates[PERSONA_OUTPUT_KEYS.index("sources_accordion")]["visible"] is False
-    assert updates[PERSONA_OUTPUT_KEYS.index("sources_md")]["value"] == ""
-
-
 # ---- Quellen in Ask-All (#32a) ---------------------------------------------
 # Eigenes Accordion innerhalb der Ask-All-Gruppe: das Einzelchat-Accordion
 # liegt außerhalb und stünde in dieser Ansicht über dem ganzen Block.
@@ -1814,14 +1809,6 @@ def test_ask_all_hides_the_accordion_without_wiki_hits():
     assert all(item[ASK_ALL_SOURCES_ACCORDION]["visible"] is False for item in outputs)
 
 
-def test_reset_updates_hide_the_ask_all_sources_accordion():
-    updates = _create_web_ui()._reset_ui_updates()
-
-    accordion = updates[PERSONA_OUTPUT_KEYS.index("ask_all_sources_accordion")]
-    assert accordion["visible"] is False
-    assert updates[PERSONA_OUTPUT_KEYS.index("ask_all_sources_md")]["value"] == ""
-
-
 # ---- Statuszeile: Kontext-Füllstand und Tempo (#36) -------------------------
 # Beide Zahlen kannte das Projekt längst — der Füllstand steckt in
 # context_near_limit, die Zeiten standen nur im Logfile.
@@ -1866,14 +1853,6 @@ def test_stream_reply_publishes_the_status_only_at_the_end():
     final = outputs[-1][STATUS_INDEX]
     assert final["visible"] is True
     assert "10.0" in final["value"]
-
-
-def test_reset_hides_the_status_line():
-    updates = _create_web_ui()._reset_ui_updates()
-
-    status = updates[PERSONA_OUTPUT_KEYS.index("status_md")]
-    assert status["visible"] is False
-    assert status["value"] == ""
 
 
 # ---- Identität in Log und Votes (#53) --------------------------------------
@@ -2263,13 +2242,6 @@ def test_persona_selection_opens_exactly_one_conversation(tmp_path):
     assert [ref.id for ref in store.list_conversations(user="yulyen")] == [
         conversation_id
     ]
-
-
-def test_leaving_the_history_clears_the_delete_confirmation():
-    """Ein gesetztes Häkchen darf den Weg zur Startseite nicht überleben."""
-    updates = _create_web_ui()._reset_ui_updates()
-
-    assert updates[PERSONA_OUTPUT_KEYS.index("history_confirm")]["value"] is False
 
 
 # ---- Datei-Austausch abschaltbar (#54) -------------------------------------

@@ -162,33 +162,39 @@ def test_custom_patterns_empty_lists_disable_defaults():
     assert block["ok"] is True, "Output blocklist default pattern should be disabled"
 
 
-def test_factory_creates_basic_guard():
+def test_factory_passes_every_security_switch_to_the_guard():
+    """Jeder Schalter aus `security` kommt im Guard an — auch der Wrongdoing-Teil.
+
+    Fasste früher drei Tests in zwei Dateien zusammen, die dieselbe Factory mit
+    je anderen Schaltern bauten.
+    """
     overrides = {
         "guard": "BasicGuard",
         "enabled": True,
         "prompt_injection_protection": True,
         "pii_protection": True,
         "output_blocklist": True,
+        "wrongdoing_protection": True,
+        "wrongdoing_lock_turns": 2,
     }
-    streamer = _streamer_with_security(overrides)
-    guard = streamer.guard
+    guard = _streamer_with_security(overrides).guard
     assert isinstance(guard, BasicGuard)
     assert guard.enabled is True
-    assert guard.flags["prompt_injection_protection"] is True
-    assert guard.flags["pii_protection"] is True
-    assert guard.flags["output_blocklist"] is True
+    for flag in (
+        "prompt_injection_protection",
+        "pii_protection",
+        "output_blocklist",
+        "wrongdoing_protection",
+    ):
+        assert guard.flags[flag] is True, flag
+    assert guard.wrongdoing_lock_turns == 2
 
 
-def test_factory_uses_disabled_guard_stub():
-    streamer = _streamer_with_security({"guard": "DisabledGuard", "enabled": True})
-    guard = streamer.guard
+@pytest.mark.parametrize("name", ["DisabledGuard", "disabled"])
+def test_factory_builds_the_disabled_guard_under_both_names(name):
+    guard = _streamer_with_security({"guard": name, "enabled": True}).guard
     assert isinstance(guard, DisabledGuard)
     assert guard.enabled is False
-
-
-def test_factory_accepts_disabled_alias():
-    streamer = _streamer_with_security({"guard": "disabled", "enabled": True})
-    assert isinstance(streamer.guard, DisabledGuard)
 
 
 def test_factory_returns_no_guard_when_security_disabled():

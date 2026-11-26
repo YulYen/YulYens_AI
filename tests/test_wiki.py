@@ -221,9 +221,8 @@ def test_lookup_wiki_snippet_for_germany():
     Integration test: verifies that the local wiki proxy returns a snippet for
     'Deutschland' containing the capital 'Berlin'.
 
-    Starts the proxy and offline Kiwix itself (same mechanism as the
-    ``client_with_date_and_wiki`` fixture) so the test does not depend on other
-    tests having started them first. When the offline wiki is unavailable
+    Starts the proxy and offline Kiwix itself, so the test does not depend on
+    other tests having started them first. When the offline wiki is unavailable
     (e.g. Kiwix not installed), the test skips instead of failing — before
     starting the proxy thread, so no resources leak on skip.
     """

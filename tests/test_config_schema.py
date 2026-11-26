@@ -22,11 +22,6 @@ def _real_config() -> dict:
     return yaml.safe_load((REPO_ROOT / "config.yaml").read_text(encoding="utf-8"))
 
 
-def test_the_shipped_config_passes():
-    """Wenn das Schema die eigene config.yaml ablehnt, ist das Schema falsch."""
-    assert validate_config(_real_config()) == []
-
-
 @pytest.mark.parametrize("language", ["de", "en"])
 def test_the_shipped_ensemble_passes(language):
     assert validate_ensemble(REPO_ROOT / "ensembles" / "classic", language) == []
@@ -263,7 +258,7 @@ def test_the_wording_separates_sections_from_settings():
 
 
 def test_every_section_of_the_shipped_config_is_modelled():
-    """Der Test, der diesen Umbau überhaupt abnimmt.
+    """Wenn das Schema die eigene config.yaml ablehnt, ist das Schema falsch.
 
     Die Rekursion ist nur so viel wert, wie das Schema die echte Config kennt:
     jeder nicht modellierte Key wäre ab sofort eine Warnung beim *normalen*

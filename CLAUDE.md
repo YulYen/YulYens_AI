@@ -339,6 +339,9 @@ make test-browser   # laufende WebUI im echten Chromium (~20 s in der Sandbox)
   `SimpleNamespace` — ein nacktes Mock ist für jedes Attribut wahr.
 - **Nach einem Gradio-Bump `make test-browser` von Hand** — kein anderes Gate
   schaut dorthin. Rollen-Selektoren, Locale festnageln, nie `networkidle`.
+- **Gradio-Ausgaben per Name prüfen** (`_named(updates)["mic_audio"]`), nie per
+  Position — eine Zahl prüft still die falsche Komponente, sobald das Layout
+  wächst.
 
 ## Werkzeuge → [werkzeuge.md](docs/entwurf/werkzeuge.md)
 
