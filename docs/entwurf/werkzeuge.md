@@ -111,8 +111,8 @@ Eine zweite Liste in `[project]` liefe beim nächsten Pin auseinander.
 
 ### `make check` — ein Kommando vor dem Push
 
-`make check` fährt `lint`, `lint-imports`, `types` und `test` nacheinander und
-stoppt beim ersten Fehler; die Reihenfolge ist nach Laufzeit sortiert, damit das
+`make check` fährt `lint` (Black prüfend und Ruff, wie der CI-Job), `lint-imports`,
+`types` und `test` nacheinander und stoppt beim ersten Fehler; die Reihenfolge ist nach Laufzeit sortiert, damit das
 Billige zuerst fehlschlägt. Bewusst **ohne** `audit` (braucht Netz) und ohne
 `test-browser` (braucht einen Browser-Build) — beides läuft getrennt, und ein
 Ziel, das ohne Netz fehlschlägt, würde bald umgangen.

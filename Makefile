@@ -16,7 +16,10 @@ setup:
 format:
 	python -m black .
 
+# Black prüfend *und* Ruff — wie der lint-Job der CI. Fehlte Black hier, war
+# `make check` grün und die CI rot (passiert 2026-11-26, PR #251).
 lint:
+	python -m black --check .
 	python -m ruff check .
 
 # Schichten als Vertrag (import-linter). Braucht das installierte Paket.

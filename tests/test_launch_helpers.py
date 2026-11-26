@@ -36,7 +36,9 @@ def _fake_check(name, ok, severity="critical", detail="Detail"):
 
 def test_run_doctor_reports_ok(monkeypatch, capsys):
     results = [_fake_check("ollama", True), _fake_check("spacy", True)]
-    monkeypatch.setattr("yulyen_ai.launch._load_config_for_cli", lambda path: SimpleNamespace())
+    monkeypatch.setattr(
+        "yulyen_ai.launch._load_config_for_cli", lambda path: SimpleNamespace()
+    )
     monkeypatch.setattr("yulyen_ai.core.system_checks.run_checks", lambda cfg: results)
     monkeypatch.setattr("yulyen_ai.core.system_checks.overall_status", lambda res: "ok")
 
@@ -53,7 +55,9 @@ def test_run_doctor_fails_on_critical_error(monkeypatch, capsys):
         _fake_check("ollama", False, severity="critical", detail="nicht erreichbar"),
         _fake_check("vram", False, severity="warning", detail="knapp"),
     ]
-    monkeypatch.setattr("yulyen_ai.launch._load_config_for_cli", lambda path: SimpleNamespace())
+    monkeypatch.setattr(
+        "yulyen_ai.launch._load_config_for_cli", lambda path: SimpleNamespace()
+    )
     monkeypatch.setattr("yulyen_ai.core.system_checks.run_checks", lambda cfg: results)
     monkeypatch.setattr(
         "yulyen_ai.core.system_checks.overall_status", lambda res: "error"
@@ -73,7 +77,9 @@ def test_with_localized_quotes_merges_templates(monkeypatch):
         "email_quote_attribution": "Am {date} schrieb {sender}:",
         "email_quote_attribution_no_date": "{sender} schrieb:",
     }
-    monkeypatch.setattr("yulyen_ai.launch.Config", lambda *a, **k: SimpleNamespace(texts=texts))
+    monkeypatch.setattr(
+        "yulyen_ai.launch.Config", lambda *a, **k: SimpleNamespace(texts=texts)
+    )
 
     merged = _with_localized_quotes({"enabled": True, "quote": {"prefix": "> "}})
 
@@ -83,7 +89,9 @@ def test_with_localized_quotes_merges_templates(monkeypatch):
 
 
 def test_with_localized_quotes_falls_back_without_texts(monkeypatch):
-    monkeypatch.setattr("yulyen_ai.launch.Config", lambda *a, **k: SimpleNamespace(texts={}))
+    monkeypatch.setattr(
+        "yulyen_ai.launch.Config", lambda *a, **k: SimpleNamespace(texts={})
+    )
 
     original = {"enabled": True}
     assert _with_localized_quotes(original) is original
