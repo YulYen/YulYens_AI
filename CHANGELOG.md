@@ -60,6 +60,25 @@ in them turns out to be wrong, it gets corrected in a later entry.
   [`v3.0.0`](https://github.com/YulYen/YulYens_AI/tree/v3.0.0/docs); the
   README now carries the short answer as a table (VRAM → model → ensemble).
 
+- **A `share_auth` block in the config now stops the start** (exit code 4).
+  `ui.web.share_auth` used to be read as a fallback login when no
+  `ui.web.auth` section existed. Simply dropping it would have left such an
+  installation **running without a login** after the update, so the start
+  refuses instead and names the replacement. **Move the user to
+  `ui.web.auth`** (`provider: local`, `users: {name: "env:VARIABLE"}`) and
+  delete the `share_auth` block — also an empty one.
+
+- **The `briefing:` section is no longer read.** It has been called `rss:`
+  since 2.0.0 and was kept as an alias with a warning. **If your config still says
+  `briefing:`, rename it to `rss:`** — otherwise the feeds are off, the start
+  logs an unknown section and `--doctor` reports it.
+
+### Removed
+
+- `modelfiles/` (Ollama Modelfiles for models the project no longer uses) and
+  `examples/` (a terminal config for a 7B model and an image helper). Neither
+  was referenced anywhere; both remain in release `v3.0.0`.
+
 ## [3.0.0] - 2026-11-24
 
 **Read "Breaking" before you update.** This release needs Python 3.12 and a

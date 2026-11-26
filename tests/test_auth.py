@@ -146,23 +146,27 @@ def test_header_auth_without_the_header_is_anonymous():
     assert provider.identity_from_request(_request(headers={})).is_known is False
 
 
-# ---- Rückwärtskompatibilität ------------------------------------------------
+# ---- share_auth gibt es seit 4.0 nicht mehr -----------------------------------
 
 
-def test_legacy_share_auth_still_produces_a_login(caplog):
-    provider = build_auth_provider(
-        {"share_auth": {"username": "alt", "password": "pw"}}
-    )
+@pytest.mark.parametrize(
+    "web_cfg",
+    [
+        {"share_auth": {"username": "alt", "password": "pw"}},
+        {"share_auth": {"username": "", "password": ""}},
+        # Auch neben einem gültigen `auth`: wer beides stehen hat, soll wissen,
+        # dass eines davon nicht mehr gilt.
+        {"share_auth": {}, "auth": {"provider": "local", "users": {"a": "b"}}},
+    ],
+)
+def test_a_leftover_share_auth_stops_the_start(web_cfg):
+    """Bis 3.x ein Rückfall, seit 4.0 ein Abbruch.
 
-    assert isinstance(provider, LocalUsersAuth)
-    assert provider.check("alt", "pw") is True
-    assert "veraltet" in caplog.text
-
-
-def test_empty_legacy_share_auth_stays_disabled():
-    provider = build_auth_provider({"share_auth": {"username": "", "password": ""}})
-
-    assert isinstance(provider, DisabledAuth)
+    Ihn nur zu streichen hätte eine Installation, die allein `share_auth`
+    kennt, nach dem Update still ohne Anmeldung laufen lassen (#89).
+    """
+    with pytest.raises(AuthConfigError, match="ui.web.auth"):
+        build_auth_provider(web_cfg)
 
 
 @pytest.mark.parametrize("share", [True, False])

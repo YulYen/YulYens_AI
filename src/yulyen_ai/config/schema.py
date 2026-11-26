@@ -95,13 +95,6 @@ class WebAuthSection(BaseModel):
     header_name: str | None = None
 
 
-class ShareAuthSection(BaseModel):
-    model_config = _ALLOW_EXTRA
-
-    username: str | None = None
-    password: str | None = None
-
-
 class WebSection(BaseModel):
     model_config = _ALLOW_EXTRA
 
@@ -109,8 +102,6 @@ class WebSection(BaseModel):
     port: int | None = Field(default=None, ge=1, le=65535)
     share: bool | None = None
     auth: WebAuthSection | None = None
-    # Abgelöst durch `auth`, wirkt nur noch als Fallback mit Deprecation-Warnung.
-    share_auth: ShareAuthSection | None = None
 
 
 class ExperimentalSection(BaseModel):
@@ -313,9 +304,6 @@ class ConfigSchema(BaseModel):
     tts: TtsSection | None = None
     stt: SttSection | None = None
     rss: RssSection | None = None
-    # Alter Name; `Config._load_config` bennent ihn um und warnt. Hier
-    # modelliert, damit eine Bestandsdatei keine "unbekannte Sektion" meldet.
-    briefing: RssSection | None = None
     email_adapter: EmailAdapterSection | None = None
 
 

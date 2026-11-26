@@ -185,25 +185,24 @@ class HeaderAuth:
 def build_auth_provider(web_cfg: dict | None) -> AuthProvider:
     """Baut den Provider aus ``ui.web``.
 
-    Fällt auf das alte ``share_auth`` zurück, wenn kein ``auth``-Abschnitt
-    existiert: bestehende Installationen sollen durch #53 nicht kaputtgehen.
-    Neu ist dabei, dass die Anmeldung **unabhängig von ``share``** greift — vorher
-    horchte die App auf ``0.0.0.0``, verlangte im LAN aber nichts.
+    Die Anmeldung greift **unabhängig von ``share``** (#53) — vorher horchte die
+    App auf ``0.0.0.0``, verlangte im LAN aber nichts.
+
+    **``share_auth`` bricht den Start ab (seit 4.0).** Bis 3.x war es ein
+    Rückfall mit Warnung. Ihn einfach zu streichen hätte eine Installation, die
+    nur ``share_auth`` kennt, nach dem Update still ohne Anmeldung laufen
+    lassen — derselbe Fehler wie der Tippfehler im Provider (#89).
     """
     web_cfg = web_cfg or {}
-    auth_cfg = web_cfg.get("auth")
+    if "share_auth" in web_cfg:
+        raise AuthConfigError(
+            "'ui.web.share_auth' gibt es seit 4.0 nicht mehr. Die Anmeldung "
+            "steht unter 'ui.web.auth' (provider: local, users: {name: "
+            '"env:VARIABLE"}); den Block share_auth aus der Config löschen.'
+        )
 
+    auth_cfg = web_cfg.get("auth")
     if not isinstance(auth_cfg, dict):
-        legacy = web_cfg.get("share_auth") or {}
-        username = str(legacy.get("username") or "").strip()
-        password = legacy.get("password") or ""
-        if username and password:
-            logging.warning(
-                "[AUTH] 'ui.web.share_auth' ist veraltet — bitte auf "
-                "'ui.web.auth' umstellen (provider: local). Die Anmeldung gilt "
-                "jetzt auch ohne share."
-            )
-            return LocalUsersAuth({username: password})
         return DisabledAuth()
 
     provider = str(auth_cfg.get("provider") or "disabled").strip().lower()

@@ -145,7 +145,7 @@ All central settings are controlled through `config.yaml`. Important toggles:
 - `language`: controls UI texts and persona prompts (`"de"` or `"en"`).
 - `ui.type`: selects the interface (`"terminal"`, `"web"`, or `null` for API only).
 - `ui.web.host`: **defaults to `127.0.0.1`** — the web UI is then reachable only from your own machine. Set it to `"0.0.0.0"` if others on the network should use it; enable `ui.web.auth` in that case, or the start-up warns (rightly) and loudly.
-- `ui.web.auth.provider`: the web UI's login — `disabled` (default), `local` (users from `ui.web.auth.users`, passwords as `env:NAME`) or `header` (identity from a reverse proxy in front). It applies **independently** of `ui.web.share`. The former `ui.web.share_auth` only acts as a fallback now and is flagged at start-up.
+- `ui.web.auth.provider`: the web UI's login — `disabled` (default), `local` (users from `ui.web.auth.users`, passwords as `env:NAME`) or `header` (identity from a reverse proxy in front). It applies **independently** of `ui.web.share`. The former `ui.web.share_auth` is gone since 4.0; as long as it is still in the config, the start stops.
 - `storage.enabled`: the conversation store (SQLite at `storage.path`), the basis for history, continuation and Markdown export. **Without a login the web UI still records nothing** — every visitor would be the same user `local` and would see everyone else's conversations. If you deliberately want that on a single seat, set `storage.shared_without_login: true`; the start-up then warns once, loudly. `storage.history_limit` caps the history list, `storage.file_exchange` toggles the JSON download/upload.
 - `tts.enabled`: enables/disables text-to-speech.
 - `tts.features.terminal_auto_create_wav`: creates one WAV file per reply in terminal mode and plays it — Windows via `winsound`, Linux/macOS via `paplay`/`aplay`/`ffplay` or `afplay`. Without an available player you still get the file in `out/`.
@@ -292,7 +292,7 @@ versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
   - With `ui.type: "web"`, a web interface starts automatically
   - Open in the browser: `http://<host>:<port>` according to the `ui.web` settings (default: `http://127.0.0.1:7860`)
   - Login (optional): set `ui.web.auth.provider` to `local` or `header` — it applies **whether or not a share link is active**. Without a login the web UI records no conversations and hides the history card (`storage.shared_without_login: true` deliberately turns it back on)
-  - Optional: a public Gradio share link via `ui.web.share: true`. The old `ui.web.share_auth` is deprecated and only acts as a fallback when no `auth` section exists; the start-up flags it
+  - Optional: a public Gradio share link via `ui.web.share: true`. The old `ui.web.share_auth` is gone since 4.0 — if it is still in your config, the start stops and points you to `ui.web.auth`
   - Pick a persona and start chatting
   - Pro option: the collapsed "Advanced" section at the bottom of the start screen lets you switch the model for the current session (choices = installed Ollama models). Session-only — after a restart, `core.model_name` from `config.yaml` applies again
   - Voice input (opt-in): after `pip install faster-whisper`, a microphone appears next to the input field in the persona chat. Record → stop → the transcript is appended to the input field and can be edited before sending. The first recording loads the Whisper model (including a one-time download), so it takes a moment. Details and model choice: [src/yulyen_ai/stt/ReadMe.md](../../src/stt/ReadMe.md)
@@ -365,4 +365,4 @@ it skips cleanly.
 
 ## Status
 
-🚧 **Work in progress** – stable to use, but under active development (including initial LoRA fine-tuning experiments). Private project, **not intended for production use**.
+🚧 **Work in progress** – stable to use, but under active development. Private project, **not intended for production use**.

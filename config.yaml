@@ -69,10 +69,6 @@ ui:
       # (oauth2-proxy, Authelia, …). Nur hinter einem Proxy benutzen, der den
       # Header von außen entfernt! Das ist der Weg zu Keycloak.
       header_name: "X-Forwarded-User"
-    # Veraltet, wirkt nur noch als Fallback wenn `auth` fehlt:
-    share_auth:
-      username: ""
-      password: ""
 
 
 # --- Text-to-Speech settings (piper is currently the only provider) ---------------------------------------------------------------
@@ -99,11 +95,9 @@ stt:
   compute_type: "auto"     # auto | int8 | float16 …
   language: "de"           # null = Auto-Erkennung
 
-# --- Briefing (RSS): Persona fasst konfigurierte Feeds zusammen -------------------------------------------------
 # --- RSS/News als Kontextquelle (#73) -------------------------------------
 # Ein Schalter fuer alles: Hintergrund-Cache, automatische Injektion und den
-# Briefing-Knopf. Die frueher hier stehende Sektion hiess `briefing:` und wird
-# weiterhin gelesen (mit Warnung) — bitte umbenennen.
+# Briefing-Knopf.
 rss:
   enabled: true
   show_button: true          # den "Briefing"-Knopf getrennt abschaltbar machen

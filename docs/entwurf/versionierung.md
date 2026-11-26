@@ -70,8 +70,9 @@ auch nicht.
 Config blieb gültig, aber eine WebUI ohne Anmeldung zeichnete plötzlich nichts
 mehr auf. Das ist die teuerste Sorte, weil den Verlust nichts anzeigt — wer sie
 unter „Changed" einsortiert, versteckt sie. Eine Deprecation dagegen ist *kein*
-Bruch: `briefing:` → `rss:` wird weitergelesen und warnt, das gehört unter
-„Changed".
+Bruch: `briefing:` → `rss:` wurde bis 3.x weitergelesen und warnte, das gehörte
+unter „Changed". Den Alias in 4.0 zu streichen war dann der Bruch — er steht
+unter „Breaking".
 
 Die Stelle wird **beim Taggen** entschieden, nicht vorher: man liest den
 `Unreleased`-Abschnitt und sieht es. Steht dort etwas unter „Breaking", ist es

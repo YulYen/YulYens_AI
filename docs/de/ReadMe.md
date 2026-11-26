@@ -144,7 +144,7 @@ Alle zentralen Einstellungen werden über `config.yaml` gesteuert. Wichtige Scha
 - `language`: steuert UI-Texte und Persona-Prompts (`"de"` oder `"en"`).
 - `ui.type`: wählt die Oberfläche (`"terminal"`, `"web"` oder `null` für nur API).
 - `ui.web.host`: **Standard `127.0.0.1`** — die Web-UI ist dann nur vom eigenen Rechner aus erreichbar. Auf `"0.0.0.0"` stellen, wenn andere im Netz sie benutzen sollen; dann aber `ui.web.auth` einschalten, sonst warnt der Start (zu Recht) laut.
-- `ui.web.auth.provider`: Anmeldung der Web-UI — `disabled` (Standard), `local` (Nutzer aus `ui.web.auth.users`, Passwörter als `env:NAME`) oder `header` (Identität von einem vorgeschalteten Proxy). Gilt **unabhängig** von `ui.web.share`. Das frühere `ui.web.share_auth` wirkt nur noch als Fallback und wird beim Start angemahnt.
+- `ui.web.auth.provider`: Anmeldung der Web-UI — `disabled` (Standard), `local` (Nutzer aus `ui.web.auth.users`, Passwörter als `env:NAME`) oder `header` (Identität von einem vorgeschalteten Proxy). Gilt **unabhängig** von `ui.web.share`. Das frühere `ui.web.share_auth` gibt es seit 4.0 nicht mehr; solange es noch in der Config steht, bricht der Start ab.
 - `storage.enabled`: die Gesprächs-Ablage (SQLite unter `storage.path`), Grundlage für Verlauf, Fortsetzen und Markdown-Export. **Ohne Anmeldung zeichnet die Web-UI trotzdem nichts auf** — alle Besucher wären derselbe Nutzer `local` und sähen gegenseitig ihre Gespräche. Wer das für den Einzelplatz ausdrücklich will, setzt `storage.shared_without_login: true`; der Start warnt dann einmal laut. `storage.history_limit` steuert die Länge der Verlauf-Liste, `storage.file_exchange` den JSON-Down-/Upload.
 - `tts.enabled`: schaltet Text-to-Speech ein/aus.
 - `tts.features.terminal_auto_create_wav`: erzeugt im Terminal-Modus pro Antwort eine WAV-Datei und spielt sie ab — Windows über `winsound`, Linux/macOS über `paplay`/`aplay`/`ffplay` bzw. `afplay`. Ohne verfügbaren Player bleibt es bei der Datei in `out/`.
@@ -302,7 +302,7 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
   - Bei `ui.type: "web"` wird automatisch eine Weboberfläche gestartet
   - Im Browser öffnen: `http://<host>:<port>` entsprechend der Einstellungen unter `ui.web` (Standard: `http://127.0.0.1:7860`)
   - Anmeldung (optional): `ui.web.auth.provider` auf `local` oder `header` setzen — sie gilt **unabhängig davon, ob ein Share-Link aktiv ist**. Ohne Anmeldung zeichnet die Web-UI keine Gespräche auf und blendet die Verlauf-Karte aus (`storage.shared_without_login: true` schaltet sie ausdrücklich wieder ein)
-  - Optional: öffentlicher Gradio-Share-Link per `ui.web.share: true`. Das alte `ui.web.share_auth` ist veraltet und wirkt nur noch als Fallback, wenn kein `auth`-Abschnitt existiert; der Start mahnt es an
+  - Optional: öffentlicher Gradio-Share-Link per `ui.web.share: true`. Das alte `ui.web.share_auth` gibt es seit 4.0 nicht mehr — steht es noch in der Config, bricht der Start mit einem Hinweis auf `ui.web.auth` ab
   - Persona auswählen und loschatten
   - Profi-Option: Im zugeklappten „Erweitert"-Bereich unten am Startbildschirm lässt sich das Modell für die laufende Sitzung wechseln (Liste = installierte Ollama-Modelle). Gilt nur bis zum Neustart — danach greift wieder `core.model_name` aus der `config.yaml`
   - Spracheingabe (opt-in): Nach `pip install faster-whisper` erscheint im Persona-Chat ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird ans Eingabefeld angehängt und kann vor dem Senden editiert werden. Die erste Aufnahme lädt das Whisper-Modell (einmalig inkl. Download) und dauert daher etwas. Details und Modellwahl: [src/yulyen_ai/stt/ReadMe.md](../../src/stt/ReadMe.md)
@@ -375,5 +375,5 @@ Playwright, wird sauber übersprungen.
 
 ## Status
 
-🚧 **Work in Progress** – stabil nutzbar, aber aktiv in Entwicklung (inkl. erster LoRA-Finetuning-Experimente).
+🚧 **Work in Progress** – stabil nutzbar, aber aktiv in Entwicklung.
 Privates Projekt, **nicht für Produktivbetrieb gedacht**.

@@ -289,9 +289,11 @@ oauth2-proxy/Authelia davor, die die Identität als Header durchreichen; genau
 dafür gibt es `HeaderAuth`.
 
 Die Anmeldung gilt **unabhängig von `share`**. Das alte `ui.web.share_auth`
-greift nur noch als Fallback (mit Deprecation-Warnung) — es wirkte früher
-ausschließlich beim Share-Link, obwohl der Server per Default auf `0.0.0.0`
-horcht.
+wirkte ausschließlich beim Share-Link, obwohl der Server per Default auf
+`0.0.0.0` horchte; bis 3.x las die App es noch als Fallback. **Seit 4.0 bricht
+ein `share_auth` in der Config den Start ab**, statt still zu verschwinden:
+wer nur das stehen hatte, liefe sonst nach dem Update ohne Anmeldung — die
+Klasse aus #89, „nie auf offen zurückfallen".
 
 ## Logging
 
