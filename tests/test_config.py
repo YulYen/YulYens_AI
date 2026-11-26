@@ -1,10 +1,10 @@
 # tests/test_config.py
-import logging
 import sys
 from datetime import datetime
 
 import pytest
 from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.config.schema import validate_config
 
 
 def test_config_local_override_is_merged(tmp_path, monkeypatch):
@@ -366,49 +366,25 @@ def test_config_without_ensemble_key_still_has_attribute(tmp_path):
         Config.reset_instance()
 
 
-def test_the_old_briefing_section_is_still_read(tmp_path, caplog):
-    """`briefing:` heißt seit #73 `rss:` — ohne Alias wäre das ein stiller Bruch.
+def test_the_old_briefing_section_is_no_longer_read(tmp_path):
+    """`briefing:` hieß bis 3.x ein Alias für `rss:` — seit 4.0 nicht mehr.
 
-    Die rekursive Schema-Prüfung (#66) meldete jedem Bestandsnutzer
-    „unbekannte Sektion 'briefing'", und die Feeds wären einfach weg. Derselbe
-    Weg wie bei `ui.web.share_auth` → `auth`: lesen, warnen, nicht brechen.
+    Die Sektion gilt dann als unbekannt: beim Start eine Warnung, in
+    `--doctor` und `/healthz` ein harter Befund. Die Feeds daraus sind weg —
+    das steht als Bruch im Changelog.
     """
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(
-        "language: de\n"
-        "core:\n  model_name: m\n"
-        "briefing:\n"
-        "  enabled: true\n"
-        "  feeds:\n"
-        "    - name: alt\n      url: https://example.org/f\n",
-        encoding="utf-8",
-    )
-
-    Config.reset_instance()
-    with caplog.at_level(logging.WARNING):
-        cfg = Config(str(cfg_file))
-
-    assert cfg.rss["enabled"] is True
-    assert cfg.rss["feeds"][0]["name"] == "alt"
-    assert not hasattr(cfg, "briefing")
-    assert any("'rss:'" in r.message % r.args for r in caplog.records)
-    Config.reset_instance()
-
-
-def test_the_new_section_wins_over_the_old_one(tmp_path):
-    """Steht beides da, gilt `rss:` — der neue Name ist die Absicht."""
-    cfg_file = tmp_path / "config.yaml"
-    cfg_file.write_text(
-        "language: de\n"
-        "core:\n  model_name: m\n"
-        "briefing:\n  enabled: false\n  refresh_minutes: 5\n"
-        "rss:\n  enabled: true\n",
+        "language: de\ncore:\n  model_name: m\nbriefing:\n  enabled: true\n",
         encoding="utf-8",
     )
 
     Config.reset_instance()
     cfg = Config(str(cfg_file))
 
-    assert cfg.rss["enabled"] is True
-    assert cfg.rss["refresh_minutes"] == 5, "unbestrittene Werte bleiben erhalten"
+    assert not getattr(cfg, "rss", None)
+    problems = validate_config(
+        {"language": "de", "core": {"model_name": "m"}, "briefing": {"enabled": True}}
+    )
+    assert any("briefing" in p for p in problems), problems
     Config.reset_instance()

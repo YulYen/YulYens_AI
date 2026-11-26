@@ -384,5 +384,7 @@ Interpreter.
 ## Backlog
 
 [backlog.md](backlog.md) sind die offenen Tickets mit Effort/Benefit,
-[backlog_archiv.md](backlog_archiv.md) das Erledigte samt Begründung — die
-ausführliche Projektgeschichte.
+[backlog_archiv.md](backlog_archiv.md) das Erledigte. Bis 3.0.0 steht dort nur
+ein Index; die Begründung eines alten Tickets holt
+`git show v3.0.0:backlog_archiv.md | grep "^| 62 |"` (braucht den tiefen Clone,
+den der Hook holt).

@@ -69,8 +69,9 @@ erledigt) und ihre Ausbaustufe.
 
 Die abgeschlossenen Tickets stehen seit dem 2026-08-06 in einer eigenen Datei:
 
-**➜ [backlog_archiv.md](backlog_archiv.md)** — 86 erledigte Einträge mit
-Begründung, neueste zuerst.
+**➜ [backlog_archiv.md](backlog_archiv.md)** — seit 4.0 ein Index der
+Tickets bis 3.0.0 (der volle Text liegt im Tag `v3.0.0`, Abrufweg in der Datei)
+und die vollen Einträge danach, neueste zuerst.
 
 Sie ist der ausführliche Teil der Projektgeschichte: warum etwas so gebaut
 wurde, was dabei gemessen wurde und welche Annahme sich nicht bestätigt hat.

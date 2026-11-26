@@ -139,7 +139,6 @@ _CONFIG_SECTIONS = (
     "security",
     "tts",
     "stt",
-    "briefing",
     "email_adapter",
     "context_management",
 )
