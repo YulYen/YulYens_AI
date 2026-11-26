@@ -97,7 +97,9 @@ nächsten Umbau leicht umfallen:
   eine Datei lädt.
 - **Kein Wheel.** `config.yaml`, `ensembles/`, `locales/`, `static/` und
   `evals/` liegen neben `src/`. Ein Wheel enthielte sie nicht, und `__file__`
-  zeigte in `site-packages`. Wer das ändern will, muss die Daten ins Paket
+  zeigte in `site-packages`. `paths.checkout_root` prüft das beim Import und
+  bricht mit `NotACheckoutError` ab, statt still ins Leere zu zeigen
+  (`tests/test_paths.py`). Wer das ändern will, muss die Daten ins Paket
   holen *und* alle cwd-relativen Pfade (`config.yaml`, `logs/`, `data/`) an
   `PROJECT_ROOT` hängen — erst dann ergibt auch ein Konsolenbefehl Sinn.
 - **Kein `sys.path`-Griff und kein `PYTHONPATH=src` mehr.** Ein Skript, das
