@@ -3,8 +3,8 @@
 from typing import Any
 
 import pytest
-from config.config_singleton import Config
-from core.factory import AppFactory
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.factory import AppFactory
 
 
 class RecordingWarmUpCore:
@@ -105,7 +105,7 @@ def test_persona_without_llm_options_still_yields_a_usable_streamer(cfg, monkeyp
     Kontext-Check über `.get("num_ctx")` aufgefallen, also mitten im Gespräch.
     """
     cfg.override("core", {"backend": "dummy"})
-    monkeypatch.setattr("config.personas.get_options", lambda name: None)
+    monkeypatch.setattr("yulyen_ai.config.personas.get_options", lambda name: None)
 
     streamer = AppFactory().get_streamer_for_persona("LEAH")
 

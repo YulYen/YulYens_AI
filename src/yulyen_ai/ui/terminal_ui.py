@@ -1,0 +1,694 @@
+# terminal_ui.py
+from __future__ import annotations
+
+import logging
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from colorama import Fore, Style, init
+
+from yulyen_ai.config.personas import get_all_persona_names, get_drink
+from yulyen_ai.core.ask_all_moderator import iter_verdict
+from yulyen_ai.core.context_injection import prompt_only
+from yulyen_ai.core.context_utils import context_near_limit, shrink_history_for_context
+from yulyen_ai.core.orchestrator import broadcast_to_ensemble
+from yulyen_ai.core.utils import (
+    _greeting_text,
+    is_broadcast_enabled,
+    is_file_exchange_enabled,
+)
+from yulyen_ai.rss.feeds import _rss_cache_of, inject_rss_context
+from yulyen_ai.security.tinyguard import input_refused
+from yulyen_ai.ui import self_talk
+from yulyen_ai.ui.continuation import continuable_persona, persona_info_from_names
+from yulyen_ai.ui.conversation_io_terminal import load_conversation, save_conversation
+from yulyen_ai.ui.persona_chooser import prompt_persona_choice
+from yulyen_ai.wiki.lookup import (
+    WikiLookup,
+    WikiSnippet,
+    format_snippet_meta,
+    inject_wiki_context,
+)
+
+
+def _is_yes(answer: str) -> bool:
+    """Ja/Nein am Terminal, sprachunabhängig — leere Eingabe heißt Nein.
+
+    Beide Sprachbuchstaben zählen: der Prompt kommt aus den Locales („[j/N]"
+    bzw. „[y/N]"), die Eingabe des Nutzers folgt aber seiner Tastatur, nicht
+    der Config.
+    """
+    return answer.strip().lower() in {"j", "ja", "y", "yes"}
+
+
+class TerminalUI:
+    """
+    Terminal chat—uses the same wiki logic as the WebUI:
+    - Wiki hint (🕵️‍♀️ …) is shown only in the terminal (not sent to the LLM)
+    - Wiki snippet (if available) is injected as system context
+    - Token-by-token streaming of the LLM response stays unchanged
+    """
+
+    def __init__(self, factory, config, wiki: WikiLookup) -> None:
+        self.factory = factory
+        self.config = config
+        self.wiki = wiki
+        # None heisst „noch keine Persona gewaehlt" — der Chat-Loop laeuft
+        # erst nach `_set_persona`. Ausdruecklich annotiert, weil mypy sonst
+        # den Typ `None` festschreibt und jeder spaetere String ein Fehler ist.
+        self.greeting: str | None = None
+        self.bot: str | None = None
+        self.streamer: Any = None
+        self.texts = config.texts
+        self._t = config.t
+        self.broadcast_enabled = is_broadcast_enabled(config)
+        # JSON-Austausch per Datei ist abschaltbar (#54).
+        self.file_exchange_enabled = is_file_exchange_enabled(config)
+        self.tts_cfg = getattr(config, "tts", {}) or {}
+        self.tts_auto_wav_enabled = bool(self.tts_cfg.get("enabled")) and bool(
+            self.tts_cfg.get("features", {}).get("terminal_auto_create_wav")
+        )
+        self.rss_cache = _rss_cache_of(factory)
+        self.briefing_enabled = bool(self.rss_cache.feed_names) and bool(
+            (getattr(config, "rss", {}) or {}).get("show_button", True)
+        )
+
+        # Only real conversation turns (user/assistant) plus optional system contexts (wiki)
+        self.history: list[dict[str, str]] = []
+        self.meta: dict[str, str] = {}
+        # Zuletzt injizierte Wiki-Ausschnitte, für /quellen (#32a).
+        self.last_wiki_snippets: list[WikiSnippet] = []
+
+    def choose_persona(self) -> None:
+        """Asks the user for the desired persona and configures the streamer."""
+        names = get_all_persona_names()
+        # Solo (#85): das eigene Modell steht nur dort, wo es abweicht.
+        default = str(self.config.core.get("model_name", ""))
+        solo_models = {
+            name: model
+            for name in names
+            if (model := str(self.factory.solo_model(name))) and model != default
+        }
+        persona_name = prompt_persona_choice(
+            names, self.texts, "terminal_persona_prompt", models=solo_models
+        )
+        self._set_persona(persona_name)
+        print(self._t("terminal_persona_selected", persona_name=self.bot))
+
+    # ---------- Small UI helpers ----------
+    def init_ui(self) -> None:
+        init(autoreset=True)
+
+    def print_welcome(self) -> None:
+        print(self.greeting)
+        print(f"{Fore.MAGENTA}{self.texts['terminal_exit_hint']}{Style.RESET_ALL}")
+        print(f"{Fore.MAGENTA}{self.texts['terminal_clear_hint']}{Style.RESET_ALL}")
+        if self.file_exchange_enabled:
+            save_hint = self.texts.get(
+                "terminal_save_hint", "('/save <pfad> zum Speichern)"
+            )
+            print(f"{Fore.MAGENTA}{save_hint}{Style.RESET_ALL}")
+        if self.briefing_enabled:
+            briefing_hint = self.texts.get("terminal_briefing_hint", "/briefing")
+            print(f"{Fore.MAGENTA}{briefing_hint}{Style.RESET_ALL}")
+        if self.wiki.keyword_finder:
+            sources_hint = self.texts.get("terminal_sources_hint", "/quellen")
+            print(f"{Fore.MAGENTA}{sources_hint}{Style.RESET_ALL}")
+        # Nur anbieten, wenn die Ablage wirklich schreibt — ein Kommando über
+        # einem NullStore verspricht etwas, das sich nie füllen kann (#72).
+        if getattr(self.factory.get_store(), "records", False):
+            search_hint = self.texts.get("terminal_search_hint", "/suche <begriff>")
+            print(f"{Fore.MAGENTA}{search_hint}{Style.RESET_ALL}")
+
+    def prompt_user(self) -> str:
+        return input(
+            f"{Fore.GREEN}{self.texts['terminal_user_prompt']}{Style.RESET_ALL} "
+        ).strip()
+
+    def print_bot_prefix(self, bot: str) -> None:
+        bot_prefix = self._t("terminal_bot_prefix", persona_name=bot)
+        print(f"{Fore.CYAN}{bot_prefix}{Style.RESET_ALL} ", end="", flush=True)
+
+    def print_stream(self, text: str) -> None:
+        print(text, end="", flush=True)
+
+    def print_exit(self) -> None:
+        print(self.texts["terminal_exit_message"])
+
+    # ---------- Start menu ----------
+    def _start_dialog_flow(self) -> bool:
+        while True:
+            print(self.texts["terminal_start_menu_title"])
+            # Zwei Bereiche wie in der WebUI (#85): Solo ist das Gespräch zu
+            # zweit (ggf. mit eigenem Modell), das Orchester spielt auf dem
+            # gemeinsamen Modell.
+            print(self.texts["terminal_start_menu_solo_heading"])
+            print(self.texts["terminal_start_menu_new_option"])
+            if self.file_exchange_enabled:
+                print(self.texts["terminal_start_menu_load_option"])
+            print(
+                self._t(
+                    "terminal_start_menu_orchestra_heading",
+                    model_name=str(self.config.core.get("model_name", "")),
+                )
+            )
+            print(self.texts["terminal_start_menu_self_talk_option"])
+
+            if self.broadcast_enabled:
+                print(self.texts["terminal_start_menu_ask_all_option"])
+                prompt = self.texts[
+                    "terminal_start_menu_prompt_with_self_talk_and_ask_all"
+                ]
+            else:
+                prompt = self.texts["terminal_start_menu_prompt_with_self_talk"]
+
+            choice = input(prompt + " ").strip().lower()
+
+            if choice in {"1", "n", "new"}:
+                self.history.clear()
+                self.last_wiki_snippets = []
+                self.choose_persona()
+                self._reset_meta()
+                self.print_welcome()
+                return True
+
+            if choice in {"2", "l", "load"} and self.file_exchange_enabled:
+                if self._load_conversation_from_prompt():
+                    self.print_welcome()
+                    return True
+                continue
+
+            if choice in {"3", "s", "self", "self-talk", "self talk"}:
+                self_talk.run(self.factory, self.config, self)
+                continue
+
+            if self.broadcast_enabled and choice in {
+                "4",
+                "a",
+                "ask",
+                "askall",
+                "ask-all",
+                "ask all",
+            }:
+                self._run_ask_all_flow()
+                continue
+
+            if choice in {"exit", "quit"}:
+                self.print_exit()
+                return False
+
+            print(
+                f"{Fore.YELLOW}{self.texts['terminal_invalid_selection']}{Style.RESET_ALL}"
+            )
+
+    def _set_persona(self, persona_name: str) -> None:
+        # Build the streamer for the selected persona
+        self.streamer = self.factory.get_streamer_for_persona(persona_name)
+        self.bot = persona_name
+        self.greeting = _greeting_text(
+            self.config, self.bot, str(self.factory.solo_model(persona_name))
+        )
+        # Auch das Terminal zeichnet in der Ablage auf (#54) — ohne Anmeldung
+        # unter dem lokalen Nutzer. Vorher landete hier gar nichts mehr, seit
+        # der JSONL-Mitschnitt standardmäßig aus ist.
+        self.streamer.set_conversation(
+            self.factory.open_conversation(persona_name, "terminal")
+        )
+
+    def _reset_meta(self) -> None:
+        self.meta = {
+            "created_at": datetime.now().isoformat(),
+            "model": (
+                str(self.factory.solo_model(self.bot))
+                if self.bot
+                else str(self.config.core.get("model_name"))
+            ),
+            "persona": self.bot or "",
+            "app": "terminal",
+        }
+
+    def _load_conversation_from_prompt(self) -> bool:
+        path = input(self.texts["terminal_load_path_prompt"] + " ").strip()
+        if not path:
+            hint = self.texts.get("terminal_load_path_required")
+            if hint:
+                print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+            return False
+
+        try:
+            meta, messages = load_conversation(path)
+        except (OSError, ValueError) as exc:
+            msg = self._t("terminal_load_failed", reason=str(exc))
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
+        persona_name = meta.get("persona")
+        if persona_name not in get_all_persona_names():
+            msg = self._t(
+                "terminal_load_invalid_persona",
+                persona_name=persona_name or "<unbekannt>",
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
+        # Dieselbe Prüfung wie im Verlauf und beim Upload der WebUI: der Name
+        # allein reicht nicht. Ein Gast-Gespräch (`app: web-guest`) trägt einen
+        # Personennamen, aber sein System-Prompt lebte nur in jener Sitzung —
+        # es hier zu laden hieße, es still als die echte Ensemble-Persona
+        # fortzusetzen. #55 hat diese Regel für die beiden WebUI-Wege gebaut
+        # und den dritten übersehen, obwohl er dieselbe Datei liest.
+        if not continuable_persona(
+            persona_name,
+            meta.get("app"),
+            persona_info_from_names(get_all_persona_names()),
+        ):
+            msg = self._t(
+                "terminal_load_guest_not_continuable", persona_name=persona_name
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return False
+
+        self._set_persona(persona_name)
+        self.history = messages
+        self.meta = meta
+        self.last_wiki_snippets = []
+
+        success = self._t("terminal_load_success", persona_name=self.bot)
+        print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
+        self._print_loaded_history()
+        return True
+
+    def _handle_save_command(self, save_target: str) -> None:
+        if not self.file_exchange_enabled:
+            msg = self.texts.get(
+                "terminal_file_exchange_off",
+                "Datei-Austausch ist abgeschaltet (storage.file_exchange).",
+            )
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return
+        if not save_target:
+            usage = self.texts.get("terminal_save_usage") or "/save <pfad>"
+            print(f"{Fore.YELLOW}{usage}{Style.RESET_ALL}\n")
+            return
+
+        try:
+            save_conversation(save_target, self.meta, self.history)
+        except (OSError, ValueError) as exc:
+            msg = self._t("terminal_save_failed", reason=str(exc))
+            print(f"{Fore.YELLOW}{msg}{Style.RESET_ALL}\n")
+            return
+
+        success = self._t("terminal_save_success", path=save_target)
+        print(f"{Fore.BLUE}{success}{Style.RESET_ALL}\n")
+
+    def _run_ask_all_flow(self) -> None:
+        if not self.broadcast_enabled:
+            disabled_msg = self.texts.get("terminal_broadcast_disabled")
+            print(f"{Fore.YELLOW}{disabled_msg}{Style.RESET_ALL}\n")
+            return
+
+        question = input(self.texts["terminal_askall_prompt"] + " ").strip()
+        print()
+        if not question:
+            hint = self.texts.get("terminal_askall_missing_question")
+            print(f"{Fore.YELLOW}{hint}{Style.RESET_ALL}\n")
+            return
+
+        # Opt-in wie das Häkchen in der WebUI (#27) — gefragt wird *vor* der
+        # Runde, weil danach vier Antworten auf dem Schirm stehen und eine
+        # Rückfrage dort untergeht.
+        want_verdict = _is_yes(
+            input(self.texts["terminal_askall_moderator_prompt"] + " ")
+        )
+        print()
+
+        # Wiki-Lookup einmal für alle Personas; Hints nur anzeigen, Snippets
+        # als geteilter System-Kontext vor die Frage jedes Broadcasts legen.
+        context_messages: list[dict[str, str]] = []
+        if self.wiki.keyword_finder and not input_refused(
+            self.factory.build_guard(), question
+        ):
+            wiki_hints, contexts = self.wiki.snippets(
+                question, "ask_all", self.factory.build_guard()
+            )
+            self.last_wiki_snippets = list(contexts)
+            for wiki_hint in wiki_hints:
+                if wiki_hint:
+                    print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
+            if contexts:
+                # Wie in der WebUI: der Broadcast baut die Streamer erst danach.
+                inject_wiki_context(
+                    context_messages, contexts, self.factory.build_guard()
+                )
+
+        print(
+            f"{Fore.MAGENTA}{self.texts['terminal_askall_block_start']}{Style.RESET_ALL}"
+        )
+
+        last_persona: str | None = None
+
+        def _on_token(persona: str, token: str) -> None:
+            nonlocal last_persona
+            if persona != last_persona:
+                if last_persona is not None:
+                    print("\n")
+                print(f"{Fore.CYAN}[{persona}]{Style.RESET_ALL} ", end="", flush=True)
+                last_persona = persona
+            print(token, end="", flush=True)
+
+        results = broadcast_to_ensemble(
+            self.factory,
+            question,
+            on_token=_on_token,
+            context_messages=context_messages,
+        )
+
+        if last_persona is not None:
+            print("\n")
+
+        if want_verdict:
+            self._print_ask_all_verdict(
+                question, {r["persona"]: r["reply"] for r in results}
+            )
+
+        print(
+            f"{Fore.MAGENTA}{self.texts['terminal_askall_block_end']}{Style.RESET_ALL}\n"
+        )
+
+    def _handle_search_command(self, term: str) -> None:
+        """`/suche <begriff>` über die eigenen Gespräche (#49).
+
+        Ohne `user` gerufen, wie `load` und `delete` im Terminal auch: hier gibt
+        es keine Anmeldung, die fehlen könnte.
+        """
+        term = term.strip()
+        if not term:
+            usage = self.texts.get("terminal_search_usage", "/suche <begriff>")
+            print(f"{Fore.YELLOW}{usage}{Style.RESET_ALL}\n")
+            return
+
+        hits = self.factory.get_store().search(term)
+        if not hits:
+            miss = self.texts.get("terminal_search_empty", "Nichts gefunden.")
+            print(f"{Fore.YELLOW}{miss}{Style.RESET_ALL}\n")
+            return
+
+        for hit in hits:
+            stamp = hit.updated_at[:16].replace("T", " ")
+            print(
+                f"{Fore.CYAN}[{hit.persona} · {stamp}]{Style.RESET_ALL} {hit.snippet}"
+            )
+        print()
+
+    def _print_ask_all_verdict(self, question: str, replies: dict[str, str]) -> None:
+        """Das Fazit über die Runde, tokenweise wie die Antworten davor."""
+        heading = self.texts["ask_all_moderator_heading"]
+        printed = False
+        for event in iter_verdict(self.factory, question, replies):
+            if event["type"] != "token":
+                continue
+            if not printed:
+                print(
+                    f"{Fore.MAGENTA}[{heading}]{Style.RESET_ALL} ", end="", flush=True
+                )
+                printed = True
+            print(event["token"], end="", flush=True)
+        if printed:
+            print("\n")
+
+    # ---------- Main loop ----------
+    def launch(self) -> None:
+        self.init_ui()
+        logging.info("Launching TerminalUI")
+
+        if not self._start_dialog_flow():
+            return
+
+        while True:
+            user_input = self.prompt_user()
+            logging.debug("[Terminal] User input received (%d chars)", len(user_input))
+            print()  # add a small blank line after the input
+            if not self.handle_input(user_input):
+                break
+
+    def handle_input(self, user_input: str) -> bool:
+        """Verarbeitet **eine** Eingabe; ``False`` beendet die Sitzung.
+
+        Aus der Schleife herausgelöst, damit das, was mit einer Eingabe
+        passiert, ohne `input()`-Attrappe prüfbar ist: Kommandos, die leere
+        Eingabe, und die Reihenfolge Guard → Wiki → Modell (#88). Vorher stand
+        all das in `launch()` und hatte keinen Test.
+        """
+
+        # Leere Eingabe: nichts fragen, statt einen Modelllauf zu starten.
+        if not user_input:
+            return True
+
+        # Exit
+        if user_input.lower() in ("exit", "quit"):
+            self.print_exit()
+            return False
+
+        # Save conversation
+        if user_input.lower().startswith("/save"):
+            save_target = user_input[len("/save") :].strip()
+            self._handle_save_command(save_target)
+            return True
+
+        # Clear / start a new conversation
+        if user_input.lower() == "clear":
+            if not self._start_dialog_flow():
+                return False
+            return True
+
+        # Briefing: summarize the configured RSS feeds
+        if user_input.lower() == "/briefing":
+            if self.briefing_enabled:
+                self._handle_briefing_command()
+            return True
+
+        # Quellen des zuletzt injizierten Wiki-Kontexts (#32a).
+        # Beide Schreibweisen, damit das Kommando auch in der englischen
+        # Locale greift — die Kommandos selbst sind nicht übersetzt.
+        if user_input.lower() in ("/quellen", "/sources"):
+            self._handle_sources_command()
+            return True
+
+        # Volltextsuche über die eigenen Gespräche (#49). Beide
+        # Schreibweisen wie bei /quellen — Kommandos sind nicht übersetzt.
+        if user_input.lower().startswith(("/suche", "/search")):
+            self._handle_search_command(
+                user_input.split(maxsplit=1)[1] if " " in user_input else ""
+            )
+            return True
+
+        # --- (1) Wiki lookup: fetch up to N matches, show hints, inject snippets if available ---
+        # Erst der Guard, dann das Netz (#88): was `stream()` gleich
+        # ablehnt, löst keinen Abruf aus.
+        guard = getattr(self.streamer, "guard", None)
+        if self.wiki.keyword_finder and not input_refused(guard, user_input):
+            wiki_hints, contexts = self.wiki.snippets(user_input, self.bot or "", guard)
+
+            self.last_wiki_snippets = list(contexts)
+
+            # Show the hint (🕵️‍♀️ …) only to the user — do not send it to the LLM
+            for wiki_hint in wiki_hints:
+                if wiki_hint:
+                    print(f"{Fore.YELLOW}{wiki_hint}{Style.RESET_ALL}\n")
+
+            # Insert the snippet as system context (guardrail plus context)
+            if contexts:
+                inject_wiki_context(
+                    self.history, contexts, getattr(self.streamer, "guard", None)
+                )
+
+        # --- (2) Append the user question to history ---
+        self.history.append({"role": "user", "content": user_input})
+
+        self._ensure_context_headroom()
+
+        # --- (3) + (4) Stream the answer and record it in history ---
+        self._stream_and_record_reply()
+        return True
+
+    def _stream_and_record_reply(self) -> None:
+        """Streams the reply token by token, records it and finishes cleanly."""
+        self.print_bot_prefix(self.bot or "")
+        reply = ""
+        for token in self.streamer.stream(messages=self.history):
+            reply += token
+            self.print_stream(token)
+
+        logging.info(f"[Terminal] {self.bot}: {reply}")
+
+        self.history.append({"role": "assistant", "content": reply})
+        # Der Gesprächsstand steht erst hier fest (#59) — vorher zeichnete
+        # `stream()` Generierungsversuche auf.
+        self.streamer.record_conversation(self.history)
+        self._maybe_create_tts_wav(reply)
+        # Always ensure two trailing blank lines after the answer:
+        # (If streaming already emitted \n, add only the missing ones.)
+        trailing_nl = len(reply) - len(reply.rstrip("\n"))
+        for _ in range(max(0, 2 - trailing_nl)):
+            print()
+
+    def _handle_sources_command(self) -> None:
+        """Zeigt die zuletzt injizierten Wiki-Ausschnitte im Wortlaut (#32a).
+
+        Bewusst ungekürzt: dass der Text vollständig dasteht, ist der Grund für
+        das Kommando — nur so ist erkennbar, worauf die letzte Antwort beruht.
+        """
+        if not self.last_wiki_snippets:
+            empty = self.texts.get(
+                "terminal_sources_empty", "Kein Wikipedia-Kontext im letzten Turn."
+            )
+            print(f"{Fore.YELLOW}{empty}{Style.RESET_ALL}\n")
+            return
+
+        title = self.texts.get(
+            "terminal_sources_title", "Quellen des letzten Kontexts:"
+        )
+        print(f"{Fore.MAGENTA}{title}{Style.RESET_ALL}\n")
+        for idx, snippet in enumerate(self.last_wiki_snippets, start=1):
+            meta = format_snippet_meta(snippet, self._t)
+            print(f"{Fore.CYAN}{idx}. {snippet.topic}{Style.RESET_ALL}")
+            print(f"{Fore.YELLOW}{meta}{Style.RESET_ALL}")
+            if snippet.link:
+                print(snippet.link)
+            print()
+            print(snippet.snippet)
+            print()
+
+    def _handle_briefing_command(self) -> None:
+        """Fetches the configured feeds and lets the persona summarize them."""
+        # Derselbe Cache wie die automatische Injektion — der Knopf holt
+        # nichts mehr selbst (#73).
+        items = self.rss_cache.items_for(self.rss_cache.feed_names)
+        # Same ordering as the wiki context: system messages first, then user turn
+        result = inject_rss_context(
+            self.history,
+            items,
+            self.rss_cache,
+            getattr(self.streamer, "guard", None),
+        )
+        if not result:
+            print(f"{Fore.YELLOW}{self._t('briefing_empty')}{Style.RESET_ALL}\n")
+            return
+
+        stamp = self.rss_cache.filled_at
+        print(
+            f"{Fore.YELLOW}"
+            + self._t(
+                "rss_hint",
+                persona_name=self.bot or "",
+                feed_names=", ".join(self.rss_cache.feed_names),
+                stand=stamp.strftime("%H:%M") if stamp else "?",
+            )
+            + f"{Style.RESET_ALL}\n"
+        )
+
+        self.history.append(
+            {"role": "user", "content": self._t("briefing_user_prompt")}
+        )
+        self._ensure_context_headroom()
+        self._stream_and_record_reply()
+
+    def _maybe_create_tts_wav(
+        self,
+        reply: str,
+        block: bool = False,
+        persona_name: str | None = None,
+    ) -> None:
+        persona_for_tts = persona_name or self.bot
+
+        if not self.tts_auto_wav_enabled or not reply.strip() or not persona_for_tts:
+            return
+
+        try:
+            from yulyen_ai.tts.audio_player import play_wav
+            from yulyen_ai.tts.piper_tts import create_wav
+
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            persona = "".join(
+                ch if ch.isalnum() or ch in ("-", "_") else "_"
+                for ch in persona_for_tts
+            )
+            out_wav = Path("out") / f"{timestamp}_{persona}.wav"
+            create_wav(
+                reply,
+                persona_for_tts,
+                voices_dir=Path("voices"),
+                out_wav=out_wav,
+                tts_cfg=self.tts_cfg,
+                language=getattr(self.config, "language", "de"),
+            )
+            logging.info("[Terminal] TTS wav created: %s", out_wav)
+            play_wav(out_wav, block)
+        except Exception as exc:
+            logging.warning("[Terminal] Could not create or play TTS wav file: %s", exc)
+
+    def _ensure_context_headroom(self) -> None:
+        """Trims the history when the context limit is nearly reached."""
+
+        if not self.streamer:
+            return
+
+        persona_options = getattr(self.streamer, "persona_options", {}) or {}
+
+        if not context_near_limit(self.history, persona_options):
+            return
+
+        drink = get_drink(self.bot or "")
+        wait_msg = self._t("context_wait_message", persona_name=self.bot, drink=drink)
+        print(wait_msg)
+
+        # Gezählt wird, was noch an das Modell geht: die herausgenommenen
+        # Turns bleiben markiert im Verlauf, damit die Ablage das ganze
+        # Gespräch behält.
+        original_length = len(prompt_only(self.history))
+        self.history = shrink_history_for_context(
+            self.history,
+            self.config,
+            persona_options,
+            llm_core=getattr(self.streamer, "_llm_core", None),
+            chat_model_name=getattr(self.streamer, "model_name", ""),
+            persona_name=self.bot,
+        )
+
+        removed = original_length - len(prompt_only(self.history))
+        if removed > 0:
+            logging.info(
+                "TerminalUI: Removed %s older messages to free up context.",
+                removed,
+            )
+            notice = self.texts["terminal_context_trim_notice"]
+            print(f"{Fore.YELLOW}{notice}{Style.RESET_ALL}")
+
+    def _print_loaded_history(self) -> None:
+        if not self.history:
+            return
+
+        header = self.texts.get("terminal_loaded_history_header")
+        if header:
+            print(f"{Fore.MAGENTA}{header}{Style.RESET_ALL}")
+
+        role_labels = {
+            "user": f"{Fore.GREEN}{self.texts['terminal_user_prompt']}{Style.RESET_ALL}",
+            "assistant": f"{Fore.CYAN}{self._t('terminal_bot_prefix', persona_name=self.bot)}{Style.RESET_ALL}",
+            "system": f"{Fore.MAGENTA}[system]{Style.RESET_ALL}",
+        }
+
+        for msg in self.history:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            prefix = role_labels.get(role, f"{Fore.YELLOW}[{role}]{Style.RESET_ALL}")
+
+            lines = content.splitlines() or [""]
+            for idx, line in enumerate(lines):
+                if idx == 0:
+                    print(f"{prefix} {line}")
+                else:
+                    print(f"    {line}")
+
+        print()

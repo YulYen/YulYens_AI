@@ -45,13 +45,13 @@ Zu wissen:
 
 Ein Ensemble bündelt Personas mit ihren System-Prompts, LLM-Optionen (Temperatur, `repeat_penalty`, `num_ctx`) und Avataren. Welches beim Start geladen wird, bestimmt `--ensemble` / `-e`. Drei Ensembles liegen im Repo:
 
-- **`classic`** — LEAH, DORIS, PETER, POPCORN (Standard, `python src/launch.py -e classic`)
-- **`examples/classic_ministral14b`** — dieselben vier, mit den Temperaturen und Prompts, die auf `ministral-3:14b` abgestimmt sind (Stand vor dem Wechsel auf `gemma4:26b`). Gedacht für Karten mit 12–16 GB VRAM: `core.model_name: "ministral-3:14b"` in `config.local.yaml` setzen, dann `python src/launch.py -e examples/classic_ministral14b`
-- **`examples/spaceship_crew`** — die Crew des Raumschiffs *Aurora-One*: CAPTAIN_SELINA (besonnene Kommandantin), ZETA_FLUX (sarkastische Chefingenieurin), ELIAS_MOREL (poetischer Navigator) und LYRA_VEX (außerirdische Diplomatin). Start: `python src/launch.py -e examples/spaceship_crew`
+- **`classic`** — LEAH, DORIS, PETER, POPCORN (Standard, `python -m yulyen_ai -e classic`)
+- **`examples/classic_ministral14b`** — dieselben vier, mit den Temperaturen und Prompts, die auf `ministral-3:14b` abgestimmt sind (Stand vor dem Wechsel auf `gemma4:26b`). Gedacht für Karten mit 12–16 GB VRAM: `core.model_name: "ministral-3:14b"` in `config.local.yaml` setzen, dann `python -m yulyen_ai -e examples/classic_ministral14b`
+- **`examples/spaceship_crew`** — die Crew des Raumschiffs *Aurora-One*: CAPTAIN_SELINA (besonnene Kommandantin), ZETA_FLUX (sarkastische Chefingenieurin), ELIAS_MOREL (poetischer Navigator) und LYRA_VEX (außerirdische Diplomatin). Start: `python -m yulyen_ai -e examples/spaceship_crew`
 
 ![Spaceship-Crew: Persona-Auswahl mit der Crew der Aurora-One](../screenshot_spaceship_crew.png)
 
-Welche Ensembles verfügbar sind, listet `python src/launch.py --list-ensembles` — mit Personas, vorhandenen Sprachen und dem Namen, den `-e` erwartet. Der Ensemble-Name ist ein Pfad unterhalb von `ensembles/` und wird immer mit Schrägstrich geschrieben. Eigene Ensembles brauchen keinen Code, nur YAML und Bilder: siehe [Eigenes Ensemble hinzufügen](Ensemble_hinzufuegen.md).
+Welche Ensembles verfügbar sind, listet `python -m yulyen_ai --list-ensembles` — mit Personas, vorhandenen Sprachen und dem Namen, den `-e` erwartet. Der Ensemble-Name ist ein Pfad unterhalb von `ensembles/` und wird immer mit Schrägstrich geschrieben. Eigene Ensembles brauchen keinen Code, nur YAML und Bilder: siehe [Eigenes Ensemble hinzufügen](Ensemble_hinzufuegen.md).
 
 ## Benutzeroberflächen (UI)
 
@@ -117,11 +117,11 @@ So kann die KI-Antwort nicht nur gelesen, sondern unmittelbar auch als Audio aus
 
 ## Spracheingabe (STT)
 
-Umgekehrt lässt sich in der Web-UI auch **sprechen** statt tippen: Mit `stt.enabled: true` und einem installierten `faster-whisper` (`pip install faster-whisper`) erscheint ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird an das Eingabefeld angehängt und lässt sich vor dem Absenden noch bearbeiten — die Erkennung ersetzt das Senden also nicht, sie füllt nur das Feld. Die erste Aufnahme lädt das Whisper-Modell (einmalig, inklusive Download) und dauert deshalb spürbar länger als die folgenden. Größe und Sprache stehen unter `stt.model` und `stt.language`; Details in [src/stt/ReadMe.md](../../src/stt/ReadMe.md).
+Umgekehrt lässt sich in der Web-UI auch **sprechen** statt tippen: Mit `stt.enabled: true` und einem installierten `faster-whisper` (`pip install faster-whisper`) erscheint ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird an das Eingabefeld angehängt und lässt sich vor dem Absenden noch bearbeiten — die Erkennung ersetzt das Senden also nicht, sie füllt nur das Feld. Die erste Aufnahme lädt das Whisper-Modell (einmalig, inklusive Download) und dauert deshalb spürbar länger als die folgenden. Größe und Sprache stehen unter `stt.model` und `stt.language`; Details in [src/yulyen_ai/stt/ReadMe.md](../../src/stt/ReadMe.md).
 
 ## One-Shot API
 
-Parallel zur UI kann das System auch über eine REST-API angesprochen werden (z. B. für Integrationen oder Tests). Ein FastAPI-Server stellt einen **`/ask`-Endpoint** bereit, über den per HTTP-POST einzelne Fragen gestellt werden können. Die Anfrage nimmt ein JSON entgegen (mit Feldern für die **Frage** und die gewünschte **Persona**) und liefert die KI-Antwort als JSON-Antwort zurück. Für das Monitoring existieren zwei Endpunkte: **`/health`** als schneller Liveness-Check und **`/healthz`** als Deep-Check, der Ollama-Erreichbarkeit, gepulltes Modell, spaCy, Kiwix und VRAM prüft (HTTP 503 bei kritischem Ausfall). Passt ein Mixture-of-Experts-Modell wie `gemma4:26b` nicht ganz in den freien VRAM, ist das nur ein Hinweis, keine Warnung — ein Teil darf im Arbeitsspeicher liegen. Dieselben Prüfungen laufen auch per CLI über `python src/launch.py --doctor` als farbiger Preflight-Report. Diese API ermöglicht es, die KI-Funktionalität in externe Anwendungen einzubinden oder automatisiert zu nutzen.
+Parallel zur UI kann das System auch über eine REST-API angesprochen werden (z. B. für Integrationen oder Tests). Ein FastAPI-Server stellt einen **`/ask`-Endpoint** bereit, über den per HTTP-POST einzelne Fragen gestellt werden können. Die Anfrage nimmt ein JSON entgegen (mit Feldern für die **Frage** und die gewünschte **Persona**) und liefert die KI-Antwort als JSON-Antwort zurück. Für das Monitoring existieren zwei Endpunkte: **`/health`** als schneller Liveness-Check und **`/healthz`** als Deep-Check, der Ollama-Erreichbarkeit, gepulltes Modell, spaCy, Kiwix und VRAM prüft (HTTP 503 bei kritischem Ausfall). Passt ein Mixture-of-Experts-Modell wie `gemma4:26b` nicht ganz in den freien VRAM, ist das nur ein Hinweis, keine Warnung — ein Teil darf im Arbeitsspeicher liegen. Dieselben Prüfungen laufen auch per CLI über `python -m yulyen_ai --doctor` als farbiger Preflight-Report. Diese API ermöglicht es, die KI-Funktionalität in externe Anwendungen einzubinden oder automatisiert zu nutzen.
 
 ## OpenAI-kompatible API
 

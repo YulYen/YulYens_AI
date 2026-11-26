@@ -2,9 +2,9 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
-from core.context_injection import prompt_only, recorded_turns
-from core.context_summarizer import KarlSummarizationError
-from core.context_utils import (
+from yulyen_ai.core.context_injection import prompt_only, recorded_turns
+from yulyen_ai.core.context_summarizer import KarlSummarizationError
+from yulyen_ai.core.context_utils import (
     apply_heuristic_context_trim,
     apply_karl_context_summary,
     require_context_management_config,
@@ -52,7 +52,7 @@ def test_require_config_rejects_incomplete_karl_section():
 
 def test_heuristic_trim_uses_num_ctx():
     with patch(
-        "core.context_utils.karl_prepare_quick_and_dirty",
+        "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty",
         side_effect=lambda history, limit: history[1:],
     ) as mock_prepare:
         result = apply_heuristic_context_trim(
@@ -88,9 +88,9 @@ def test_karl_summary_falls_back_to_heuristic_when_configured():
         "fallback_strategy": "heuristic",
     }
     with (
-        patch("core.context_utils.KarlSummarizer") as mock_karl,
+        patch("yulyen_ai.core.context_utils.KarlSummarizer") as mock_karl,
         patch(
-            "core.context_utils.karl_prepare_quick_and_dirty",
+            "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty",
             side_effect=lambda history, limit: history[1:],
         ),
     ):
@@ -113,7 +113,7 @@ def test_karl_summary_reraises_without_fallback():
         "keep_last_messages": 2,
         "log_dir": "logs",
     }
-    with patch("core.context_utils.KarlSummarizer") as mock_karl:
+    with patch("yulyen_ai.core.context_utils.KarlSummarizer") as mock_karl:
         mock_karl.return_value.summarize.side_effect = KarlSummarizationError("boom")
         with pytest.raises(KarlSummarizationError):
             apply_karl_context_summary(
@@ -127,7 +127,7 @@ def test_karl_summary_reraises_without_fallback():
 
 def test_shrink_dispatches_to_heuristic():
     with patch(
-        "core.context_utils.apply_heuristic_context_trim",
+        "yulyen_ai.core.context_utils.apply_heuristic_context_trim",
         return_value=HISTORY[1:],
     ) as mock_trim:
         result = shrink_history_for_context(
@@ -143,7 +143,7 @@ def test_shrink_dispatches_to_heuristic():
 
 def test_shrink_dispatches_to_karl():
     summary = [{"role": "system", "content": "Kurzfassung"}]
-    with patch("core.context_utils.KarlSummarizer") as mock_karl:
+    with patch("yulyen_ai.core.context_utils.KarlSummarizer") as mock_karl:
         mock_karl.return_value.summarize.return_value = summary
         result = shrink_history_for_context(
             HISTORY,

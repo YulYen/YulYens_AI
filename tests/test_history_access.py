@@ -11,7 +11,7 @@ Jetzt steht sie hier, wo sie hingehört.
 """
 
 import pytest
-from ui.history_access import DEFAULT_HISTORY_LIMIT, ConversationHistory
+from yulyen_ai.ui.history_access import DEFAULT_HISTORY_LIMIT, ConversationHistory
 
 
 class _Ref:

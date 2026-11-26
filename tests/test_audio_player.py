@@ -8,8 +8,8 @@ is the whole point, since the project runs Windows-first while CI runs Linux.
 from pathlib import Path
 
 import pytest
-from tts import audio_player
-from tts.audio_player import find_player, play_wav
+from yulyen_ai.tts import audio_player
+from yulyen_ai.tts.audio_player import find_player, play_wav
 
 WAV = Path("out") / "test.wav"
 

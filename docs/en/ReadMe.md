@@ -45,7 +45,7 @@ See also: [Features.md](Features.md)
 - **Core**:
   - Swappable LLM core (`OllamaLLMCore`, `DummyLLMCore` for tests) including `YulYenStreamingProvider`
   - Wikipedia support including a spaCy-based keyword extractor
-- **Personas**: system prompts & LLM options as YAML under `ensembles/<name>/`; `src/config/personas.py` loads them
+- **Personas**: system prompts & LLM options as YAML under `ensembles/<name>/`; `src/yulyen_ai/config/personas.py` loads them
 - **UI**:
   - `TerminalUI` for the CLI
   - `WebUI` (Gradio) with persona selection & avatars
@@ -98,9 +98,13 @@ python -m venv .venv
 source .venv/bin/activate   # Linux/macOS
 .venv\Scripts\activate      # Windows
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package and its dependencies (editable: it points at this checkout)
+pip install -e .
 ```
+
+The package is installed **editable only**: `config.yaml`, `ensembles/`, `locales/`
+and `static/` live next to `src/`, not inside the package. The pins stay in
+`requirements.txt`; `pyproject.toml` reads them from there.
 
 ### Language model for spaCy
 
@@ -212,7 +216,7 @@ The `security` section selects the guard for input and output checks:
 ### Launch
 
 ```bash
-python src/launch.py -e classic
+python -m yulyen_ai -e classic
 ```
 
 The `--ensemble` (short `-e`) parameter selects which ensemble definition to start. `classic` is the
@@ -220,7 +224,7 @@ default choice for the regular experience. You can try another ensemble, such as
 `spaceship_crew` example, by running:
 
 ```bash
-python src/launch.py -e examples/spaceship_crew
+python -m yulyen_ai -e examples/spaceship_crew
 ```
 
 The name is a path below `ensembles/` and is **always written with forward slashes**, on Windows
@@ -233,7 +237,7 @@ You can optionally pass an alternative configuration file via `--config` (short 
 ensemble parameter, for example:
 
 ```bash
-python src/launch.py -e classic --config path/to/config.yaml
+python -m yulyen_ai -e classic --config path/to/config.yaml
 ```
 
 #### Listing ensembles
@@ -241,7 +245,7 @@ python src/launch.py -e classic --config path/to/config.yaml
 To see which ensembles ship with the repo — including the exact name `-e` expects — run:
 
 ```bash
-python src/launch.py --list-ensembles
+python -m yulyen_ai --list-ensembles
 ```
 
 ```
@@ -264,13 +268,13 @@ environment — Ollama reachability, pulled model, spaCy model, Kiwix, and VRAM 
 concrete fix hints instead of cryptic tracebacks:
 
 ```bash
-python src/launch.py --doctor
+python -m yulyen_ai --doctor
 ```
 
 Exit code 1 signals a critical failure (handy for scripts).
 
 The header line names the running version. You can also get it on its own with
-`python src/launch.py --version`, and over HTTP as the `version` field of
+`python -m yulyen_ai --version`, and over HTTP as the `version` field of
 `/health` — useful before filing a bug report. What changed between two
 versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
 
@@ -289,9 +293,9 @@ versions is in [`CHANGELOG.md`](../../CHANGELOG.md).
   - Optional: a public Gradio share link via `ui.web.share: true`. The old `ui.web.share_auth` is deprecated and only acts as a fallback when no `auth` section exists; the start-up flags it
   - Pick a persona and start chatting
   - Pro option: the collapsed "Advanced" section at the bottom of the start screen lets you switch the model for the current session (choices = installed Ollama models). Session-only — after a restart, `core.model_name` from `config.yaml` applies again
-  - Voice input (opt-in): after `pip install faster-whisper`, a microphone appears next to the input field in the persona chat. Record → stop → the transcript is appended to the input field and can be edited before sending. The first recording loads the Whisper model (including a one-time download), so it takes a moment. Details and model choice: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
+  - Voice input (opt-in): after `pip install faster-whisper`, a microphone appears next to the input field in the persona chat. Record → stop → the transcript is appended to the input field and can be edited before sending. The first recording loads the Whisper model (including a one-time download), so it takes a moment. Details and model choice: [src/yulyen_ai/stt/ReadMe.md](../../src/stt/ReadMe.md)
   - News (RSS): with `rss.enabled: true` the application fetches the configured feeds **in the background** (at start-up and then every `rss.refresh_minutes`) and keeps the latest items in memory. Ask something like “What's new?” or “What does the Tagesschau say?” and the persona adds the matching items as context by itself — with dates and the age of the cache. A chat **never** waits for the network: whatever has not been fetched is simply missing. The “Briefing 📰” button uses the same cache and can be hidden with `rss.show_button: false` without disabling the source. To switch everything off: `rss.enabled: false`
-  - Read aloud (TTS): the "Read aloud 🔊" button in the persona chat plays the latest reply with the persona's Piper voice in the browser (in the browser rather than through a system player). Only appears when `pip install piper-tts` is done and voices exist in the `voices/` folder; disable via `tts.features.web_read_aloud: false`. Setup: [src/tts/ReadMe.md](../../src/tts/ReadMe.md)
+  - Read aloud (TTS): the "Read aloud 🔊" button in the persona chat plays the latest reply with the persona's Piper voice in the browser (in the browser rather than through a system player). Only appears when `pip install piper-tts` is done and voices exist in the `voices/` folder; disable via `tts.features.web_read_aloud: false`. Setup: [src/yulyen_ai/tts/ReadMe.md](../../src/tts/ReadMe.md)
 
 - **API only (no UI)**
   - Set `ui.type: null` – FastAPI keeps running and serves `/ask`

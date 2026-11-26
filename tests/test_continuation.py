@@ -16,11 +16,15 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pytest
-from config.texts import Texts
-from ui.continuation import GUEST_APP, continuable_persona, persona_info_from_names
-from ui.session import SessionContext
-from ui.terminal_ui import TerminalUI
-from wiki.lookup import WikiLookup
+from yulyen_ai.config.texts import Texts
+from yulyen_ai.ui.continuation import (
+    GUEST_APP,
+    continuable_persona,
+    persona_info_from_names,
+)
+from yulyen_ai.ui.session import SessionContext
+from yulyen_ai.ui.terminal_ui import TerminalUI
+from yulyen_ai.wiki.lookup import WikiLookup
 
 PERSONA_INFO = {"leah": {"name": "LEAH", "description": "warm"}}
 
@@ -141,7 +145,7 @@ def test_way_3_terminal_load_refuses_a_guest_conversation(
     path = _write_conversation(tmp_path, "LEAH", GUEST_APP)
     monkeypatch.setattr("builtins.input", lambda _: str(path))
     monkeypatch.setattr(
-        "ui.terminal_ui.get_all_persona_names", lambda: ["LEAH", "DORIS"]
+        "yulyen_ai.ui.terminal_ui.get_all_persona_names", lambda: ["LEAH", "DORIS"]
     )
 
     accepted = ui._load_conversation_from_prompt()
@@ -157,7 +161,7 @@ def test_way_3_terminal_load_still_accepts_a_real_persona(tmp_path, monkeypatch)
     path = _write_conversation(tmp_path, "LEAH", "terminal")
     monkeypatch.setattr("builtins.input", lambda _: str(path))
     monkeypatch.setattr(
-        "ui.terminal_ui.get_all_persona_names", lambda: ["LEAH", "DORIS"]
+        "yulyen_ai.ui.terminal_ui.get_all_persona_names", lambda: ["LEAH", "DORIS"]
     )
     monkeypatch.setattr(ui, "_set_persona", lambda name: setattr(ui, "bot", name))
 

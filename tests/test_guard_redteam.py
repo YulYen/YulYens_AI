@@ -6,9 +6,9 @@ which is why this runs in CI on every push.
 """
 
 import pytest
-from evals.corpus import load_guard_corpus
-from evals.guard_eval import evaluate_guard_case
-from security.tinyguard import BasicGuard
+from yulyen_ai.evals.corpus import load_guard_corpus
+from yulyen_ai.evals.guard_eval import evaluate_guard_case
+from yulyen_ai.security.tinyguard import BasicGuard
 
 CUSTOM_TEXTS = {
     "security_mask_text": "[mask]",

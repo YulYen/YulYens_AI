@@ -5,7 +5,7 @@ Die wichtigsten Schalter aus `config.yaml`, das lokale Override, die Schema-Prü
 ## Konfiguration (config.yaml)
 
 Die Schalter stehen in `config.yaml` und sind dort kommentiert; ihre Typen und
-Defaults in `src/config/schema.py`. Hier steht nur, was beides nicht sagt.
+Defaults in `src/yulyen_ai/config/schema.py`. Hier steht nur, was beides nicht sagt.
 
 ### Lokales Override: `config.local.yaml` (gitignored)
 Beim Laden wird ein optionales `config.local.yaml` (neben `config.yaml`) **per
@@ -15,7 +15,7 @@ persönliche/geheime Werte (z. B. echter Mail-Host/-Adresse) aus der **öffentli
 in `.gitignore` — niemals committen. Passwörter weiterhin via `env:NAME`.
 
 ### Schema-Prüfung (#43): zwei Härtegrade
-`src/config/schema.py` prüft `config.yaml` und die Ensemble-Dateien mit pydantic.
+`src/yulyen_ai/config/schema.py` prüft `config.yaml` und die Ensemble-Dateien mit pydantic.
 **Beim Start wird nur gewarnt** (`logging.warning("[CONFIG] …")`) — ein laufendes
 Setup darf nicht an einem Schema scheitern, das die persönliche
 `config.local.yaml` nie gesehen hat. **`--doctor` und `/healthz` melden denselben

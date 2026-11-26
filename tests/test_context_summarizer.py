@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from core.context_summarizer import KarlSummarizer
+from yulyen_ai.core.context_summarizer import KarlSummarizer
 
 
 class _FakeLLMCore:

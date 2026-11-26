@@ -8,9 +8,9 @@ are stated honestly; the wiki line is dropped when no wiki source is active.
 
 from datetime import datetime
 
-import core.utils as u
 import pytest
-from config.config_singleton import Config
+import yulyen_ai.core.utils as u
+from yulyen_ai.config.config_singleton import Config
 
 
 @pytest.fixture
@@ -158,7 +158,7 @@ def test_factory_streamer_prompt_carries_three_stamps(cfg):
             "offline": {"zim_prefix": "wikipedia_de_all_nopic_2025-06"},
         },
     )
-    from core.factory import AppFactory
+    from yulyen_ai.core.factory import AppFactory
 
     prompt = AppFactory().get_streamer_for_persona("LEAH").persona_prompt
     assert datetime.now().strftime("%Y-%m-%d") in prompt

@@ -4,7 +4,7 @@ import sys
 import types
 from types import SimpleNamespace
 
-import stt.whisper_stt as whisper_stt
+import yulyen_ai.stt.whisper_stt as whisper_stt
 
 
 class _FakeWhisperModel:

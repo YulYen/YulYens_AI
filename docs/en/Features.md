@@ -47,13 +47,13 @@ Good to know:
 
 An ensemble bundles personas together with their system prompts, LLM options (temperature, `repeat_penalty`, `num_ctx`) and avatars. Which one is loaded at start-up is decided by `--ensemble` / `-e`. Three ensembles ship with the repo:
 
-- **`classic`** — LEAH, DORIS, PETER, POPCORN (default, `python src/launch.py -e classic`)
-- **`examples/classic_ministral14b`** — the same four, with the temperatures and prompts tuned for `ministral-3:14b` (the state before the switch to `gemma4:26b`). Meant for cards with 12–16 GB of VRAM: set `core.model_name: "ministral-3:14b"` in `config.local.yaml`, then run `python src/launch.py -e examples/classic_ministral14b`
-- **`examples/spaceship_crew`** — the crew of the starship *Aurora-One*: CAPTAIN_SELINA (composed commander), ZETA_FLUX (sarcastic chief engineer), ELIAS_MOREL (poetic navigator) and LYRA_VEX (alien diplomat). Start with `python src/launch.py -e examples/spaceship_crew`
+- **`classic`** — LEAH, DORIS, PETER, POPCORN (default, `python -m yulyen_ai -e classic`)
+- **`examples/classic_ministral14b`** — the same four, with the temperatures and prompts tuned for `ministral-3:14b` (the state before the switch to `gemma4:26b`). Meant for cards with 12–16 GB of VRAM: set `core.model_name: "ministral-3:14b"` in `config.local.yaml`, then run `python -m yulyen_ai -e examples/classic_ministral14b`
+- **`examples/spaceship_crew`** — the crew of the starship *Aurora-One*: CAPTAIN_SELINA (composed commander), ZETA_FLUX (sarcastic chief engineer), ELIAS_MOREL (poetic navigator) and LYRA_VEX (alien diplomat). Start with `python -m yulyen_ai -e examples/spaceship_crew`
 
 ![Spaceship crew: persona selection showing the crew of the Aurora-One](../screenshot_spaceship_crew.png)
 
-`python src/launch.py --list-ensembles` lists the available ensembles — with personas, bundled locales and the exact name `-e` expects. The ensemble name is a path below `ensembles/` and is always written with forward slashes. Building your own takes no code, just YAML and images: see [Adding a custom ensemble](Adding_an_ensemble.md).
+`python -m yulyen_ai --list-ensembles` lists the available ensembles — with personas, bundled locales and the exact name `-e` expects. The ensemble name is a path below `ensembles/` and is always written with forward slashes. Building your own takes no code, just YAML and images: see [Adding a custom ensemble](Adding_an_ensemble.md).
 
 ## User interfaces (UI)
 
@@ -117,11 +117,11 @@ This allows replies to be consumed not only as text but also immediately as audi
 
 ## Speech input (STT)
 
-The other direction works too: in the web UI you can **speak** instead of typing. With `stt.enabled: true` and `faster-whisper` installed (`pip install faster-whisper`), a microphone appears next to the input field. Record → stop → the transcript is appended to the input field and can still be edited before sending — recognition does not replace sending, it only fills the field. The first recording loads the Whisper model (once, including a download) and therefore takes noticeably longer than the ones after it. Size and language live under `stt.model` and `stt.language`; details in [src/stt/ReadMe.md](../../src/stt/ReadMe.md).
+The other direction works too: in the web UI you can **speak** instead of typing. With `stt.enabled: true` and `faster-whisper` installed (`pip install faster-whisper`), a microphone appears next to the input field. Record → stop → the transcript is appended to the input field and can still be edited before sending — recognition does not replace sending, it only fills the field. The first recording loads the Whisper model (once, including a download) and therefore takes noticeably longer than the ones after it. Size and language live under `stt.model` and `stt.language`; details in [src/yulyen_ai/stt/ReadMe.md](../../src/stt/ReadMe.md).
 
 ## One-shot API
 
-Alongside the UI, the system can be accessed through a REST API (e.g., for integrations or testing). A FastAPI server exposes an **`/ask` endpoint** that accepts individual questions via HTTP POST. The request accepts JSON (with fields for the **question** and desired **persona**) and returns the AI reply as JSON. Two endpoints exist for monitoring: **`/health`** as a fast liveness check and **`/healthz`** as a deep check that verifies Ollama reachability, the pulled model, spaCy, Kiwix, and VRAM (HTTP 503 on critical failure). If a mixture-of-experts model such as `gemma4:26b` does not fit entirely into free VRAM, that is a note, not a warning — part of it may sit in system RAM. The same checks are available on the CLI via `python src/launch.py --doctor` as a colored preflight report. This API makes it possible to embed the AI functionality into external applications or use it for automation.
+Alongside the UI, the system can be accessed through a REST API (e.g., for integrations or testing). A FastAPI server exposes an **`/ask` endpoint** that accepts individual questions via HTTP POST. The request accepts JSON (with fields for the **question** and desired **persona**) and returns the AI reply as JSON. Two endpoints exist for monitoring: **`/health`** as a fast liveness check and **`/healthz`** as a deep check that verifies Ollama reachability, the pulled model, spaCy, Kiwix, and VRAM (HTTP 503 on critical failure). If a mixture-of-experts model such as `gemma4:26b` does not fit entirely into free VRAM, that is a note, not a warning — part of it may sit in system RAM. The same checks are available on the CLI via `python -m yulyen_ai --doctor` as a colored preflight report. This API makes it possible to embed the AI functionality into external applications or use it for automation.
 
 ## OpenAI-compatible API
 

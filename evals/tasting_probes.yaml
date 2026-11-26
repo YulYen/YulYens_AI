@@ -5,7 +5,7 @@
 # Wortlaut nicht; das hier ist der Wortlaut ab dem 2026-11-21.
 #
 # **Wer hier ändert, gibt die Vergleichbarkeit mit früheren Verkostungen auf**
-# — dieselbe Regel wie beim Fragensatz der Stoppuhr (src/bench/questions.py).
+# — dieselbe Regel wie beim Fragensatz der Stoppuhr (src/yulyen_ai/bench/questions.py).
 # Eine neue Probe anhängen ist in Ordnung; eine bestehende umformulieren nicht,
 # dann lieber eine neue `id`.
 #

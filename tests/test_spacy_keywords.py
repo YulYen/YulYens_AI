@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 import pytest
-from wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
+from yulyen_ai.wiki.spacy_keyword_finder import SpacyKeywordFinder, resolve_spacy_model
 
 from tests.util import has_spacy_model
 

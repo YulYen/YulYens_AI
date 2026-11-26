@@ -75,7 +75,7 @@ the system prompt from it (so the personas know how fresh their Wikipedia knowle
 ### 4. Verify
 
 ```bash
-python src/launch.py --doctor
+python -m yulyen_ai --doctor
 ```
 
 The setup doctor checks (among other things) that kiwix-serve is reachable.
@@ -100,7 +100,7 @@ Dumps are rebuilt several times a year — an outdated dump means outdated knowl
 4. **Adjust `config.yaml`:** point `zim_prefix` and `zim_path` at the new file name.
 5. **Stop a running kiwix-serve** (it keeps the old ZIM open) and restart the
    Orchestra — with `autostart: true`, kiwix-serve comes back up with the new archive.
-6. **Verify:** `python src/launch.py --doctor` → Kiwix check green.
+6. **Verify:** `python -m yulyen_ai --doctor` → Kiwix check green.
 7. **Delete the old ZIM** once everything works.
 
 ---

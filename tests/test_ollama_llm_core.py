@@ -24,7 +24,7 @@ class _PlaceholderClient:  # pragma: no cover - replaced by monkeypatch.
 if not hasattr(ollama, "Client"):
     ollama.Client = _PlaceholderClient  # type: ignore[attr-defined]
 
-from core.ollama_llm_core import OllamaLLMCore
+from yulyen_ai.core.ollama_llm_core import OllamaLLMCore
 
 
 class RecordingClient:
@@ -59,7 +59,7 @@ class ShowingClient(RecordingClient):
 
 @pytest.fixture()
 def showing_core(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr("core.ollama_llm_core.Client", ShowingClient)
+    monkeypatch.setattr("yulyen_ai.core.ollama_llm_core.Client", ShowingClient)
     core = OllamaLLMCore(base_url="http://example")
     return core, core._client
 
@@ -78,7 +78,7 @@ def fake_client_factory(
         return client
 
     monkeypatch.setattr(ollama, "Client", factory)
-    monkeypatch.setattr("core.ollama_llm_core.Client", factory)
+    monkeypatch.setattr("yulyen_ai.core.ollama_llm_core.Client", factory)
 
     def get_last_client() -> RecordingClient:
         assert created_clients, "Client was not instantiated"

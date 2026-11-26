@@ -4,8 +4,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
-from config.personas import get_all_persona_names
-from core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.config.personas import get_all_persona_names
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
 
 # ---- Deterministic time in Europe/Berlin ------------------------------------
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -60,8 +60,8 @@ def test_api_turns_are_recorded_in_the_store(client, monkeypatch, tmp_path):
     Weg, den eine echte Anfrage nimmt. Jetzt läuft der echte Pfad gegen das
     Dummy-Backend, und nur der Store wird untergeschoben.
     """
-    from core.factory import AppFactory
-    from storage import SqliteStore
+    from yulyen_ai.core.factory import AppFactory
+    from yulyen_ai.storage import SqliteStore
 
     store = SqliteStore(tmp_path / "conversations.sqlite3")
     monkeypatch.setattr(AppFactory, "get_store", lambda self: store)

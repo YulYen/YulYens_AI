@@ -9,9 +9,9 @@ from datetime import datetime
 
 import pytest
 import requests
-from config.config_singleton import Config
-from core.context_injection import is_injected
-from rss.feeds import (
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.context_injection import is_injected
+from yulyen_ai.rss.feeds import (
     RssCache,
     RssItem,
     _parse_feed,

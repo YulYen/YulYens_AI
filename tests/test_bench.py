@@ -11,9 +11,9 @@ from __future__ import annotations
 import time
 
 import pytest
-from bench.cli import _holdback_note, _quietest_persona
-from bench.drivers import HttpDriver, InProcessDriver
-from bench.harness import (
+from yulyen_ai.bench.cli import _holdback_note, _quietest_persona
+from yulyen_ai.bench.drivers import HttpDriver, InProcessDriver
+from yulyen_ai.bench.harness import (
     BenchAborted,
     BenchRun,
     Question,
@@ -23,9 +23,9 @@ from bench.harness import (
     measured,
     run_bench,
 )
-from bench.questions import DEFAULT_QUESTIONS, load_questions
-from bench.report import CSV_COLUMNS, render_csv, render_markdown
-from core.streaming_provider import LLM_ERROR_MESSAGE
+from yulyen_ai.bench.questions import DEFAULT_QUESTIONS, load_questions
+from yulyen_ai.bench.report import CSV_COLUMNS, render_csv, render_markdown
+from yulyen_ai.core.streaming_provider import LLM_ERROR_MESSAGE
 
 from tests.doubles import factory_double, streamer_double
 
@@ -372,7 +372,7 @@ def test_the_default_persona_is_the_coolest_one():
     Runden — und die Antwortlänge ist der größte Einzeleinfluss auf die
     Gesamtdauer.
     """
-    from config import personas
+    from yulyen_ai.config import personas
 
     temperaturen = {"LEAH": 0.65, "PETER": 0.10, "POPCORN": 0.80}
     original = personas.get_options

@@ -12,8 +12,8 @@ dass die Rolle nichts ändert. Genau diese Verwechslung wäre teuer.
 from __future__ import annotations
 
 import pytest
-from core.context_injection import is_injected
-from evals.injection_probe import (
+from yulyen_ai.core.context_injection import is_injected
+from yulyen_ai.evals.injection_probe import (
     ARMS,
     FRAGE,
     PAYLOADS,

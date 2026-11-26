@@ -19,18 +19,18 @@ from __future__ import annotations
 import json
 
 import pytest
-from config.config_singleton import Config
-from core.context_injection import (
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.context_injection import (
     INJECTED_KEY,
     conversation_only,
     injected_message,
     is_injected,
 )
-from rss.feeds import RssCache, RssItem, inject_rss_context
-from security.tinyguard import BasicGuard
-from storage import SqliteStore
-from ui.conversation_io_terminal import load_conversation, save_conversation
-from wiki.lookup import WikiLookup, WikiSnippet, inject_wiki_context
+from yulyen_ai.rss.feeds import RssCache, RssItem, inject_rss_context
+from yulyen_ai.security.tinyguard import BasicGuard
+from yulyen_ai.storage import SqliteStore
+from yulyen_ai.ui.conversation_io_terminal import load_conversation, save_conversation
+from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet, inject_wiki_context
 
 
 @pytest.fixture()
@@ -244,7 +244,7 @@ def test_the_lookup_drops_it_before_anyone_sees_it(rule, monkeypatch):
     article = _ARTICLE.format(payload=POISONED[rule])
     harmlos = _snippet(topic="ZIM", text="ZIM ist ein Containerformat.")
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet",
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: ([], [_snippet(text=article), harmlos]),
     )
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 import threading
 
 import pytest
-from config.config_singleton import Config
-from config.personas import quietest_persona_name
-from core.ask_all_moderator import (
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.config.personas import quietest_persona_name
+from yulyen_ai.core.ask_all_moderator import (
     MODERATOR_PERSONA,
     build_messages,
     iter_verdict,
@@ -15,8 +15,8 @@ from core.ask_all_moderator import (
     reply_char_budget,
     usable_replies,
 )
-from core.dummy_llm_core import DummyLLMCore
-from core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
 
 from tests.doubles import streamer_double
 
@@ -181,7 +181,7 @@ def test_only_sampling_is_inherited_from_the_persona(monkeypatch):
     aussehen sollte.
     """
     monkeypatch.setattr(
-        "config.personas.get_options",
+        "yulyen_ai.config.personas.get_options",
         lambda name: {
             "temperature": 0.1,
             "num_ctx": 4096,
@@ -200,7 +200,7 @@ def test_only_sampling_is_inherited_from_the_persona(monkeypatch):
 def test_a_persona_without_a_temperature_loses_against_one_with(monkeypatch):
     """Ohne Angabe zählt 1.0 — sonst gewänne die Persona, über die nichts bekannt ist."""
     monkeypatch.setattr(
-        "config.personas.get_options",
+        "yulyen_ai.config.personas.get_options",
         lambda name: {"temperature": 0.4} if name == "B" else {},
     )
 

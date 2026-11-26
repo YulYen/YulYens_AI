@@ -2,13 +2,13 @@ import threading
 import time
 
 import pytest
-from core.dummy_llm_core import DummyLLMCore
-from core.orchestrator import (
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.orchestrator import (
     broadcast_to_ensemble,
     iter_broadcast_events,
     iter_broadcast_events_parallel,
 )
-from core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
 
 
 class _DummyFactory:
@@ -286,7 +286,7 @@ class _StoreBackedFactory(_DummyFactory):
 
 
 def _broadcast_store(tmp_path):
-    from storage import SqliteStore
+    from yulyen_ai.storage import SqliteStore
 
     return SqliteStore(tmp_path / "conversations.sqlite3")
 

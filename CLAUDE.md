@@ -72,7 +72,7 @@ Diese Datei wird bei jeder Sitzung komplett geladen. Sie war schon einmal auf
 
 ## Versionierung und Changelog (#74)
 
-- Die Version steht in **`src/version.py`** und sonst nirgends;
+- Die Version steht in **`src/yulyen_ai/version.py`** und sonst nirgends;
   `CHANGELOG.md` trägt sie als oberste Überschrift
   (`tests/test_version_consistency.py`). Baseline ist 2.0.0 (2026-08-05).
 - **Ins Changelog gehört nur, was ein Betreiber merkt** (Schalter, Default,
@@ -116,7 +116,7 @@ Details: [arbeitsweise.md](docs/entwurf/arbeitsweise.md).
 Es betreibt 4 KI-Charaktere (LEAH, DORIS, PETER, POPCORN) über lokale LLMs via Ollama.
 Kein Cloud-Zwang. Offline-Wikipedia via Kiwix integriert. Zwei UIs: Terminal und Gradio-Web.
 
-**Start:** `python src/launch.py -e classic`
+**Start:** `python -m yulyen_ai -e classic`
 
 Python 3.12+, Ollama, Gradio, FastAPI, spaCy + Kiwix, Piper (TTS),
 faster-whisper (STT). Versionen und Pins: `requirements.txt`,
@@ -126,17 +126,17 @@ faster-whisper (STT). Versionen und Pins: `requirements.txt`,
 
 | Pfad | Inhalt |
 |---|---|
-| `src/launch.py` | Einstieg (`--doctor`, `--list-ensembles`, `--version`) |
-| `src/core/` | LLM-Abstraktion, Streamer + Moderator, Orchestrator (Ask-All), Fazit, AppFactory, Kontext-Kanäle, Karl |
-| `src/config/` | Config-Singleton, Ensemble-Loader, pydantic-Schema, i18n |
-| `src/ui/` | WebUI (aufgeteilt in Layout/Format/Chat/Ask-All/Features/Events), Terminal, Sitzung, Feedback, Verlauf, Self-Talk |
-| `src/api/` | FastAPI (`/ask`, `/health`, `/healthz`) + OpenAI-kompatibles `/v1` |
-| `src/security/tinyguard.py` | BasicGuard: benannte Regeln für Eingang, Kontext und Ausgang |
-| `src/wiki/`, `src/rss/` | die zwei Kontextquellen |
-| `src/storage/`, `src/auth/` | Gesprächs-Ablage (SQLite) und Identitäts-Naht |
-| `src/email_adapter/`, `src/mcp_adapter/`, `src/tts/`, `src/stt/` | opt-in Kanäle |
-| `src/evals/`, `src/bench/` | Eval-Suite und Stoppuhr; Einstiege in `scripts/` |
-| `src/version.py` | die einzige Quelle der Version |
+| `src/yulyen_ai/launch.py` | Einstieg, gestartet als `python -m yulyen_ai` (`--doctor`, `--list-ensembles`, `--version`) |
+| `src/yulyen_ai/core/` | LLM-Abstraktion, Streamer + Moderator, Orchestrator (Ask-All), Fazit, AppFactory, Kontext-Kanäle, Karl |
+| `src/yulyen_ai/config/` | Config-Singleton, Ensemble-Loader, pydantic-Schema, i18n |
+| `src/yulyen_ai/ui/` | WebUI (aufgeteilt in Layout/Format/Chat/Ask-All/Features/Events), Terminal, Sitzung, Feedback, Verlauf, Self-Talk |
+| `src/yulyen_ai/api/` | FastAPI (`/ask`, `/health`, `/healthz`) + OpenAI-kompatibles `/v1` |
+| `src/yulyen_ai/security/tinyguard.py` | BasicGuard: benannte Regeln für Eingang, Kontext und Ausgang |
+| `src/yulyen_ai/wiki/`, `src/yulyen_ai/rss/` | die zwei Kontextquellen |
+| `src/yulyen_ai/storage/`, `src/yulyen_ai/auth/` | Gesprächs-Ablage (SQLite) und Identitäts-Naht |
+| `src/yulyen_ai/email_adapter/`, `src/yulyen_ai/mcp_adapter/`, `src/yulyen_ai/tts/`, `src/yulyen_ai/stt/` | opt-in Kanäle |
+| `src/yulyen_ai/evals/`, `src/yulyen_ai/bench/` | Eval-Suite und Stoppuhr; Einstiege in `scripts/` |
+| `src/yulyen_ai/version.py` | die einzige Quelle der Version |
 | `evals/` | Eval-Korpora als YAML (Guard-Red-Team, Personas, Karl) |
 | `ensembles/<name>/` | `personas_base.yaml` + `locales/{de,en}/personas.yaml` |
 | `locales/{de,en}.yaml` | UI-Texte, Parität per Test |
@@ -187,6 +187,11 @@ rss/feeds.py (RSS-Cache) ──→ Guard (Kontext) ──┘
   RSS-Cache. **Streamer und Guard entstehen bei jedem Aufruf frisch** — der
   Guard trägt Sitzungszustand (Wrongdoing-Lock)
 - Zustand in Tests via `set_provider(None)` + `Config.reset_instance()` zurücksetzen
+
+### Paket
+Alles unter `src/yulyen_ai/`, **nur editierbar** installiert (`pip install -e .`).
+Projektwurzel aus `yulyen_ai.paths`, nie `parents[n]`; kein `sys.path`-Griff in
+Skripten ([werkzeuge.md](docs/entwurf/werkzeuge.md#das-paket-wird-nur-editierbar-installiert-44)).
 
 ### WikiLookup
 `wiki/lookup.py` bündelt alle Wiki-Einstellungen in **einem** Objekt, das die
@@ -239,7 +244,7 @@ meist ein Fehler, der genau so passiert ist — steht in der verlinkten Datei.
   Bisherige pro Token (war quadratisch).
 - **Stoppuhr: erstes ausgeliefertes Zeichen und Zeichen/s vergleichen, nie die
   Gesamtdauer.** Rundenweise messen, Median, Fehlermeldung ist keine Bestzeit.
-  Der Fragensatz liegt in `src/bench/questions.py` (ändern = Vergleichbarkeit
+  Der Fragensatz liegt in `src/yulyen_ai/bench/questions.py` (ändern = Vergleichbarkeit
   aufgeben). Das Skript heißt `run_bench.py`, weil `bench.py` das Paket verdeckt.
 
 ### Ablage der Gespräche → [ablage-und-anmeldung.md](docs/entwurf/ablage-und-anmeldung.md)

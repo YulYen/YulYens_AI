@@ -8,8 +8,8 @@ is pointed at a model.
 from datetime import date
 
 import pytest
-from evals.checks import expand, placeholders, run_checks
-from evals.corpus import (
+from yulyen_ai.evals.checks import expand, placeholders, run_checks
+from yulyen_ai.evals.corpus import (
     BehaviourCorpus,
     Checks,
     GuardCorpus,
@@ -18,9 +18,9 @@ from evals.corpus import (
     PersonaCase,
     PersonaCorpus,
 )
-from evals.judge import Judge, build_prompt, parse_verdict
-from evals.report import CSV_COLUMNS, render_csv, render_markdown
-from evals.runner import (
+from yulyen_ai.evals.judge import Judge, build_prompt, parse_verdict
+from yulyen_ai.evals.report import CSV_COLUMNS, render_csv, render_markdown
+from yulyen_ai.evals.runner import (
     EvalRun,
     judge_results,
     load_answers,
@@ -346,7 +346,7 @@ def test_karl_runner_without_corpus_returns_nothing():
 
 
 def test_guard_runner_gets_a_fresh_guard_per_case():
-    from evals.corpus import GuardCase
+    from yulyen_ai.evals.corpus import GuardCase
 
     made = []
 
@@ -369,7 +369,7 @@ def test_guard_runner_gets_a_fresh_guard_per_case():
 
 
 def test_known_gap_does_not_count_as_failure():
-    from evals.corpus import GuardCase
+    from yulyen_ai.evals.corpus import GuardCase
 
     corpus = GuardCorpus(
         description="",
@@ -544,7 +544,7 @@ def test_a_backend_error_text_is_an_error_not_a_scored_answer():
     Zahl, über die Modelle verglichen werden. Die Stoppuhr kennt den Fall
     längst („eine Fehlermeldung ist keine Bestzeit").
     """
-    from core.streaming_provider import LLM_ERROR_MESSAGE
+    from yulyen_ai.core.streaming_provider import LLM_ERROR_MESSAGE
 
     judge_core = _FakeCore("1: 1 | keine Antwort")
     judge = Judge(llm_core=judge_core, model_name="judge")

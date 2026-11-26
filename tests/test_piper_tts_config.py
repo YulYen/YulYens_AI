@@ -16,8 +16,8 @@ sys.modules["piper.voice"] = voice_module
 
 from pathlib import Path
 
-from tts import piper_tts
-from tts.piper_tts import _resolve_model_name
+from yulyen_ai.tts import piper_tts
+from yulyen_ai.tts.piper_tts import _resolve_model_name
 
 
 def test_resolve_model_name_uses_german_persona_override() -> None:

@@ -10,14 +10,14 @@ Inline-Kommentare nur wenn nötig.
 
 ### ⚠️ Ein Prüfer, der abbricht, meldet *weniger* Fehler — nicht keine
 
-mypy lief lange über drei Module. Ein Lauf über `src/ui` meldete genau **einen**
+mypy lief lange über drei Module. Ein Lauf über `src/yulyen_ai/ui` meldete genau **einen**
 Fehler, und zwar diesen: „Source file found twice under different module names",
 mit dem Zusatz `errors prevented further checking`. Die Zahl 1 war kein
 Qualitätsurteil, sondern ein **Abbruch** — nach der ersten Meldung hat mypy
 aufgehört zu schauen. Tatsächlich waren es 46.
 
 Ursache ist `mypy_path = "src"` in Kombination mit den Importen des Projekts
-(`from ui.session import …`): `src/ui/webui_format.py` ist damit auf zwei Wegen
+(`from ui.session import …`): `src/yulyen_ai/ui/webui_format.py` ist damit auf zwei Wegen
 erreichbar, als `webui_format` und als `ui.webui_format`. mypy weigert sich
 dann weiterzuarbeiten. `explicit_package_bases = true` sagt ihm, wo die
 Paketwurzel liegt.
@@ -84,10 +84,37 @@ Zwei Dinge, die beim Einbau aufgefallen sind:
    Code. **Vor dem Schluss „das Gate ist blind" also nachsehen, ob die Mutation
    überhaupt drinsteht.** Richtig eingesetzt schlug der Vertrag sofort an.
 
+### Das Paket wird nur editierbar installiert (#44)
+
+Seit 2026-11-26 liegt alles unter `src/yulyen_ai/`, installiert mit
+`pip install -e .`, gestartet mit `python -m yulyen_ai`. Drei Dinge, die beim
+nächsten Umbau leicht umfallen:
+
+- **Die Projektwurzel kommt aus `yulyen_ai.paths`**, nie aus
+  `Path(__file__).parents[n]`. Beim Umzug zeigte genau diese Zahl in vier
+  Modulen still auf `src/` statt auf die Wurzel — Ensembles und Locales wären
+  nicht mehr gefunden worden, und erst ein Test hätte es gemerkt, der zufällig
+  eine Datei lädt.
+- **Kein Wheel.** `config.yaml`, `ensembles/`, `locales/`, `static/` und
+  `evals/` liegen neben `src/`. Ein Wheel enthielte sie nicht, und `__file__`
+  zeigte in `site-packages`. `paths.checkout_root` prüft das beim Import und
+  bricht mit `NotACheckoutError` ab, statt still ins Leere zu zeigen
+  (`tests/test_paths.py`). Wer das ändern will, muss die Daten ins Paket
+  holen *und* alle cwd-relativen Pfade (`config.yaml`, `logs/`, `data/`) an
+  `PROJECT_ROOT` hängen — erst dann ergibt auch ein Konsolenbefehl Sinn.
+- **Kein `sys.path`-Griff und kein `PYTHONPATH=src` mehr.** Ein Skript, das
+  ohne Installation läuft, verdeckt, ob das Paket installiert ist; so hätte
+  ein venv zwei Wahrheiten. Ein neues Skript in `scripts/` importiert
+  `yulyen_ai.…` direkt.
+
+Abhängigkeiten und Version stehen weiter in `requirements.txt` und
+`src/yulyen_ai/version.py`; `pyproject.toml` liest beide per `dynamic`.
+Eine zweite Liste in `[project]` liefe beim nächsten Pin auseinander.
+
 ### `make check` — ein Kommando vor dem Push
 
-`make check` fährt `lint`, `lint-imports`, `types` und `test` nacheinander und
-stoppt beim ersten Fehler; die Reihenfolge ist nach Laufzeit sortiert, damit das
+`make check` fährt `lint` (Black prüfend und Ruff, wie der CI-Job), `lint-imports`,
+`types` und `test` nacheinander und stoppt beim ersten Fehler; die Reihenfolge ist nach Laufzeit sortiert, damit das
 Billige zuerst fehlschlägt. Bewusst **ohne** `audit` (braucht Netz) und ohne
 `test-browser` (braucht einen Browser-Build) — beides läuft getrennt, und ein
 Ziel, das ohne Netz fehlschlägt, würde bald umgangen.
@@ -196,7 +223,7 @@ deshalb jetzt `python -m pytest`.
 
 **Und eine vierte Fassung, die keine PATH-Falle ist, aber dieselbe Form hat:
 lokal installiert ≠ in der CI installiert.** Der mypy-Job installierte nur
-`requirements-dev.txt`; solange nur `src/core` geprüft wurde, genügte das. Mit
+`requirements-dev.txt`; solange nur `src/yulyen_ai/core` geprüft wurde, genügte das. Mit
 dem erweiterten Prüfbereich meldete er 12-mal `import-not-found` statt zu
 prüfen — lokal war alles grün, weil hier alles installiert ist. Merksatz: **wer
 einen CI-Job ändert, stellt seine Installationsmenge nach, nicht nur sein

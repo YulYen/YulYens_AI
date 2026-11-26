@@ -12,7 +12,7 @@ All ensembles live in [`ensembles/`](../../ensembles). A typical ensemble contai
 - `locales/<language>/personas.yaml` – Language-specific descriptions, prompts, and metadata
 - `static/personas/<NAME>/{thumb.webp,full.webp}` – (optional) avatar images for the web UI
 
-> 💡 Tip: The sample ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) shows a complete example structure with localization (de/en) and avatar images. Launch it via `python src/launch.py -e examples/spaceship_crew`.
+> 💡 Tip: The sample ensemble [`ensembles/examples/spaceship_crew`](../../ensembles/examples/spaceship_crew) shows a complete example structure with localization (de/en) and avatar images. Launch it via `python -m yulyen_ai -e examples/spaceship_crew`.
 
 ## Step-by-step instructions
 
@@ -52,7 +52,7 @@ All ensembles live in [`ensembles/`](../../ensembles). A typical ensemble contai
 5. **Test the ensemble**
    - Launch the project with the CLI flag:
      ```bash
-     python src/launch.py -e my_ensemble
+     python -m yulyen_ai -e my_ensemble
      ```
    - Alternatively, set `ensemble: "my_ensemble"` in `config.yaml` if you prefer not to pass the flag. When both are set, `-e` wins.
    - Verify that all personas show up and answer in both terminal and web UI (if enabled).

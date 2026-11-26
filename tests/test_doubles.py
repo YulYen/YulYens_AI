@@ -10,9 +10,9 @@ import inspect
 from unittest.mock import Mock
 
 import pytest
-from core.dummy_llm_core import DummyLLMCore
-from core.streaming_provider import YulYenStreamingProvider
-from security.tinyguard import BasicGuard
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.security.tinyguard import BasicGuard
 
 from tests.doubles import factory_double, permissive_guard_double, streamer_double
 

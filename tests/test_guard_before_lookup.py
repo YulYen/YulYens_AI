@@ -10,15 +10,15 @@ Wiki-Hinweis, dann die Absage.
 from types import SimpleNamespace
 
 import pytest
-from api.provider import AiApiProvider
-from config.config_singleton import Config
-from core.dummy_llm_core import DummyLLMCore
-from core.streaming_provider import YulYenStreamingProvider
-from rss.feeds import RssCache
-from security.tinyguard import BasicGuard, input_refused
-from ui.session import SessionContext
-from ui.webui_chat import ChatController
-from wiki.lookup import WikiLookup, WikiSnippet
+from yulyen_ai.api.provider import AiApiProvider
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.rss.feeds import RssCache
+from yulyen_ai.security.tinyguard import BasicGuard, input_refused
+from yulyen_ai.ui.session import SessionContext
+from yulyen_ai.ui.webui_chat import ChatController
+from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet
 
 from tests.doubles import factory_double
 
@@ -59,7 +59,7 @@ def lookups(monkeypatch):
         calls.append(question)
         return ["🕵️ schlägt nach"], [WikiSnippet("Kiwix", "Kiwix ist ein Leser.")]
 
-    monkeypatch.setattr("wiki.lookup.lookup_wiki_snippet", _lookup)
+    monkeypatch.setattr("yulyen_ai.wiki.lookup.lookup_wiki_snippet", _lookup)
     return calls
 
 
@@ -157,8 +157,8 @@ def test_the_openai_endpoint_still_looks_up_a_harmless_question(lookups):
 def _terminal(guard=None):
     from pathlib import Path
 
-    from config.texts import Texts
-    from ui.terminal_ui import TerminalUI
+    from yulyen_ai.config.texts import Texts
+    from yulyen_ai.ui.terminal_ui import TerminalUI
 
     catalog = Texts(
         language="de", locales_dir=Path(__file__).resolve().parents[1] / "locales"

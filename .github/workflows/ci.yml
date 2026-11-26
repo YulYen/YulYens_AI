@@ -15,8 +15,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      # Das Paket ohne Abhängigkeiten: import-linter muss es finden, braucht
+      # aber weder Gradio noch spaCy.
       - name: Install tooling
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-dev.txt && pip install --no-deps -e .
       # 'python -m' erzwingt die gepinnten pip-Versionen (PATH-Shadowing-Falle,
       # siehe CLAUDE.md "Bekannte Falle: PATH-Shadowing")
       - name: Black (check only)
@@ -26,10 +28,8 @@ jobs:
       # Schichten als Vertrag (`[tool.importlinter]` in pyproject.toml). Hier im
       # lint-Job statt in einem eigenen: es ist eine statische Strukturprüfung,
       # sie braucht weder Netz noch Modelle und läuft in Sekunden.
-      # PYTHONPATH=src, weil die Pakete top-level importiert werden — genau wie
-      # zur Laufzeit.
       - name: Schichten (import-linter)
-        run: PYTHONPATH=src lint-imports
+        run: lint-imports
 
   audit:
     # Bekannte Schwachstellen in den gepinnten Abhängigkeiten (#61).
@@ -75,12 +75,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install tooling
-        # **Beide** Dateien. Solange nur src/core geprüft wurde, genügten die
-        # Dev-Tools; seit der Prüfbereich `src/api`, `src/config`, `src/wiki`
-        # und `src/rss` einschliesst, braucht mypy die echten Pakete
+        # **Beide** Dateien. Solange nur src/yulyen_ai/core geprüft wurde, genügten die
+        # Dev-Tools; seit der Prüfbereich `src/yulyen_ai/api`, `src/yulyen_ai/config`, `src/yulyen_ai/wiki`
+        # und `src/yulyen_ai/rss` einschliesst, braucht mypy die echten Pakete
         # (pydantic, fastapi, uvicorn, bs4) — ohne sie meldet es
         # `import-not-found` statt die Typen zu prüfen.
-        run: pip install -r requirements.txt -r requirements-dev.txt
+        run: pip install -e . -r requirements-dev.txt
       # 'python -m' wie bei Black/Ruff (PATH-Shadowing-Falle, siehe CLAUDE.md)
       - name: mypy
         run: python -m mypy
@@ -135,13 +135,12 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -e . -r requirements-dev.txt
       - name: Run tests
         # Deliberately includes the 'slow' marker (locally 'make test' skips it).
         # spaCy- and Ollama-dependent tests skip themselves when the
         # model or server is unavailable (see tests/conftest.py).
-        run: python -m pytest -q -m "not ollama and not browser" --cov=src --cov-report=term-missing --cov-report=json
+        run: python -m pytest -q -m "not ollama and not browser" --cov=yulyen_ai --cov-report=term-missing --cov-report=json
       - name: Coverage in die Job-Summary schreiben
         # Statt eines externen Badge-Dienstes (bräuchte Account und Token): die
         # Zahl steht direkt im Run. Siehe Backlog #45.
@@ -167,8 +166,7 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+          pip install -e . -r requirements-dev.txt
       - name: Passende Modellversion aus der installierten spaCy ableiten
         # Nicht hart pinnen: requirements.txt erlaubt spacy>=3.7,<4.0, und ein
         # Modell verlangt seinerseits genau die passende Minor-Linie

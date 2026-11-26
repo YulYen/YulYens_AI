@@ -3,9 +3,9 @@ from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
 
-from config.texts import Texts
-from ui.terminal_ui import TerminalUI
-from wiki.lookup import WikiLookup, WikiSnippet
+from yulyen_ai.config.texts import Texts
+from yulyen_ai.ui.terminal_ui import TerminalUI
+from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet
 
 from tests.doubles import factory_double, store_double, streamer_double
 
@@ -67,8 +67,12 @@ def test_terminal_ui_trims_history_when_context_is_full(monkeypatch, capsys) -> 
         calls["karl_args"] = (list(messages), num_ctx)
         return trimmed_history
 
-    monkeypatch.setattr("ui.terminal_ui.context_near_limit", fake_context_near_limit)
-    monkeypatch.setattr("core.context_utils.karl_prepare_quick_and_dirty", fake_karl)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.context_near_limit", fake_context_near_limit
+    )
+    monkeypatch.setattr(
+        "yulyen_ai.core.context_utils.karl_prepare_quick_and_dirty", fake_karl
+    )
 
     ui._ensure_context_headroom()
 
@@ -131,7 +135,9 @@ def test_terminal_ui_run_ask_all_flow_calls_broadcast(monkeypatch, capsys) -> No
         on_token("LEAH", "Hallo")
         on_token("MAX", "Hi")
 
-    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", fake_broadcast)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.broadcast_to_ensemble", fake_broadcast
+    )
 
     ui._run_ask_all_flow()
 
@@ -149,21 +155,23 @@ def test_terminal_ui_run_ask_all_flow_passes_wiki_context(monkeypatch, capsys) -
 
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet",
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
         lambda *args, **kwargs: (["🕵️ Hinweis"], [WikiSnippet("Thema", "Snippet")]),
     )
 
     def fake_inject(history, contexts, guard=None):
         history.append({"role": "system", "content": "WIKI"})
 
-    monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", fake_inject)
+    monkeypatch.setattr("yulyen_ai.ui.terminal_ui.inject_wiki_context", fake_inject)
 
     captured: dict = {}
 
     def fake_broadcast(factory, question, on_token, *, context_messages=None):
         captured["context_messages"] = context_messages
 
-    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", fake_broadcast)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.broadcast_to_ensemble", fake_broadcast
+    )
 
     ui._run_ask_all_flow()
 
@@ -182,7 +190,9 @@ def _broadcast_returning(monkeypatch, *pairs: tuple[str, str]) -> None:
     def fake_broadcast(factory, question, on_token=None, *, context_messages=None):
         return [{"persona": p, "reply": r} for p, r in pairs]
 
-    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", fake_broadcast)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.broadcast_to_ensemble", fake_broadcast
+    )
 
 
 def test_terminal_ask_all_asks_no_verdict_by_default(monkeypatch, capsys) -> None:
@@ -192,7 +202,7 @@ def test_terminal_ask_all_asks_no_verdict_by_default(monkeypatch, capsys) -> Non
     _answers(monkeypatch, "Frage", "")
     _broadcast_returning(monkeypatch, ("LEAH", "A"), ("DORIS", "B"))
     mock_verdict = Mock()
-    monkeypatch.setattr("ui.terminal_ui.iter_verdict", mock_verdict)
+    monkeypatch.setattr("yulyen_ai.ui.terminal_ui.iter_verdict", mock_verdict)
 
     ui._run_ask_all_flow()
 
@@ -215,7 +225,7 @@ def test_terminal_ask_all_prints_the_verdict_when_asked_for(
         yield {"type": "token", "token": "Einigkeit."}
         yield {"type": "done", "reply": "Einigkeit."}
 
-    monkeypatch.setattr("ui.terminal_ui.iter_verdict", fake_verdict)
+    monkeypatch.setattr("yulyen_ai.ui.terminal_ui.iter_verdict", fake_verdict)
 
     ui._run_ask_all_flow()
 
@@ -229,7 +239,9 @@ def test_terminal_ui_run_ask_all_flow_requires_question(monkeypatch, capsys) -> 
     ui = _create_terminal_ui()
     monkeypatch.setattr("builtins.input", lambda _: "")
     mock_broadcast = Mock()
-    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", mock_broadcast)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.broadcast_to_ensemble", mock_broadcast
+    )
 
     ui._run_ask_all_flow()
 
@@ -251,8 +263,8 @@ def test_terminal_ui_tts_uses_explicit_persona(monkeypatch) -> None:
 
     calls: dict[str, object] = {}
 
-    fake_piper = ModuleType("tts.piper_tts")
-    fake_audio = ModuleType("tts.audio_player")
+    fake_piper = ModuleType("yulyen_ai.tts.piper_tts")
+    fake_audio = ModuleType("yulyen_ai.tts.audio_player")
 
     def fake_create_wav(text, persona, voices_dir, out_wav, tts_cfg, language):
         calls["create"] = {
@@ -268,8 +280,8 @@ def test_terminal_ui_tts_uses_explicit_persona(monkeypatch) -> None:
 
     fake_piper.create_wav = fake_create_wav
     fake_audio.play_wav = fake_play_wav
-    monkeypatch.setitem(sys.modules, "tts.piper_tts", fake_piper)
-    monkeypatch.setitem(sys.modules, "tts.audio_player", fake_audio)
+    monkeypatch.setitem(sys.modules, "yulyen_ai.tts.piper_tts", fake_piper)
+    monkeypatch.setitem(sys.modules, "yulyen_ai.tts.audio_player", fake_audio)
 
     ui._maybe_create_tts_wav("Hallo Selftalk", block=True, persona_name="LEAH")
 
@@ -286,13 +298,13 @@ def test_terminal_ui_tts_skips_without_persona(monkeypatch) -> None:
     create_mock = Mock()
     play_mock = Mock()
 
-    fake_piper = ModuleType("tts.piper_tts")
-    fake_audio = ModuleType("tts.audio_player")
+    fake_piper = ModuleType("yulyen_ai.tts.piper_tts")
+    fake_audio = ModuleType("yulyen_ai.tts.audio_player")
     fake_piper.create_wav = create_mock
     fake_audio.play_wav = play_mock
 
-    monkeypatch.setitem(sys.modules, "tts.piper_tts", fake_piper)
-    monkeypatch.setitem(sys.modules, "tts.audio_player", fake_audio)
+    monkeypatch.setitem(sys.modules, "yulyen_ai.tts.piper_tts", fake_piper)
+    monkeypatch.setitem(sys.modules, "yulyen_ai.tts.audio_player", fake_audio)
 
     ui._maybe_create_tts_wav("Hallo ohne Persona")
 
@@ -359,10 +371,12 @@ def test_chat_loop_records_the_injected_snippets(monkeypatch) -> None:
 
     snippets = [_snippet()]
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet",
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: (["hint"], snippets),
     )
-    monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.inject_wiki_context", lambda *a, **k: None
+    )
     monkeypatch.setattr(TerminalUI, "_start_dialog_flow", lambda self: True)
     monkeypatch.setattr(TerminalUI, "_ensure_context_headroom", lambda self: None)
     monkeypatch.setattr(TerminalUI, "_maybe_create_tts_wav", lambda self, reply: None)
@@ -383,10 +397,14 @@ def test_ask_all_flow_records_the_injected_snippets(monkeypatch) -> None:
     snippets = [_snippet()]
     monkeypatch.setattr("builtins.input", lambda _: "Frage")
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet", lambda *a, **k: ([], snippets)
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet", lambda *a, **k: ([], snippets)
     )
-    monkeypatch.setattr("ui.terminal_ui.inject_wiki_context", lambda *a, **k: None)
-    monkeypatch.setattr("ui.terminal_ui.broadcast_to_ensemble", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.inject_wiki_context", lambda *a, **k: None
+    )
+    monkeypatch.setattr(
+        "yulyen_ai.ui.terminal_ui.broadcast_to_ensemble", lambda *a, **k: None
+    )
 
     ui._run_ask_all_flow()
 
@@ -443,7 +461,7 @@ def test_start_menu_shows_loading_by_default(monkeypatch, capsys) -> None:
 
 
 def _hit(persona="LEAH", snippet="… Kiwix serviert »ZIM« …"):
-    from storage.store import SearchHit
+    from yulyen_ai.storage.store import SearchHit
 
     return SearchHit(
         conversation_id="c1",

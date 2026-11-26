@@ -19,20 +19,22 @@ from pathlib import Path
 
 import pytest
 
-SRC = Path(__file__).resolve().parents[1] / "src"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # Alle Pakete, die jemand von außen als Einstieg benutzen könnte — ein
 # Wartungsskript gegen die Ablage, ein kleines CLI gegen den Guard, ein
 # Migrationswerkzeug.
 PACKAGES = [
-    "storage",
-    "auth",
-    "core",
-    "config.config_singleton",
-    "security.tinyguard",
-    "wiki.lookup",
-    "api.provider",
-    "ui.continuation",
+    "yulyen_ai",
+    "yulyen_ai.version",
+    "yulyen_ai.storage",
+    "yulyen_ai.auth",
+    "yulyen_ai.core",
+    "yulyen_ai.config.config_singleton",
+    "yulyen_ai.security.tinyguard",
+    "yulyen_ai.wiki.lookup",
+    "yulyen_ai.api.provider",
+    "yulyen_ai.ui.continuation",
 ]
 
 
@@ -40,7 +42,7 @@ PACKAGES = [
 def test_module_imports_as_the_first_project_import(module):
     result = subprocess.run(
         [sys.executable, "-c", f"import {module}"],
-        cwd=SRC,
+        cwd=REPO_ROOT,
         capture_output=True,
         text=True,
     )
@@ -52,12 +54,10 @@ def test_module_imports_as_the_first_project_import(module):
 
 # ---- Startet die CLI überhaupt? (#64e) -------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(SRC / "launch.py"), *args],
+        [sys.executable, "-m", "yulyen_ai", *args],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,

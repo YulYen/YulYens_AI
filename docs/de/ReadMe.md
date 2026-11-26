@@ -43,7 +43,7 @@ siehe auch: [Features.md](Features.md)
 - **Core**:
   - Austauschbarer LLM-Core (`OllamaLLMCore`, `DummyLLMCore` für Tests) samt `YulYenStreamingProvider`
   - Wikipedia-Support inkl. spaCy-basiertem Keyword-Extractor
-- **Personas**: Systemprompts & LLM-Optionen als YAML unter `ensembles/<name>/`; `src/config/personas.py` lädt sie
+- **Personas**: Systemprompts & LLM-Optionen als YAML unter `ensembles/<name>/`; `src/yulyen_ai/config/personas.py` lädt sie
 - **UI**:
   - `TerminalUI` für CLI
   - `WebUI` (Gradio) mit Persona-Auswahl & Avataren
@@ -97,9 +97,13 @@ python -m venv .venv
 source .venv/bin/activate   # Linux/macOS
 .venv\Scripts\activate      # Windows
 
-# Abhängigkeiten installieren
-pip install -r requirements.txt
+# Paket und Abhängigkeiten installieren (editierbar: es zeigt auf diesen Checkout)
+pip install -e .
 ```
+
+Installiert wird **nur editierbar**: `config.yaml`, `ensembles/`, `locales/` und
+`static/` liegen neben `src/`, nicht im Paket. Die Pins stehen weiter in
+`requirements.txt`; `pyproject.toml` liest sie von dort.
 
 ### Sprachmodell für spaCy
 
@@ -222,7 +226,7 @@ Der Abschnitt `security` wählt den Guard für Ein- und Ausgabekontrollen aus:
 ### Start
 
 ```bash
-python src/launch.py -e classic
+python -m yulyen_ai -e classic
 ```
 
 Mit dem Parameter `--ensemble` (Kurzform `-e`) wird festgelegt, welches Ensemble gestartet wird.
@@ -230,7 +234,7 @@ Mit dem Parameter `--ensemble` (Kurzform `-e`) wird festgelegt, welches Ensemble
 `spaceship_crew` lässt sich der Start wie folgt ausführen:
 
 ```bash
-python src/launch.py -e examples/spaceship_crew
+python -m yulyen_ai -e examples/spaceship_crew
 ```
 
 Der Name ist ein Pfad unterhalb von `ensembles/` und wird **immer mit Schrägstrich** geschrieben,
@@ -243,7 +247,7 @@ Optional kann zusätzlich eine alternative Konfigurationsdatei per `--config` (K
 übergeben werden, zum Beispiel:
 
 ```bash
-python src/launch.py -e classic --config pfad/zur/config.yaml
+python -m yulyen_ai -e classic --config pfad/zur/config.yaml
 ```
 
 #### Ensembles auflisten
@@ -251,7 +255,7 @@ python src/launch.py -e classic --config pfad/zur/config.yaml
 Welche Ensembles im Repo liegen — inklusive des Namens, den `-e` erwartet — zeigt:
 
 ```bash
-python src/launch.py --list-ensembles
+python -m yulyen_ai --list-ensembles
 ```
 
 ```
@@ -274,13 +278,13 @@ Ollama-Erreichbarkeit, gepulltes Modell, spaCy-Modell, Kiwix und VRAM — mit ko
 Fix-Hinweisen statt kryptischer Tracebacks:
 
 ```bash
-python src/launch.py --doctor
+python -m yulyen_ai --doctor
 ```
 
 Exit-Code 1 signalisiert einen kritischen Ausfall (praktisch für Skripte).
 
 Die Kopfzeile nennt die laufende Version. Sie allein bekommt man auch mit
-`python src/launch.py --version`, und über HTTP als Feld `version` in `/health`
+`python -m yulyen_ai --version`, und über HTTP als Feld `version` in `/health`
 — nützlich, bevor man einen Fehler meldet. Was sich zwischen zwei Versionen
 geändert hat, steht in [`CHANGELOG.md`](../../CHANGELOG.md) (englisch).
 
@@ -299,9 +303,9 @@ Mitgeprüft wird auch die `config.yaml` selbst: unbekannte Schlüssel werden auf
   - Optional: öffentlicher Gradio-Share-Link per `ui.web.share: true`. Das alte `ui.web.share_auth` ist veraltet und wirkt nur noch als Fallback, wenn kein `auth`-Abschnitt existiert; der Start mahnt es an
   - Persona auswählen und loschatten
   - Profi-Option: Im zugeklappten „Erweitert"-Bereich unten am Startbildschirm lässt sich das Modell für die laufende Sitzung wechseln (Liste = installierte Ollama-Modelle). Gilt nur bis zum Neustart — danach greift wieder `core.model_name` aus der `config.yaml`
-  - Spracheingabe (opt-in): Nach `pip install faster-whisper` erscheint im Persona-Chat ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird ans Eingabefeld angehängt und kann vor dem Senden editiert werden. Die erste Aufnahme lädt das Whisper-Modell (einmalig inkl. Download) und dauert daher etwas. Details und Modellwahl: [src/stt/ReadMe.md](../../src/stt/ReadMe.md)
+  - Spracheingabe (opt-in): Nach `pip install faster-whisper` erscheint im Persona-Chat ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird ans Eingabefeld angehängt und kann vor dem Senden editiert werden. Die erste Aufnahme lädt das Whisper-Modell (einmalig inkl. Download) und dauert daher etwas. Details und Modellwahl: [src/yulyen_ai/stt/ReadMe.md](../../src/stt/ReadMe.md)
   - Nachrichten (RSS): Ist `rss.enabled: true` gesetzt, holt die Anwendung die konfigurierten Feeds **im Hintergrund** (beim Start und dann alle `rss.refresh_minutes`) und hält die neuesten Meldungen im Speicher. Fragt man dann etwas wie „Was gibt's Neues?" oder „Was sagt die Tagesschau?", legt die Persona die passenden Meldungen von selbst als Kontext dazu — mit Datum und dem Stand des Zwischenspeichers. Ein Chat wartet dabei **nie** auf das Netz: was noch nicht geholt ist, fehlt eben. Der Button „Briefing 📰" nutzt denselben Zwischenspeicher und lässt sich mit `rss.show_button: false` ausblenden, ohne die Quelle abzuschalten. Alles zusammen abschalten: `rss.enabled: false`
-  - Vorlesen (TTS): Der Button „Vorlesen 🔊" im Persona-Chat spielt die letzte Antwort mit der Piper-Stimme der Persona im Browser ab (im Browser statt über einen System-Player). Erscheint nur, wenn `pip install piper-tts` erfolgt ist und Stimmen im `voices/`-Ordner liegen; abschalten per `tts.features.web_read_aloud: false`. Setup: [src/tts/ReadMe.md](../../src/tts/ReadMe.md)
+  - Vorlesen (TTS): Der Button „Vorlesen 🔊" im Persona-Chat spielt die letzte Antwort mit der Piper-Stimme der Persona im Browser ab (im Browser statt über einen System-Player). Erscheint nur, wenn `pip install piper-tts` erfolgt ist und Stimmen im `voices/`-Ordner liegen; abschalten per `tts.features.web_read_aloud: false`. Setup: [src/yulyen_ai/tts/ReadMe.md](../../src/tts/ReadMe.md)
 
 - **Nur API (ohne UI)**
   - `ui.type: null` setzen – die FastAPI läuft weiter und bedient `/ask`

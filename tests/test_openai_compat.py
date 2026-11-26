@@ -8,9 +8,9 @@ the feature: if the shape is wrong, Open WebUI and friends break.
 import json
 
 import pytest
-from api.openai_compat import RateLimiter, reset_rate_limiter, resolve_secret
-from config.config_singleton import Config
-from wiki.lookup import WikiLookup, WikiSnippet
+from yulyen_ai.api.openai_compat import RateLimiter, reset_rate_limiter, resolve_secret
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.wiki.lookup import WikiLookup, WikiSnippet
 
 
 @pytest.fixture(autouse=True)
@@ -216,7 +216,7 @@ def test_streaming_and_non_streaming_agree_on_content(client):
 
 def test_stream_error_ends_with_finish_reason_error(client, monkeypatch):
     """Mitten im Stream gibt es keinen HTTP-Status mehr — also ein Signal im Body."""
-    from api import app as app_module
+    from yulyen_ai.api import app as app_module
 
     provider = app_module.get_provider()
 
@@ -379,7 +379,7 @@ def test_resolve_secret_reads_braced_env(monkeypatch):
 
 def _provider_with_fake_streamer(monkeypatch, captured):
     """Provider mit Dummy-Factory, der die an das Modell gehende History festhält."""
-    from api.provider import AiApiProvider
+    from yulyen_ai.api.provider import AiApiProvider
 
     from tests.doubles import factory_double, streamer_double
 
@@ -403,11 +403,11 @@ def test_wiki_context_lands_directly_before_the_last_user_turn(client, monkeypat
     captured = []
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet",
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: (["hint"], [WikiSnippet("Kiwix", "Ein Schnipsel")]),
     )
     monkeypatch.setattr(
-        "api.provider.inject_wiki_context",
+        "yulyen_ai.api.provider.inject_wiki_context",
         lambda history, contexts, guard=None: history.append(
             {"role": "system", "content": f"WIKI:{contexts[0].topic}"}
         ),
@@ -434,7 +434,7 @@ def test_wiki_lookup_uses_the_last_user_message(client, monkeypatch):
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     asked = {}
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet",
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
         lambda question, *a, **k: (asked.update(question=question), ([], []))[1],
     )
 
@@ -452,11 +452,11 @@ def test_stream_messages_does_not_mutate_the_callers_history(client, monkeypatch
     captured = []
     provider = _provider_with_fake_streamer(monkeypatch, captured)
     monkeypatch.setattr(
-        "wiki.lookup.lookup_wiki_snippet",
+        "yulyen_ai.wiki.lookup.lookup_wiki_snippet",
         lambda *a, **k: ([], [WikiSnippet("T", "S")]),
     )
     monkeypatch.setattr(
-        "api.provider.inject_wiki_context",
+        "yulyen_ai.api.provider.inject_wiki_context",
         lambda history, contexts, guard=None: history.append(
             {"role": "system", "content": "WIKI"}
         ),
@@ -469,7 +469,7 @@ def test_stream_messages_does_not_mutate_the_callers_history(client, monkeypatch
 
 
 def test_stream_messages_rejects_unknown_persona(client, monkeypatch):
-    from api.provider import UnknownPersonaError
+    from yulyen_ai.api.provider import UnknownPersonaError
 
     provider = _provider_with_fake_streamer(monkeypatch, [])
 
@@ -573,7 +573,7 @@ def test_an_api_key_with_umlauts_is_usable(client):
 
 def _quiet_checks(monkeypatch):
     """Die Deep-Checks selbst sind hier nicht das Thema — und kosten Netz."""
-    import core.system_checks as system_checks
+    import yulyen_ai.core.system_checks as system_checks
 
     monkeypatch.setattr(system_checks, "run_checks", lambda _cfg: [])
 

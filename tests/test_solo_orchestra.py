@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 import yaml
-from config import personas
-from config.config_singleton import Config
-from config.schema import validate_ensemble
-from core import system_checks
-from core.factory import AppFactory
-from ui.persona_chooser import prompt_persona_choice
+from yulyen_ai.config import personas
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.config.schema import validate_ensemble
+from yulyen_ai.core import system_checks
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.ui.persona_chooser import prompt_persona_choice
 
 from tests.doubles import store_double
 
@@ -126,7 +126,7 @@ def test_the_store_records_the_model_that_actually_answers(
 
 def test_orchestra_paths_never_ask_for_a_solo_streamer(cfg, peter_solo, monkeypatch):
     """Ask-All darf kein Solo-Modell laden — sonst wechselt Ollama je Persona."""
-    from core.orchestrator import broadcast_to_ensemble
+    from yulyen_ai.core.orchestrator import broadcast_to_ensemble
 
     factory = AppFactory()
     monkeypatch.setattr(
@@ -170,7 +170,7 @@ def test_loader_reads_the_model_field_and_treats_blank_as_none(tmp_path):
 
 
 def test_schema_knows_the_model_field(tmp_path):
-    from config.schema import PersonasBase, _extra_key_problems
+    from yulyen_ai.config.schema import PersonasBase, _extra_key_problems
 
     ensemble = _write_ensemble(tmp_path, SOLO)
 
@@ -211,7 +211,7 @@ def test_doctor_checks_every_solo_model(cfg, peter_solo, monkeypatch):
 
 def test_terminal_chooser_shows_only_differing_models(monkeypatch, capsys):
     monkeypatch.setattr(
-        "ui.persona_chooser._load_system_prompts",
+        "yulyen_ai.ui.persona_chooser._load_system_prompts",
         lambda: [
             {"name": "LEAH", "description": "warm"},
             {"name": "PETER", "description": "sachlich"},

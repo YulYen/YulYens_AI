@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 
 import pytest
-from config.config_singleton import Config
+from yulyen_ai.config.config_singleton import Config
 
 
 def test_config_local_override_is_merged(tmp_path, monkeypatch):
@@ -56,12 +56,12 @@ def test_config_local_override_skipped_in_tests(tmp_path):
         Config.reset_instance()
 
 
-from config.personas import _load_system_prompts
-from core import utils as utils_module
-from core.dummy_llm_core import DummyLLMCore
-from core.factory import AppFactory
-from core.streaming_provider import YulYenStreamingProvider
-from core.utils import (
+from yulyen_ai.config.personas import _load_system_prompts
+from yulyen_ai.core import utils as utils_module
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.core.utils import (
     _greeting_text,
     _system_prompt_with_date,
     _wiki_mode_enabled,
@@ -69,7 +69,7 @@ from core.utils import (
 
 
 def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
-    from src import launch
+    from yulyen_ai import launch
 
     Config.reset_instance()
     monkeypatch.chdir(tmp_path)
@@ -89,7 +89,7 @@ def test_launch_main_handles_missing_config(tmp_path, monkeypatch, capfd):
 
 
 def test_launch_main_handles_invalid_yaml(tmp_path, monkeypatch, capfd):
-    from src import launch
+    from yulyen_ai import launch
 
     Config.reset_instance()
     bad_config = tmp_path / "config.yaml"
@@ -148,15 +148,15 @@ def _prepare_factory(
 ):
     cfg = _build_test_cfg(backend, core_updates)
 
-    from config import config_singleton
+    from yulyen_ai.config import config_singleton
 
     monkeypatch.setattr(config_singleton, "Config", lambda: cfg)
 
-    import core.factory as factory_module
+    import yulyen_ai.core.factory as factory_module
 
     monkeypatch.setattr(factory_module, "Config", lambda: cfg)
 
-    from core import utils
+    from yulyen_ai.core import utils
 
     monkeypatch.setattr(
         utils,
@@ -164,7 +164,7 @@ def _prepare_factory(
         lambda name, include: f"SYSTEM::{name}",
     )
 
-    import config.personas as personas
+    import yulyen_ai.config.personas as personas
 
     monkeypatch.setattr(personas, "get_options", lambda name: {"temperature": 0.1})
 
@@ -223,7 +223,7 @@ def test_factory_ollama_backend_missing_dependency(monkeypatch):
 
 def test_load_system_prompts_caches_yaml_parse(monkeypatch):
     """Repeated persona loads must not re-parse the YAML files (mtime-keyed cache)."""
-    from config import personas as personas_mod
+    from yulyen_ai.config import personas as personas_mod
 
     personas_mod._parse_persona_files.cache_clear()
     first = personas_mod._load_system_prompts()
@@ -316,7 +316,7 @@ def test_system_prompt_includes_three_timestamps(monkeypatch):
 
 def test_spaceship_crew_ensemble_resolves_with_forward_slashes():
     """The path-like ensemble name advertised in the docs must load (#29)."""
-    from config import personas as personas_mod
+    from yulyen_ai.config import personas as personas_mod
 
     Config.reset_instance()
     try:

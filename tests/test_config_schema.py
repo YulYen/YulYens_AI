@@ -11,9 +11,9 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
-from config.config_singleton import Config
-from config.schema import validate_config, validate_ensemble
-from core.system_checks import check_config_schema
+from yulyen_ai.config.config_singleton import Config
+from yulyen_ai.config.schema import validate_config, validate_ensemble
+from yulyen_ai.core.system_checks import check_config_schema
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 

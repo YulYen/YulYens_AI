@@ -87,7 +87,7 @@ def _fake_piper_module():
     Der Handler importiert `create_wav` erst beim Klick (lazy, weil piper auf
     Modulebene importiert). Ein Eintrag in `sys.modules` genügt deshalb.
     """
-    module = ModuleType("tts.piper_tts")
+    module = ModuleType("yulyen_ai.tts.piper_tts")
 
     def create_wav(text, persona, *, voices_dir, out_wav, tts_cfg, language="de"):
         Path(out_wav).write_bytes(_EMPTY_WAV)
@@ -105,9 +105,9 @@ def _running_app(workdir, **storage_overrides):
     dieselbe App einmal ohne Ablage (die ausgelieferte Lage, #72) und einmal
     mit gemeinsamer Ablage fahren, ohne den Aufbau zu doppeln.
     """
-    from config.config_singleton import Config
-    from core.dummy_llm_core import DummyLLMCore
-    from core.factory import AppFactory
+    from yulyen_ai.config.config_singleton import Config
+    from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+    from yulyen_ai.core.factory import AppFactory
 
     Config.reset_instance()
     cfg = Config("config.yaml")
@@ -143,10 +143,11 @@ def _running_app(workdir, **storage_overrides):
     # Die Verfügbarkeitsfragen beantwortet seit #56 `ui/webui_features.py` —
     # dort hängt auch die Prüfung auf installierte Pakete.
     with patch(
-        "ui.webui_features.module_available", lambda name: name != "faster_whisper"
+        "yulyen_ai.ui.webui_features.module_available",
+        lambda name: name != "faster_whisper",
     ):
         ui = AppFactory().get_ui()
-    sys.modules["tts.piper_tts"] = _fake_piper_module()
+    sys.modules["yulyen_ai.tts.piper_tts"] = _fake_piper_module()
 
     # `_start_server` läuft **echt**. Der erste Anlauf fing es ab und rief
     # `demo.launch()` selbst — damit prüfte der Browser-Test alles außer dem
@@ -189,7 +190,7 @@ def _running_app(workdir, **storage_overrides):
             )
         finally:
             demo.close()
-            sys.modules.pop("tts.piper_tts", None)
+            sys.modules.pop("yulyen_ai.tts.piper_tts", None)
             Config.reset_instance()
 
 
@@ -552,7 +553,7 @@ def test_a_conversation_can_be_reopened_and_continued_from_the_history(
     dem Nutzer der Sitzung, und das Fortsetzen schreibt in **dasselbe**
     Gespräch statt in ein neues. Geprüft wird am Ende gegen die Datei.
     """
-    from storage.store import SqliteStore
+    from yulyen_ai.storage.store import SqliteStore
 
     with _open_page(browser, recording_app.url) as page:
         _pick_persona(page)

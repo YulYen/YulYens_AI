@@ -40,13 +40,13 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import create_autospec
 
-from auth import DisabledAuth
-from core.factory import AppFactory
-from core.streaming_provider import YulYenStreamingProvider
-from rss.feeds import RssCache
-from security.tinyguard import BasicGuard
-from storage import NullStore
-from storage.store import SqliteStore
+from yulyen_ai.auth import DisabledAuth
+from yulyen_ai.core.factory import AppFactory
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
+from yulyen_ai.rss.feeds import RssCache
+from yulyen_ai.security.tinyguard import BasicGuard
+from yulyen_ai.storage import NullStore
+from yulyen_ai.storage.store import SqliteStore
 
 
 def streamer_double(**overrides: Any):

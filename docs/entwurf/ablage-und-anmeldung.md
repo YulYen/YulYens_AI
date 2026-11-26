@@ -3,7 +3,7 @@
 Store ≠ Logfile (#54/#59), Migrationen, Volltextsuche (#49), keine Aufzeichnung ohne Anmeldung (#72), die Identitäts-Naht (#53), was in `logs/` und was in `data/` liegt.
 
 ### Ablage der Gespräche (#54): Store ≠ Logfile
-`src/storage/store.py` hält die Gespräche in einer SQLite-Datei
+`src/yulyen_ai/storage/store.py` hält die Gespräche in einer SQLite-Datei
 (`storage.path`, gitignored). **Das Gesprächs-Logfile war vorher die Persistenz**
 — mit zwei unvereinbaren Formaten und ohne Gesprächsbegriff. Jetzt gilt:
 
@@ -244,7 +244,7 @@ fortgesetzte Gespräch im eigenen Verlauf fehlte. Der Handler bekommt jetzt
 `user_state` wie jeder Verlauf-Handler.
 
 ### Anmeldung (#53): eine Naht, kein Sicherheitsprodukt
-`src/auth/provider.py` beantwortet „wer bedient die UI". Drei Provider über
+`src/yulyen_ai/auth/provider.py` beantwortet „wer bedient die UI". Drei Provider über
 `ui.web.auth.provider`:
 
 | Provider | Verhalten |

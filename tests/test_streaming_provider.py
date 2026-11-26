@@ -4,9 +4,9 @@ from datetime import datetime
 from typing import Any
 
 import pytest
-from core.dummy_llm_core import DummyLLMCore
-from core.streaming_provider import YulYenStreamingProvider, _StreamModerator
-from security.tinyguard import BasicGuard
+from yulyen_ai.core.dummy_llm_core import DummyLLMCore
+from yulyen_ai.core.streaming_provider import YulYenStreamingProvider, _StreamModerator
+from yulyen_ai.security.tinyguard import BasicGuard
 
 from tests.doubles import permissive_guard_double
 
@@ -368,7 +368,7 @@ def test_raising_the_holdback_hides_even_the_label() -> None:
 
 def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
     """#53: der Nutzer steht in jeder Zeile — hier über den Debug-Mitschnitt."""
-    from core.streaming_provider import YulYenStreamingProvider
+    from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
 
     provider = YulYenStreamingProvider(
         base_url="",
@@ -395,7 +395,7 @@ def test_conversation_log_carries_the_user(tmp_path, monkeypatch):
 
 
 def test_set_user_falls_back_instead_of_writing_an_empty_name(tmp_path, monkeypatch):
-    from core.streaming_provider import YulYenStreamingProvider
+    from yulyen_ai.core.streaming_provider import YulYenStreamingProvider
 
     provider = YulYenStreamingProvider(
         base_url="",
@@ -432,7 +432,7 @@ def test_stream_and_one_shot_refuse_the_same_way() -> None:
     Einstiegen zur identischen Absage, statt dass eine Änderung nur an einer
     Stelle ankommt.
     """
-    from wiki.lookup import WikiLookup
+    from yulyen_ai.wiki.lookup import WikiLookup
 
     provider = create_streaming_provider(guard=_block_all_guard())
 
@@ -633,7 +633,7 @@ def test_a_refused_question_never_reaches_the_wiki() -> None:
     """
     from unittest.mock import create_autospec
 
-    from wiki.lookup import WikiLookup
+    from yulyen_ai.wiki.lookup import WikiLookup
 
     wiki = create_autospec(WikiLookup, instance=True)
     wiki.snippets.return_value = ([], [])
@@ -654,7 +654,7 @@ def test_the_one_shot_answer_is_moderated_by_the_stream_alone() -> None:
     Der Test hält fest, worauf es wirklich ankommt: dass die Maskierung im
     One-Shot ankommt.
     """
-    from wiki.lookup import WikiLookup
+    from yulyen_ai.wiki.lookup import WikiLookup
 
     guard = BasicGuard(
         enabled=True,
