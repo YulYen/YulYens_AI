@@ -117,7 +117,7 @@ So kann die KI-Antwort nicht nur gelesen, sondern unmittelbar auch als Audio aus
 
 ## Spracheingabe (STT)
 
-Umgekehrt lässt sich in der Web-UI auch **sprechen** statt tippen: Mit `stt.enabled: true` und einem installierten `faster-whisper` (`pip install faster-whisper`) erscheint ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird an das Eingabefeld angehängt und lässt sich vor dem Absenden noch bearbeiten — die Erkennung ersetzt das Senden also nicht, sie füllt nur das Feld. Die erste Aufnahme lädt das Whisper-Modell (einmalig, inklusive Download) und dauert deshalb spürbar länger als die folgenden. Größe und Sprache stehen unter `stt.model` und `stt.language`; Details in [src/yulyen_ai/stt/ReadMe.md](../../src/yulyen_ai/stt/ReadMe.md).
+Umgekehrt lässt sich in der Web-UI auch **sprechen** statt tippen: Mit `stt.enabled: true` und einem installierten `faster-whisper` (`pip install faster-whisper "av<19"`) erscheint ein Mikrofon neben dem Eingabefeld. Aufnehmen → stoppen → das Transkript wird an das Eingabefeld angehängt und lässt sich vor dem Absenden noch bearbeiten — die Erkennung ersetzt das Senden also nicht, sie füllt nur das Feld. Die erste Aufnahme lädt das Whisper-Modell (einmalig, inklusive Download) und dauert deshalb spürbar länger als die folgenden. Mit `stt.device: auto` (Standard) nutzt die Erkennung die Grafikkarte, sofern deren CUDA-Bibliotheken installiert sind, und weicht sonst von selbst auf den Prozessor aus; wer `cuda` ausdrücklich setzt, bekommt stattdessen den Fehler angezeigt. Größe und Sprache stehen unter `stt.model` und `stt.language`; Details in [src/yulyen_ai/stt/ReadMe.md](../../src/yulyen_ai/stt/ReadMe.md).
 
 ## One-Shot API
 

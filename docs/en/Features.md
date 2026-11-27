@@ -117,7 +117,7 @@ This allows replies to be consumed not only as text but also immediately as audi
 
 ## Speech input (STT)
 
-The other direction works too: in the web UI you can **speak** instead of typing. With `stt.enabled: true` and `faster-whisper` installed (`pip install faster-whisper`), a microphone appears next to the input field. Record → stop → the transcript is appended to the input field and can still be edited before sending — recognition does not replace sending, it only fills the field. The first recording loads the Whisper model (once, including a download) and therefore takes noticeably longer than the ones after it. Size and language live under `stt.model` and `stt.language`; details in [src/yulyen_ai/stt/ReadMe.md](../../src/yulyen_ai/stt/ReadMe.md).
+The other direction works too: in the web UI you can **speak** instead of typing. With `stt.enabled: true` and `faster-whisper` installed (`pip install faster-whisper "av<19"`), a microphone appears next to the input field. Record → stop → the transcript is appended to the input field and can still be edited before sending — recognition does not replace sending, it only fills the field. The first recording loads the Whisper model (once, including a download) and therefore takes noticeably longer than the ones after it. With `stt.device: auto` (the default) recognition uses the graphics card if its CUDA libraries are installed and otherwise falls back to the CPU on its own; setting `cuda` explicitly shows the error instead. Size and language live under `stt.model` and `stt.language`; details in [src/yulyen_ai/stt/ReadMe.md](../../src/yulyen_ai/stt/ReadMe.md).
 
 ## One-shot API
 

@@ -193,6 +193,21 @@ Merksatz: **wenn ein gepinntes Werkzeug plötzlich anders urteilt, zuerst
 einzeln erklären wollen. Die Ursache ist die Version, in beiden Fassungen: über
 den PATH (unten) oder über die Abhängigkeiten (hier).
 
+#### Opt-in-Pakete haben keinen Pin — und kein Gate, das sie prüft (2026-11-27)
+`piper-tts` und `faster-whisper` stehen in keiner `requirements*.txt`; CI und
+Sandbox haben sie nicht, die Tests fälschen sie. Eine Unverträglichkeit *unter*
+ihnen fällt deshalb nur auf einem Rechner auf, auf dem sie installiert sind. So
+geschehen: PyAV 19 kennt `metadata_errors` nicht mehr, faster-whisper 1.2.1
+ruft es auf und deckelt `av` nicht. Das Mikrofon war auf Yuls Kiste drei Wochen
+lang kaputt, während jede Prüfung grün war.
+
+Der Deckel steht deshalb **im Installationsbefehl der Doku**
+(`pip install faster-whisper "av<19"`, ReadMes, `Features.md`,
+`src/yulyen_ai/stt/ReadMe.md`) und der Fehler wird in `stt/whisper_stt.py` in
+genau diesen Befehl übersetzt. Weg kann beides, sobald eine faster-whisper-Version
+mit PyAV 19 umgehen kann. Merksatz: **nach einem Update der Opt-in-Pakete einmal
+von Hand durch den Kanal** — eine Aufnahme, ein Vorlesen.
+
 #### ⚠️ Bekannte Falle: PATH-Shadowing (ist schon mehrfach passiert!)
 Black/Ruff **immer als Modul aufrufen**, nie als nacktes Binary:
 

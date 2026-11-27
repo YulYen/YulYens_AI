@@ -79,6 +79,20 @@ in them turns out to be wrong, it gets corrected in a later entry.
   `examples/` (a terminal config for a 7B model and an image helper). Neither
   was referenced anywhere; both remain in release `v3.0.0`.
 
+### Fixed
+
+- **Voice input no longer fails on a machine with an NVIDIA card but without
+  the CUDA libraries.** With `stt.device: auto` (the default) every recording
+  failed with `Library cublas64_12.dll is not found`; it now falls back to the
+  CPU on the first recording, logs a warning once and stays there. An explicit
+  `stt.device: cuda` still reports the error instead of switching silently.
+- **Install voice input with `pip install faster-whisper "av<19"`.** PyAV 19
+  breaks faster-whisper 1.2.1 (`unexpected keyword argument
+  'metadata_errors'`), and faster-whisper does not cap it, so a plain
+  `pip install faster-whisper` gets the broken pair. If you already have it,
+  run `pip install "av<19"`. The web UI's error message now says exactly that
+  instead of showing the raw error.
+
 ## [3.0.0] - 2026-11-24
 
 **Read "Breaking" before you update.** This release needs Python 3.12 and a

@@ -91,7 +91,7 @@ tts:
 stt:
   enabled: true            # Mikro in der Web-UI erscheint nur, wenn zusätzlich faster-whisper installiert ist
   model: "small"           # tiny | base | small | medium | large-v3
-  device: "auto"           # auto | cpu | cuda
+  device: "auto"           # auto | cpu | cuda — auto weicht auf die CPU aus, wenn die CUDA-Bibliotheken fehlen
   compute_type: "auto"     # auto | int8 | float16 …
   language: "de"           # null = Auto-Erkennung
 

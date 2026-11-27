@@ -3,11 +3,18 @@
 ## Install faster-whisper
 
 ```bash
-pip install faster-whisper
+pip install faster-whisper "av<19"
 ```
 
 Kein System-ffmpeg nötig — faster-whisper dekodiert Audio über PyAV
 (gebündeltes ffmpeg), funktioniert also auch unter Windows out of the box.
+
+**Warum `av<19`:** faster-whisper 1.2.1 ruft `av.open(…, metadata_errors=…)`
+auf, und PyAV 19 kennt das Argument nicht mehr. faster-whisper selbst deckelt
+`av` nicht, ein nacktes `pip install faster-whisper` holt also die kaputte
+Kombination. Die WebUI meldet das dann mit genau diesem Befehl. Der Deckel kann
+weg, sobald eine faster-whisper-Version erscheint, die mit PyAV 19 umgehen kann
+(`pip index versions faster-whisper`).
 
 ## Configure STT in `config.yaml`
 
@@ -24,6 +31,12 @@ stt:
   sind schneller, aber ungenauer; `large-v3` braucht eine kräftige GPU.
 - `language`: fest auf `de` verdrahtet ist schneller und robuster als
   Auto-Erkennung; auf `null` setzen, wenn gemischt gesprochen wird.
+- `device`: `auto` nimmt die GPU, wenn eine NVIDIA-Karte da ist — braucht dort
+  aber die CUDA-12-Laufzeit (cuBLAS, cuDNN), die faster-whisper nicht
+  mitbringt. Fehlt sie, weicht `auto` bei der ersten Aufnahme mit einer Warnung
+  im Log auf die CPU aus und bleibt dort. `cuda` ausdrücklich gesetzt weicht
+  nicht aus, sondern zeigt den Fehler. `small` auf der CPU braucht für einen
+  kurzen Satz etwa eine Sekunde.
 
 ## Runtime behavior
 
