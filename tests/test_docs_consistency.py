@@ -160,3 +160,41 @@ def test_documented_marker_names_are_registered_in_pyproject():
     assert (
         not unknown
     ), f"Diese Marker stehen in der Doku, aber nicht in pyproject.toml: {unknown}"
+
+
+# ---- Relative Links --------------------------------------------------------
+
+# Datierte Aufzeichnungen bleiben draußen, aus demselben Grund wie bei
+# LIVING_DOCS: ein Link darin zeigt auf den Stand von damals.
+DATED_RECORDS = {"CHANGELOG.md", "backlog_archiv.md"}
+_MD_LINK = re.compile(r"\]\(([^)\s]+)\)")
+
+
+def _markdown_files() -> list[Path]:
+    top = [p for p in REPO_ROOT.glob("*.md") if p.name not in DATED_RECORDS]
+    nested = [
+        p
+        for folder in ("docs", "src", "tests", "ensembles", ".github")
+        for p in (REPO_ROOT / folder).rglob("*.md")
+    ]
+    return sorted(top + nested)
+
+
+def test_relative_links_point_at_existing_files():
+    """Der Umzug nach `src/yulyen_ai/` (#44) ließ sechs Links ins Leere zeigen.
+
+    Der Linktext war mitgezogen, das Ziel nicht — beim Lesen sah alles richtig
+    aus. Geprüft wird nur, ob die Datei existiert, nicht der Anker dahinter.
+    """
+    dead = []
+    for md in _markdown_files():
+        for n, line in enumerate(md.read_text(encoding="utf-8").splitlines(), 1):
+            for target in _MD_LINK.findall(line):
+                if re.match(r"[a-z][a-z0-9+.-]*:", target) or target.startswith("#"):
+                    continue  # URL, mailto: oder Anker in derselben Datei
+                path = target.split("#")[0]
+                if path and not (md.parent / path).exists():
+                    dead.append(
+                        f"{md.relative_to(REPO_ROOT).as_posix()}:{n} → {target}"
+                    )
+    assert not dead, "Relative Links ins Leere:\n" + "\n".join(dead)
